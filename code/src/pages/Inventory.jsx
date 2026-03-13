@@ -1,0 +1,852 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { format } from 'date-fns';
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  Warehouse,
+  TrendingDown,
+  TrendingUp,
+  MoreVertical,
+  ShoppingCart,
+  Download,
+  CheckSquare,
+  X
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+export default function Inventory() {
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [wastageDialogOpen, setWastageDialogOpen] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [convertForm, setConvertForm] = useState({ fromUnit: '', toUnit: '', quantity: 0 });
+  const [wastageForm, setWastageForm] = useState({ quantity: 0, unit: '', reason: 'spoiled', notes: '' });
+  const [addForm, setAddForm] = useState({ product_name: '', accounting_category: 'food', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const queryClient = useQueryClient();
+
+  const { data: inventory = [], isLoading } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: () => base44.entities.Inventory.list(),
+  });
+
+  const { data: wastageLogs = [] } = useQuery({
+    queryKey: ['wastage'],
+    queryFn: () => base44.entities.WastageLog.list('-created_date', 50),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Inventory.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Inventory updated');
+      setEditDialogOpen(false);
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.Inventory.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Item added to inventory');
+      setAddDialogOpen(false);
+      setAddForm({ product_name: '', accounting_category: 'food', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Inventory.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Item removed from inventory');
+    },
+  });
+
+  const createWastageMutation = useMutation({
+    mutationFn: (data) => base44.entities.WastageLog.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wastage'] });
+      toast.success('Wastage logged');
+      setWastageDialogOpen(false);
+    },
+  });
+
+  // Stats
+  const totalItems = inventory.length;
+  const totalValue = inventory.reduce((sum, i) => sum + (i.current_value || 0), 0);
+  const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+  const totalWastageValue = wastageLogs.reduce((sum, w) => sum + (w.value || 0), 0);
+
+  // Group by category
+  const byCategory = inventory.reduce((acc, item) => {
+    const cat = item.accounting_category || 'Other';
+    if (!acc[cat]) acc[cat] = { items: 0, value: 0 };
+    acc[cat].items++;
+    acc[cat].value += item.current_value || 0;
+    return acc;
+  }, {});
+
+  const handleEdit = (item) => {
+    setSelectedItem(item);
+    setEditForm({
+      product_name: item.product_name || '',
+      accounting_category: item.accounting_category || 'food',
+      current_quantity: item.current_quantity || 0,
+      current_unit: item.current_unit || 'ea',
+      unit_cost: item.unit_cost || 0,
+      par_level: item.par_level || 0,
+      reorder_point: item.reorder_point || 0,
+      location: item.location || '',
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = (item) => {
+    if (confirm(`Remove "${item.product_name}" from inventory? This cannot be undone.`)) {
+      deleteMutation.mutate(item.id);
+    }
+  };
+
+  const handleConvert = (item) => {
+    setSelectedItem(item);
+    setConvertForm({ fromUnit: item.current_unit || 'ea', toUnit: '', quantity: item.current_quantity || 0 });
+    setConvertDialogOpen(true);
+  };
+
+  const handleLogWastage = (item) => {
+    setSelectedItem(item);
+    setWastageForm({ quantity: 0, unit: item.current_unit || 'ea', reason: 'spoiled', notes: '' });
+    setWastageDialogOpen(true);
+  };
+
+  const saveEdit = () => {
+    const value = editForm.current_quantity * editForm.unit_cost;
+    updateMutation.mutate({
+      id: selectedItem.id,
+      data: {
+        ...editForm,
+        current_value: value,
+        previous_quantity: selectedItem.current_quantity,
+        previous_value: selectedItem.current_value,
+        last_counted_date: new Date().toISOString().split('T')[0],
+      }
+    });
+  };
+
+  const saveAdd = () => {
+    createMutation.mutate({
+      ...addForm,
+      product_id: `PRD-${Date.now()}`,
+      current_value: addForm.current_quantity * addForm.unit_cost,
+    });
+  };
+
+  const saveConvert = () => {
+    // Simple conversion example - in real app would use conversion_rates
+    const conversionRates = {
+      'box_to_lb': 10,
+      'lb_to_ea': 16,
+      'case_to_ea': 24,
+    };
+    
+    const key = `${convertForm.fromUnit}_to_${convertForm.toUnit}`;
+    const rate = conversionRates[key] || 1;
+    const newQty = convertForm.quantity * rate;
+    
+    updateMutation.mutate({
+      id: selectedItem.id,
+      data: {
+        current_quantity: newQty,
+        current_unit: convertForm.toUnit,
+        previous_quantity: selectedItem.current_quantity,
+      }
+    });
+    setConvertDialogOpen(false);
+  };
+
+  const saveWastage = () => {
+    const value = wastageForm.quantity * (selectedItem.unit_cost || 0);
+    createWastageMutation.mutate({
+      product_id: selectedItem.product_id,
+      product_name: selectedItem.product_name,
+      quantity: wastageForm.quantity,
+      unit: wastageForm.unit,
+      value,
+      reason: wastageForm.reason,
+      notes: wastageForm.notes,
+    });
+
+    // Update inventory
+    const newQty = Math.max(0, (selectedItem.current_quantity || 0) - wastageForm.quantity);
+    updateMutation.mutate({
+      id: selectedItem.id,
+      data: { current_quantity: newQty }
+    });
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredInventory.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredInventory.map(i => i.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Delete ${selectedIds.size} selected item(s)? This cannot be undone.`)) {
+      Promise.all([...selectedIds].map(id => deleteMutation.mutateAsync(id))).then(() => {
+        setSelectedIds(new Set());
+        toast.success(`${selectedIds.size} item(s) deleted`);
+      });
+    }
+  };
+
+  const handleBulkOrder = async () => {
+    if (selectedIds.size === 0) return;
+    const selected = inventory.filter(i => selectedIds.has(i.id));
+    const orderItems = selected.map(item => ({
+      product_id: item.product_id,
+      product_name: item.product_name,
+      current_stock: item.current_quantity || 0,
+      par_level: item.par_level || 10,
+      suggested_quantity: Math.max(0, (item.par_level || 10) - (item.current_quantity || 0)),
+      approved_quantity: Math.max(0, (item.par_level || 10) - (item.current_quantity || 0)),
+      unit: item.current_unit || 'ea',
+      unit_price: item.unit_cost || 0,
+      total_price: Math.max(0, (item.par_level || 10) - (item.current_quantity || 0)) * (item.unit_cost || 0),
+    }));
+    await base44.entities.AutoOrder.create({
+      order_number: `ORD-${Date.now()}`,
+      vendor_name: 'Multiple Vendors',
+      status: 'pending_approval',
+      items: orderItems,
+      total_amount: orderItems.reduce((s, i) => s + i.total_price, 0),
+      chat_history: [],
+    });
+    toast.success(`Order created for ${selectedIds.size} item(s) — check Auto Ordering`);
+    setSelectedIds(new Set());
+  };
+
+  const handleExport = () => {
+    const selected = selectedIds.size > 0
+      ? inventory.filter(i => selectedIds.has(i.id))
+      : filteredInventory;
+    const headers = ['Product Name', 'Category', 'Quantity', 'Unit', 'Unit Cost', 'Value', 'Par Level', 'Reorder Point', 'Location'];
+    const rows = selected.map(i => [
+      i.product_name, i.accounting_category, i.current_quantity, i.current_unit,
+      i.unit_cost, i.current_value, i.par_level, i.reorder_point, i.location
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v ?? ''}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'inventory.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const filteredInventory = inventory.filter(item => {
+    const matchesSearch = !search || 
+      item.product_name?.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || item.accounting_category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
+          <p className="text-slate-500 mt-1">Track and manage stock levels</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" /> Export
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
+            <Plus className="h-4 w-4 mr-2" /> Add Item
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Total Items</p>
+                <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
+              </div>
+              <Warehouse className="h-8 w-8 text-teal-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Total Value</p>
+                <p className="text-2xl font-bold text-slate-900">${totalValue.toLocaleString()}</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Low Stock</p>
+                <p className="text-2xl font-bold text-red-600">{lowStock}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Wastage (MTD)</p>
+                <p className="text-2xl font-bold text-orange-600">${totalWastageValue.toLocaleString()}</p>
+              </div>
+              <TrendingDown className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="inventory" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="summary">Summary by Category</TabsTrigger>
+          <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inventory" className="space-y-4">
+          {/* Filters */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search inventory..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="food">Food</SelectItem>
+                    <SelectItem value="beverage">Beverage</SelectItem>
+                    <SelectItem value="supplies">Supplies</SelectItem>
+                    <SelectItem value="equipment">Equipment</SelectItem>
+                    <SelectItem value="packaging">Packaging</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Bulk Action Bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+              <span className="text-sm font-medium text-teal-800">{selectedIds.size} item(s) selected</span>
+              <div className="flex gap-2 ml-auto">
+                <Button size="sm" variant="outline" onClick={handleBulkOrder}>
+                  <ShoppingCart className="h-4 w-4 mr-1" /> Create Order
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleExport}>
+                  <Download className="h-4 w-4 mr-1" /> Export
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-red-600 border-red-300 hover:bg-red-50">
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Inventory Table */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                   <TableRow>
+                     <TableHead className="w-[40px]">
+                       <Checkbox
+                         checked={filteredInventory.length > 0 && selectedIds.size === filteredInventory.length}
+                         onCheckedChange={toggleSelectAll}
+                       />
+                     </TableHead>
+                     <TableHead>Category</TableHead>
+                     <TableHead>Item</TableHead>
+                     <TableHead>Report By</TableHead>
+                     <TableHead>Prev Count</TableHead>
+                     <TableHead>Prev Value</TableHead>
+                     <TableHead>Count</TableHead>
+                     <TableHead>Value</TableHead>
+                     <TableHead>Threshold</TableHead>
+                     <TableHead>Change</TableHead>
+                     <TableHead className="w-[60px]"></TableHead>
+                   </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center py-8 text-slate-500">
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredInventory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center py-8 text-slate-500">
+                          No inventory items found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredInventory.map((item) => {
+                        const change = (item.current_value || 0) - (item.previous_value || 0);
+                        const isLow = item.current_quantity <= (item.reorder_point || 5);
+                        
+                        return (
+                          <TableRow key={item.id} className={cn(isLow && "bg-red-50", selectedIds.has(item.id) && "bg-teal-50")}>
+                             <TableCell>
+                               <Checkbox
+                                 checked={selectedIds.has(item.id)}
+                                 onCheckedChange={() => toggleSelect(item.id)}
+                               />
+                             </TableCell>
+                             <TableCell>
+                               <Badge variant="secondary">{item.accounting_category}</Badge>
+                             </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{item.product_name}</span>
+                                {isLow && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.current_unit}</TableCell>
+                            <TableCell>{item.previous_quantity || 0}</TableCell>
+                            <TableCell>${(item.previous_value || 0).toFixed(2)}</TableCell>
+                            <TableCell className="font-semibold">{item.current_quantity || 0}</TableCell>
+                             <TableCell className="font-semibold">${(item.current_value || 0).toFixed(2)}</TableCell>
+                             <TableCell>
+                               <div className="flex flex-col gap-0.5">
+                                 <span className="text-xs text-slate-500">Par: <span className="font-medium text-slate-700">{item.par_level ?? '—'}</span></span>
+                                 <span className="text-xs text-slate-500">Reorder: <span className={cn("font-medium", isLow ? "text-red-600" : "text-slate-700")}>{item.reorder_point ?? '—'}</span></span>
+                               </div>
+                             </TableCell>
+                             <TableCell>
+                               <span className={cn(
+                                "font-medium",
+                                change > 0 && "text-green-600",
+                                change < 0 && "text-red-600"
+                              )}>
+                                {change > 0 ? '+' : ''}{change.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                    <Edit2 className="h-4 w-4 mr-2" /> Edit Item
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleConvert(item)}>
+                                    <RefreshCw className="h-4 w-4 mr-2" /> Convert Unit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleLogWastage(item)}>
+                                    <Trash2 className="h-4 w-4 mr-2" /> Log Wastage
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="summary">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle>Inventory Summary by Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(byCategory).map(([category, data]) => (
+                  <div key={category} className="p-4 bg-slate-50 rounded-lg">
+                    <p className="font-medium text-slate-900 capitalize">{category}</p>
+                    <div className="mt-2 flex justify-between text-sm">
+                      <span className="text-slate-500">{data.items} items</span>
+                      <span className="font-semibold">${data.value.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="wastage">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle>Wastage Log</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wastageLogs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                        No wastage logged
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    wastageLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell>{format(new Date(log.created_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell className="font-medium">{log.product_name}</TableCell>
+                        <TableCell>{log.quantity} {log.unit}</TableCell>
+                        <TableCell className="text-red-600 font-semibold">${log.value?.toFixed(2)}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{log.reason}</Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-500">{log.notes}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Inventory Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Product Name</Label>
+              <Input
+                value={editForm.product_name}
+                onChange={(e) => setEditForm({ ...editForm, product_name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={editForm.accounting_category} onValueChange={(v) => setEditForm({ ...editForm, accounting_category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="food">Food</SelectItem>
+                  <SelectItem value="beverage">Beverage</SelectItem>
+                  <SelectItem value="supplies">Supplies</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="packaging">Packaging</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Current Quantity</Label>
+                <Input type="number" value={editForm.current_quantity} onChange={(e) => setEditForm({ ...editForm, current_quantity: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Input value={editForm.current_unit} onChange={(e) => setEditForm({ ...editForm, current_unit: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Unit Cost ($)</Label>
+                <Input type="number" step="0.01" value={editForm.unit_cost} onChange={(e) => setEditForm({ ...editForm, unit_cost: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Par Level</Label>
+                <Input type="number" value={editForm.par_level} onChange={(e) => setEditForm({ ...editForm, par_level: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Reorder Point</Label>
+                <Input type="number" value={editForm.reorder_point} onChange={(e) => setEditForm({ ...editForm, reorder_point: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveEdit} className="bg-teal-600 hover:bg-teal-700">Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Item Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Inventory Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Product Name</Label>
+              <Input value={addForm.product_name} onChange={(e) => setAddForm({ ...addForm, product_name: e.target.value })} placeholder="e.g. Chicken Breast" />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={addForm.accounting_category} onValueChange={(v) => setAddForm({ ...addForm, accounting_category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="food">Food</SelectItem>
+                  <SelectItem value="beverage">Beverage</SelectItem>
+                  <SelectItem value="supplies">Supplies</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="packaging">Packaging</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <Input type="number" value={addForm.current_quantity} onChange={(e) => setAddForm({ ...addForm, current_quantity: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Input value={addForm.current_unit} onChange={(e) => setAddForm({ ...addForm, current_unit: e.target.value })} placeholder="ea, lb, box..." />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Unit Cost ($)</Label>
+                <Input type="number" step="0.01" value={addForm.unit_cost} onChange={(e) => setAddForm({ ...addForm, unit_cost: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} placeholder="e.g. Walk-in Cooler" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Par Level</Label>
+                <Input type="number" value={addForm.par_level} onChange={(e) => setAddForm({ ...addForm, par_level: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Reorder Point</Label>
+                <Input type="number" value={addForm.reorder_point} onChange={(e) => setAddForm({ ...addForm, reorder_point: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveAdd} className="bg-teal-600 hover:bg-teal-700">Add Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert Dialog */}
+      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convert Unit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-500">
+              Convert {selectedItem?.product_name} from {selectedItem?.current_unit}
+            </p>
+            <div className="space-y-2">
+              <Label>From Unit</Label>
+              <Input value={convertForm.fromUnit} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>To Unit</Label>
+              <Select
+                value={convertForm.toUnit}
+                onValueChange={(v) => setConvertForm({ ...convertForm, toUnit: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ea">Each (ea)</SelectItem>
+                  <SelectItem value="lb">Pound (lb)</SelectItem>
+                  <SelectItem value="oz">Ounce (oz)</SelectItem>
+                  <SelectItem value="box">Box</SelectItem>
+                  <SelectItem value="case">Case</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConvertDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveConvert} className="bg-teal-600 hover:bg-teal-700">Convert</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wastage Dialog */}
+      <Dialog open={wastageDialogOpen} onOpenChange={setWastageDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log Wastage</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-500">
+              Log wastage for {selectedItem?.product_name}
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  value={wastageForm.quantity}
+                  onChange={(e) => setWastageForm({ ...wastageForm, quantity: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Input value={wastageForm.unit} disabled />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Select
+                value={wastageForm.reason}
+                onValueChange={(v) => setWastageForm({ ...wastageForm, reason: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="damaged">Damaged</SelectItem>
+                  <SelectItem value="spoiled">Spoiled</SelectItem>
+                  <SelectItem value="overproduction">Overproduction</SelectItem>
+                  <SelectItem value="customer_return">Customer Return</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={wastageForm.notes}
+                onChange={(e) => setWastageForm({ ...wastageForm, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWastageDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveWastage} className="bg-red-600 hover:bg-red-700">Log Wastage</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
