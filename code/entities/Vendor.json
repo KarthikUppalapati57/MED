@@ -1,0 +1,94 @@
+{
+    "name": "Vendor",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "contact_name": {
+        "type": "string"
+      },
+      "email": {
+        "type": "string"
+      },
+      "phone": {
+        "type": "string"
+      },
+      "address": {
+        "type": "string"
+      },
+      "city": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      },
+      "zip_code": {
+        "type": "string"
+      },
+      "country": {
+        "type": "string",
+        "default": "USA"
+      },
+      "payment_terms": {
+        "type": "string",
+        "enum": [
+          "net_15",
+          "net_30",
+          "net_45",
+          "net_60",
+          "due_on_receipt"
+        ],
+        "default": "net_30"
+      },
+      "rating": {
+        "type": "number"
+      },
+      "total_orders": {
+        "type": "number",
+        "default": 0
+      },
+      "total_spent": {
+        "type": "number",
+        "default": 0
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive",
+          "blacklisted"
+        ],
+        "default": "active"
+      },
+      "categories": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "notes": {
+        "type": "string"
+      },
+      "whatsapp_number": {
+        "type": "string"
+      },
+      "bank_details": {
+        "type": "object",
+        "properties": {
+          "bank_name": {
+            "type": "string"
+          },
+          "account_number": {
+            "type": "string"
+          },
+          "routing_number": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -52,7 +52,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import emailjs from 'emailjs-com';
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/lib/AuthContext';
 
 const roleColors = {
   admin: 'bg-red-100 text-red-700',
@@ -110,7 +112,9 @@ export default function UserManagement() {
   const [inviteRole, setInviteRole] = useState('ground_staff');
   const [inviting, setInviting] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const queryClient = useQueryClient();
+  const { user: currentUser, role: userRole, userProfile } = useAuth();
   const [editForm, setEditForm] = useState({
     role: 'ground_staff',
     department: '',
@@ -119,19 +123,25 @@ export default function UserManagement() {
     permissions: rolePermissions.ground_staff
   });
 
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
-  }, []);
-
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, isError, error: queryError, refetch } = useQuery({
     queryKey: ['users'],
-    queryFn: () => base44.entities.User.list('-created_date'),
+    queryFn: async () => {
+      console.log('UserManagement: Fetching users...');
+      try {
+        const data = await api.entities.User.list('-created_at');
+        console.log('UserManagement: Users fetched successfully:', data?.length);
+        return data;
+      } catch (err) {
+        console.error('UserManagement: Error fetching users:', err);
+        throw err;
+      }
+    },
+    retry: 1,
+    staleTime: 30000,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.User.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('User updated');
@@ -140,12 +150,14 @@ export default function UserManagement() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.User.delete(id),
+    mutationFn: (id) => api.entities.User.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('User removed');
     },
   });
+
+  const [lastGeneratedInvite, setLastGeneratedInvite] = useState(null);
 
   const handleInvite = async () => {
     if (!inviteEmail) {
@@ -155,16 +167,78 @@ export default function UserManagement() {
 
     setInviting(true);
     try {
-      await base44.users.inviteUser(inviteEmail, inviteRole === 'admin' ? 'admin' : 'user');
-      toast.success('Invitation sent');
-      setInviteDialogOpen(false);
-      setInviteEmail('');
-      setInviteRole('ground_staff');
+      const invite = await api.entities.Invitation.create({
+        email: inviteEmail,
+        role: inviteRole,
+        invited_by: currentUser?.id,
+        organization_id: userProfile?.organization_id || currentUser?.user_metadata?.organization_id,
+        brand_id: userProfile?.brand_id || currentUser?.user_metadata?.brand_id,
+        location_id: userProfile?.location_id || currentUser?.user_metadata?.location_id,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      if (invite?.token) {
+        const fullInviteLink = `${window.location.origin}/signup/${invite.token}`;
+        setLastGeneratedInvite(fullInviteLink);
+        
+        await navigator.clipboard.writeText(fullInviteLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        
+        toast.success('Link copied to clipboard');
+      }
     } catch (error) {
-      toast.error('Failed to send invitation');
+      console.error('Invitation error:', error);
+      toast.error('Failed to create invitation: ' + error.message);
     } finally {
       setInviting(false);
     }
+  };
+
+  const sendDirectEmail = async () => {
+    if (!lastGeneratedInvite) {
+      toast.error('Please generate an invitation link first');
+      return;
+    }
+
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+    if (!serviceId || !templateId || !publicKey) {
+      toast.error('Email service not configured. Please check .env file.');
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const templateParams = {
+        to_email: inviteEmail,
+        to_name: inviteEmail.split('@')[0],
+        role: inviteRole.replace('_', ' '),
+        invite_link: lastGeneratedInvite,
+        app_name: 'EdgeOps'
+      };
+
+      await emailjs.send(serviceId, templateId, templateParams, publicKey);
+      toast.success(`Invitation sent directly to ${inviteEmail}!`);
+    } catch (error) {
+      console.error('EmailJS error:', error);
+      toast.error('Failed to send email: ' + (error.text || error.message));
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const copyInviteLink = async () => {
+    if (!lastGeneratedInvite) {
+      toast.info("Click 'Send Invitation' first to generate a unique link.");
+      return;
+    }
+    await navigator.clipboard.writeText(lastGeneratedInvite);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success('Link copied to clipboard');
   };
 
   const handleEdit = (user) => {
@@ -188,28 +262,30 @@ export default function UserManagement() {
   };
 
   const handleSaveEdit = () => {
-    updateMutation.mutate({
-      id: editingUser.id,
-      data: editForm
-    });
+    if (editingUser) {
+      updateMutation.mutate({
+        id: editingUser.id,
+        data: editForm
+      });
+    }
   };
 
   const canManageUser = (user) => {
     if (!currentUser) return false;
-    const currentRole = currentUser.role || 'ground_staff';
-    const userRole = user.role || 'ground_staff';
+    const currentRole = userRole;
+    const targetUserRole = user.role || 'ground_staff';
     
     // Admin can manage everyone
     if (currentRole === 'admin') return true;
     // Owner can manage manager and below
-    if (currentRole === 'owner' && ['manager', 'ground_staff'].includes(userRole)) return true;
+    if (currentRole === 'owner' && ['manager', 'ground_staff'].includes(targetUserRole)) return true;
     // Manager can only manage ground staff
-    if (currentRole === 'manager' && userRole === 'ground_staff') return true;
+    if (currentRole === 'manager' && targetUserRole === 'ground_staff') return true;
     
     return false;
   };
 
-  const canSuperDelete = currentUser?.role === 'admin' || currentUser?.permissions?.can_super_delete;
+  const canSuperDelete = userRole === 'admin';
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = !search || 
@@ -218,15 +294,6 @@ export default function UserManagement() {
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
-
-  const inviteLink = `${window.location.origin}/invite?ref=${currentUser?.id || ''}`;
-
-  const copyInviteLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast.success('Link copied');
-  };
 
   return (
     <div className="space-y-6">
@@ -323,8 +390,23 @@ export default function UserManagement() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
-                      Loading...
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
+                        <p className="text-sm text-slate-500">Fetching users...</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="text-sm text-red-500 font-medium">Failed to load users</p>
+                        <p className="text-xs text-slate-400 mb-2">{queryError?.message}</p>
+                        <Button variant="outline" size="sm" onClick={() => refetch()}>
+                          Retry Fetch
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
@@ -399,7 +481,7 @@ export default function UserManagement() {
 
       {/* Invite Dialog */}
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
             <DialogDescription>
@@ -427,36 +509,60 @@ export default function UserManagement() {
                 <SelectContent>
                   <SelectItem value="ground_staff">Ground Staff</SelectItem>
                   <SelectItem value="manager">Manager</SelectItem>
-                  {currentUser?.role === 'owner' && <SelectItem value="owner">Owner</SelectItem>}
-                  {currentUser?.role === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
+                  {(userRole === 'owner' || userRole === 'admin') && <SelectItem value="owner">Owner</SelectItem>}
+                  {userRole === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="pt-4 border-t">
-              <Label className="text-slate-500">Or share invite link</Label>
-              <div className="flex gap-2 mt-2">
-                <Input value={inviteLink} readOnly className="text-sm" />
-                <Button variant="outline" size="icon" onClick={copyInviteLink}>
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            <div className="pt-6 border-t space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Invitation Link</Label>
+              <div className="flex gap-0 group">
+                <Input 
+                  value={lastGeneratedInvite || (window.location.origin + '/signup/')} 
+                  readOnly 
+                  className="text-xs bg-slate-50 h-10 rounded-r-none border-r-0 focus:ring-0 focus-visible:ring-0" 
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-10 px-4 rounded-l-none border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
+                  onClick={copyInviteLink}
+                >
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-slate-600" />}
                 </Button>
               </div>
+              <p className="text-[10px] text-slate-400 italic font-medium">
+                {lastGeneratedInvite ? "Specific tokenized link generated." : "Base link (token will appear after generation)."}
+              </p>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
-              Cancel
-            </Button>
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between border-t pt-4 mt-4 gap-3">
             <Button 
-              onClick={handleInvite} 
-              disabled={inviting}
-              className="bg-teal-600 hover:bg-teal-700"
+              variant="outline" 
+              onClick={sendDirectEmail} 
+              disabled={sendingEmail || !lastGeneratedInvite}
+              className="w-full sm:w-auto h-10 px-4 border-teal-200 text-teal-700 hover:bg-teal-50"
             >
-              <Send className="h-4 w-4 mr-2" />
-              {inviting ? 'Sending...' : 'Send Invitation'}
+              <Mail className="h-4 w-4 mr-2" />
+              {sendingEmail ? 'Sending...' : 'Send Direct Email'}
             </Button>
-          </DialogFooter>
+            
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <Button variant="ghost" onClick={() => setInviteDialogOpen(false)} className="w-full sm:w-auto h-10 text-slate-500 px-4">
+                Close
+              </Button>
+              <Button 
+                onClick={handleInvite} 
+                disabled={inviting}
+                className="w-full sm:w-auto h-10 bg-teal-600 hover:bg-teal-700 text-white px-6"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {inviting ? 'Generating...' : 'Generate New Link'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
   Search,
@@ -80,16 +80,16 @@ export default function Inventory() {
 
   const { data: inventory = [], isLoading } = useQuery({
     queryKey: ['inventory'],
-    queryFn: () => base44.entities.Inventory.list(),
+    queryFn: () => api.entities.Inventory.list(),
   });
 
   const { data: wastageLogs = [] } = useQuery({
     queryKey: ['wastage'],
-    queryFn: () => base44.entities.WastageLog.list('-created_date', 50),
+    queryFn: () => api.entities.WastageLog.list('-created_at', 50),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Inventory.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Inventory updated');
@@ -98,7 +98,7 @@ export default function Inventory() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Inventory.create(data),
+    mutationFn: (data) => api.entities.Inventory.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Item added to inventory');
@@ -108,7 +108,7 @@ export default function Inventory() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Inventory.delete(id),
+    mutationFn: (id) => api.entities.Inventory.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Item removed from inventory');
@@ -116,7 +116,7 @@ export default function Inventory() {
   });
 
   const createWastageMutation = useMutation({
-    mutationFn: (data) => base44.entities.WastageLog.create(data),
+    mutationFn: (data) => api.entities.WastageLog.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wastage'] });
       toast.success('Wastage logged');
@@ -277,7 +277,7 @@ export default function Inventory() {
       unit_price: item.unit_cost || 0,
       total_price: Math.max(0, (item.par_level || 10) - (item.current_quantity || 0)) * (item.unit_cost || 0),
     }));
-    await base44.entities.AutoOrder.create({
+    await api.entities.AutoOrder.create({
       order_number: `ORD-${Date.now()}`,
       vendor_name: 'Multiple Vendors',
       status: 'pending_approval',
@@ -600,7 +600,7 @@ export default function Inventory() {
                   ) : (
                     wastageLogs.map((log) => (
                       <TableRow key={log.id}>
-                        <TableCell>{format(new Date(log.created_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(new Date(log.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-medium">{log.product_name}</TableCell>
                         <TableCell>{log.quantity} {log.unit}</TableCell>
                         <TableCell className="text-red-600 font-semibold">${log.value?.toFixed(2)}</TableCell>

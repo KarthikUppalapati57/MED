@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import {
   Plus,
   Search,
@@ -114,11 +114,11 @@ export default function Products() {
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list('-created_date'),
+    queryFn: () => api.entities.Product.list('-created_at'),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Product.create(data),
+    mutationFn: (data) => api.entities.Product.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product created');
@@ -128,7 +128,7 @@ export default function Products() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Product.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Product.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product updated');
@@ -138,7 +138,7 @@ export default function Products() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Product.delete(id),
+    mutationFn: (id) => api.entities.Product.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product deleted');

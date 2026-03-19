@@ -1,0 +1,60 @@
+{
+    "name": "Inventory",
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string"
+      },
+      "product_name": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string"
+      },
+      "accounting_category": {
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "current_quantity": {
+        "type": "number"
+      },
+      "current_unit": {
+        "type": "string"
+      },
+      "current_value": {
+        "type": "number"
+      },
+      "previous_quantity": {
+        "type": "number"
+      },
+      "previous_value": {
+        "type": "number"
+      },
+      "unit_cost": {
+        "type": "number"
+      },
+      "par_level": {
+        "type": "number"
+      },
+      "reorder_point": {
+        "type": "number"
+      },
+      "last_counted_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "last_counted_by": {
+        "type": "string"
+      },
+      "conversion_rates": {
+        "type": "object",
+        "description": "Unit conversion rates e.g. {box_to_lb: 10, lb_to_ea: 0.5}"
+      }
+    },
+    "required": [
+      "product_id",
+      "product_name"
+    ]
+  }

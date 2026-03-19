@@ -1,0 +1,124 @@
+{
+    "name": "Recipe",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "appetizer",
+          "main_course",
+          "dessert",
+          "beverage",
+          "side",
+          "sauce",
+          "other"
+        ]
+      },
+      "yield_quantity": {
+        "type": "number"
+      },
+      "yield_unit": {
+        "type": "string"
+      },
+      "prep_time_minutes": {
+        "type": "number"
+      },
+      "cook_time_minutes": {
+        "type": "number"
+      },
+      "ingredients": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product_id": {
+              "type": "string"
+            },
+            "product_name": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "unit_cost": {
+              "type": "number"
+            },
+            "total_cost": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "labor_cost": {
+        "type": "number"
+      },
+      "labor_time_minutes": {
+        "type": "number"
+      },
+      "labor_rate_per_hour": {
+        "type": "number"
+      },
+      "packaging_items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "item_name": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "unit_cost": {
+              "type": "number"
+            },
+            "total_cost": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "total_ingredient_cost": {
+        "type": "number"
+      },
+      "total_packaging_cost": {
+        "type": "number"
+      },
+      "total_cost": {
+        "type": "number"
+      },
+      "cost_per_serving": {
+        "type": "number"
+      },
+      "suggested_price": {
+        "type": "number"
+      },
+      "instructions": {
+        "type": "string"
+      },
+      "image_url": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive",
+          "seasonal"
+        ],
+        "default": "active"
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }

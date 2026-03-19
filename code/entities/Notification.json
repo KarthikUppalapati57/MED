@@ -1,0 +1,49 @@
+{
+    "name": "Notification",
+    "type": "object",
+    "properties": {
+      "user_id": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "invoice",
+          "payment",
+          "order",
+          "inventory",
+          "system",
+          "alert"
+        ]
+      },
+      "priority": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "medium"
+      },
+      "is_read": {
+        "type": "boolean",
+        "default": false
+      },
+      "link": {
+        "type": "string"
+      },
+      "reference_id": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "title",
+      "message"
+    ]
+  }

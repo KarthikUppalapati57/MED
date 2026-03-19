@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   FileText,
@@ -19,7 +18,9 @@ import {
   X,
   LogOut,
   Settings,
-  User
+  User,
+  Shield,
+  Check
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,37 +32,113 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/lib/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { supabase } from '@/lib/supabaseClient';
 
 const navigation = [
-  { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard },
-  { name: 'Invoices', href: 'Invoices', icon: FileText },
-  { name: 'Payments', href: 'Payments', icon: CreditCard },
-  { name: 'Products', href: 'Products', icon: Package },
-  { name: 'Inventory', href: 'Inventory', icon: Warehouse },
-  { name: 'Auto Ordering', href: 'AutoOrdering', icon: ShoppingCart },
-  { name: 'Recipes', href: 'Recipes', icon: ChefHat },
-  { name: 'Vendors', href: 'Vendors', icon: Store },
-  { name: 'Users', href: 'UserManagement', icon: Users },
+  { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Platform Admin', href: 'PlatformAdmin', icon: Shield, minRole: 'platform_admin' },
+  { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
+  { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'manager' },
+  { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },
+  { name: 'Inventory', href: 'Inventory', icon: Warehouse, minRole: 'manager' },
+  { name: 'Auto Ordering', href: 'AutoOrdering', icon: ShoppingCart, minRole: 'manager' },
+  { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'manager' },
+  { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'manager' },
+  { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'owner' },
 ];
+
+const roleBadgeColors = {
+  admin: 'bg-red-100 text-red-700',
+  owner: 'bg-purple-100 text-purple-700',
+  manager: 'bg-blue-100 text-blue-700',
+  ground_staff: 'bg-slate-100 text-slate-700',
+};
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState(null);
+  const { user, userProfile, logout } = useAuth();
+  const { hasMinRole } = usePermissions();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    base44.auth.me().then(setUser).catch(() => {});
-  }, []);
+  const queryClient = useQueryClient();
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications', user?.email],
-    queryFn: () => base44.entities.Notification.filter({ user_id: user?.email, is_read: false }),
-    enabled: !!user?.email,
+    queryKey: ['notifications', user?.id],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          // If table doesn't exist (42P01) or cache is stale (PGRST205), just return empty
+          if (error.code === '42P01' || error.code === 'PGRST205') return [];
+          throw error;
+        }
+        return data ?? [];
+      } catch (err) {
+        console.warn('Notifications fetch error:', err);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
   });
 
-  const handleLogout = () => {
-    base44.auth.logout();
+  // Real-time notification subscription
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
+
+  const markAsRead = async (notifId) => {
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notifId);
+    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
+
+  const markAllAsRead = async () => {
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user?.id)
+      .eq('is_read', false);
+    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  // Filter navigation based on user role
+  const filteredNavigation = navigation.filter(item => hasMinRole(item.minRole));
+
+  const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
+  const role = userProfile?.role || 'ground_staff';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,7 +152,7 @@ export default function Layout({ children, currentPageName }) {
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -101,7 +178,7 @@ export default function Layout({ children, currentPageName }) {
         </div>
 
         <nav className="p-4 space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = currentPageName === item.href;
             return (
               <Link
@@ -109,9 +186,9 @@ export default function Layout({ children, currentPageName }) {
                 to={createPageUrl(item.href)}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                   isActive
-                    ? "bg-teal-500/10 text-teal-400"
+                    ? "bg-teal-500/10 text-teal-400 shadow-sm"
                     : "text-slate-400 hover:bg-slate-800 hover:text-white"
                 )}
               >
@@ -121,6 +198,23 @@ export default function Layout({ children, currentPageName }) {
             );
           })}
         </nav>
+
+        {/* User info at bottom of sidebar */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
+          <div className="flex items-center gap-3 px-3">
+            <div className="h-8 w-8 rounded-full bg-teal-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">{displayName}</p>
+              <Badge className={cn("text-[10px] px-1.5 py-0", roleBadgeColors[role])}>
+                {role.replace('_', ' ')}
+              </Badge>
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* Main content */}
@@ -143,14 +237,24 @@ export default function Layout({ children, currentPageName }) {
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="h-5 w-5 text-slate-600" />
                   {notifications.length > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs">
-                      {notifications.length}
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs animate-pulse">
+                      {notifications.length > 9 ? '9+' : notifications.length}
                     </Badge>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
-                <div className="p-2 font-medium text-sm text-slate-900">Notifications</div>
+                <div className="flex items-center justify-between p-2">
+                  <span className="font-medium text-sm text-slate-900">Notifications</span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
                 <DropdownMenuSeparator />
                 {notifications.length === 0 ? (
                   <div className="p-4 text-center text-sm text-slate-500">
@@ -158,11 +262,21 @@ export default function Layout({ children, currentPageName }) {
                   </div>
                 ) : (
                   notifications.slice(0, 5).map((notif) => (
-                    <DropdownMenuItem key={notif.id} className="p-3 cursor-pointer">
-                      <div>
-                        <p className="font-medium text-sm">{notif.title}</p>
+                    <DropdownMenuItem
+                      key={notif.id}
+                      className="p-3 cursor-pointer"
+                      onClick={() => markAsRead(notif.id)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{notif.title}</p>
+                          {notif.priority === 'high' && (
+                            <Badge className="bg-red-100 text-red-700 text-[10px] px-1">urgent</Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
                       </div>
+                      <Check className="h-3.5 w-3.5 text-slate-400 shrink-0 ml-2" />
                     </DropdownMenuItem>
                   ))
                 )}
@@ -176,9 +290,14 @@ export default function Layout({ children, currentPageName }) {
                   <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
                     <User className="h-4 w-4 text-teal-600" />
                   </div>
-                  <span className="hidden md:block text-sm font-medium text-slate-700">
-                    {user?.full_name || 'User'}
-                  </span>
+                  <div className="hidden md:block text-left">
+                    <span className="block text-sm font-medium text-slate-700">
+                      {displayName}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 capitalize">
+                      {role.replace('_', ' ')}
+                    </span>
+                  </div>
                   <ChevronDown className="h-4 w-4 text-slate-400" />
                 </Button>
               </DropdownMenuTrigger>
@@ -190,6 +309,10 @@ export default function Layout({ children, currentPageName }) {
                 <DropdownMenuItem className="cursor-pointer">
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Shield className="h-4 w-4 mr-2" />
+                  <span className="capitalize">{role.replace('_', ' ')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">

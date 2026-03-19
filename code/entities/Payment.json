@@ -1,0 +1,66 @@
+{
+    "name": "Payment",
+    "type": "object",
+    "properties": {
+      "invoice_id": {
+        "type": "string"
+      },
+      "vendor_id": {
+        "type": "string"
+      },
+      "vendor_name": {
+        "type": "string"
+      },
+      "invoice_number": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "payment_method": {
+        "type": "string",
+        "enum": [
+          "stripe",
+          "paypal",
+          "bank_transfer",
+          "cheque",
+          "manual"
+        ],
+        "default": "bank_transfer"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "default": "pending"
+      },
+      "transaction_id": {
+        "type": "string"
+      },
+      "payment_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "notes": {
+        "type": "string"
+      },
+      "approved_by": {
+        "type": "string"
+      },
+      "cheque_number": {
+        "type": "string"
+      },
+      "bank_reference": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "invoice_id",
+      "amount"
+    ]
+  }

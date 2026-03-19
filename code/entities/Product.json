@@ -1,0 +1,99 @@
+{
+    "name": "Product",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "product_id": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string"
+      },
+      "accounting_category": {
+        "type": "string",
+        "enum": [
+          "food",
+          "beverage",
+          "supplies",
+          "equipment",
+          "packaging",
+          "cleaning",
+          "other"
+        ],
+        "default": "food"
+      },
+      "is_inventoried": {
+        "type": "boolean",
+        "default": true
+      },
+      "is_tax_exempt": {
+        "type": "boolean",
+        "default": false
+      },
+      "report_by_unit": {
+        "type": "string"
+      },
+      "base_unit": {
+        "type": "string"
+      },
+      "latest_price": {
+        "type": "number"
+      },
+      "average_price": {
+        "type": "number"
+      },
+      "price_history": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "price": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "vendor_id": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "preferred_vendor_id": {
+        "type": "string"
+      },
+      "par_level": {
+        "type": "number"
+      },
+      "reorder_point": {
+        "type": "number"
+      },
+      "location_specific": {
+        "type": "boolean",
+        "default": false
+      },
+      "locations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "active",
+          "discontinued",
+          "seasonal"
+        ],
+        "default": "active"
+      }
+    },
+    "required": [
+      "name"
+    ]
+  }

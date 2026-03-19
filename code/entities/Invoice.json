@@ -1,0 +1,163 @@
+{
+    "name": "Invoice",
+    "type": "object",
+    "properties": {
+      "vendor_id": {
+        "type": "string"
+      },
+      "vendor_name": {
+        "type": "string"
+      },
+      "invoice_number": {
+        "type": "string"
+      },
+      "invoice_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "due_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "payment_terms": {
+        "type": "string"
+      },
+      "total_amount": {
+        "type": "number"
+      },
+      "subtotal": {
+        "type": "number"
+      },
+      "tax_amount": {
+        "type": "number"
+      },
+      "fuel_surcharge": {
+        "type": "number"
+      },
+      "delivery_fee": {
+        "type": "number"
+      },
+      "other_charges": {
+        "type": "number"
+      },
+      "currency": {
+        "type": "string",
+        "default": "USD"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "pending_review",
+          "validated",
+          "approved",
+          "paid",
+          "rejected",
+          "duplicate",
+          "flagged"
+        ],
+        "default": "pending_review"
+      },
+      "payment_status": {
+        "type": "string",
+        "enum": [
+          "unpaid",
+          "partial",
+          "paid"
+        ],
+        "default": "unpaid"
+      },
+      "source": {
+        "type": "string",
+        "enum": [
+          "manual_upload",
+          "email_import",
+          "vendor_portal"
+        ],
+        "default": "manual_upload"
+      },
+      "file_url": {
+        "type": "string"
+      },
+      "line_items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "product_id": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "unit_price": {
+              "type": "number"
+            },
+            "extended_price": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "validation_results": {
+        "type": "object",
+        "properties": {
+          "duplicate_check": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "warning"
+            ]
+          },
+          "fraud_detection": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "warning"
+            ]
+          },
+          "price_deviation": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "warning"
+            ]
+          },
+          "delivery_match": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "warning"
+            ]
+          }
+        }
+      },
+      "validation_notes": {
+        "type": "string"
+      },
+      "approved_by": {
+        "type": "string"
+      },
+      "approved_date": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "location": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "vendor_name",
+      "invoice_number",
+      "total_amount"
+    ]
+  }

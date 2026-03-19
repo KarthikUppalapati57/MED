@@ -52,7 +52,9 @@ import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Invoices from './pages/Invoices';
 import Payments from './pages/Payments';
+import PlatformAdmin from './pages/PlatformAdmin';
 import Products from './pages/Products';
+import OnboardingPage from './pages/OnboardingPage';
 import Recipes from './pages/Recipes';
 import UserManagement from './pages/UserManagement';
 import Vendors from './pages/Vendors';
@@ -64,7 +66,9 @@ export const PAGES = {
     "Dashboard": Dashboard,
     "Inventory": Inventory,
     "Invoices": Invoices,
+    "OnboardingPage": OnboardingPage,
     "Payments": Payments,
+    "PlatformAdmin": PlatformAdmin,
     "Products": Products,
     "Recipes": Recipes,
     "UserManagement": UserManagement,

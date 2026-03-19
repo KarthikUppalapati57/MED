@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
   ShoppingCart,
@@ -61,21 +61,21 @@ export default function AutoOrdering() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['auto-orders'],
-    queryFn: () => base44.entities.AutoOrder.list('-created_date'),
+    queryFn: () => api.entities.AutoOrder.list('-created_at'),
   });
 
   const { data: inventory = [] } = useQuery({
     queryKey: ['inventory'],
-    queryFn: () => base44.entities.Inventory.list(),
+    queryFn: () => api.entities.Inventory.list(),
   });
 
   const { data: vendors = [] } = useQuery({
     queryKey: ['vendors'],
-    queryFn: () => base44.entities.Vendor.list(),
+    queryFn: () => api.entities.Vendor.list(),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.AutoOrder.create(data),
+    mutationFn: (data) => api.entities.AutoOrder.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auto-orders'] });
       toast.success('Order created');
@@ -83,7 +83,7 @@ export default function AutoOrdering() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.AutoOrder.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.AutoOrder.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auto-orders'] });
     },
@@ -106,40 +106,14 @@ export default function AutoOrdering() {
         return;
       }
 
-      // Get external suggestions from AI
-      const aiResponse = await base44.integrations.Core.InvokeLLM({
-        prompt: `Based on the following low inventory items, suggest any adjustments considering:
-        - Current weather patterns
-        - Upcoming holidays
-        - Seasonal trends
-        
-        Items: ${JSON.stringify(lowItems.map(i => ({
-          name: i.product_name,
-          current: i.current_quantity,
-          par: i.par_level
-        })))}
-        
-        Return suggestions for ordering adjustments.`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            suggestions: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  type: { type: "string" },
-                  description: { type: "string" },
-                  impact: { type: "string" }
-                }
-              }
-            }
-          }
-        }
-      });
+      // Simple, local suggestion generation without external AI
+      const generatedSuggestions = lowItems.map((item) => ({
+        type: 'threshold',
+        description: `Consider reordering ${item.product_name} to reach par level.`,
+        impact: `Current ${item.current_quantity || 0}, par ${item.par_level || 10}.`,
+      }));
 
-      setSuggestions(aiResponse?.suggestions || []);
+      setSuggestions(generatedSuggestions);
 
       // Group items by vendor (simplified - in real app would match products to vendors)
       const orderItems = lowItems.map(item => ({
@@ -160,7 +134,7 @@ export default function AutoOrdering() {
         status: 'pending_approval',
         items: orderItems,
         total_amount: orderItems.reduce((sum, i) => sum + i.total_price, 0),
-        external_suggestions: aiResponse?.suggestions || [],
+        external_suggestions: generatedSuggestions,
         chat_history: []
       };
 
@@ -217,51 +191,15 @@ export default function AutoOrdering() {
       { role: 'user', message: chatMessage, timestamp: new Date().toISOString() }
     ];
 
-    // Get AI response
-    const aiResponse = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are helping adjust a purchase order. The user says: "${chatMessage}"
-      
-      Current order items: ${JSON.stringify(selectedOrder.items)}
-      
-      Suggest any changes to quantities or items based on the user's request.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          response: { type: "string" },
-          suggested_changes: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                product_name: { type: "string" },
-                new_quantity: { type: "number" }
-              }
-            }
-          }
-        }
-      }
-    });
-
     newHistory.push({ 
       role: 'assistant', 
-      message: aiResponse?.response || 'I understand. Let me help adjust the order.',
+      message: 'Thanks, your request has been noted. Please adjust quantities directly in the table as needed.',
       timestamp: new Date().toISOString()
     });
 
     // Apply suggested changes if any
     let updatedItems = [...selectedOrder.items];
-    if (aiResponse?.suggested_changes) {
-      aiResponse.suggested_changes.forEach(change => {
-        const idx = updatedItems.findIndex(i => i.product_name === change.product_name);
-        if (idx !== -1) {
-          updatedItems[idx] = {
-            ...updatedItems[idx],
-            approved_quantity: change.new_quantity,
-            total_price: change.new_quantity * updatedItems[idx].unit_price
-          };
-        }
-      });
-    }
+    // No automatic changes without a configured AI backend
 
     await updateMutation.mutateAsync({
       id: selectedOrder.id,
@@ -317,7 +255,7 @@ export default function AutoOrdering() {
           <CardContent>
             <div className="space-y-3">
               {suggestions.map((s, idx) => (
-                <div key={idx} className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
+                <div key={s.id || `suggestion-${idx}`} className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
                   <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
                     {s.type === 'weather' ? <Cloud className="h-4 w-4 text-teal-600" /> :
                      s.type === 'holiday' ? <Calendar className="h-4 w-4 text-teal-600" /> :
@@ -375,7 +313,7 @@ export default function AutoOrdering() {
                     </TableHeader>
                     <TableBody>
                       {order.items?.slice(0, 5).map((item, idx) => (
-                        <TableRow key={idx}>
+                        <TableRow key={item.product_id || item.product_name || idx}>
                           <TableCell className="font-medium">{item.product_name}</TableCell>
                           <TableCell>{item.current_stock}</TableCell>
                           <TableCell>{item.par_level}</TableCell>
@@ -383,11 +321,18 @@ export default function AutoOrdering() {
                           <TableCell>
                             <Input
                               type="number"
-                              value={item.approved_quantity}
-                              onChange={(e) => {
+                              defaultValue={item.approved_quantity}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                if (val === item.approved_quantity) return;
+
                                 const newItems = [...order.items];
-                                newItems[idx].approved_quantity = parseFloat(e.target.value) || 0;
-                                newItems[idx].total_price = newItems[idx].approved_quantity * newItems[idx].unit_price;
+                                newItems[idx] = {
+                                  ...newItems[idx],
+                                  approved_quantity: val,
+                                  total_price: val * newItems[idx].unit_price,
+                                };
+
                                 updateMutation.mutate({
                                   id: order.id,
                                   data: { 
@@ -505,7 +450,7 @@ export default function AutoOrdering() {
           <div className="h-64 overflow-y-auto border rounded-lg p-4 space-y-3">
             {(selectedOrder?.chat_history || []).map((msg, idx) => (
               <div
-                key={idx}
+                key={msg.timestamp || idx}
                 className={cn(
                   "p-3 rounded-lg max-w-[80%]",
                   msg.role === 'user' 

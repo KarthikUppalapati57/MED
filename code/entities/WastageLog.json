@@ -1,0 +1,46 @@
+{
+    "name": "WastageLog",
+    "type": "object",
+    "properties": {
+      "product_id": {
+        "type": "string"
+      },
+      "product_name": {
+        "type": "string"
+      },
+      "quantity": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string"
+      },
+      "value": {
+        "type": "number"
+      },
+      "reason": {
+        "type": "string",
+        "enum": [
+          "expired",
+          "damaged",
+          "spoiled",
+          "overproduction",
+          "customer_return",
+          "other"
+        ]
+      },
+      "notes": {
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "logged_by": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "product_id",
+      "quantity",
+      "reason"
+    ]
+  }

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import React from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,24 +14,42 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function InvoiceEditor({ invoice, onChange }) {
-  const [editingItem, setEditingItem] = useState(null);
+
+
+  const recalculateTotals = (items, currentInvoice) => {
+    const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.extended_price) || 0), 0);
+    const totalAmount = subtotal +
+      (parseFloat(currentInvoice.tax_amount) || 0) +
+      (parseFloat(currentInvoice.fuel_surcharge) || 0) +
+      (parseFloat(currentInvoice.delivery_fee) || 0) +
+      (parseFloat(currentInvoice.other_charges) || 0);
+    return { subtotal, total_amount: totalAmount };
+  };
 
   const handleFieldChange = (field, value) => {
-    onChange({ ...invoice, [field]: value });
+    const updated = { ...invoice, [field]: value };
+    // Recalculate total when fee fields change
+    if (['tax_amount', 'fuel_surcharge', 'delivery_fee', 'other_charges'].includes(field)) {
+      const totals = recalculateTotals(updated.line_items || [], updated);
+      onChange({ ...updated, ...totals });
+    } else {
+      onChange(updated);
+    }
   };
 
   const handleLineItemChange = (index, field, value) => {
     const newItems = [...(invoice.line_items || [])];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Auto-calculate extended price
     if (field === 'quantity' || field === 'unit_price') {
-      const qty = field === 'quantity' ? value : newItems[index].quantity || 0;
-      const price = field === 'unit_price' ? value : newItems[index].unit_price || 0;
+      const qty = parseFloat(field === 'quantity' ? value : newItems[index].quantity) || 0;
+      const price = parseFloat(field === 'unit_price' ? value : newItems[index].unit_price) || 0;
       newItems[index].extended_price = qty * price;
     }
-    
-    onChange({ ...invoice, line_items: newItems });
+
+    const totals = recalculateTotals(newItems, invoice);
+    onChange({ ...invoice, line_items: newItems, ...totals });
   };
 
   const addLineItem = () => {
@@ -45,12 +62,12 @@ export default function InvoiceEditor({ invoice, onChange }) {
       extended_price: 0
     }];
     onChange({ ...invoice, line_items: newItems });
-    setEditingItem(newItems.length - 1);
   };
 
   const removeLineItem = (index) => {
-    const newItems = invoice.line_items.filter((_, i) => i !== index);
-    onChange({ ...invoice, line_items: newItems });
+    const newItems = (invoice.line_items || []).filter((_, i) => i !== index);
+    const totals = recalculateTotals(newItems, invoice);
+    onChange({ ...invoice, line_items: newItems, ...totals });
   };
 
   const calculateTotal = () => {
@@ -81,10 +98,18 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
+              <Label>Account Number</Label>
+              <Input
+                value={invoice.account_number || ''}
+                onChange={(e) => handleFieldChange('account_number', e.target.value)}
+                placeholder="Vendor account #"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Invoice Date</Label>
               <Input
                 type="date"
-                value={invoice.invoice_date || ''}
+                value={(invoice.invoice_date || '').split('T')[0]}
                 onChange={(e) => handleFieldChange('invoice_date', e.target.value)}
               />
             </div>
@@ -92,7 +117,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Label>Due Date</Label>
               <Input
                 type="date"
-                value={invoice.due_date || ''}
+                value={(invoice.due_date || '').split('T')[0]}
                 onChange={(e) => handleFieldChange('due_date', e.target.value)}
               />
             </div>
@@ -102,6 +127,15 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 value={invoice.payment_terms || ''}
                 onChange={(e) => handleFieldChange('payment_terms', e.target.value)}
                 placeholder="e.g. Net 30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subtotal</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={invoice.subtotal || ''}
+                onChange={(e) => handleFieldChange('subtotal', parseFloat(e.target.value) || 0)}
               />
             </div>
             <div className="space-y-2">

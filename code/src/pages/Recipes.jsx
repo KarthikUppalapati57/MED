@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import {
   Plus,
   Search,
@@ -83,16 +83,16 @@ export default function Recipes() {
 
   const { data: recipes = [], isLoading } = useQuery({
     queryKey: ['recipes'],
-    queryFn: () => base44.entities.Recipe.list('-created_date'),
+    queryFn: () => api.entities.Recipe.list('-created_at'),
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list(),
+    queryFn: () => api.entities.Product.list(),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Recipe.create(data),
+    mutationFn: (data) => api.entities.Recipe.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Recipe created');
@@ -102,7 +102,7 @@ export default function Recipes() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Recipe.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Recipe.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Recipe updated');
@@ -112,7 +112,7 @@ export default function Recipes() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Recipe.delete(id),
+    mutationFn: (id) => api.entities.Recipe.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Recipe deleted');
@@ -248,40 +248,27 @@ export default function Recipes() {
     setCalculatingCost(true);
 
     try {
-      const response = await base44.integrations.Core.InvokeLLM({
-        prompt: `Analyze this recipe and provide cost estimation and suggestions:
-        
-Recipe: ${recipe.name}
-Ingredients: ${JSON.stringify(recipe.ingredients)}
-Labor time: ${recipe.labor_time_minutes} minutes
-Yield: ${recipe.yield_quantity} ${recipe.yield_unit}
+      const ingredientCost = (recipe.ingredients || []).reduce(
+        (sum, i) => sum + (i.total_cost || 0),
+        0
+      );
+      const packagingCost = (recipe.packaging_items || []).reduce(
+        (sum, p) => sum + (p.total_cost || 0),
+        0
+      );
+      const laborCost = ((recipe.labor_time_minutes || 0) / 60) * (recipe.labor_rate_per_hour || 0);
+      const totalCost = ingredientCost + packagingCost + laborCost;
+      const costPerServing = (recipe.yield_quantity || 1) > 0
+        ? totalCost / (recipe.yield_quantity || 1)
+        : totalCost;
 
-Based on typical restaurant costs and your knowledge:
-1. Estimate the total cost
-2. Suggest a selling price (with 30-40% food cost ratio)
-3. Provide any cost-saving suggestions`,
-        add_context_from_internet: true,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            estimated_total_cost: { type: "number" },
-            suggested_price: { type: "number" },
-            food_cost_percentage: { type: "number" },
-            suggestions: { type: "array", items: { type: "string" } }
-          }
-        }
+      await updateMutation.mutateAsync({
+        id: recipe.id,
+        data: {
+          total_cost: totalCost,
+          cost_per_serving: costPerServing,
+        },
       });
-
-      if (response) {
-        await updateMutation.mutateAsync({
-          id: recipe.id,
-          data: {
-            total_cost: response.estimated_total_cost,
-            suggested_price: response.suggested_price,
-            cost_per_serving: response.estimated_total_cost / (recipe.yield_quantity || 1)
-          }
-        });
-      }
     } catch (error) {
       toast.error('Failed to calculate cost');
     } finally {

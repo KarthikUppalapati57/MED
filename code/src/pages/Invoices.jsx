@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -71,11 +71,11 @@ export default function Invoices() {
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['invoices'],
-    queryFn: () => base44.entities.Invoice.list('-created_date'),
+    queryFn: () => api.entities.Invoice.list('-created_at'),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Invoice.create(data),
+    mutationFn: (data) => api.entities.Invoice.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice saved successfully');
@@ -83,7 +83,7 @@ export default function Invoices() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Invoice.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Invoice.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice updated');
@@ -91,7 +91,7 @@ export default function Invoices() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Invoice.delete(id),
+    mutationFn: (id) => api.entities.Invoice.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice deleted');
@@ -105,6 +105,7 @@ export default function Invoices() {
   };
 
   const handleInvoiceExtracted = (data) => {
+    console.log('Invoices Page received extraction data:', data);
     setEditingInvoice(data);
     setEditorOpen(true);
   };
@@ -135,8 +136,8 @@ export default function Invoices() {
     }
 
     const [existingProducts, existingInventory] = await Promise.all([
-      base44.entities.Product.list(),
-      base44.entities.Inventory.list(),
+      api.entities.Product.list(),
+      api.entities.Inventory.list(),
     ]);
 
     for (const item of items) {
@@ -153,7 +154,7 @@ export default function Invoices() {
 
       let productId;
       if (existingProduct) {
-        await base44.entities.Product.update(existingProduct.id, {
+        await api.entities.Product.update(existingProduct.id, {
           latest_price: unitPrice,
           price_history: [
             ...(existingProduct.price_history || []),
@@ -162,7 +163,7 @@ export default function Invoices() {
         });
         productId = existingProduct.product_id;
       } else {
-        const newProd = await base44.entities.Product.create({
+        const newProd = await api.entities.Product.create({
           name,
           product_id: `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           latest_price: unitPrice,
@@ -182,13 +183,13 @@ export default function Invoices() {
 
       if (existingInv) {
         const newQty = (existingInv.current_quantity || 0) + qty;
-        await base44.entities.Inventory.update(existingInv.id, {
+        await api.entities.Inventory.update(existingInv.id, {
           current_quantity: newQty,
           unit_cost: unitPrice,
           current_value: newQty * unitPrice,
         });
       } else {
-        await base44.entities.Inventory.create({
+        await api.entities.Inventory.create({
           product_id: productId,
           product_name: name,
           current_quantity: qty,
