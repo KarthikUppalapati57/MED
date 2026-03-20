@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function OnboardingPage() {
-  const { user, fetchProfile } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -52,7 +52,7 @@ export default function OnboardingPage() {
       toast.success('Onboarding complete! Welcome to the platform.');
       
       // Refresh profile in context
-      await fetchProfile(user.id);
+      await refreshProfile();
       
       // Redirect to dashboard
       navigate('/');

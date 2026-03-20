@@ -140,11 +140,13 @@ export const AuthProvider = ({ children }) => {
 
         // Sync Org ID and Role to JWT if missing or changed (fire and forget to not block UI)
         const currentMetadata = sessionUser.user_metadata || {};
+        const safeValue = (val) => (val === undefined || val === null) ? null : val;
+        
         const needsSync = 
-          profile.organization_id !== currentMetadata.organization_id ||
-          profile.role !== currentMetadata.role ||
-          profile.brand_id !== currentMetadata.brand_id ||
-          profile.location_id !== currentMetadata.location_id;
+          safeValue(profile.organization_id) !== safeValue(currentMetadata.organization_id) ||
+          safeValue(profile.role) !== safeValue(currentMetadata.role) ||
+          safeValue(profile.brand_id) !== safeValue(currentMetadata.brand_id) ||
+          safeValue(profile.location_id) !== safeValue(currentMetadata.location_id);
 
         if (needsSync) {
           supabase.auth.updateUser({
@@ -181,6 +183,8 @@ export const AuthProvider = ({ children }) => {
         console.log('initializeSequence: getSession returned:', { session, error });
         if (error) throw error;
         if (session?.user) {
+          // Process any pending invitations synchronously before loading the profile
+          await processPendingInvitation(session.user.email, session.user.id);
           await loadProfile(session.user);
         } else {
           setUser(null);
@@ -218,10 +222,9 @@ export const AuthProvider = ({ children }) => {
           setActiveLocation(null);
         } else if (currentUser) {
            if (event === 'SIGNED_IN') {
-             // Run invitation processing without blocking
-             processPendingInvitation(currentUser.email, currentUser.id).then(() => {
-               loadProfile(currentUser);
-             });
+             // Process invitation before loading profile on a fresh sign in
+             await processPendingInvitation(currentUser.email, currentUser.id);
+             await loadProfile(currentUser);
            } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
              await loadProfile(currentUser);
            }
@@ -236,7 +239,6 @@ export const AuthProvider = ({ children }) => {
   }, [fetchProfile, processPendingInvitation]);
 
   const loginWithEmail = async (email, password) => {
-    setIsLoadingAuth(true);
     setAuthError(null);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -248,8 +250,6 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setAuthError(err);
       return { data: null, error: err };
-    } finally {
-      setIsLoadingAuth(false);
     }
   };
 
@@ -269,7 +269,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signUp = async (email, password, metadata = {}) => {
-    setIsLoadingAuth(true);
     setAuthError(null);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -288,8 +287,6 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setAuthError(err);
       return { data: null, error: err };
-    } finally {
-      setIsLoadingAuth(false);
     }
   };
 

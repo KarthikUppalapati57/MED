@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import OnboardingPage from './pages/OnboardingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Initialize global error monitoring
 initGlobalErrorHandlers();

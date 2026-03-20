@@ -13,7 +13,8 @@ import {
   Download,
   MoreVertical,
   Upload,
-  Trash2
+  Trash2,
+  Save
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -455,19 +456,20 @@ export default function Invoices() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {
+                            <DropdownMenuItem onSelect={(e) => {
+                              e.preventDefault();
                               setEditingInvoice(invoice);
                               setEditorOpen(true);
                             }}>
                               <Eye className="h-4 w-4 mr-2" /> View/Edit
                             </DropdownMenuItem>
                             {(invoice.status === 'validated' || invoice.status === 'pending_review') && (
-                              <DropdownMenuItem onClick={() => handleApprove(invoice)}>
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
                                 <Check className="h-4 w-4 mr-2" /> Approve
                               </DropdownMenuItem>
                             )}
                             {(invoice.status === 'validated' || invoice.status === 'approved') && (
-                              <DropdownMenuItem onClick={() => handleReject(invoice)} className="text-red-600">
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-red-600">
                                 <X className="h-4 w-4 mr-2" /> Reject
                               </DropdownMenuItem>
                             )}
@@ -478,7 +480,7 @@ export default function Invoices() {
                                 </a>
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => handleDelete(invoice)} className="text-red-600">
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-red-600">
                               <Trash2 className="h-4 w-4 mr-2" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
