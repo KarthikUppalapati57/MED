@@ -94,15 +94,7 @@ export const api = {
         access_level: 'organization',
       });
 
-      // 5. Update Auth Metadata (for RLS)
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { 
-          organization_id: org.id,
-          role: 'owner' 
-        }
-      });
-      if (authError) throw authError;
-
+      // 5. Auth metadata now automatically synced by AuthContext when profile updates
       return { org, brand, location };
     },
   },

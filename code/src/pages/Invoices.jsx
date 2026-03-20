@@ -53,9 +53,13 @@ import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 
 const statusColors = {
+  pending_review: 'bg-yellow-100 text-yellow-700',
   validated: 'bg-blue-100 text-blue-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  paid: 'bg-emerald-100 text-emerald-700',
+  flagged: 'bg-orange-100 text-orange-700',
+  duplicate: 'bg-slate-100 text-slate-600',
 };
 
 export default function Invoices() {
@@ -74,8 +78,38 @@ export default function Invoices() {
     queryFn: () => api.entities.Invoice.list('-created_at'),
   });
 
+  // Sanitize invoice data before saving to Supabase
+  const sanitizeInvoiceData = (data) => {
+    const cleaned = { ...data };
+    // Remove blob URLs (they won't persist across sessions)
+    if (cleaned.file_url && cleaned.file_url.startsWith('blob:')) {
+      delete cleaned.file_url;
+    }
+    // Remove fields that are not in the DB schema
+    delete cleaned.id; // Don't send id on create, it's auto-generated
+    // Ensure numeric fields are properly typed
+    ['subtotal', 'tax_amount', 'fuel_surcharge', 'delivery_fee', 'other_charges', 'total_amount'].forEach(field => {
+      if (cleaned[field] !== undefined && cleaned[field] !== null) {
+        cleaned[field] = parseFloat(cleaned[field]) || 0;
+      }
+    });
+    // Remove null/undefined vendor_id (it's a UUID column)
+    if (!cleaned.vendor_id) delete cleaned.vendor_id;
+    // Remove null/undefined approved_by (it's a UUID column) 
+    if (!cleaned.approved_by) delete cleaned.approved_by;
+    // Remove null/undefined organization_id and location_id
+    if (!cleaned.organization_id) delete cleaned.organization_id;
+    if (!cleaned.location_id) delete cleaned.location_id;
+    if (!cleaned.created_by) delete cleaned.created_by;
+    return cleaned;
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data) => api.entities.Invoice.create(data),
+    mutationFn: (data) => {
+      const cleaned = sanitizeInvoiceData(data);
+      delete cleaned.id; // Ensure no id on create
+      return api.entities.Invoice.create(cleaned);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice saved successfully');
@@ -83,7 +117,11 @@ export default function Invoices() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.Invoice.update(id, data),
+    mutationFn: ({ id, data }) => {
+      const cleaned = sanitizeInvoiceData(data);
+      delete cleaned.id; // Don't update id
+      return api.entities.Invoice.update(id, cleaned);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice updated');
@@ -146,6 +184,8 @@ export default function Invoices() {
       const unitPrice = item.unit_price || 0;
       const unit = item.unit || 'ea';
       const qty = item.quantity || 0;
+      const vendorName = invoice.vendor_name || '';
+      const itemProductId = item.product_id || '';
 
       // Upsert product
       const existingProduct = existingProducts.find(
@@ -156,6 +196,8 @@ export default function Invoices() {
       if (existingProduct) {
         await api.entities.Product.update(existingProduct.id, {
           latest_price: unitPrice,
+          vendor_name: vendorName,
+          description: name,
           price_history: [
             ...(existingProduct.price_history || []),
             { price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }
@@ -163,14 +205,17 @@ export default function Invoices() {
         });
         productId = existingProduct.product_id;
       } else {
+        const genProductId = itemProductId ? `PRD-${itemProductId}` : `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         const newProd = await api.entities.Product.create({
           name,
-          product_id: `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          description: name,
+          product_id: genProductId,
           latest_price: unitPrice,
           report_by_unit: unit,
           base_unit: unit,
           is_inventoried: true,
           accounting_category: 'food',
+          vendor_name: vendorName,
           price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
         });
         productId = newProd.product_id;
@@ -196,6 +241,11 @@ export default function Invoices() {
           current_unit: unit,
           unit_cost: unitPrice,
           current_value: qty * unitPrice,
+          accounting_category: 'food',
+          par_level: 0,
+          reorder_point: 0,
+          previous_quantity: 0,
+          previous_value: 0,
           location: invoice.location || '',
         });
       }
@@ -206,12 +256,17 @@ export default function Invoices() {
   };
 
   const handleApprove = async (invoice) => {
-    await updateMutation.mutateAsync({ 
-      id: invoice.id, 
-      data: { status: 'approved' }
-    });
-    await syncInvoiceToProductsAndInventory(invoice);
-    toast.success('Invoice approved & products/inventory updated');
+    try {
+      await updateMutation.mutateAsync({ 
+        id: invoice.id, 
+        data: { status: 'approved' }
+      });
+      await syncInvoiceToProductsAndInventory(invoice);
+      toast.success('Invoice approved & products/inventory updated');
+    } catch (err) {
+      console.error('Approve failed:', err);
+      toast.error(`Failed to approve invoice: ${err.message}`);
+    }
   };
 
   const handleReject = async (invoice) => {
@@ -221,17 +276,38 @@ export default function Invoices() {
     });
   };
 
-  const handleEditorApprove = async () => {
-    const data = { ...editingInvoice, status: 'approved' };
-    if (editingInvoice.id) {
-      await updateMutation.mutateAsync({ id: editingInvoice.id, data });
-    } else {
-      await createMutation.mutateAsync(data);
+  const handleEditorSave = async () => {
+    try {
+      if (editingInvoice.id) {
+        await updateMutation.mutateAsync({ id: editingInvoice.id, data: editingInvoice });
+      } else {
+        await createMutation.mutateAsync(editingInvoice);
+      }
+      toast.success('Invoice saved for later');
+      setEditorOpen(false);
+      setEditingInvoice(null);
+    } catch (err) {
+      console.error('Editor save failed:', err);
+      toast.error(`Failed to save invoice: ${err.message}`);
     }
-    await syncInvoiceToProductsAndInventory(editingInvoice);
-    toast.success('Invoice approved & products/inventory updated');
-    setEditorOpen(false);
-    setEditingInvoice(null);
+  };
+
+  const handleEditorApprove = async () => {
+    try {
+      const data = { ...editingInvoice, status: 'approved' };
+      if (editingInvoice.id) {
+        await updateMutation.mutateAsync({ id: editingInvoice.id, data });
+      } else {
+        await createMutation.mutateAsync(data);
+      }
+      await syncInvoiceToProductsAndInventory(editingInvoice);
+      toast.success('Invoice approved & products/inventory updated');
+      setEditorOpen(false);
+      setEditingInvoice(null);
+    } catch (err) {
+      console.error('Editor approve failed:', err);
+      toast.error(`Failed to approve invoice: ${err.message}`);
+    }
   };
 
   const handleEditorReject = async () => {
@@ -385,7 +461,7 @@ export default function Invoices() {
                             }}>
                               <Eye className="h-4 w-4 mr-2" /> View/Edit
                             </DropdownMenuItem>
-                            {invoice.status === 'validated' && (
+                            {(invoice.status === 'validated' || invoice.status === 'pending_review') && (
                               <DropdownMenuItem onClick={() => handleApprove(invoice)}>
                                 <Check className="h-4 w-4 mr-2" /> Approve
                               </DropdownMenuItem>
@@ -445,6 +521,13 @@ export default function Invoices() {
                   className="flex-1"
                 >
                   Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleEditorSave}
+                  className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                >
+                  <Save className="h-4 w-4 mr-1" /> Save
                 </Button>
                 <Button
                   variant="outline"

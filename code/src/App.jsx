@@ -215,6 +215,17 @@ function LoginPage() {
     setIsSubmitting(false);
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      toast.success('Email verified successfully! You can now sign in.', {
+        duration: 5000,
+      });
+      // Clear the query param without refreshing
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const handleSignup = async (e) => {
     e.preventDefault();
     setLocalError('');
@@ -429,7 +440,10 @@ const AuthenticatedApp = () => {
 
       {/* Protected routes */}
       {!user ? (
-        <Route path="*" element={<LoginPage />} />
+        <>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<LoginPage />} />
+        </>
       ) : needsOnboarding ? (
         // Redirect to onboarding if authenticated but no org
         <Route path="*" element={<Navigate to="/onboarding" replace />} />

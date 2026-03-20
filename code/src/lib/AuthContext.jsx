@@ -138,11 +138,29 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
 
-        // Sync Org ID to JWT if missing or changed (fire and forget to not block UI)
-        if (profile.organization_id && sessionUser.user_metadata?.organization_id !== profile.organization_id) {
+        // Sync Org ID and Role to JWT if missing or changed (fire and forget to not block UI)
+        const currentMetadata = sessionUser.user_metadata || {};
+        const needsSync = 
+          profile.organization_id !== currentMetadata.organization_id ||
+          profile.role !== currentMetadata.role ||
+          profile.brand_id !== currentMetadata.brand_id ||
+          profile.location_id !== currentMetadata.location_id;
+
+        if (needsSync) {
           supabase.auth.updateUser({
-            data: { organization_id: profile.organization_id }
-          }).catch(err => console.warn('Silent user metadata update failed:', err));
+            data: { 
+              organization_id: profile.organization_id,
+              role: profile.role,
+              brand_id: profile.brand_id,
+              location_id: profile.location_id
+            }
+          }).catch(err => {
+            if (err.message?.includes('Lock broken')) {
+              console.log('Silent metadata sync: auth lock handled');
+            } else {
+              console.warn('Silent user metadata update failed:', err);
+            }
+          });
         }
       } else {
         setUser(sessionUser);
@@ -259,6 +277,7 @@ export const AuthProvider = ({ children }) => {
         password,
         options: {
           data: metadata,
+          emailRedirectTo: `${window.location.origin}/login?verified=true`,
         },
       });
       if (error) {

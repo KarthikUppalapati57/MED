@@ -344,10 +344,9 @@ export default function Products() {
                     />
                   </TableHead>
                   <TableHead>Product ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Inventoried</TableHead>
-                  <TableHead>Unit</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>On Inventory</TableHead>
+                  <TableHead>Vendor</TableHead>
                   <TableHead>Latest Price</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -355,13 +354,13 @@ export default function Products() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                       No products found
                     </TableCell>
                   </TableRow>
@@ -380,13 +379,8 @@ export default function Products() {
                           <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
                             <Package className="h-4 w-4 text-slate-500" />
                           </div>
-                          <span className="font-medium">{product.name}</span>
+                          <span className="font-medium">{product.description || product.name}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={categoryColors[product.accounting_category]}>
-                          {product.accounting_category}
-                        </Badge>
                       </TableCell>
                       <TableCell>
                         {product.is_inventoried ? (
@@ -395,7 +389,7 @@ export default function Products() {
                           <Badge variant="secondary">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{product.report_by_unit}</TableCell>
+                      <TableCell>{product.vendor_name || '—'}</TableCell>
                       <TableCell className="font-semibold">
                         ${product.latest_price?.toFixed(2) || '0.00'}
                       </TableCell>

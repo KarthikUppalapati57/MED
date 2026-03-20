@@ -66,13 +66,10 @@ CREATE TABLE IF NOT EXISTS public.dim_vendor (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_vendor_id UUID UNIQUE,                -- FK back to vendors.id
     name            TEXT NOT NULL,
-    contact_name    TEXT,
-    city            TEXT,
-    state           TEXT,
-    country         TEXT DEFAULT 'USA',
-    payment_terms   TEXT,
+    email           TEXT,
     status          TEXT,
     organization_id UUID REFERENCES public.organizations(id),
+    location_id     UUID REFERENCES public.locations(id),
     valid_from      TIMESTAMPTZ DEFAULT now(),
     valid_to        TIMESTAMPTZ,
     is_current      BOOLEAN DEFAULT true
@@ -87,9 +84,9 @@ CREATE TABLE IF NOT EXISTS public.dim_product (
     product_code        TEXT,                     -- products.product_id (text code)
     name                TEXT NOT NULL,
     category            TEXT,
-    accounting_category TEXT,
-    status              TEXT,
+    latest_price        NUMERIC(12,2),
     organization_id     UUID REFERENCES public.organizations(id),
+    location_id         UUID REFERENCES public.locations(id),
     valid_from          TIMESTAMPTZ DEFAULT now(),
     valid_to            TIMESTAMPTZ,
     is_current          BOOLEAN DEFAULT true
@@ -217,27 +214,25 @@ CREATE TABLE IF NOT EXISTS public.fact_orders (
 -- ============================================================
 
 -- Load dim_vendor from vendors
-INSERT INTO public.dim_vendor (source_vendor_id, name, contact_name, city, state, country, payment_terms, status, organization_id)
-SELECT id, name, contact_name, city, state, COALESCE(country,'USA'), payment_terms, status, organization_id
+INSERT INTO public.dim_vendor (source_vendor_id, name, email, status, organization_id, location_id)
+SELECT id, name, email, status, organization_id, location_id
 FROM public.vendors
 ON CONFLICT (source_vendor_id) DO UPDATE SET
     name = EXCLUDED.name,
-    contact_name = EXCLUDED.contact_name,
-    city = EXCLUDED.city,
-    state = EXCLUDED.state,
-    payment_terms = EXCLUDED.payment_terms,
-    status = EXCLUDED.status;
+    email = EXCLUDED.email,
+    status = EXCLUDED.status,
+    location_id = EXCLUDED.location_id;
 
 -- Load dim_product from products
-INSERT INTO public.dim_product (source_product_id, product_code, name, category, accounting_category, status, organization_id)
-SELECT id, product_id, name, category, accounting_category, status, organization_id
+INSERT INTO public.dim_product (source_product_id, product_code, name, category, latest_price, organization_id, location_id)
+SELECT id, product_id, name, category, latest_price, organization_id, location_id
 FROM public.products
 ON CONFLICT (source_product_id) DO UPDATE SET
     product_code = EXCLUDED.product_code,
     name = EXCLUDED.name,
     category = EXCLUDED.category,
-    accounting_category = EXCLUDED.accounting_category,
-    status = EXCLUDED.status;
+    latest_price = EXCLUDED.latest_price,
+    location_id = EXCLUDED.location_id;
 
 -- Load dim_user from profiles
 INSERT INTO public.dim_user (source_user_id, full_name, email, role, organization_id)
@@ -324,10 +319,10 @@ SELECT
     inv.location_id,
     inv.location,
     inv.current_quantity,
-    inv.current_value,
-    inv.unit_cost,
-    inv.par_level,
-    inv.reorder_point
+    NULL AS current_value,
+    NULL AS unit_cost,
+    NULL AS par_level,
+    NULL AS reorder_point
 FROM public.inventory inv
 LEFT JOIN public.dim_product dp ON dp.product_code = inv.product_id
 ON CONFLICT (source_inventory_id) DO NOTHING;
@@ -388,17 +383,14 @@ ON CONFLICT (source_order_id) DO NOTHING;
 CREATE OR REPLACE FUNCTION public.sync_dim_vendor()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.dim_vendor (source_vendor_id, name, contact_name, city, state, country, payment_terms, status, organization_id)
-    VALUES (NEW.id, NEW.name, NEW.contact_name, NEW.city, NEW.state, COALESCE(NEW.country,'USA'), NEW.payment_terms, NEW.status, NEW.organization_id)
+    INSERT INTO public.dim_vendor (source_vendor_id, name, email, status, organization_id, location_id)
+    VALUES (NEW.id, NEW.name, NEW.email, NEW.status, NEW.organization_id, NEW.location_id)
     ON CONFLICT (source_vendor_id) DO UPDATE SET
         name = EXCLUDED.name,
-        contact_name = EXCLUDED.contact_name,
-        city = EXCLUDED.city,
-        state = EXCLUDED.state,
-        country = EXCLUDED.country,
-        payment_terms = EXCLUDED.payment_terms,
+        email = EXCLUDED.email,
         status = EXCLUDED.status,
-        organization_id = EXCLUDED.organization_id;
+        organization_id = EXCLUDED.organization_id,
+        location_id = EXCLUDED.location_id;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -412,15 +404,15 @@ CREATE TRIGGER trg_sync_dim_vendor
 CREATE OR REPLACE FUNCTION public.sync_dim_product()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.dim_product (source_product_id, product_code, name, category, accounting_category, status, organization_id)
-    VALUES (NEW.id, NEW.product_id, NEW.name, NEW.category, NEW.accounting_category, NEW.status, NEW.organization_id)
+    INSERT INTO public.dim_product (source_product_id, product_code, name, category, latest_price, organization_id, location_id)
+    VALUES (NEW.id, NEW.product_id, NEW.name, NEW.category, NEW.latest_price, NEW.organization_id, NEW.location_id)
     ON CONFLICT (source_product_id) DO UPDATE SET
         product_code = EXCLUDED.product_code,
         name = EXCLUDED.name,
         category = EXCLUDED.category,
-        accounting_category = EXCLUDED.accounting_category,
-        status = EXCLUDED.status,
-        organization_id = EXCLUDED.organization_id;
+        latest_price = EXCLUDED.latest_price,
+        organization_id = EXCLUDED.organization_id,
+        location_id = EXCLUDED.location_id;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -573,10 +565,10 @@ BEGIN
         NEW.location_id,
         NEW.location,
         NEW.current_quantity,
-        NEW.current_value,
-        NEW.unit_cost,
-        NEW.par_level,
-        NEW.reorder_point
+        NULL AS current_value,
+        NULL AS unit_cost,
+        NULL AS par_level,
+        NULL AS reorder_point
     )
     ON CONFLICT (source_inventory_id) DO UPDATE SET
         snapshot_date_key = EXCLUDED.snapshot_date_key,
