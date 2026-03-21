@@ -167,13 +167,16 @@ export default function UserManagement() {
 
     setInviting(true);
     try {
+      const isOrgLevel = ['admin', 'owner'].includes(inviteRole);
+
       const invite = await api.entities.Invitation.create({
         email: inviteEmail,
         role: inviteRole,
         invited_by: currentUser?.id,
         organization_id: userProfile?.organization_id || currentUser?.user_metadata?.organization_id,
-        brand_id: userProfile?.brand_id || currentUser?.user_metadata?.brand_id,
-        location_id: userProfile?.location_id || currentUser?.user_metadata?.location_id,
+        brand_id: isOrgLevel ? null : (userProfile?.brand_id || currentUser?.user_metadata?.brand_id),
+        location_id: isOrgLevel ? null : (userProfile?.location_id || currentUser?.user_metadata?.location_id),
+        access_level: isOrgLevel ? 'organization' : 'location',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
@@ -263,9 +266,22 @@ export default function UserManagement() {
 
   const handleSaveEdit = () => {
     if (editingUser) {
+      const isOrgLevel = ['admin', 'owner'].includes(editForm.role);
+      const updateData = {
+        ...editForm,
+      };
+      
+      if (isOrgLevel) {
+        updateData.brand_id = null;
+        updateData.location_id = null;
+        updateData.access_level = 'organization';
+      } else {
+        updateData.access_level = 'location';
+      }
+
       updateMutation.mutate({
         id: editingUser.id,
-        data: editForm
+        data: updateData
       });
     }
   };

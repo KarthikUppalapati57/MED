@@ -63,6 +63,7 @@ export const api = {
     Organization: createEntityClient('organizations'),
     Brand: createEntityClient('brands'),
     Location: createEntityClient('locations'),
+    AuditLog: createEntityClient('audit_logs'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

@@ -58,6 +58,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import Recipes from './pages/Recipes';
 import UserManagement from './pages/UserManagement';
 import Vendors from './pages/Vendors';
+import AuditLogs from './pages/AuditLogs';
 import __Layout from './Layout.jsx';
 
 
@@ -73,6 +74,7 @@ export const PAGES = {
     "Recipes": Recipes,
     "UserManagement": UserManagement,
     "Vendors": Vendors,
+    "AuditLogs": AuditLogs,
 }
 
 export const pagesConfig = {

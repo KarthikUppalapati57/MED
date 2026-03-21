@@ -47,6 +47,7 @@ const navigation = [
   { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'manager' },
   { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'manager' },
   { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'owner' },
+  { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'owner' },
 ];
 
 const roleBadgeColors = {
