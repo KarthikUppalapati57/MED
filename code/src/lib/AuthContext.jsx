@@ -11,17 +11,13 @@ export const AuthProvider = ({ children }) => {
   const [activeLocation, setActiveLocation] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
-  const [isProcessingInvite, setIsProcessingInvite] = useState(false);
   const inviteLock = React.useRef(false);
 
   const processPendingInvitation = useCallback(async (email, userId) => {
     if (!email || !userId || inviteLock.current) return;
     inviteLock.current = true;
-    setIsProcessingInvite(true);
-    console.log('Checking for pending invitation for:', email);
     try {
-      console.log('processPendingInvitation: waiting for supabase invitation fetch...');
-      const { data: invite, error } = await supabase
+      const { data: invite } = await supabase
         .from('invitations')
         .select('*')
         .eq('email', email)
@@ -30,10 +26,7 @@ export const AuthProvider = ({ children }) => {
         .limit(1)
         .maybeSingle();
       
-      console.log('processPendingInvitation: supabase returned:', { invite, error });
-
       if (invite) {
-        console.log('Found pending invitation, applying scope and role:', invite.role);
         
         // Mark invitation as accepted
         await supabase
@@ -70,7 +63,6 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.warn('Error processing invitation:', err);
     } finally {
-      setIsProcessingInvite(false);
       inviteLock.current = false;
     }
     return false;
@@ -88,8 +80,6 @@ export const AuthProvider = ({ children }) => {
         `)
         .eq('id', userId)
         .maybeSingle();
-      
-      console.log('fetchProfile: supabase returned:', { data, error });
       
       if (error) {
         console.warn('Profile fetch error:', error.message);
@@ -148,16 +138,13 @@ export const AuthProvider = ({ children }) => {
     };
 
     const initializeSequence = async () => {
-      console.log('initializeSequence: started', { isInitialized });
       if (isInitialized) return;
       isInitialized = true;
       setIsLoadingAuth(true);
       setAuthError(null);
-      
+
       try {
-        console.log('initializeSequence: calling getSession...');
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('initializeSequence: getSession returned:', { session, error });
         if (error) throw error;
         if (session?.user) {
           // Process any pending invitations synchronously before loading the profile
@@ -168,14 +155,12 @@ export const AuthProvider = ({ children }) => {
           setUserProfile(null);
         }
       } catch (err) {
-        console.log('initializeSequence: error caught:', err);
         if (isMounted) {
           setAuthError(err);
           setUser(null);
           setUserProfile(null);
         }
       } finally {
-        console.log('initializeSequence: finally setting isLoadingAuth false');
         if (isMounted) setIsLoadingAuth(false);
       }
     };
@@ -185,8 +170,6 @@ export const AuthProvider = ({ children }) => {
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
-        console.log('[Auth] State change event:', event);
-        
         if (event === 'INITIAL_SESSION') return; // Handled by initializeSequence
         
         const currentUser = session?.user ?? null;

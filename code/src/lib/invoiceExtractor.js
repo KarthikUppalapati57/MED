@@ -278,7 +278,6 @@ function fileToBase64(file) {
 
 // ── Main Extract Function ───────────────────────────────────
 export async function extractInvoiceData(file, onProgress) {
-  console.log('Starting extraction for file:', file.name, file.type);
   onProgress?.('Preparing file...');
 
   if (file.name.toLowerCase().includes('usfoods') || file.name.toLowerCase().includes('us_foods')) {
@@ -355,7 +354,6 @@ export async function extractInvoiceData(file, onProgress) {
 
       onProgress?.('AI is analyzing your invoice...');
       const result = await extractWithOpenAI(base64, mimeType);
-      console.log('OpenAI Extraction Result:', result);
       onProgress?.('Extraction complete!');
       return { ...result, extraction_method: 'openai_vision' };
     } else {
@@ -363,7 +361,6 @@ export async function extractInvoiceData(file, onProgress) {
       
       try {
         const result = await extractWithClientOCR(file);
-        console.log('Tesseract OCR Result:', result);
         onProgress?.('Extraction complete!');
         return { ...result, extraction_method: 'tesseract_ocr' };
       } catch (err) {

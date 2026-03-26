@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster } from "sonner"
+import { Toaster as SonnerToaster, toast } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
@@ -414,7 +414,6 @@ function LoginPage() {
 // ── Authenticated App ──────────────────────────────────────
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role } = useAuth();
-  const navigate = useNavigate();
 
   // SaaS Redirection Logic
   const needsOnboarding = user && !role?.includes('platform_admin') && !userProfile?.organization_id;
