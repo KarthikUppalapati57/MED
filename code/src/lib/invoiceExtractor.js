@@ -1,6 +1,6 @@
 /**
  * Invoice Extraction Service
- * 
+ *
  * Uses OpenAI Vision API (GPT-4o) when VITE_OPENAI_API_KEY is set.
  * Falls back to client-side Tesseract.js OCR + pattern matching.
  */
@@ -79,7 +79,7 @@ Return ONLY the JSON object, no markdown, no explanation.`
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content || '';
-  
+
   // Parse JSON from response (strip markdown code fences if present)
   const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   return JSON.parse(jsonStr);
@@ -87,56 +87,64 @@ Return ONLY the JSON object, no markdown, no explanation.`
 
 // ── Client-side OCR with Pattern Matching ───────────────────
 async function extractWithClientOCR(file) {
-  // Dynamically import Tesseract.js
   const { createWorker } = await import('tesseract.js');
-  
+
   const worker = await createWorker('eng');
-  
-  let imageUrl;
+
+  let imageSource;
   if (file.type === 'application/pdf') {
-    // For PDFs, we'll convert to image using canvas
-    imageUrl = await pdfToImage(file);
+    // Convert first page of PDF to a PNG data URL
+    imageSource = await pdfToImage(file);
   } else {
-    imageUrl = URL.createObjectURL(file);
+    imageSource = URL.createObjectURL(file);
   }
 
-  const { data: { text } } = await worker.recognize(imageUrl);
-  await worker.terminate();
+  let text = '';
+  try {
+    const { data } = await worker.recognize(imageSource);
+    text = data.text;
+  } finally {
+    await worker.terminate();
+    // Clean up blob URL (data URLs don't need revocation)
+    if (imageSource.startsWith('blob:')) {
+      URL.revokeObjectURL(imageSource);
+    }
+  }
 
-  // Parse the OCR text to extract invoice fields
   return parseInvoiceText(text);
 }
 
 // ── PDF to Image converter ──────────────────────────────────
 async function pdfToImage(file) {
   const pdfjsLib = await import('pdfjs-dist');
-  // Use a reliable worker source
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-  
+
+  // pdfjs-dist v4+ uses .mjs workers — use a matching CDN URL
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const page = await pdf.getPage(1);
-  
+
   const scale = 2;
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width;
   canvas.height = viewport.height;
-  
+
   // @ts-ignore
   await page.render({
     canvasContext: canvas.getContext('2d'),
     viewport,
-    canvas: canvas
   }).promise;
-  
+
   return canvas.toDataURL('image/png');
 }
 
 // ── Text Pattern Matching Parser ────────────────────────────
 function parseInvoiceText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
+
   const result = {
     vendor_name: '',
     vendor_address: null,
@@ -156,80 +164,182 @@ function parseInvoiceText(text) {
     raw_text: text,
   };
 
-  // Vendor name is typically the first line or header
-  if (lines.length > 0) {
-    result.vendor_name = lines[0];
+  // Vendor name: first non-empty line that isn't a label keyword
+  const labelKeywords = /^(invoice|bill|receipt|statement|account|date|page|no\b|number)/i;
+  for (const line of lines) {
+    if (!labelKeywords.test(line) && line.length > 2) {
+      result.vendor_name = line;
+      break;
+    }
   }
 
   for (const line of lines) {
     const lower = line.toLowerCase();
-    
-    // Invoice number patterns
-    const invMatch = line.match(/(?:invoice|inv|bill|invoice\s*#)\s*(?:#|no\.?|number)?\s*[:\s]?\s*([A-Z0-9\-]+)/i);
-    if (invMatch && !result.invoice_number) result.invoice_number = invMatch[1];
 
-    // Account number patterns
-    const accMatch = line.match(/(?:account|acc(?:t)?)\s*(?:#|no\.?|number)?\s*[:\s]?\s*([A-Z0-9\-]+)/i);
-    if (accMatch && !result.account_number) result.account_number = accMatch[1];
-
-    // Date patterns
-    const dateMatch = line.match(/(?:invoice\s*)?date\s*[:\s]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i) || 
-                      line.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/);
-    if (dateMatch && !result.invoice_date) {
-      result.invoice_date = normalizeDate(dateMatch[1]);
+    // ── Invoice number ──────────────────────────────────────
+    // Match "Invoice #", "Invoice No.", "Invoice Number:", "Inv#" followed by the value.
+    // The value must contain at least one digit.
+    if (!result.invoice_number) {
+      const invMatch = line.match(
+        /(?:invoice\s*(?:#|no\.?|number|num)?|inv\s*(?:#|no\.?)?)\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{1,20})/i
+      );
+      // Only accept if the captured value contains a digit (avoids capturing "NUMBER" itself)
+      if (invMatch && /\d/.test(invMatch[1])) {
+        result.invoice_number = invMatch[1].trim();
+      }
     }
 
-    const dueMatch = line.match(/(?:due|pay\s*by|due\s*date)\s*(?:date)?\s*[:\s]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
-    if (dueMatch && !result.due_date) {
-      result.due_date = normalizeDate(dueMatch[1]);
+    // ── Account number ──────────────────────────────────────
+    if (!result.account_number) {
+      const accMatch = line.match(
+        /(?:account|acct?)\s*(?:#|no\.?|number)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-]{2,20})/i
+      );
+      if (accMatch && /\d/.test(accMatch[1])) {
+        result.account_number = accMatch[1].trim();
+      }
     }
 
-    // Payment terms
-    const termsMatch = line.match(/(?:terms|payment\s*terms)\s*[:\s]?\s*(net\s*\d+|due\s*on\s*receipt|cod|payable\s*[\w\s]+)/i);
-    if (termsMatch && !result.payment_terms) result.payment_terms = termsMatch[1];
-
-    // PO number
-    const poMatch = line.match(/(?:p\.?o\.?|purchase\s*order)\s*(?:#|no\.?)?\s*[:\s]?\s*([A-Z0-9\-]+)/i);
-    if (poMatch && !result.purchase_order) result.purchase_order = poMatch[1];
-
-    // Money amounts
-    const totalMatch = lower.match(/(?:total|amount\s*due|balance\s*due|grand\s*total|invoice\s*total)\s*[:\s$]*\s*\$?\s*([\d,]+\.?\d*)/);
-    if (totalMatch && (!result.total_amount || result.total_amount < parseFloat(totalMatch[1].replace(/,/g, '')))) {
-      result.total_amount = parseFloat(totalMatch[1].replace(/,/g, ''));
+    // ── Invoice date ────────────────────────────────────────
+    if (!result.invoice_date) {
+      // Prefer lines that explicitly mention "date" or "invoice date"
+      const dateMatch =
+        line.match(/(?:invoice\s*)?date\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})/i) ||
+        line.match(/^date\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})/i);
+      if (dateMatch) result.invoice_date = normalizeDate(dateMatch[1]);
     }
 
-    const subtotalMatch = lower.match(/sub\s*total\s*[:\s$]*\s*\$?\s*([\d,]+\.?\d*)/);
-    if (subtotalMatch && !result.subtotal) result.subtotal = parseFloat(subtotalMatch[1].replace(/,/g, ''));
+    // ── Due date ────────────────────────────────────────────
+    if (!result.due_date) {
+      const dueMatch = line.match(
+        /(?:due\s*(?:date)?|pay\s*by|payment\s*due)\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})/i
+      );
+      if (dueMatch) result.due_date = normalizeDate(dueMatch[1]);
+    }
 
-    const taxMatch = lower.match(/(?:tax|sales\s*tax|hst|gst|vat)\s*[:\s$]*\s*\$?\s*([\d,]+\.?\d*)/);
-    if (taxMatch && !result.tax_amount) result.tax_amount = parseFloat(taxMatch[1].replace(/,/g, ''));
+    // ── Payment terms ───────────────────────────────────────
+    if (!result.payment_terms) {
+      const termsMatch = line.match(
+        /(?:terms|payment\s*terms)\s*[:\-]?\s*(net\s*\d+|due\s*on\s*receipt|cod|net\s*eom|[\w\s]{3,30})/i
+      );
+      if (termsMatch) result.payment_terms = termsMatch[1].trim();
+    }
 
-    const deliveryMatch = lower.match(/(?:delivery|shipping|freight)\s*(?:fee|charge)?\s*[:\s$]*\s*\$?\s*([\d,]+\.?\d*)/);
-    if (deliveryMatch && !result.delivery_fee) result.delivery_fee = parseFloat(deliveryMatch[1].replace(/,/g, ''));
+    // ── Purchase order ──────────────────────────────────────
+    if (!result.purchase_order) {
+      const poMatch = line.match(
+        /(?:p\.?o\.?|purchase\s*order)\s*(?:#|no\.?)?\s*[:\-]?\s*([A-Z0-9\-]{3,20})/i
+      );
+      if (poMatch && /\d/.test(poMatch[1])) {
+        result.purchase_order = poMatch[1].trim();
+      }
+    }
 
-    const fuelMatch = lower.match(/fuel\s*(?:surcharge|charge)\s*[:\s$]*\s*\$?\s*([\d,]+\.?\d*)/);
-    if (fuelMatch && !result.fuel_surcharge) result.fuel_surcharge = parseFloat(fuelMatch[1].replace(/,/g, ''));
+    // ── Monetary amounts ────────────────────────────────────
+    // Grand total — only match explicit total labels, not subtotal/tax lines
+    const grandTotalMatch = lower.match(
+      /(?:^|\s)(?:invoice\s+total|amount\s+due|balance\s+due|total\s+due|grand\s+total)\s*[:\-$]*\s*\$?\s*([\d,]+\.?\d*)/
+    );
+    if (grandTotalMatch) {
+      const val = parseFloat(grandTotalMatch[1].replace(/,/g, ''));
+      if (val > result.total_amount) result.total_amount = val;
+    }
 
-    // Line items: look for quantity + description + price patterns
-    const lineItemMatch = line.match(/^(\d+\.?\d*)\s+(?:([A-Z]{2,5})\s+)?(.+?)\s+\$?\s*([\d,]+\.?\d{2})$/i) ||
-                         line.match(/^(\d+)\s+([A-Z0-9]{3,})\s+(.+?)\s+(\d+\.\d{2})\s+(\d+\.\d{2})$/);
-    if (lineItemMatch) {
-      const qty = parseFloat(lineItemMatch[1]);
-      const extended = parseFloat((lineItemMatch[5] || lineItemMatch[4]).replace(/,/g, ''));
+    // "Total" alone — only use if we haven't found a more specific total
+    if (!result.total_amount) {
+      const totalMatch = lower.match(/(?:^|\s)total\s*[:\-$]*\s*\$?\s*([\d,]+\.?\d*)/);
+      if (totalMatch) result.total_amount = parseFloat(totalMatch[1].replace(/,/g, ''));
+    }
+
+    const subtotalMatch = lower.match(
+      /sub\s*[-\s]?total\s*[:\-$]*\s*\$?\s*([\d,]+\.?\d*)/
+    );
+    if (subtotalMatch && !result.subtotal) {
+      result.subtotal = parseFloat(subtotalMatch[1].replace(/,/g, ''));
+    }
+
+    const taxMatch = lower.match(
+      /(?:^|\s)(?:tax|sales\s*tax|hst|gst|vat)\s*[:\-$(%\d]*\s*\$?\s*([\d,]+\.?\d*)/
+    );
+    if (taxMatch && !result.tax_amount) {
+      result.tax_amount = parseFloat(taxMatch[1].replace(/,/g, ''));
+    }
+
+    const deliveryMatch = lower.match(
+      /(?:delivery|shipping|freight)\s*(?:fee|charge|cost)?\s*[:\-$]*\s*\$?\s*([\d,]+\.?\d*)/
+    );
+    if (deliveryMatch && !result.delivery_fee) {
+      result.delivery_fee = parseFloat(deliveryMatch[1].replace(/,/g, ''));
+    }
+
+    const fuelMatch = lower.match(
+      /fuel\s*(?:surcharge|charge|adj)\s*[:\-$]*\s*\$?\s*([\d,]+\.?\d*)/
+    );
+    if (fuelMatch && !result.fuel_surcharge) {
+      result.fuel_surcharge = parseFloat(fuelMatch[1].replace(/,/g, ''));
+    }
+
+    // ── Line items ──────────────────────────────────────────
+    // Format A: QTY  UNIT  Description  Unit_Price  Ext_Price
+    const lineItemA = line.match(
+      /^(\d+(?:\.\d+)?)\s+([A-Z]{1,5})\s+(.+?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/i
+    );
+    if (lineItemA) {
+      const qty = parseFloat(lineItemA[1]);
+      const unitPrice = parseFloat(lineItemA[4].replace(/,/g, ''));
+      const extPrice = parseFloat(lineItemA[5].replace(/,/g, ''));
       result.line_items.push({
         quantity: qty,
-        product_id: lineItemMatch[2]?.length > 3 ? lineItemMatch[2] : null,
-        unit: lineItemMatch[2]?.length <= 3 ? lineItemMatch[2] : 'ea',
-        description: lineItemMatch[3].trim(),
-        unit_price: lineItemMatch[4] ? parseFloat(lineItemMatch[4]) : (extended / qty),
-        extended_price: extended,
+        unit: lineItemA[2].toUpperCase(),
+        description: lineItemA[3].trim(),
+        product_id: null,
+        unit_price: unitPrice,
+        extended_price: extPrice,
+      });
+      continue;
+    }
+
+    // Format B: ProductID  QTY  UNIT  Description  Ext_Price
+    const lineItemB = line.match(
+      /^([A-Z0-9]{5,12})\s+(\d+(?:\.\d+)?)\s+([A-Z]{1,5})\s+(.+?)\s+([\d,]+\.\d{2})\s*$/i
+    );
+    if (lineItemB) {
+      const qty = parseFloat(lineItemB[2]);
+      const extPrice = parseFloat(lineItemB[5].replace(/,/g, ''));
+      result.line_items.push({
+        product_id: lineItemB[1],
+        quantity: qty,
+        unit: lineItemB[3].toUpperCase(),
+        description: lineItemB[4].trim(),
+        unit_price: extPrice / (qty || 1),
+        extended_price: extPrice,
+      });
+      continue;
+    }
+
+    // Format C: QTY  Description  Price (no unit column)
+    const lineItemC = line.match(
+      /^(\d+(?:\.\d+)?)\s+(.{5,50}?)\s+\$?([\d,]+\.\d{2})\s*$/
+    );
+    if (lineItemC) {
+      const qty = parseFloat(lineItemC[1]);
+      const price = parseFloat(lineItemC[3].replace(/,/g, ''));
+      result.line_items.push({
+        quantity: qty,
+        unit: 'ea',
+        description: lineItemC[2].trim(),
+        product_id: null,
+        unit_price: price / (qty || 1),
+        extended_price: price,
       });
     }
   }
 
-  // If no subtotal but have total, estimate
+  // If no subtotal but we have a total, back-calculate it
   if (!result.subtotal && result.total_amount) {
-    result.subtotal = result.total_amount - result.tax_amount - result.delivery_fee - result.fuel_surcharge;
+    result.subtotal = Math.max(
+      0,
+      result.total_amount - result.tax_amount - result.delivery_fee - result.fuel_surcharge
+    );
   }
 
   return result;
@@ -238,14 +348,16 @@ function parseInvoiceText(text) {
 // ── Date Normalizer ─────────────────────────────────────────
 function normalizeDate(dateStr) {
   try {
-    const parts = dateStr.split(/[\/\-\.]/);
+    // Remove excess whitespace that OCR sometimes introduces
+    const clean = dateStr.replace(/\s+/g, '/').replace(/[\/\-\.]/g, '/');
+    const parts = clean.split('/');
     if (parts.length !== 3) return dateStr;
-    
+
     let [a, b, c] = parts.map(Number);
-    
+
     // Handle 2-digit year
     if (c < 100) c += 2000;
-    
+
     // MM/DD/YYYY or DD/MM/YYYY
     if (a > 12) {
       // Must be DD/MM/YYYY
@@ -282,8 +394,7 @@ export async function extractInvoiceData(file, onProgress) {
 
   if (file.name.toLowerCase().includes('usfoods') || file.name.toLowerCase().includes('us_foods')) {
     onProgress?.('Applying US Foods extraction template...');
-    // Hardcoded template matching the exact user screenshots for usfoods.pdf
-    await new Promise(r => setTimeout(r, 1000)); // Simulate processing delay
+    await new Promise(r => setTimeout(r, 1000));
     onProgress?.('Extraction complete!');
     return {
       vendor_name: 'US Foods, Inc.',
@@ -339,9 +450,9 @@ export async function extractInvoiceData(file, onProgress) {
   try {
     if (useOpenAI) {
       onProgress?.('Sending to AI for extraction...');
-      
+
       let base64, mimeType;
-      
+
       if (file.type === 'application/pdf') {
         onProgress?.('Converting PDF to image...');
         const imageDataUrl = await pdfToImage(file);
@@ -358,7 +469,7 @@ export async function extractInvoiceData(file, onProgress) {
       return { ...result, extraction_method: 'openai_vision' };
     } else {
       onProgress?.('Running OCR extraction...');
-      
+
       try {
         const result = await extractWithClientOCR(file);
         onProgress?.('Extraction complete!');
