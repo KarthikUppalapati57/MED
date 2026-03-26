@@ -141,11 +141,24 @@ export default function UserManagement() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.User.update(id, data),
+    mutationFn: ({ id, data }) => api.admin.updateUserRole({
+      targetUserId: id,
+      newRole: data.role,
+      newStatus: data.status || null,
+      newDepartment: data.department || null,
+      newLocation: data.location || null,
+      newPermissions: data.permissions || null,
+      newBrandId: data.brand_id || null,
+      newLocationId: data.location_id || null,
+      newAccessLevel: data.access_level || null,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('User updated');
+      toast.success('User updated securely');
       setEditDialogOpen(false);
+    },
+    onError: (err) => {
+      toast.error('Failed to update user: ' + (err.message || 'Unknown error'));
     },
   });
 
@@ -154,6 +167,9 @@ export default function UserManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('User removed');
+    },
+    onError: (err) => {
+      toast.error('Failed to delete user: ' + (err.message || 'Unknown error'));
     },
   });
 
@@ -476,7 +492,11 @@ export default function UserManagement() {
                               </DropdownMenuItem>
                               {canSuperDelete && (
                                 <DropdownMenuItem 
-                                  onClick={() => deleteMutation.mutate(user.id)}
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to permanently delete ${user.full_name || user.email}? This cannot be undone.`)) {
+                                      deleteMutation.mutate(user.id);
+                                    }
+                                  }}
                                   className="text-red-600"
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" /> Delete

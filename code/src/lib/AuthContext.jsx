@@ -138,32 +138,9 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
 
-        // Sync Org ID and Role to JWT if missing or changed (fire and forget to not block UI)
-        const currentMetadata = sessionUser.user_metadata || {};
-        const safeValue = (val) => (val === undefined || val === null) ? null : val;
-        
-        const needsSync = 
-          safeValue(profile.organization_id) !== safeValue(currentMetadata.organization_id) ||
-          safeValue(profile.role) !== safeValue(currentMetadata.role) ||
-          safeValue(profile.brand_id) !== safeValue(currentMetadata.brand_id) ||
-          safeValue(profile.location_id) !== safeValue(currentMetadata.location_id);
-
-        if (needsSync) {
-          supabase.auth.updateUser({
-            data: { 
-              organization_id: profile.organization_id,
-              role: profile.role,
-              brand_id: profile.brand_id,
-              location_id: profile.location_id
-            }
-          }).catch(err => {
-            if (err.message?.includes('Lock broken')) {
-              console.log('Silent metadata sync: auth lock handled');
-            } else {
-              console.warn('Silent user metadata update failed:', err);
-            }
-          });
-        }
+        // NOTE: JWT metadata sync is now handled server-side by the
+        // admin_update_user_role() RPC function. Client-side metadata
+        // updates have been removed to prevent privilege escalation.
       } else {
         setUser(sessionUser);
         setUserProfile(null);

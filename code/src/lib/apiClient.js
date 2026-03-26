@@ -86,16 +86,15 @@ export const api = {
         brand_id: brand.id,
       });
 
-      // 4. Update Profile
-      await api.entities.User.update(userId, {
-        organization_id: org.id,
-        brand_id: brand.id,
-        location_id: location.id,
-        role: 'owner',
-        access_level: 'organization',
+      // 4. Complete onboarding via secure RPC (updates profile + JWT metadata server-side)
+      const { error } = await supabase.rpc('complete_onboarding', {
+        p_user_id: userId,
+        p_org_id: org.id,
+        p_brand_id: brand.id,
+        p_location_id: location.id,
       });
+      if (error) throw error;
 
-      // 5. Auth metadata now automatically synced by AuthContext when profile updates
       return { org, brand, location };
     },
   },
@@ -109,6 +108,34 @@ export const api = {
         throw error || new Error('Not authenticated');
       }
       return user;
+    },
+  },
+  admin: {
+    /** Securely update a user's role via server-side RPC (prevents privilege escalation) */
+    updateUserRole: async ({
+      targetUserId,
+      newRole,
+      newStatus = null,
+      newDepartment = null,
+      newLocation = null,
+      newPermissions = null,
+      newBrandId = null,
+      newLocationId = null,
+      newAccessLevel = null,
+    }) => {
+      const { data, error } = await supabase.rpc('admin_update_user_role', {
+        target_user_id: targetUserId,
+        new_role: newRole,
+        new_status: newStatus,
+        new_department: newDepartment,
+        new_location: newLocation,
+        new_permissions: newPermissions,
+        new_brand_id: newBrandId,
+        new_location_id: newLocationId,
+        new_access_level: newAccessLevel,
+      });
+      if (error) throw error;
+      return data;
     },
   },
 };
