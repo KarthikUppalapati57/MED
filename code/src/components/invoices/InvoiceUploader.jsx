@@ -89,7 +89,6 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
         raw_text: extractedData.raw_text || '',
       };
 
-      console.log('Final Prepared Invoice Data:', invoiceData);
       onInvoiceExtracted(invoiceData);
       onOpenChange(false);
 

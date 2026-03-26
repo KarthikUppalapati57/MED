@@ -97,7 +97,7 @@ export default function ValidationDialog({
     });
 
     const inv = currentInvoiceRef.current;
-    console.log("[Validation] Starting checks for:", inv?.invoice_number);
+
 
     try {
       // 1. Duplicate Check
@@ -133,7 +133,7 @@ export default function ValidationDialog({
       await new Promise(r => setTimeout(r, 600));
       setResults(prev => ({ ...prev, delivery_match: 'pass' }));
       
-      console.log("[Validation] All checks completed");
+
     } catch (err) {
       console.error("[Validation] Global failure:", err);
     } finally {
