@@ -67,35 +67,24 @@ export const api = {
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
-      // 1. Create Organization
-      const org = await api.entities.Organization.create({
-        ...orgData,
-        owner_id: userId,
-      });
-
-      // 2. Create Brand
-      const brand = await api.entities.Brand.create({
-        organization_id: org.id,
-        name: brandName,
-      });
-
-      // 3. Create First Location
-      const location = await api.entities.Location.create({
-        ...locationData,
-        organization_id: org.id,
-        brand_id: brand.id,
-      });
-
-      // 4. Complete onboarding via secure RPC (updates profile + JWT metadata server-side)
-      const { error } = await supabase.rpc('complete_onboarding', {
+      // Execute the entire onboarding process as a single atomic transaction.
+      // If any step fails, all steps are rolled back to prevent orphaned records.
+      const { data, error } = await supabase.rpc('setup_organization_full', {
         p_user_id: userId,
-        p_org_id: org.id,
-        p_brand_id: brand.id,
-        p_location_id: location.id,
+        p_org_name: orgData.name,
+        p_org_slug: orgData.slug,
+        p_brand_name: brandName,
+        p_location_name: locationData.name,
+        p_location_address: locationData.address
       });
+      
       if (error) throw error;
 
-      return { org, brand, location };
+      return { 
+        org: { id: data.org_id, ...orgData }, 
+        brand: { id: data.brand_id, name: brandName }, 
+        location: { id: data.location_id, ...locationData } 
+      };
     },
   },
   auth: {
