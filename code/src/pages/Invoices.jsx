@@ -100,6 +100,10 @@ export default function Invoices() {
     if (cleaned.file_url && cleaned.file_url.startsWith('blob:')) {
       delete cleaned.file_url;
     }
+    
+    // Remove extremely large texts that cause Supabase timeout errors
+    delete cleaned.raw_text;
+    
     // Remove fields that are not in the DB schema
     delete cleaned.id; // Don't send id on create, it's auto-generated
     // Ensure numeric fields are properly typed
