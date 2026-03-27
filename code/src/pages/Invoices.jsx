@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -72,6 +73,7 @@ export default function Invoices() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
 
+  const { userProfile } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -82,6 +84,18 @@ export default function Invoices() {
   // Sanitize invoice data before saving to Supabase
   const sanitizeInvoiceData = (data) => {
     const cleaned = { ...data };
+    
+    // Auto-inject context fields for RLS if missing
+    if (!cleaned.organization_id && userProfile?.organization_id) {
+      cleaned.organization_id = userProfile.organization_id;
+    }
+    if (!cleaned.location_id && userProfile?.location_id) {
+      cleaned.location_id = userProfile.location_id;
+    }
+    if (!cleaned.created_by && userProfile?.id) {
+      cleaned.created_by = userProfile.id;
+    }
+
     // Remove blob URLs (they won't persist across sessions)
     if (cleaned.file_url && cleaned.file_url.startsWith('blob:')) {
       delete cleaned.file_url;
@@ -98,7 +112,7 @@ export default function Invoices() {
     if (!cleaned.vendor_id) delete cleaned.vendor_id;
     // Remove null/undefined approved_by (it's a UUID column) 
     if (!cleaned.approved_by) delete cleaned.approved_by;
-    // Remove null/undefined organization_id and location_id
+    // Remove null/undefined organization_id and location_id (if still missing)
     if (!cleaned.organization_id) delete cleaned.organization_id;
     if (!cleaned.location_id) delete cleaned.location_id;
     if (!cleaned.created_by) delete cleaned.created_by;
