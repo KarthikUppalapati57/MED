@@ -44,15 +44,14 @@ export async function extractInvoiceData(file, onProgress) {
     } catch (authError) {
       console.warn('[extractInvoiceData] Warning: Could not get local session (may have timed out). Proceeding with anon key.', authError);
     }
-
+    
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
     };
 
-    // Add Authorization header if user is authenticated
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
+    // Add Authorization header: use user's JWT if available; otherwise, fallback to the anon key.
+    // The Supabase Edge Function Gateway requires a Bearer token in all requests.
+    headers['Authorization'] = `Bearer ${accessToken || SUPABASE_ANON_KEY}`;
 
     console.log('[extractInvoiceData] Getting ready to call Edge Function...');
     onProgress?.('Sending to AI for extraction...');
