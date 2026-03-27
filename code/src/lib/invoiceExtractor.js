@@ -23,6 +23,7 @@ const EXTRACT_INVOICE_URL = `${SUPABASE_URL}/functions/v1/extract-invoice`;
  * @returns {Promise<Object>} Extracted invoice data
  */
 export async function extractInvoiceData(file, onProgress) {
+  console.log('[extractInvoiceData] Started extraction process for file:', file?.name);
   onProgress?.('Preparing file for upload...');
 
   try {
@@ -30,9 +31,19 @@ export async function extractInvoiceData(file, onProgress) {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Get the user's JWT for authenticated requests
-    const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
+    console.log('[extractInvoiceData] Checking session...');
+    let accessToken = null;
+    
+    try {
+      // Prevent getSession from hanging indefinitely (known Supabase lock issue)
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 3000));
+      const result = await Promise.race([sessionPromise, timeoutPromise]);
+      accessToken = result?.data?.session?.access_token;
+      console.log('[extractInvoiceData] Session retrieved safely.');
+    } catch (authError) {
+      console.warn('[extractInvoiceData] Warning: Could not get local session (may have timed out). Proceeding with anon key.', authError);
+    }
 
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
@@ -43,13 +54,18 @@ export async function extractInvoiceData(file, onProgress) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
+    console.log('[extractInvoiceData] Getting ready to call Edge Function...');
     onProgress?.('Sending to AI for extraction...');
 
     // 130 second client-side timeout (server has 150s limit)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 130000);
+    const timeoutId = setTimeout(() => {
+      console.warn('[extractInvoiceData] Client-side fetch timeout triggered.');
+      controller.abort();
+    }, 130000);
 
     let response;
+    console.log('[extractInvoiceData] Calling fetch on:', EXTRACT_INVOICE_URL);
     try {
       response = await fetch(EXTRACT_INVOICE_URL, {
         method: 'POST',
@@ -57,7 +73,9 @@ export async function extractInvoiceData(file, onProgress) {
         body: formData,
         signal: controller.signal,
       });
+      console.log('[extractInvoiceData] Fetch returned response with status:', response.status);
     } catch (fetchErr) {
+      console.error('[extractInvoiceData] Fetch threw an error:', fetchErr);
       clearTimeout(timeoutId);
       if (fetchErr.name === 'AbortError') {
         throw new Error('Extraction timed out. The file may be too large or complex. Please try a smaller file or a single-page image.');
@@ -67,6 +85,7 @@ export async function extractInvoiceData(file, onProgress) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.error('[extractInvoiceData] Server returned non-ok status.', response.status);
       const errorData = await response.json().catch(() => ({}));
       const errorMsg = errorData.error || errorData.detail || `Server error: ${response.status}`;
       throw new Error(errorMsg);
