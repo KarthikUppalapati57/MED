@@ -2,8 +2,10 @@
  * Invoice Extraction Service
  *
  * Sends documents to the Supabase Edge Function for extraction.
- * The Edge Function uses OpenAI Vision (GPT-4o) for structured extraction.
+ * The Edge Function uses Gemini for structured extraction.
  */
+
+import { supabase } from '@/lib/supabaseClient';
 
 // @ts-ignore
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -28,15 +30,41 @@ export async function extractInvoiceData(file, onProgress) {
     const formData = new FormData();
     formData.append('file', file);
 
-    onProgress?.('Sending to Docling AI for extraction...');
+    // Get the user's JWT for authenticated requests
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
 
-    const response = await fetch(EXTRACT_INVOICE_URL, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-      },
-      body: formData,
-    });
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+    };
+
+    // Add Authorization header if user is authenticated
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    onProgress?.('Sending to AI for extraction...');
+
+    // 130 second client-side timeout (server has 150s limit)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 130000);
+
+    let response;
+    try {
+      response = await fetch(EXTRACT_INVOICE_URL, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        throw new Error('Extraction timed out. The file may be too large or complex. Please try a smaller file or a single-page image.');
+      }
+      throw fetchErr;
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -66,7 +94,7 @@ export async function extractInvoiceData(file, onProgress) {
       other_charges: result.other_charges || 0,
       total_amount: result.total_amount || 0,
       line_items: result.line_items || [],
-      extraction_method: result.extraction_method || 'docling',
+      extraction_method: result.extraction_method || 'gemini',
       raw_text: result.raw_text || '',
     };
   } catch (err) {
