@@ -448,6 +448,8 @@ const AuthenticatedApp = () => {
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       ) : (
         <>
+          {/* Redirect /login to / when already authenticated (handles post-verification redirect) */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route
             path="/"
             element={
