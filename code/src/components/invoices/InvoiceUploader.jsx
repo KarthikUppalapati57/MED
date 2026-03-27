@@ -93,10 +93,8 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
       onOpenChange(false);
 
       const method = extractedData.extraction_method;
-      if (method === 'openai_vision') {
-        toast.success('Invoice extracted with AI! Please review the details.');
-      } else if (method === 'tesseract_ocr') {
-        toast.success('Invoice scanned with OCR. Some fields may need correction.');
+      if (method === 'docling') {
+        toast.success('Invoice extracted with Docling AI! Please review the details.');
       } else {
         toast.success('Invoice uploaded. Please fill in the details manually.');
       }
@@ -188,9 +186,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                     <span className="text-xs text-amber-600 font-medium">
-                      {import.meta.env.VITE_OPENAI_API_KEY 
-                        ? 'AI-Powered Extraction (GPT-4o)' 
-                        : 'OCR Extraction Enabled'}
+                      Docling AI-Powered Extraction
                     </span>
                   </div>
                   <Input
