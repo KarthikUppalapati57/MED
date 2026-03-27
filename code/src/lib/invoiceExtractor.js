@@ -1,16 +1,20 @@
 /**
  * Invoice Extraction Service
  *
- * Sends documents to the Docling-powered Python backend for extraction.
- * The backend uses Docling for document parsing and OpenAI for structured extraction.
+ * Sends documents to the Supabase Edge Function for extraction.
+ * The Edge Function uses OpenAI Vision (GPT-4o) for structured extraction.
  */
 
 // @ts-ignore
-const DOCLING_API_URL = import.meta.env.VITE_DOCLING_API_URL || 'http://localhost:8000';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// @ts-ignore
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const EXTRACT_INVOICE_URL = `${SUPABASE_URL}/functions/v1/extract-invoice`;
 
 /**
  * Main extraction entry point.
- * Sends the file to the Docling backend and returns structured invoice data.
+ * Sends the file to the Supabase Edge Function and returns structured invoice data.
  *
  * @param {File} file - The invoice file (PDF, PNG, JPG, etc.)
  * @param {(msg: string) => void} [onProgress] - Optional progress callback
@@ -26,14 +30,17 @@ export async function extractInvoiceData(file, onProgress) {
 
     onProgress?.('Sending to Docling AI for extraction...');
 
-    const response = await fetch(`${DOCLING_API_URL}/extract-invoice`, {
+    const response = await fetch(EXTRACT_INVOICE_URL, {
       method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+      },
       body: formData,
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.detail || `Server error: ${response.status}`;
+      const errorMsg = errorData.error || errorData.detail || `Server error: ${response.status}`;
       throw new Error(errorMsg);
     }
 
@@ -63,16 +70,7 @@ export async function extractInvoiceData(file, onProgress) {
       raw_text: result.raw_text || '',
     };
   } catch (err) {
-    console.error('Docling extraction error:', err);
-
-    // If the backend is unreachable, provide a clear message
-    if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-      throw new Error(
-        'Cannot connect to extraction server. Please ensure the Docling backend is running on ' +
-        DOCLING_API_URL
-      );
-    }
-
+    console.error('Invoice extraction error:', err);
     throw err;
   }
 }
