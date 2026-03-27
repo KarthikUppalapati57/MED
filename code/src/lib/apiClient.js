@@ -86,6 +86,13 @@ export const api = {
         location: { id: data.location_id, ...locationData } 
       };
     },
+    acceptInvitation: async (token) => {
+      const { data, error } = await supabase.rpc('accept_invitation', {
+        p_token: token
+      });
+      if (error) throw error;
+      return data;
+    },
   },
   auth: {
     me: async () => {

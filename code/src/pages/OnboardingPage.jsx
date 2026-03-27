@@ -21,6 +21,7 @@ export default function OnboardingPage() {
     brandName: '',
     locationName: '',
     address: '',
+    orgSlugManual: false,
   });
 
   const handleInputChange = (e) => {
@@ -39,9 +40,18 @@ export default function OnboardingPage() {
   const prevStep = () => setStep((s) => s - 1);
 
   const handleSubmit = async () => {
-    if (!user) return;
+    if (!user) {
+      toast.error('You must be logged in to complete onboarding');
+      return;
+    }
+    
     setLoading(true);
     try {
+      // Validate inputs before calling RPC
+      if (!formData.orgName || !formData.orgSlug || !formData.brandName || !formData.locationName) {
+        throw new Error('Please fill in all required fields');
+      }
+
       await api.onboarding.setupOrgAndFirstLocation(
         user.id,
         { name: formData.orgName, slug: formData.orgSlug },
@@ -51,16 +61,22 @@ export default function OnboardingPage() {
 
       toast.success('Onboarding complete! Welcome to the platform.');
       
-      // Refresh profile in context
+      // Force refresh of the user profile and trigger SaaS redirection logic in App.jsx
       await refreshProfile();
       
-      // Redirect to dashboard
-      navigate('/');
+      // Minor delay to ensure state propagates before navigation
+      setTimeout(() => navigate('/'), 500);
     } catch (error) {
       console.error('Onboarding failed:', error);
-      toast.error(error.message || 'Failed to complete onboarding');
-    } finally {
-      setLoading(false);
+      // Handle Postgres unique constraint violation for slug
+      const message = error.message?.includes('organizations_slug_key') 
+        ? 'This organization slug is already taken. Please try a different one.' 
+        : (error.message || 'Failed to complete onboarding');
+      
+      toast.error(message, {
+        duration: 5000,
+      });
+      setLoading(false); // Ensure loading is reset on error to allow retry
     }
   };
 

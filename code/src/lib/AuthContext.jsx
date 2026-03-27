@@ -27,37 +27,9 @@ export const AuthProvider = ({ children }) => {
         .maybeSingle();
       
       if (invite) {
-        
-        // Mark invitation as accepted
-        await supabase
-          .from('invitations')
-          .update({ accepted_at: new Date().toISOString() })
-          .eq('id', invite.id);
-
-        // Update Profile with hierarchy info
-        const profileUpdates = { 
-          role: invite.role,
-          organization_id: invite.organization_id,
-          brand_id: invite.brand_id,
-          location_id: invite.location_id,
-          access_level: invite.access_level || 'location'
-        };
-
-        await supabase
-          .from('profiles')
-          .update(profileUpdates)
-          .eq('id', userId);
-
-        // Update Auth Metadata (Strict Tenant Isolation)
-        await supabase.auth.updateUser({
-          data: { 
-            role: invite.role,
-            organization_id: invite.organization_id,
-            brand_id: invite.brand_id,
-            location_id: invite.location_id
-          }
-        });
-
+        // Use secure RPC to accept invitation (bypasses RLS on profiles update)
+        const { api } = await import('@/lib/apiClient');
+        await api.onboarding.acceptInvitation(invite.token);
         return true;
       }
     } catch (err) {
