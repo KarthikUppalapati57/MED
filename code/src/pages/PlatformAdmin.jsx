@@ -121,11 +121,16 @@ export default function PlatformAdmin() {
         queryClient.invalidateQueries({ queryKey: ["platform-admins"] });
       }
     } catch (e) {
-      console.error("Invite error:", e);
-      const { toast } = await import("sonner");
-      toast.error(e.message || "Failed to invite platform admin");
+      console.error("Platform admin invite error:", e);
+      try {
+        const { toast } = await import("sonner");
+        toast.error(e.message || "Failed to invite platform admin");
+      } catch (toastErr) {
+        alert(e.message || "Failed to invite platform admin");
+      }
+    } finally {
+      setPlatformInviting(false);
     }
-    setPlatformInviting(false);
   };
 
   const handleInviteClient = async () => {
@@ -163,11 +168,16 @@ export default function PlatformAdmin() {
         setInviteSuccess(true);
       }
     } catch (e) {
-      console.error("Invite error:", e);
-      const { toast } = await import("sonner");
-      toast.error(e.message || "Failed to send invitation");
+      console.error("Client invite error:", e);
+      try {
+        const { toast } = await import("sonner");
+        toast.error(e.message || "Failed to send invitation");
+      } catch (toastErr) {
+        alert(e.message || "Failed to send invitation");
+      }
+    } finally {
+      setInviting(false);
     }
-    setInviting(false);
   };
 
   const { data: requests = [], isLoading } = useQuery({
@@ -220,16 +230,26 @@ export default function PlatformAdmin() {
   const { data: orgs = [] } = useQuery({
     queryKey: ["organizations"],
     queryFn: async () => {
+      // NOTE: Joining profiles!owner_id only works if a FK exists between organizations.owner_id and profiles.id.
+      // If it fails with 400, fallback to a simple select.
       const { data, error } = await supabase
         .from("organizations")
-        .select("*, profiles!owner_id(email)")
+        .select("*, owner:owner_id(email)") 
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+         // Second try: very simple select if the join is the culprit
+         const { data: simpleData, error: simpleError } = await supabase
+          .from("organizations")
+          .select("*")
+          .order("created_at", { ascending: false });
+         if (simpleError) throw simpleError;
+         return simpleData.map(o => ({ ...o, admin_email: "—" }));
+      }
+      
       return data.map((org) => ({
         ...org,
-        // Helper to get the primary admin email
-        admin_email: org.profiles?.email || "—",
+        admin_email: org.owner?.email || "—",
       }));
     },
     enabled:
