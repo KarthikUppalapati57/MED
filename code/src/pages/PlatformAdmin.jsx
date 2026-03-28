@@ -1,251 +1,61 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/lib/AuthContext';
-import {
-  Building2,
-  Users,
-  Plus,
-  Search,
-  ExternalLink,
-  MoreVertical,
-  ChevronRight,
-  Shield,
-  CreditCard,
-  AlertCircle,
-  Share2,
-  Mail,
-  Copy,
-  Check,
-  Globe,
-  Loader2,
-  CheckCircle2,
-  X,
-  Trash2,
-  Activity,
-  UserCheck
-} from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from 'sonner';
-import { cn } from "@/lib/utils";
-import { format } from 'date-fns';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, Copy, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 
-export default function PlatformAdmin() {
+export default function SuperAdmin() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("orgs");
-
-  // App state
-  const [search, setSearch] = useState('');
-  
-  // Dialogs
-  const [isNewOrgOpen, setIsNewOrgOpen] = useState(false);
-  const [newOrg, setNewOrg] = useState({ name: '', slug: '' });
-  
-  const [inviteOrgOpen, setInviteOrgOpen] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState(null);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [selectedModules, setSelectedModules] = useState([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [processingRequests, setProcessingRequests] = useState(new Set());
+  const [selectedRequests, setSelectedRequests] = useState(new Set());
   const [inviting, setInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
-
-  const [editOrgOpen, setEditOrgOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState({ name: '', slug: '' });
+  const [activeTab, setActiveTab] = useState("access");
   
-  const [billingOrgOpen, setBillingOrgOpen] = useState(false);
-  const [billingFormData, setBillingFormData] = useState({ subscription_status: 'trialing', subscription_plan: 'free' });
-  const [suspendAlertOpen, setSuspendAlertOpen] = useState(false);
-
-  // Platform Admins Auth State
+  // Platform Admin Invite State
   const [showPlatformInviteModal, setShowPlatformInviteModal] = useState(false);
   const [platformInviteEmail, setPlatformInviteEmail] = useState("");
   const [platformInviting, setPlatformInviting] = useState(false);
-  const [platformCopiedLink, setPlatformCopiedLink] = useState(null);
-
-  // Queries
-  const { data: orgs = [], isLoading: isLoadingOrgs } = useQuery({
-    queryKey: ['platform_orgs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    }
-  });
+  const [platformCopiedLink, setPlatformCopiedLink] = useState('');
+  
+  const [editingOrgModules, setEditingOrgModules] = useState(null);
+  const authChecked = !!user || true;
 
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useQuery({
-    queryKey: ['platform_admins'],
+    queryKey: ['platform-admins'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
-        .eq("role", "platform_admin")
-        .order('created_at', { ascending: false });
+        .select("id, email, full_name, role")
+        .eq("role", "platform_admin");
       if (error) throw error;
-      return data;
-    }
+      return data || [];
+    },
+    enabled: authChecked,
   });
 
-  const { data: auditLogs = [], isLoading: isLoadingLogs } = useQuery({
-    queryKey: ['platform_audit_logs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("audit_logs")
-        .select("*, profiles:user_id(full_name, email)")
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  // Mutations
-  const createOrg = useMutation({
-    mutationFn: async (org) => {
-      const { data, error } = await supabase
-        .from('organizations')
-        .insert([org])
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform_orgs'] });
-      setIsNewOrgOpen(false);
-      setNewOrg({ name: '', slug: '' });
-      toast.success('Organization created successfully');
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const updateOrg = useMutation({
-    mutationFn: async (data) => {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ name: data.name, slug: data.slug })
-        .eq('id', selectedOrg.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform_orgs'] });
-      setEditOrgOpen(false);
-      toast.success('Organization updated');
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const updateBilling = useMutation({
-    mutationFn: async (data) => {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ subscription_status: data.subscription_status, subscription_plan: data.subscription_plan })
-        .eq('id', selectedOrg.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform_orgs'] });
-      setBillingOrgOpen(false);
-      toast.success('Billing details updated');
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const suspendOrg = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('organizations')
-        .update({ subscription_status: 'suspended' })
-        .eq('id', selectedOrg.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform_orgs'] });
-      setSuspendAlertOpen(false);
-      toast.error('Organization suspended');
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const handleInviteOrgOwner = async () => {
-    if (!inviteEmail || !selectedOrg) return;
-    setInviting(true);
-    try {
-      const { data: userCurrent } = await supabase.auth.getUser();
-      const { data: invite, error } = await supabase
-        .from('invitations')
-        .insert([{
-          email: inviteEmail,
-          role: 'owner',
-          organization_id: selectedOrg.id,
-          invited_by: userCurrent?.user?.id,
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }])
-        .select()
-        .single();
-        
-      if (error) throw error;
-
-      if (invite?.token) {
-        const fullInviteLink = `${window.location.origin}/signup/${invite.token}`;
-        setInviteLink(fullInviteLink);
-        
-        await navigator.clipboard.writeText(fullInviteLink);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-        
-        toast.success('Link generated and copied to clipboard');
-      }
-    } catch (error) {
-      toast.error('Failed to create invitation: ' + error.message);
-    } finally {
-      setInviting(false);
-    }
+  const copyInviteLink = async (link, setCopyState) => {
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    setCopyState(true);
+    setTimeout(() => setCopyState(false), 2000);
+    import("sonner").then(({ toast }) => toast.success('Link copied to clipboard'));
   };
 
   const handleInvitePlatformAdmin = async () => {
@@ -271,296 +81,787 @@ export default function PlatformAdmin() {
         const link = `${window.location.origin}/signup/${invite.token}`;
         setPlatformCopiedLink(link);
         await navigator.clipboard.writeText(link);
+        
+        const { toast } = await import("sonner");
         toast.success("Platform admin invited successfully!");
+        queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
       }
     } catch(e) {
+      console.error('Invite error:', e);
+      const { toast } = await import("sonner");
       toast.error(e.message || "Failed to invite platform admin");
-    } finally {
-      setPlatformInviting(false);
+    }
+    setPlatformInviting(false);
+  };
+
+  const handleInviteClient = async () => {
+    if (!inviteEmail) return;
+    setInviting(true);
+    try {
+      const { data: userCurrent } = await supabase.auth.getUser();
+      const { data: invite, error } = await supabase
+        .from('invitations')
+        .insert([{
+          email: inviteEmail,
+          role: 'owner',
+          invited_by: userCurrent?.user?.id,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }])
+        .select()
+        .single();
+        
+      if (error) throw error;
+
+      if (invite?.token) {
+        const fullInviteLink = `${window.location.origin}/signup/${invite.token}`;
+        setInviteLink(fullInviteLink);
+        
+        await navigator.clipboard.writeText(fullInviteLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        
+        const { toast } = await import("sonner");
+        toast.success("Invitation generated and copied to clipboard!");
+        setInviteSuccess(true);
+      }
+    } catch(e) { 
+      console.error('Invite error:', e);
+      const { toast } = await import("sonner");
+      toast.error(e.message || "Failed to send invitation");
+    }
+    setInviting(false);
+  };
+
+  const { data: requests = [], isLoading } = useQuery({
+    queryKey: ['access-requests'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('access_requests')
+        .select('*')
+        .neq('request_type', 'demo')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (user?.role === 'admin' || user?.role === 'platform_admin'),
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: contactRequests = [], isLoading: isLoadingContact } = useQuery({
+    queryKey: ['contact-requests'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contact_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (user?.role === 'admin' || user?.role === 'platform_admin'),
+    refetchOnWindowFocus: false,
+  });
+
+  // Fetch demo requests from the dedicated table — completely independent
+  const { data: demoRequests = [], isLoading: isLoadingDemo } = useQuery({
+    queryKey: ['demo-requests'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('demo_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (user?.role === 'admin' || user?.role === 'platform_admin'),
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: orgs = [] } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*, profiles!owner_id(email)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(org => ({
+        ...org,
+        // Helper to get the primary admin email
+        admin_email: org.profiles?.email || "—"
+      }));
+    },
+    enabled: authChecked && (user?.role === 'admin' || user?.role === 'platform_admin'),
+  });
+
+  // Simulate edge function logic safely via DB
+  const updateRequest = useMutation({
+    mutationFn: async ({ id, approved }) => {
+      const updateData = {
+         status: approved ? 'approved' : 'rejected',
+         updated_at: new Date().toISOString()
+      };
+      const { error } = await supabase.from('access_requests').update(updateData).eq('id', id);
+      if (error) throw new Error(error.message);
+      
+      if (approved) {
+        import("sonner").then(({ toast }) => toast.info("Request approved! In MEVS, user accounts must be linked manually via invitations instead of auto-provisioning for security."));
+      }
+      return true;
+    },
+    onMutate: ({ id }) => {
+      setProcessingRequests(prev => new Set(prev).add(id));
+    },
+    onSettled: (data, error, { id }) => {
+      setProcessingRequests(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      if (error) {
+        console.error('Mutation error:', error);
+        import('sonner').then(({ toast }) => {
+          const msg = error.message || 'Action failed';
+          toast.error(msg);
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+    },
+  });
+
+  // Revoke action: sets approved user back to pending_approval
+  const revokeRequest = useMutation({
+    mutationFn: async ({ id, email }) => {
+      // Update access_request status
+      const { error: reqError } = await supabase
+        .from('access_requests')
+        .update({ status: 'pending_approval', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (reqError) throw reqError;
+      return { id };
+    },
+    onMutate: ({ id }) => {
+      setProcessingRequests(prev => new Set(prev).add(id));
+    },
+    onSettled: (data, error, { id }) => {
+      setProcessingRequests(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      if (error) {
+        import('sonner').then(({ toast }) => toast.error(error.message || 'Revoke failed'));
+      } else {
+        import('sonner').then(({ toast }) => toast.success('Access revoked. User must be re-approved.'));
+      }
+      queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+    },
+  });
+
+  const deleteRequest = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('access_requests').delete().eq('id', id);
+      if (error) throw new Error('Deletion failed');
+      return id;
+    },
+    onMutate: (id) => {
+      setProcessingRequests(prev => new Set(prev).add(id));
+    },
+    onSettled: (data, error, id) => {
+      setProcessingRequests(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      if (error) {
+        import('sonner').then(({ toast }) => toast.error(error.message || 'Failed to delete request'));
+      } else {
+        import('sonner').then(({ toast }) => toast.success('Request deleted permanently'));
+      }
+      queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+    },
+  });
+
+  const handleBulkDelete = () => {
+    if (selectedRequests.size === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${selectedRequests.size} requests?`)) {
+      setProcessingRequests(prev => new Set([...prev, ...selectedRequests]));
+      Promise.all(Array.from(selectedRequests).map(id => supabase.from('access_requests').delete().eq('id', id)))
+        .then(() => {
+          import('sonner').then(({ toast }) => toast.success(`Deleted ${selectedRequests.size} requests`));
+          setSelectedRequests(new Set());
+          queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+        })
+        .catch(() => {
+          import('sonner').then(({ toast }) => toast.error('Failed to delete some requests'));
+        })
+        .finally(() => {
+          setProcessingRequests(prev => {
+            const next = new Set(prev);
+            selectedRequests.forEach(id => next.delete(id));
+            return next;
+          });
+        });
     }
   };
 
-  const handleDemotePlatformAdmin = async (adminId) => {
-    if (!window.confirm("Are you sure you want to demote this Platform Admin? They will lose global access immediately.")) return;
-    try {
-      // In MEVS, we just drop their role to admin and limit their access level. 
-      // Ensure they don't lock themselves out, handle carefully.
-      const { error } = await supabase.rpc('admin_update_user_role', {
-        target_user_id: adminId,
-        new_role: 'admin',
-        new_access_level: 'organization'
-      });
-      if (error) throw error;
-      toast.success("Admin demoted successfully");
-      queryClient.invalidateQueries({ queryKey: ['platform_admins'] });
-    } catch (e) {
-      toast.error(e.message || "Demotion failed");
+  const toggleSelectAllList = (checked, list) => {
+    if (checked) {
+      const next = new Set(selectedRequests);
+      list.forEach(r => next.add(r.id));
+      setSelectedRequests(next);
+    } else {
+      const next = new Set(selectedRequests);
+      list.forEach(r => next.delete(r.id));
+      setSelectedRequests(next);
     }
+  };
+
+  const toggleSelect = (id, checked) => {
+    setSelectedRequests(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const accessReqs   = requests.filter(r => r.request_type !== 'demo');
+  const contactReqs  = contactRequests;
+
+  const pendingAccessCount = accessReqs.filter(r => r.status === 'pending_approval').length;
+  const pendingContactCount = contactReqs.filter(r => r.status === 'pending_approval').length;
+  const pendingOrgCount = orgs.filter(o => ['under_review', 'pending_approval', 'onboarding'].includes(o.status)).length;
+  const pendingCount = pendingAccessCount + pendingContactCount + pendingOrgCount;
+
+  if (!authChecked) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
   }
 
-  const copyInviteLink = async (link, setCopyState) => {
-    if (!link) return;
-    await navigator.clipboard.writeText(link);
-    setCopyState(true);
-    setTimeout(() => setCopyState(false), 2000);
-    toast.success('Link copied to clipboard');
-  };
+  if (!user || (user.role !== "admin" && user.role !== "platform_admin")) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center px-4">
+        <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
+        <p className="text-slate-500 max-w-md">The SuperAdmin Console is restricted to platform administrators only. If you believe this is an error, contact your system administrator.</p>
+      </div>
+    );
+  }
 
-  const filteredOrgs = orgs.filter(o => 
-    o.name.toLowerCase().includes(search.toLowerCase()) || 
-    o.slug.toLowerCase().includes(search.toLowerCase())
+  const renderRequestTable = (list, title, countPending, type) => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base">{title}</CardTitle>
+          <p className="text-xs text-slate-400">{type === 'demo' ? `${list.length} total` : `${countPending} pending`}</p>
+        </div>
+        <div className="flex gap-2">
+          {selectedRequests.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete Selected ({selectedRequests.size})
+            </Button>
+          )}
+          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." className="pl-9 w-48 h-8" /></div>
+          <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" />Export</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50">
+              <TableHead className="w-10">
+                <Checkbox 
+                  checked={list.length > 0 && list.every(r => selectedRequests.has(r.id))}
+                  onCheckedChange={(c) => toggleSelectAllList(c, list)}
+                />
+              </TableHead>
+              <TableHead className="text-[11px]">APPLICANT</TableHead>
+              <TableHead className="text-[11px]">COMPANY</TableHead>
+              <TableHead className="text-[11px]">PHONE</TableHead>
+              <TableHead className="text-[11px]">PORTFOLIOS</TableHead>
+              <TableHead className="text-[11px]">PLAN</TableHead>
+              <TableHead className="text-[11px]">BILLING</TableHead>
+              <TableHead className="text-[11px]">TYPE</TableHead>
+              <TableHead className="text-[11px]">SUBMITTED</TableHead>
+              <TableHead className="text-[11px]">STATUS</TableHead>
+              <TableHead className="text-[11px]">ACTIONS</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={10} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></TableCell></TableRow>
+            ) : list.length === 0 ? (
+              <TableRow><TableCell colSpan={10} className="text-center py-8 text-slate-400">No requests</TableCell></TableRow>
+            ) : (
+              list.map(r => (
+                <TableRow key={r.id}>
+                  <TableCell>
+                    <Checkbox 
+                      checked={selectedRequests.has(r.id)}
+                      onCheckedChange={(c) => toggleSelect(r.id, c)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">{(r.full_name || r.email || "?").substring(0, 2).toUpperCase()}</div>
+                      <div><p className="text-sm font-medium">{r.full_name || "Unknown"}</p><p className="text-xs text-slate-400">{r.email}</p></div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">{r.company_name || "—"}</TableCell>
+                  <TableCell className="text-sm text-slate-500">{r.phone || '—'}</TableCell>
+                  <TableCell className="text-sm">{r.portfolios || r.properties_count || '—'}</TableCell>
+                  <TableCell className="text-sm">
+                    {r.plan ? <Badge variant="outline" className="text-[10px] capitalize bg-blue-50 text-blue-700 border-blue-100">{r.plan}</Badge> : '—'}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {r.billing_cycle ? <Badge variant="outline" className="text-[10px] capitalize bg-slate-50 text-slate-700 border-slate-200">{r.billing_cycle}</Badge> : '—'}
+                  </TableCell>
+                  <TableCell>
+                    {r.request_type === 'demo'
+                      ? <Badge className="bg-violet-100 text-violet-700 text-[10px] border-none font-bold">🎥 DEMO</Badge>
+                      : r.request_type === 'contact' 
+                        ? <Badge className="bg-indigo-100 text-indigo-700 text-[10px] border-none font-bold">✉️ CONTACT</Badge>
+                        : <Badge className="bg-emerald-100 text-emerald-700 text-[10px] border-none font-bold italic">⚡ ACCESS</Badge>
+                    }
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-500">
+                    {r.created_at ? new Date(r.created_at).toLocaleString('en-US', {
+                      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+                    }) : '—'}
+                  </TableCell>
+                  <TableCell>
+                    {type !== 'demo' && (
+                      <Badge className={r.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' : r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}>
+                        {r.status?.toUpperCase()}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {/* Demo & Contact — View Details only */}
+                      {(r.request_type === 'contact' || r.request_type === 'demo') ? (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50">
+                              <Mail className="w-3 h-3 mr-1" />
+                              Details
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                              {r.request_type === 'demo' ? '🎥' : (r.message ? '✉️' : '⚡')} {r.full_name || r.email}
+                            </DialogTitle>
+                          </DialogHeader>
+                            <div className="space-y-4 py-2">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-xs text-slate-500">Email</Label>
+                                  <p className="font-medium text-sm">{r.email}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-slate-500">Company</Label>
+                                  <p className="font-medium text-sm">{r.company_name || '—'}</p>
+                                </div>
+                                {r.phone && (
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Phone</Label>
+                                    <p className="font-medium text-sm">{r.phone}</p>
+                                  </div>
+                                )}
+                                {r.department && (
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Department</Label>
+                                    <p className="font-medium text-sm capitalize">{r.department}</p>
+                                  </div>
+                                )}
+                                {r.plan && (
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Plan</Label>
+                                    <p className="font-medium text-sm capitalize">{r.plan}</p>
+                                  </div>
+                                )}
+                                {r.request_type === 'demo' && (
+                                  <div>
+                                    <Label className="text-xs text-slate-500">Demo Viewed</Label>
+                                    <p className={`font-semibold text-sm ${r.demo_viewed ? 'text-emerald-600' : 'text-slate-500'}`}>
+                                      {r.demo_viewed ? '✓ Watched' : 'Not yet'}
+                                    </p>
+                                  </div>
+                                )}
+                                <div>
+                                  <Label className="text-xs text-slate-500">Submitted</Label>
+                                  <p className="font-medium text-sm">
+                                    {r.created_at ? new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                                  </p>
+                                </div>
+                              </div>
+                              {r.message && (
+                                <div>
+                                  <Label className="text-xs text-slate-500 mb-1 block">Message</Label>
+                                  <p className="bg-slate-50 p-3 rounded-md text-sm border border-slate-100 whitespace-pre-wrap">{r.message}</p>
+                                </div>
+                              )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      ) : (
+                        /* Access requests — keep Approve / Reject / Revoke */
+                        <>
+                          {r.status !== 'approved' && (
+                            <Button 
+                              size="sm" 
+                              className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                              disabled={processingRequests.has(r.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateRequest.mutate({ id: r.id, approved: true });
+                              }}>
+                              {processingRequests.has(r.id) ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                              Approve
+                            </Button>
+                          )}
+                          {r.status !== 'rejected' && r.status !== 'approved' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
+                              disabled={processingRequests.has(r.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateRequest.mutate({ id: r.id, approved: false });
+                              }}>
+                              {processingRequests.has(r.id) ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <X className="w-3 h-3 mr-1" />}
+                              Reject
+                            </Button>
+                          )}
+                          {r.status === 'approved' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-xs h-7 text-amber-600 border-amber-200 hover:bg-amber-50"
+                              disabled={processingRequests.has(r.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                revokeRequest.mutate({ id: r.id, email: r.email });
+                              }}>
+                              {processingRequests.has(r.id) ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Shield className="w-3 h-3 mr-1" />}
+                              Revoke
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="text-xs h-7 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 ml-1"
+                        disabled={processingRequests.has(r.id)}
+                        onClick={() => {
+                          if (window.confirm("Are you sure you want to permanently delete this request?")) {
+                            deleteRequest.mutate(r.id);
+                          }
+                        }}>
+                        {processingRequests.has(r.id) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  </TableCell>
+
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-teal-100 rounded-2xl flex items-center justify-center shadow-inner">
-            <Globe className="w-6 h-6 text-teal-700" />
-          </div>
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center"><Shield className="w-5 h-5 text-amber-600" /></div>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">SuperAdmin Console</h1>
-            <p className="text-sm font-medium text-slate-500">Global tenant overview & system administration</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900">SuperAdmin Console</h1>
+              {pendingCount > 0 && <Badge className="bg-amber-100 text-amber-700">{pendingCount} pending approval</Badge>}
+            </div>
+            <p className="text-sm text-slate-500">Platform-wide management · CRE Admin Version · MEVS Deployment</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setIsNewOrgOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-500/20 px-6 h-11 rounded-xl transition-all">
-            <Plus className="h-4 w-4 mr-2" />
-            New Organization
-          </Button>
+          {/* Main Invitation entrypoint (similar to New Organization but purely via email) */}
+          <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700"><Users className="w-4 h-4 mr-2" />Invite Client</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Invite Client / Tenant Admin</DialogTitle>
+                <DialogDescription>
+                  Generate a secure platform invitation token for a new tenant administrator.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Administrator Email Address</label>
+                  <Input 
+                    placeholder="admin@customer.com"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                  />
+                </div>
+                
+                {inviteLink && (
+                  <div className="pt-4 border-t space-y-3">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-green-600">Secure Invitation Link</label>
+                    <div className="flex gap-0">
+                      <Input 
+                        value={inviteLink} 
+                        readOnly 
+                        className="text-sm bg-slate-50 h-10 rounded-r-none border-r-0 focus:ring-0 focus-visible:ring-0" 
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-10 px-4 rounded-l-none border-slate-200 bg-slate-50 hover:bg-slate-100"
+                        onClick={() => copyInviteLink(inviteLink, setCopied)}
+                      >
+                        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-slate-600" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => { setShowInviteModal(false); setInviteLink(""); }}>Close</Button>
+                <Button 
+                  disabled={!inviteEmail || inviting}
+                  onClick={handleInviteClient}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {inviting ? 'Generating...' : (inviteLink ? 'Regenerate Link' : 'Generate Secure Link')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Advanced Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Venues</p>
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                <Building2 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-black text-slate-900">{orgs.length}</p>
-              <p className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">All Tenants</p>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Subs</p>
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                <CreditCard className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-black text-slate-900">
-                {orgs.filter(o => o.subscription_status === 'active').length}
-              </p>
-              <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Paying</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">System Status</p>
-              <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
-                <Shield className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse mt-2" />
-              <p className="text-2xl font-black text-slate-900">Operational</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm rounded-2xl bg-white overflow-hidden">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Platform Admins</p>
-              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                <Users className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-black text-slate-900">{platformAdmins.length}</p>
-              <p className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Super Users</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Total Organizations</p><p className="text-2xl font-bold">{orgs.length}</p><p className="text-[10px] text-blue-500">Live deployments</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Demo Requests</p><p className="text-2xl font-bold">{demoRequests.length}</p><p className="text-[10px] text-violet-500">{demoRequests.filter(r => r.demo_viewed).length} viewed</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">MRR (Demo)</p><p className="text-2xl font-bold">$124,800</p><p className="text-[10px] text-emerald-500">+8.2% MoM</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Pending Approvals</p><p className="text-2xl font-bold">{pendingCount}</p><p className="text-[10px] text-slate-400">{pendingOrgCount > 0 ? `${pendingOrgCount} org${pendingOrgCount > 1 ? 's' : ''} awaiting activation` : 'Access and contact requests'}</p></CardContent></Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 h-12 bg-white border border-slate-200 shadow-sm rounded-xl p-1 gap-1">
-          <TabsTrigger value="orgs" className="rounded-lg font-bold data-[state=active]:bg-teal-50 data-[state=active]:text-teal-700">Organizations</TabsTrigger>
-          <TabsTrigger value="admins" className="rounded-lg font-bold data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700">Platform Admins</TabsTrigger>
-          <TabsTrigger value="activity" className="rounded-lg font-bold data-[state=active]:bg-slate-100 data-[state=active]:text-slate-800">System Activity {auditLogs.length > 0 && <Badge className="ml-2 bg-slate-200 hover:bg-slate-200 text-slate-600 rounded-md font-bold text-[10px] px-1">{auditLogs.length}</Badge>}</TabsTrigger>
+      <Tabs defaultValue="access" onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="access">Access Requests {pendingAccessCount > 0 && <Badge className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5">{pendingAccessCount}</Badge>}</TabsTrigger>
+          <TabsTrigger value="demo">Demo Requests</TabsTrigger>
+          <TabsTrigger value="contact">Contact Us {pendingContactCount > 0 && <Badge className="ml-1.5 bg-blue-500 text-white text-[10px] px-1.5">{pendingContactCount}</Badge>}</TabsTrigger>
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="orgs">Organizations {pendingOrgCount > 0 && <Badge className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5">{pendingOrgCount}</Badge>}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orgs">
-          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[24px] overflow-hidden bg-white">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                  placeholder="Filter by name or slug..." 
-                  className="pl-9 bg-white border-slate-200 rounded-xl shadow-sm h-10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
+        <TabsContent value="access" className="mt-4">
+          {renderRequestTable(accessReqs, "Access Requests", pendingAccessCount, "access")}
+        </TabsContent>
 
-            <div className="overflow-x-auto">
+        <TabsContent value="demo" className="mt-4">
+          {/* Demo requests come from the dedicated demo_requests table */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Demo Requests</CardTitle>
+                <p className="text-xs text-slate-400">{demoRequests.length} total · {demoRequests.filter(r => r.demo_viewed).length} viewed</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." className="pl-9 w-48 h-8" /></div>
+                <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" />Export</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
               <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow className="border-0">
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Organization Identity</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Pricing Plan</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Creation Date</TableHead>
-                    <TableHead className="px-6 py-4 text-right"></TableHead>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-[11px]">APPLICANT</TableHead>
+                    <TableHead className="text-[11px]">COMPANY</TableHead>
+                    <TableHead className="text-[11px]">PHONE</TableHead>
+                    <TableHead className="text-[11px]">PLAN</TableHead>
+                    <TableHead className="text-[11px]">DEMO VIEWED</TableHead>
+                    <TableHead className="text-[11px]">SUBMITTED</TableHead>
+                    <TableHead className="text-[11px]">STATUS</TableHead>
+                    <TableHead className="text-[11px]">ACTIONS</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingOrgs ? (
-                    <TableRow><TableCell colSpan={5} className="py-12 text-center text-slate-400 font-bold"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Syncing tenants...</TableCell></TableRow>
-                  ) : filteredOrgs.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="py-12 text-center text-slate-400 font-bold">No matching organizations found</TableCell></TableRow>
-                  ) : (
-                    filteredOrgs.map(org => (
-                      <TableRow key={org.id} className="hover:bg-slate-50/50 transition-colors border-slate-50 group">
-                        <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-50 to-teal-100 border border-teal-200 shadow-sm flex items-center justify-center text-teal-800 font-black text-lg">
-                              {org.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900 leading-tight">{org.name}</div>
-                              <div className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-                                <span className="bg-slate-100 rounded px-1">{org.slug}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          <Badge className={cn(
-                            "capitalize shadow-sm font-bold border",
-                            org.subscription_status === 'active' 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : org.subscription_status === 'suspended'
-                                ? 'bg-red-50 text-red-700 border-red-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                          )}>
-                            {org.subscription_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase">
-                            <CreditCard className="h-4 w-4 text-slate-400" />
-                            {org.subscription_plan}
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-6 py-4 text-xs font-bold text-slate-500">
-                          {format(new Date(org.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="px-6 py-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 group-hover:text-slate-600">
-                                <MoreVertical className="h-4 w-4" />
+                  {isLoadingDemo ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></TableCell></TableRow>
+                  ) : demoRequests.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-slate-400">No demo requests yet</TableCell></TableRow>
+                  ) : demoRequests.map(r => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-xs font-bold text-violet-700">{(r.full_name || r.email || "?").substring(0, 2).toUpperCase()}</div>
+                          <div><p className="text-sm font-medium">{r.full_name || "Unknown"}</p><p className="text-xs text-slate-400">{r.email}</p></div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{r.company_name || '—'}</TableCell>
+                      <TableCell className="text-sm text-slate-500">{r.phone || '—'}</TableCell>
+                      <TableCell className="text-sm">
+                        {r.plan ? <Badge variant="outline" className="text-[10px] capitalize bg-violet-50 text-violet-700 border-violet-100">{r.plan}</Badge> : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={r.demo_viewed ? 'bg-emerald-100 text-emerald-700 border-none text-[10px]' : 'bg-slate-100 text-slate-500 border-none text-[10px]'}>
+                          {r.demo_viewed ? '✓ Watched' : 'Not yet'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500">
+                        {r.created_at ? new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-emerald-50 text-emerald-700 border-none text-[10px] uppercase">{r.status || 'new'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="text-xs h-7 text-blue-600 border-blue-200 hover:bg-blue-50">
+                                <Mail className="w-3 h-3 mr-1" />Details
                               </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 rounded-2xl shadow-xl font-medium">
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                                setSelectedOrg(org);
-                                setEditFormData({ name: org.name, slug: org.slug });
-                                setEditOrgOpen(true);
-                              }}>
-                                Edit Profile
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                                setSelectedOrg(org);
-                                setInviteEmail('');
-                                setInviteLink('');
-                                setInviteOrgOpen(true);
-                              }}>
-                                <Share2 className="w-4 h-4 mr-2 text-teal-600" /> Invite Owner
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                                setSelectedOrg(org);
-                                setBillingFormData({ subscription_status: org.subscription_status, subscription_plan: org.subscription_plan });
-                                setBillingOrgOpen(true);
-                              }}>
-                                Modify Subscription
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="cursor-pointer text-red-600 hover:bg-red-50" onClick={() => {
-                                setSelectedOrg(org);
-                                setSuspendAlertOpen(true);
-                              }}>
-                                Suspend Tenant
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                            </DialogTrigger>
+                            <DialogContent className="max-w-lg">
+                              <DialogHeader><DialogTitle className="flex items-center gap-2">🎥 {r.full_name || r.email}</DialogTitle></DialogHeader>
+                              <div className="space-y-4 py-2">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div><Label className="text-xs text-slate-500">Email</Label><p className="font-medium text-sm">{r.email}</p></div>
+                                  <div><Label className="text-xs text-slate-500">Company</Label><p className="font-medium text-sm">{r.company_name || '—'}</p></div>
+                                  {r.phone && <div><Label className="text-xs text-slate-500">Phone</Label><p className="font-medium text-sm">{r.phone}</p></div>}
+                                  {r.plan && <div><Label className="text-xs text-slate-500">Plan Interest</Label><p className="font-medium text-sm capitalize">{r.plan}</p></div>}
+                                  <div><Label className="text-xs text-slate-500">Demo Viewed</Label><p className={`font-semibold text-sm ${r.demo_viewed ? 'text-emerald-600' : 'text-slate-500'}`}>{r.demo_viewed ? '✓ Watched' : 'Not yet'}</p></div>
+                                  <div><Label className="text-xs text-slate-500">Submitted</Label><p className="font-medium text-sm">{r.created_at ? new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
+                                </div>
+                                {r.notes && <div><Label className="text-xs text-slate-500 mb-1 block">Notes</Label><p className="bg-slate-50 p-3 rounded-md text-sm border border-slate-100 whitespace-pre-wrap">{r.notes}</p></div>}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            size="sm" variant="ghost"
+                            className="text-xs h-7 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={async () => {
+                              if (!window.confirm('Delete this demo request permanently?')) return;
+                              const { error } = await supabase.from('demo_requests').delete().eq('id', r.id);
+                              if (!error) {
+                                queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+                                import('sonner').then(({ toast }) => toast.success('Demo request deleted'));
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
-            </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="admins">
-          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[24px] overflow-hidden bg-white">
-            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 bg-slate-50/50">
+        <TabsContent value="contact" className="mt-4">
+          {isLoadingContact ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+            </div>
+          ) : (
+            renderRequestTable(contactReqs, "Contact Messages", pendingContactCount, "contact")
+          )}
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="text-base font-bold text-slate-900">Platform Administrators</CardTitle>
-                <p className="text-xs font-medium text-slate-500">Users with full access to all organizations and settings.</p>
+                <CardTitle className="text-base">Platform Administrators</CardTitle>
+                <p className="text-xs text-slate-400">Manage users with full administrative access to the platform.</p>
               </div>
-              <Button onClick={() => setShowPlatformInviteModal(true)} size="sm" className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold border border-amber-300 shadow-sm rounded-xl px-4 h-9">
-                <Shield className="w-3.5 h-3.5 mr-2" /> Invite Administrator
-              </Button>
+              <Dialog open={showPlatformInviteModal} onOpenChange={setShowPlatformInviteModal}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 text-xs">
+                    <Shield className="w-3 h-3 mr-2" /> Invite Admin
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Invite Platform Admin</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                       <Label>Admin Email</Label>
+                       <Input value={platformInviteEmail} onChange={e => setPlatformInviteEmail(e.target.value)} />
+                    </div>
+                    {platformCopiedLink && (
+                       <div className="space-y-2">
+                         <Label className="text-green-600">Generated Token Link</Label>
+                         <Input value={platformCopiedLink} readOnly />
+                       </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="ghost" onClick={() => setShowPlatformInviteModal(false)}>Close</Button>
+                    <Button onClick={handleInvitePlatformAdmin} disabled={platformInviting || !platformInviteEmail}>Generate Token</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow className="border-0">
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Admin Name</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Access Level</TableHead>
-                    <TableHead className="px-6 py-4 text-right"></TableHead>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-[11px]">NAME</TableHead>
+                    <TableHead className="text-[11px]">EMAIL</TableHead>
+                    <TableHead className="text-[11px]">ROLE</TableHead>
+                    <TableHead className="text-[11px]">ACTIONS</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoadingAdmins ? (
-                    <TableRow><TableCell colSpan={4} className="py-12 text-center text-slate-400 font-bold"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
                   ) : platformAdmins.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="py-12 text-center text-sm font-bold text-slate-400">No platform admins found</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-sm text-slate-400">No platform admins found</TableCell></TableRow>
                   ) : platformAdmins.map(admin => (
-                    <TableRow key={admin.id} className="hover:bg-slate-50/50 transition-colors border-slate-50">
-                      <TableCell className="px-6 py-4 font-bold text-slate-900">{admin.full_name || 'Verification Pending'}</TableCell>
-                      <TableCell className="px-6 py-4 text-xs font-semibold text-slate-500">{admin.email}</TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none px-2 shadow-sm uppercase font-black text-[10px]">Super Admin</Badge>
+                    <TableRow key={admin.id}>
+                      <TableCell className="font-medium text-sm">{admin.full_name || "Unknown"}</TableCell>
+                      <TableCell className="text-sm text-slate-500">{admin.email}</TableCell>
+                      <TableCell>
+                        <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none text-[10px]">Super Admin</Badge>
                       </TableCell>
-                      <TableCell className="px-6 py-4 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 rounded-lg text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50" 
-                          disabled={admin.id === user?.id} 
-                          onClick={() => handleDemotePlatformAdmin(admin.id)}
-                        >
-                          Demote
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.id === user?.id} onClick={async () => {
+                          if (!window.confirm(`Demote ${admin.email} from platform admin?`)) return;
+                          try {
+                            await supabase.rpc('admin_update_user_role', {
+                              target_user_id: admin.id,
+                              new_role: 'admin',
+                              new_access_level: 'organization'
+                            });
+                            queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+                            const { toast } = await import("sonner");
+                            toast.success("Admin demoted successfully");
+                          } catch (e) { console.error(e); }
+                        }}>
+                          <X className="w-4 h-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -570,311 +871,83 @@ export default function PlatformAdmin() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="activity">
-          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[24px] overflow-hidden bg-white">
-            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 bg-slate-50/50">
-              <div>
-                <CardTitle className="text-base font-bold text-slate-900">Recent System Activity</CardTitle>
-                <p className="text-xs font-medium text-slate-500">Security and action audit logs across the entire platform.</p>
-              </div>
+        <TabsContent value="orgs" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Organizations & Module Access</CardTitle>
+              <p className="text-xs text-slate-400">Configure which modules each organization can access. Empty = all modules (admin/legacy).</p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow className="border-0">
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Time</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</TableHead>
-                    <TableHead className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Target</TableHead>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-[11px]">ORGANIZATION & ADMIN</TableHead>
+                    <TableHead className="text-[11px]">PLAN & AMOUNT</TableHead>
+                    <TableHead className="text-[11px]">STATUS</TableHead>
+                    <TableHead className="text-[11px]">SUBMITTED</TableHead>
+                    <TableHead className="text-[11px]">ENABLED MODULES</TableHead>
+                    <TableHead className="text-[11px]">ACTIONS</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingLogs ? (
-                    <TableRow><TableCell colSpan={4} className="py-12 text-center text-slate-400 font-bold"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
-                  ) : auditLogs.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="py-12 text-center text-sm font-bold text-slate-400">No activity recorded</TableCell></TableRow>
-                  ) : auditLogs.map(log => (
-                    <TableRow key={log.id} className="hover:bg-slate-50/50 transition-colors border-slate-50">
-                      <TableCell className="px-6 py-4 text-[11px] font-bold text-slate-500">
-                        {format(new Date(log.created_at), 'MMM d, h:mm a')}
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <div className="font-bold text-sm text-slate-900">{log.profiles?.full_name || 'System User'}</div>
-                        <div className="text-[10px] text-slate-500">{log.profiles?.email}</div>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Badge variant="outline" className="text-[10px] font-black uppercase text-slate-600 bg-slate-100 border-none shadow-sm">{log.action}</Badge>
-                      </TableCell>
-                      <TableCell className="px-6 py-4 text-xs font-semibold text-slate-600 font-mono bg-slate-50/50 truncate max-w-[200px]" title={log.table_name}>
-                        {log.table_name} <span className="text-slate-400 text-[10px]">({log.record_id?.substring(0,8)}...)</span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {orgs.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-sm text-slate-400">No organizations</TableCell></TableRow>
+                  ) : [...orgs].sort((a, b) => {
+                    const pendingStatuses = ['under_review', 'pending_approval', 'onboarding'];
+                    const aIsPending = pendingStatuses.includes(a.status || a.subscription_status);
+                    const bIsPending = pendingStatuses.includes(b.status || b.subscription_status);
+                    if (aIsPending && !bIsPending) return -1;
+                    if (!aIsPending && bIsPending) return 1;
+                    return 0;
+                  }).map(org => {
+                    const isPending = ['under_review', 'pending_approval', 'onboarding'].includes(org.subscription_status || org.status);
+                    const enabledCount = org.enabled_modules?.length || 0;
+                    const totalCount = ALL_MODULE_KEYS.length;
+
+                    return (
+                      <TableRow key={org.id} className={isPending ? 'bg-amber-50/30' : ''}>
+                        <TableCell>
+                          <div className="font-medium text-sm flex items-center gap-2">
+                            {org.name}
+                            {isPending && <Badge variant="outline" className="text-[9px] h-4 bg-amber-100 text-amber-700 border-amber-200 uppercase">Attention</Badge>}
+                          </div>
+                          <div className="text-xs text-slate-500">{org.admin_email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm capitalize">{org.subscription_plan || 'Pro'}</div>
+                          <div className="text-xs text-slate-500">{org.billing_amount || '—'} {org.billing_cycle || ''}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={isPending ? 'bg-amber-100 text-amber-700 uppercase' : 'bg-emerald-100 text-emerald-700 uppercase'}>
+                            {org.subscription_status || org.status || 'Active'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-500">
+                          {new Date(org.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 px-2 text-xs text-slate-600 border border-slate-200 hover:bg-slate-50 font-medium"
+                          >
+                            <Package className="w-3.5 h-3.5 mr-1" />
+                            {enabledCount === 0 ? 'All Enabled' : `${enabledCount} Modules`}
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                           {/* Add suspension or deletion placeholders here if needed */}
+                           <Badge variant="outline">Managed</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      {/* Shared Dialogs */}
-      <Dialog open={isNewOrgOpen} onOpenChange={setIsNewOrgOpen}>
-        <DialogContent className="rounded-[32px] p-8">
-          <DialogHeader className="space-y-3 pb-4">
-            <DialogTitle className="text-2xl font-black text-slate-900">Create Tenant</DialogTitle>
-            <DialogDescription className="font-medium text-slate-500">Register a new organization workspace to the platform.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-2">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Organization Name</label>
-              <Input 
-                placeholder="e.g. Acme Restaurants" 
-                value={newOrg.name}
-                className="h-12 rounded-2xl border-slate-200 focus:ring-teal-500/10 focus:border-teal-500 font-medium"
-                onChange={e => {
-                  const name = e.target.value;
-                  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-                  setNewOrg({ name, slug });
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">URL Identifier (Slug)</label>
-              <Input 
-                placeholder="acme-restaurants" 
-                className="h-12 rounded-2xl border-slate-200 focus:ring-teal-500/10 focus:border-teal-500 font-medium"
-                value={newOrg.slug}
-                onChange={e => setNewOrg({ ...newOrg, slug: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter className="pt-4">
-            <Button variant="ghost" onClick={() => setIsNewOrgOpen(false)} className="rounded-xl font-bold">Cancel</Button>
-            <Button 
-              disabled={!newOrg.name || !newOrg.slug || createOrg.isPending}
-              onClick={() => createOrg.mutate(newOrg)}
-              className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold px-6 shadow-md"
-            >
-              {createOrg.isPending ? 'Deploying...' : 'Create Tenant'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={inviteOrgOpen} onOpenChange={setInviteOrgOpen}>
-        <DialogContent className="rounded-[32px] p-8">
-          <DialogHeader className="space-y-3 pb-2">
-            <DialogTitle className="text-xl font-black text-slate-900">Invite Organization Owner</DialogTitle>
-            <DialogDescription className="font-medium text-slate-500">
-              Generate an invite link for an administrator at <strong>{selectedOrg?.name}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Owner Email Address</label>
-              <Input 
-                placeholder="admin@customer.com"
-                type="email"
-                value={inviteEmail}
-                className="h-12 rounded-2xl font-medium"
-                onChange={e => setInviteEmail(e.target.value)}
-              />
-            </div>
-            
-            {inviteLink && (
-              <div className="pt-4 space-y-3">
-                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 animate-in zoom-in-95">
-                  <p className="text-xs font-bold text-emerald-900 mb-2">Invitation Link Generated!</p>
-                  <div className="flex gap-2">
-                    <Input value={inviteLink} readOnly className="text-xs font-medium bg-white h-10 border-emerald-200 focus-visible:ring-emerald-500" />
-                    <Button 
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                      onClick={() => copyInviteLink(inviteLink, setCopied)}
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setInviteOrgOpen(false)} className="rounded-xl font-bold">Close</Button>
-            <Button 
-              disabled={!inviteEmail || inviting}
-              onClick={handleInviteOrgOwner}
-              className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-md"
-            >
-              {inviting ? 'Generating...' : (inviteLink ? 'Regenerate Link' : 'Generate Secure Link')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Dialog */}
-      <Dialog open={editOrgOpen} onOpenChange={setEditOrgOpen}>
-        <DialogContent className="rounded-[32px] p-8">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="text-xl font-black text-slate-900">Edit Organization Profile</DialogTitle>
-            <DialogDescription className="font-medium text-slate-500">Update the name and URL slug for {selectedOrg?.name}.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Organization Name</label>
-              <Input 
-                value={editFormData.name}
-                className="h-12 rounded-2xl font-medium"
-                onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Slug</label>
-              <Input 
-                value={editFormData.slug}
-                className="h-12 rounded-2xl font-medium text-slate-500"
-                onChange={e => setEditFormData({ ...editFormData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '-') })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setEditOrgOpen(false)}>Cancel</Button>
-            <Button 
-              disabled={!editFormData.name || !editFormData.slug || updateOrg.isPending}
-              onClick={() => updateOrg.mutate(editFormData)}
-              className="bg-teal-600 hover:bg-teal-700 rounded-xl font-bold shadow-md"
-            >
-              {updateOrg.isPending ? 'Saving...' : 'Commit Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Billing Dialog */}
-      <Dialog open={billingOrgOpen} onOpenChange={setBillingOrgOpen}>
-        <DialogContent className="rounded-[32px] p-8">
-          <DialogHeader className="space-y-3">
-            <DialogTitle className="text-xl font-black text-slate-900">Subscription Control</DialogTitle>
-            <DialogDescription className="font-medium text-slate-500">Force an override on the billing status for {selectedOrg?.name}.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Internal Status</label>
-              <Select value={billingFormData.subscription_status} onValueChange={(val) => setBillingFormData({ ...billingFormData, subscription_status: val })}>
-                <SelectTrigger className="h-12 rounded-2xl font-medium capitalize">
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="trialing">Trialing</SelectItem>
-                  <SelectItem value="active" className="text-emerald-700 font-bold">Active</SelectItem>
-                  <SelectItem value="past_due" className="text-amber-700 font-bold">Past Due</SelectItem>
-                  <SelectItem value="canceled">Canceled</SelectItem>
-                  <SelectItem value="suspended" className="text-red-700 font-bold">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Pricing Tier</label>
-              <Select value={billingFormData.subscription_plan} onValueChange={(val) => setBillingFormData({ ...billingFormData, subscription_plan: val })}>
-                <SelectTrigger className="h-12 rounded-2xl font-medium capitalize">
-                  <SelectValue placeholder="Select Plan" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="free">Free / Sandbox</SelectItem>
-                  <SelectItem value="pro">Pro Edition</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setBillingOrgOpen(false)}>Cancel</Button>
-            <Button 
-              disabled={updateBilling.isPending}
-              onClick={() => updateBilling.mutate(billingFormData)}
-              className="bg-teal-600 hover:bg-teal-700 rounded-xl font-bold shadow-md"
-            >
-              {updateBilling.isPending ? 'Syncing...' : 'Update Billing'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Platform Admin Invite Dialog */}
-      <Dialog open={showPlatformInviteModal} onOpenChange={setShowPlatformInviteModal}>
-        <DialogContent className="rounded-[32px] p-8 border-amber-200/50 shadow-2xl shadow-amber-500/10">
-          <DialogHeader className="space-y-3 pb-2">
-            <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center mb-2 shadow-inner border border-amber-200">
-              <Shield className="w-6 h-6 text-amber-600" />
-            </div>
-            <DialogTitle className="text-xl font-black text-slate-900">Grant Super Admin Rights</DialogTitle>
-            <DialogDescription className="font-medium text-slate-500">
-              <span className="text-amber-600 font-bold flex items-center mb-1"><AlertCircle className="w-3.5 h-3.5 mr-1" /> EXTREME CAUTION</span>
-              You are generating an invite for a platform-level administrator. This user will have unrestricted access to all tenant data.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Admin Email Address</label>
-              <Input 
-                placeholder="architect@platform.com"
-                type="email"
-                value={platformInviteEmail}
-                className="h-12 rounded-2xl font-medium focus-visible:ring-amber-500 border-slate-200"
-                onChange={e => setPlatformInviteEmail(e.target.value)}
-              />
-            </div>
-            
-            {platformCopiedLink && (
-              <div className="pt-4 space-y-3 fade-in">
-                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 shadow-inner">
-                  <p className="text-xs font-bold text-amber-900 mb-2">Immutable Link Generated</p>
-                  <div className="flex gap-2">
-                    <Input value={platformCopiedLink} readOnly className="text-xs font-medium bg-white h-10 border-amber-200 focus-visible:ring-amber-500" />
-                    <Button 
-                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
-                      onClick={() => copyInviteLink(platformCopiedLink, setCopied)}
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowPlatformInviteModal(false)} className="rounded-xl font-bold">Abort</Button>
-            <Button 
-              disabled={!platformInviteEmail || platformInviting}
-              onClick={handleInvitePlatformAdmin}
-              className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-xl shadow-slate-200"
-            >
-              {platformInviting ? 'Authorizing...' : (platformCopiedLink ? 'Mint New Token' : 'Authorize & Generate Link')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Suspend Alert */}
-      <AlertDialog open={suspendAlertOpen} onOpenChange={setSuspendAlertOpen}>
-        <AlertDialogContent className="rounded-[32px] p-8">
-          <AlertDialogHeader className="space-y-3">
-            <AlertDialogTitle className="text-2xl font-black text-slate-900">Halt Organization Access?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium text-slate-500 leading-relaxed">
-              This will suspend the tenant <strong>{selectedOrg?.name}</strong>. Their users will immediately encounter permission errors and their backend operations will be paused.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-500/20 rounded-xl font-bold"
-              onClick={() => suspendOrg.mutate()}
-            >
-              {suspendOrg.isPending ? 'Halting...' : 'Halt Tenant Access'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
