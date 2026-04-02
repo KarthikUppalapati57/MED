@@ -954,10 +954,8 @@ export default function PlatformAdmin() {
                                 if (!window.confirm(`Delete "${org.name}" and all its data?`)) return;
                                 setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
                                 try {
-                                  await supabase.from('locations').delete().eq('organization_id', org.id);
-                                  await supabase.from('brands').delete().eq('organization_id', org.id);
-                                  await supabase.from('invitations').delete().eq('organization_id', org.id);
-                                  await supabase.from('profiles').delete().eq('organization_id', org.id);
+                                  // Delete the organization itself. The database has ON DELETE CASCADE configured
+                                  // for all related tables (locations, brands, profiles, etc.)
                                   const { error } = await supabase.from('organizations').delete().eq('id', org.id);
                                   if (error) throw error;
                                   queryClient.invalidateQueries({ queryKey: ['organizations'] });
