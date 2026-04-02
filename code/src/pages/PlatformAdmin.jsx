@@ -1034,31 +1034,6 @@ export default function PlatformAdmin() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>ss(`"${org.name}" deleted successfully`);
-                              } catch (err) {
-                                console.error('Delete org error:', err);
-                                const { toast } = await import("sonner");
-                                toast.error(err.message || "Failed to delete organization");
-                              } finally {
-                                setProcessingRequests(prev => {
-                                  const next = new Set(prev);
-                                  next.delete(`del_org_${org.id}`);
-                                  return next;
-                                });
-                              }
-                            }}
-                          >
-                            {processingRequests.has(`del_org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
-                            Delete
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
