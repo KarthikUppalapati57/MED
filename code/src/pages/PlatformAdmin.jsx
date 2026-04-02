@@ -826,7 +826,32 @@ export default function PlatformAdmin() {
                         <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none text-[10px]">Platform Admin</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id ===         <TabsContent value="orgs" className="mt-4">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id === user?.id} onClick={async () => {
+                          if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
+                          try {
+                            // Try memberships table first
+                            const { error } = await supabase.from("memberships").delete().eq("id", admin.membership_id);
+                            if (error) {
+                              // Fallback: update profiles
+                              await supabase.from("profiles").update({ role: 'ground_staff' }).eq("id", admin.user_id);
+                            }
+                            queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+                            const { toast } = await import("sonner");
+                            toast.success("Admin removed");
+                          } catch (e) { console.error(e); }
+                        }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="orgs" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
