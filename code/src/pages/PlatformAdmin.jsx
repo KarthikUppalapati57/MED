@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail } from "lucide-react";
+import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Pencil } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 
@@ -32,6 +32,14 @@ export default function PlatformAdmin() {
   const [platformInviting, setPlatformInviting] = useState(false);
   
   const [editingOrgModules, setEditingOrgModules] = useState(null);
+  const [expandedOrgs, setExpandedOrgs] = useState(new Set());
+  const [expandedBrands, setExpandedBrands] = useState(new Set());
+  const [addBrandOrgId, setAddBrandOrgId] = useState(null);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [addLocationTarget, setAddLocationTarget] = useState(null);
+  const [newLocationName, setNewLocationName] = useState('');
+  const [newLocationAddress, setNewLocationAddress] = useState('');
+  const [savingEntity, setSavingEntity] = useState(false);
   const authChecked = !!user || true;
 
   // ── Platform Admins Query ──────────────────────────────────
@@ -234,6 +242,89 @@ export default function PlatformAdmin() {
     },
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
   });
+
+  // ── Brands & Locations for tree view ───────────────────────
+  const { data: allBrands = [] } = useQuery({
+    queryKey: ['all-brands'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('brands').select('*').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+  });
+
+  const { data: allLocations = [] } = useQuery({
+    queryKey: ['all-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('locations').select('*').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+  });
+
+  const getOrgBrands = (orgId) => allBrands.filter(b => b.organization_id === orgId);
+  const getBrandLocations = (brandId) => allLocations.filter(l => l.brand_id === brandId);
+
+  const toggleOrg = (orgId) => {
+    setExpandedOrgs(prev => {
+      const next = new Set(prev);
+      if (next.has(orgId)) next.delete(orgId);
+      else next.add(orgId);
+      return next;
+    });
+  };
+  const toggleBrand = (brandId) => {
+    setExpandedBrands(prev => {
+      const next = new Set(prev);
+      if (next.has(brandId)) next.delete(brandId);
+      else next.add(brandId);
+      return next;
+    });
+  };
+
+  const handleAddBrandInAdmin = async () => {
+    if (!newBrandName.trim() || !addBrandOrgId) return;
+    setSavingEntity(true);
+    try {
+      const { error } = await supabase.from('brands').insert({ name: newBrandName.trim(), organization_id: addBrandOrgId });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['all-brands'] });
+      const { toast } = await import('sonner');
+      toast.success(`Brand "${newBrandName}" created!`);
+      setAddBrandOrgId(null);
+      setNewBrandName('');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e.message || 'Failed to create brand');
+    }
+    setSavingEntity(false);
+  };
+
+  const handleAddLocationInAdmin = async () => {
+    if (!newLocationName.trim() || !addLocationTarget) return;
+    setSavingEntity(true);
+    try {
+      const { error } = await supabase.from('locations').insert({
+        name: newLocationName.trim(),
+        address: newLocationAddress.trim(),
+        brand_id: addLocationTarget.brandId,
+        organization_id: addLocationTarget.orgId,
+      });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['all-locations'] });
+      const { toast } = await import('sonner');
+      toast.success(`Location "${newLocationName}" created!`);
+      setAddLocationTarget(null);
+      setNewLocationName('');
+      setNewLocationAddress('');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e.message || 'Failed to create location');
+    }
+    setSavingEntity(false);
+  };
 
   // ── Mutations ──────────────────────────────────────────────
   const updateRequest = useMutation({
@@ -735,158 +826,215 @@ export default function PlatformAdmin() {
                         <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none text-[10px]">Platform Admin</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id === user?.id} onClick={async () => {
-                          if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
-                          try {
-                            // Try memberships table first
-                            const { error } = await supabase.from("memberships").delete().eq("id", admin.membership_id);
-                            if (error) {
-                              // Fallback: update profiles
-                              await supabase.from("profiles").update({ role: 'ground_staff' }).eq("id", admin.user_id);
-                            }
-                            queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-                            const { toast } = await import("sonner");
-                            toast.success("Admin removed");
-                          } catch (e) { console.error(e); }
-                        }}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="orgs" className="mt-4">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id ===         <TabsContent value="orgs" className="mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Organizations & Module Access</CardTitle>
-              <p className="text-xs text-slate-400">Configure which modules each organization can access.</p>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Organizations — Hierarchy View</CardTitle>
+                <p className="text-xs text-slate-400">Owner → Organizations → Brands → Locations. Click to expand.</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Badge variant="outline" className="text-[10px]">{orgs.length} orgs</Badge>
+                <Badge variant="outline" className="text-[10px]">{allBrands.length} brands</Badge>
+                <Badge variant="outline" className="text-[10px]">{allLocations.length} locations</Badge>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="text-[11px]">ORGANIZATION & ADMIN</TableHead>
-                    <TableHead className="text-[11px]">STATUS</TableHead>
-                    <TableHead className="text-[11px]">CREATED</TableHead>
-                    <TableHead className="text-[11px]">ENABLED MODULES</TableHead>
-                    <TableHead className="text-[11px]">ACTIONS</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orgs.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-sm text-slate-400">No organizations</TableCell></TableRow>
-                  ) : [...orgs].sort((a, b) => {
+              {orgs.length === 0 ? (
+                <div className="text-center py-12 text-sm text-slate-400">No organizations</div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {[...orgs].sort((a, b) => {
                     const pendingStatuses = ['under_review', 'pending_approval', 'onboarding'];
-                    const aIsPending = pendingStatuses.includes(a.status);
-                    const bIsPending = pendingStatuses.includes(b.status);
-                    if (aIsPending && !bIsPending) return -1;
-                    if (!aIsPending && bIsPending) return 1;
+                    const aP = pendingStatuses.includes(a.status);
+                    const bP = pendingStatuses.includes(b.status);
+                    if (aP && !bP) return -1;
+                    if (!aP && bP) return 1;
                     return 0;
-                  }).map(org => (
-                    <TableRow key={org.id}>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-medium">{org.name}</p>
-                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">{org.admin_email || 'No admin email'}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`text-[9px] uppercase ${org.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{org.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-[9px] text-slate-400">
-                          {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {org.enabled_modules && org.enabled_modules.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {org.enabled_modules.slice(0, 4).map(m => (
-                              <Badge key={m} variant="outline" className="text-[9px]">{MODULE_DEFINITIONS[m]?.label || m}</Badge>
-                            ))}
-                            {org.enabled_modules.length > 4 && (
-                              <Badge variant="outline" className="text-[9px] cursor-pointer hover:bg-slate-100"
-                                onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
-                                +{org.enabled_modules.length - 4}
-                              </Badge>
+                  }).map(org => {
+                    const orgBrands = getOrgBrands(org.id);
+                    const orgLocCount = allLocations.filter(l => l.organization_id === org.id).length;
+                    const isExpanded = expandedOrgs.has(org.id);
+                    const isPending = ['pending_approval', 'under_review', 'onboarding'].includes(org.status);
+
+                    return (
+                      <div key={org.id}>
+                        {/* ORG ROW */}
+                        <div className={`flex items-center gap-3 p-3 px-5 cursor-pointer hover:bg-slate-50 transition-colors ${isPending ? 'bg-amber-50/40' : ''}`} onClick={() => toggleOrg(org.id)}>
+                          <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                            {isExpanded ? <ChevronDown className="w-4 h-4 text-blue-500" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                          </div>
+                          <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                            <Building2 className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-900 truncate">{org.name}</p>
+                              <Badge className={`text-[9px] uppercase border-none ${org.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{org.status || 'active'}</Badge>
+                            </div>
+                            <p className="text-[10px] text-slate-400">
+                              {org.admin_email} · {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} · {orgLocCount} location{orgLocCount !== 1 ? 's' : ''} · {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
+                            </p>
+                          </div>
+                          {/* Modules badges */}
+                          <div className="hidden lg:flex flex-wrap gap-1 max-w-[200px] shrink-0">
+                            {org.enabled_modules && org.enabled_modules.length > 0 ? (
+                              org.enabled_modules.slice(0, 3).map(m => (
+                                <Badge key={m} variant="outline" className="text-[8px] py-0">{MODULE_DEFINITIONS[m]?.label || m}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-[9px] text-slate-300 italic">No modules</span>
+                            )}
+                            {org.enabled_modules && org.enabled_modules.length > 3 && (
+                              <Badge variant="outline" className="text-[8px] py-0">+{org.enabled_modules.length - 3}</Badge>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">None (Pending Config)</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {(org.status === 'pending_approval' || org.status === 'under_review' || org.status === 'onboarding') && (
-                            <Button 
-                              variant="default" size="sm" 
-                              className="h-8 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                setProcessingRequests(prev => new Set(prev).add(`org_${org.id}`));
-                                try {
-                                  // Try Edge Function
-                                  const { data, error } = await supabase.functions.invoke('approve-organization', {
-                                    body: { orgId: org.id }
-                                  });
-                                  if (error || data?.error) {
-                                    // Fallback: direct update
-                                    const { error: updateErr } = await supabase
-                                      .from('organizations')
-                                      .update({ status: 'active', updated_at: new Date().toISOString() })
-                                      .eq('id', org.id);
-                                    if (updateErr) throw updateErr;
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                            {isPending && (
+                              <Button variant="default" size="sm" className="h-7 text-[10px] px-2 bg-emerald-600 hover:bg-emerald-700"
+                                onClick={async () => {
+                                  setProcessingRequests(prev => new Set(prev).add(`org_${org.id}`));
+                                  try {
+                                    const { data, error } = await supabase.functions.invoke('approve-organization', { body: { orgId: org.id } });
+                                    if (error || data?.error) {
+                                      const { error: updateErr } = await supabase.from('organizations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', org.id);
+                                      if (updateErr) throw updateErr;
+                                    }
+                                    queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                    const { toast } = await import("sonner");
+                                    toast.success("Organization approved!");
+                                  } catch (e) {
+                                    const { toast } = await import("sonner");
+                                    toast.error(e.message || "Failed to approve");
+                                  } finally {
+                                    setProcessingRequests(prev => { const n = new Set(prev); n.delete(`org_${org.id}`); return n; });
                                   }
-                                  queryClient.invalidateQueries({ queryKey: ['organizations'] });
-                                  const { toast } = await import("sonner");
-                                  toast.success("Organization approved successfully!");
-                                } catch (e) {
-                                  console.error(e);
-                                  const { toast } = await import("sonner");
-                                  toast.error(e.message || "Failed to approve organization");
-                                } finally {
-                                  setProcessingRequests(prev => {
-                                    const next = new Set(prev);
-                                    next.delete(`org_${org.id}`);
-                                    return next;
-                                  });
-                                }
-                              }}
-                            >
-                              {processingRequests.has(`org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
-                              Approve
+                                }}>
+                                {processingRequests.has(`org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                Approve
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2"
+                              onClick={() => { setAddBrandOrgId(org.id); setNewBrandName(''); }}>
+                              <Plus className="w-3 h-3 mr-1" /> Brand
                             </Button>
-                          )}
-                          <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2" 
-                            onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
-                            <Package className="w-3 h-3 mr-1" /> Modules
-                          </Button>
-                          <Button 
-                            variant="ghost" size="sm" 
-                            className="h-7 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            disabled={processingRequests.has(`del_org_${org.id}`)}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!window.confirm(`Are you sure you want to permanently delete "${org.name}" and all its data? This action cannot be undone.`)) return;
-                              setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
-                              try {
-                                // Delete memberships for this org
-                                await supabase.from('memberships').delete().eq('organization_id', org.id);
-                                // Delete invitations for this org
-                                await supabase.from('invitations').delete().eq('organization_id', org.id);
-                                // Delete profiles tied to this org
-                                await supabase.from('profiles').delete().eq('organization_id', org.id);
-                                // Delete the organization itself
-                                const { error: orgErr } = await supabase.from('organizations').delete().eq('id', org.id);
-                                if (orgErr) throw orgErr;
-                                queryClient.invalidateQueries({ queryKey: ['organizations'] });
-                                const { toast } = await import("sonner");
-                                toast.success(`"${org.name}" deleted successfully`);
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2"
+                              onClick={() => { setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
+                              <Package className="w-3 h-3 mr-1" /> Modules
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              disabled={processingRequests.has(`del_org_${org.id}`)}
+                              onClick={async () => {
+                                if (!window.confirm(`Delete "${org.name}" and all its data?`)) return;
+                                setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
+                                try {
+                                  await supabase.from('locations').delete().eq('organization_id', org.id);
+                                  await supabase.from('brands').delete().eq('organization_id', org.id);
+                                  await supabase.from('invitations').delete().eq('organization_id', org.id);
+                                  await supabase.from('profiles').delete().eq('organization_id', org.id);
+                                  const { error } = await supabase.from('organizations').delete().eq('id', org.id);
+                                  if (error) throw error;
+                                  queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                  queryClient.invalidateQueries({ queryKey: ['all-brands'] });
+                                  queryClient.invalidateQueries({ queryKey: ['all-locations'] });
+                                  const { toast } = await import("sonner");
+                                  toast.success(`"${org.name}" deleted`);
+                                } catch (err) {
+                                  const { toast } = await import("sonner");
+                                  toast.error(err.message || "Failed to delete");
+                                } finally {
+                                  setProcessingRequests(prev => { const n = new Set(prev); n.delete(`del_org_${org.id}`); return n; });
+                                }
+                              }}>
+                              {processingRequests.has(`del_org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* BRANDS under this org */}
+                        {isExpanded && (
+                          <div className="bg-slate-50/60 border-t border-slate-100">
+                            {orgBrands.length === 0 ? (
+                              <div className="p-3 pl-16 text-xs text-slate-400 italic">No brands — click "+ Brand" to add one</div>
+                            ) : orgBrands.map(brand => {
+                              const brandLocs = getBrandLocations(brand.id);
+                              const isBrandExp = expandedBrands.has(brand.id);
+                              return (
+                                <div key={brand.id}>
+                                  <div className="flex items-center gap-2 py-2.5 px-5 pl-14 cursor-pointer hover:bg-slate-100/50 transition-colors border-t border-slate-100 first:border-t-0"
+                                    onClick={() => toggleBrand(brand.id)}>
+                                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                                      {isBrandExp ? <ChevronDown className="w-3.5 h-3.5 text-violet-500" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                                    </div>
+                                    <div className="w-7 h-7 bg-violet-50 rounded-md flex items-center justify-center shrink-0">
+                                      <Store className="w-3.5 h-3.5 text-violet-600" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-slate-800">{brand.name}</p>
+                                      <p className="text-[10px] text-slate-400">{brandLocs.length} location{brandLocs.length !== 1 ? 's' : ''}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-violet-600 hover:bg-violet-50"
+                                        onClick={() => { setAddLocationTarget({ orgId: org.id, brandId: brand.id }); setNewLocationName(''); setNewLocationAddress(''); }}>
+                                        <Plus className="w-3 h-3 mr-1" /> Location
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                        onClick={async () => {
+                                          if (!window.confirm(`Delete brand "${brand.name}" and its locations?`)) return;
+                                          await supabase.from('locations').delete().eq('brand_id', brand.id);
+                                          await supabase.from('brands').delete().eq('id', brand.id);
+                                          queryClient.invalidateQueries({ queryKey: ['all-brands'] });
+                                          queryClient.invalidateQueries({ queryKey: ['all-locations'] });
+                                          const { toast } = await import("sonner");
+                                          toast.success(`Brand "${brand.name}" deleted`);
+                                        }}>
+                                        <Trash2 className="w-2.5 h-2.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* LOCATIONS under this brand */}
+                                  {isBrandExp && (
+                                    <div className="bg-white/50">
+                                      {brandLocs.length === 0 ? (
+                                        <div className="p-2 pl-28 text-[10px] text-slate-400 italic">No locations</div>
+                                      ) : brandLocs.map(loc => (
+                                        <div key={loc.id} className="flex items-center gap-2 py-2 px-5 pl-24 border-t border-slate-50 hover:bg-emerald-50/30 transition-colors">
+                                          <div className="w-6 h-6 bg-emerald-50 rounded flex items-center justify-center shrink-0">
+                                            <MapPin className="w-3 h-3 text-emerald-600" />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-medium text-slate-700">{loc.name}</p>
+                                            <p className="text-[10px] text-slate-400 truncate">{loc.address || 'No address'}</p>
+                                          </div>
+                                          <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                                            onClick={async () => {
+                                              if (!window.confirm(`Delete location "${loc.name}"?`)) return;
+                                              await supabase.from('locations').delete().eq('id', loc.id);
+                                              queryClient.invalidateQueries({ queryKey: ['all-locations'] });
+                                              const { toast } = await import("sonner");
+                                              toast.success(`Location "${loc.name}" deleted`);
+                                            }}>
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>ss(`"${org.name}" deleted successfully`);
                               } catch (err) {
                                 console.error('Delete org error:', err);
                                 const { toast } = await import("sonner");

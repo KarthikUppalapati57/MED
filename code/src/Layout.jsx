@@ -20,7 +20,8 @@ import {
   Settings,
   User,
   Shield,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ const navigation = [
   { name: 'Auto Ordering', href: 'AutoOrdering', icon: ShoppingCart, minRole: 'manager' },
   { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'manager' },
   { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'manager' },
+  { name: 'My Organization', href: 'OrgManagement', icon: Building2, minRole: 'owner' },
   { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'owner' },
   { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'owner' },
 ];
