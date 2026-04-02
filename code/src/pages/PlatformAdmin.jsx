@@ -866,6 +866,43 @@ export default function PlatformAdmin() {
                             onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
                             <Package className="w-3 h-3 mr-1" /> Modules
                           </Button>
+                          <Button 
+                            variant="ghost" size="sm" 
+                            className="h-7 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            disabled={processingRequests.has(`del_org_${org.id}`)}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!window.confirm(`Are you sure you want to permanently delete "${org.name}" and all its data? This action cannot be undone.`)) return;
+                              setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
+                              try {
+                                // Delete memberships for this org
+                                await supabase.from('memberships').delete().eq('organization_id', org.id);
+                                // Delete invitations for this org
+                                await supabase.from('invitations').delete().eq('organization_id', org.id);
+                                // Delete profiles tied to this org
+                                await supabase.from('profiles').delete().eq('organization_id', org.id);
+                                // Delete the organization itself
+                                const { error: orgErr } = await supabase.from('organizations').delete().eq('id', org.id);
+                                if (orgErr) throw orgErr;
+                                queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                const { toast } = await import("sonner");
+                                toast.success(`"${org.name}" deleted successfully`);
+                              } catch (err) {
+                                console.error('Delete org error:', err);
+                                const { toast } = await import("sonner");
+                                toast.error(err.message || "Failed to delete organization");
+                              } finally {
+                                setProcessingRequests(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(`del_org_${org.id}`);
+                                  return next;
+                                });
+                              }
+                            }}
+                          >
+                            {processingRequests.has(`del_org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                            Delete
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
