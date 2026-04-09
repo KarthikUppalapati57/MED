@@ -422,7 +422,7 @@ export default function LandingPage() {
       </Dialog>
     </div>
   );
-};
+}
 
 const FeatureCard = ({ icon, title, description }) => (
   <div className="p-8 rounded-2xl bg-white/5 border border-white/10 hover:border-teal-500/30 transition-all group">
@@ -435,6 +435,3 @@ const FeatureCard = ({ icon, title, description }) => (
     </p>
   </div>
 );
-    </div>
-  );
-}

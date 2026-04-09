@@ -186,7 +186,10 @@ function SignupPage() {
 // ── Login / Signup Page ───────────────────────────────────
 function LoginPage() {
   const { loginWithEmail, signUp, authError } = useAuth();
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'signup' ? 'signup' : 'login';
+  }); // 'login' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
