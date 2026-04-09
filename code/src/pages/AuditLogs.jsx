@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
-import { Activity, Search, ShieldAlert, FileText, Database, User } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Search, ShieldAlert, Database, User } from 'lucide-react';
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,

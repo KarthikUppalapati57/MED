@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldCheck, Lock, CreditCard, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, Loader2, AlertCircle } from 'lucide-react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripe } from '@/lib/paymentService';
 import { toast } from 'sonner';

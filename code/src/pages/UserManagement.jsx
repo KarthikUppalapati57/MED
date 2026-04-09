@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { logAudit } from '@/lib/audit';
@@ -8,19 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  Plus, Search, Edit2, Trash2, Users, Mail, Shield, Copy, Check, MoreVertical,
+import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, ChevronDown, ChevronRight,
-  FileText, DollarSign, BarChart2, Settings, ShieldAlert, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt,
-  Utensils, CreditCard, ShoppingCart, History, Upload, Eye, AlertCircle
+  FileText, Settings, ShieldAlert, ShieldCheck,
+  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle
 } from 'lucide-react';
 
 // ─── MEVS Roles ─────────────────────────────────────────────────────────────

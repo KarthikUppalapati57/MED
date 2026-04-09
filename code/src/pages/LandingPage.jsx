@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  Loader2,
   ChevronRight,
   Database
 } from "lucide-react";
