@@ -106,9 +106,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       const profile = await fetchProfile(sessionUser.id);
-      
-      if (!isMounted) return;
-      
+            
       if (profile) {
         setUser(sessionUser);
         setUserProfile(profile);
@@ -141,13 +139,11 @@ export const AuthProvider = ({ children }) => {
           setUserProfile(null);
         }
       } catch (err) {
-        if (isMounted) {
-          setAuthError(err);
-          setUser(null);
-          setUserProfile(null);
-        }
+        setAuthError(err);
+        setUser(null);
+        setUserProfile(null);
       } finally {
-        if (isMounted) setIsLoadingAuth(false);
+        setIsLoadingAuth(false);
       }
     };
 
