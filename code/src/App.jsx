@@ -12,6 +12,7 @@ import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
+import MFASetupPage from './pages/MFASetupPage';
 import React, { useState, useEffect } from 'react';
 
 // Initialize global error monitoring
@@ -422,15 +423,16 @@ function LoginPage() {
 
 // ── Authenticated App ──────────────────────────────────────
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, user, userProfile, role, mfaLevel } = useAuth();
+  const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors } = useAuth();
   
   // MFA Interceptor
   const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1';
+  const needsMFASetup = user && mfaFactors.length === 0;
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const needsPaymentVerification = user && !needsMFAChallenge && !isPlatformAdmin && !userProfile?.payment_verified;
-  const needsOnboarding = user && !needsMFAChallenge && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
+  const needsPaymentVerification = user && !needsMFAChallenge && !needsMFASetup && !isPlatformAdmin && !userProfile?.payment_verified;
+  const needsOnboarding = user && !needsMFAChallenge && !needsMFASetup && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
 
   if (isLoadingAuth) {
     return (
@@ -448,12 +450,18 @@ const AuthenticatedApp = () => {
     return <MFAChallenge />;
   }
 
+  // Show MFA setup if user is authenticated but has no factors enrolled
+  if (needsMFASetup) {
+    return <MFASetupPage />;
+  }
+
   return (
     <Routes>
       {/* Public routes */}
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
 
       {/* Onboarding & Verification routes (explicit) */}
+      <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
       <Route path="/verify-payment" element={user ? <PaymentVerification /> : <Navigate to="/" />} />
       <Route path="/onboarding" element={user ? <OnboardingPage /> : <Navigate to="/" />} />
 
