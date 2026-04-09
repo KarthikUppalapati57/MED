@@ -60,10 +60,10 @@ export default class ErrorBoundary extends React.Component {
               </p>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {this.state.error && (
               <div className="bg-red-50 rounded-lg p-3 text-left">
                 <p className="text-xs font-mono text-red-700 break-all">
-                  {this.state.error.message}
+                  {this.state.error.stack || this.state.error.message}
                 </p>
               </div>
             )}
