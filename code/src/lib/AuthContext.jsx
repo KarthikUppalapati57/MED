@@ -125,17 +125,15 @@ export const AuthProvider = ({ children }) => {
       const profile = await fetchProfileRef.current(sessionUser.id);
             
       if (profile) {
-        setUser(sessionUser);
         setUserProfile(profile);
         setActiveOrg(profile.organization);
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
-        await refreshMFAStatusRef.current();
       } else {
-        setUser(sessionUser);
         setUserProfile(null);
-        await refreshMFAStatusRef.current();
       }
+      // NOTE: refreshMFAStatus is NOT called here anymore.
+      // It's called immediately after setUser in the event handler.
     };
 
     // Use ONLY onAuthStateChange for ALL auth initialization.
@@ -149,13 +147,23 @@ export const AuthProvider = ({ children }) => {
         
         try {
           if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-            // CRITICAL: Set the user FIRST from the session token.
-            // This ensures the user is never null if a session exists,
-            // even if profile loading or invitation processing fails below.
             if (currentUser) {
+              // 1. Set the user IMMEDIATELY from the session token
               setUser(currentUser);
               
-              // Now do async work — errors here won't lose the user
+              // 2. Refresh MFA status IMMEDIATELY — this calls Supabase Auth
+              //    (not the database), so it's fast and won't be blocked by
+              //    slow profile/invitation queries.
+              try {
+                await refreshMFAStatusRef.current();
+              } catch (mfaErr) {
+                console.warn('MFA status refresh error (non-fatal):', mfaErr);
+              }
+              
+              // 3. Mark loading as complete NOW — user and MFA are ready
+              if (isMounted) setIsLoadingAuth(false);
+              
+              // 4. Do slower async work in the background (non-blocking)
               try {
                 await processPendingInvitationRef.current(currentUser.email, currentUser.id);
               } catch (inviteErr) {
@@ -170,8 +178,8 @@ export const AuthProvider = ({ children }) => {
             } else {
               setUser(null);
               setUserProfile(null);
+              if (isMounted) setIsLoadingAuth(false);
             }
-            if (isMounted) setIsLoadingAuth(false);
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setUserProfile(null);
@@ -184,13 +192,13 @@ export const AuthProvider = ({ children }) => {
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
               setUser(currentUser);
+              await refreshMFAStatusRef.current();
               await loadProfile(currentUser);
             }
           }
         } catch (err) {
           console.warn('Auth state change error:', err);
           if (isMounted) {
-            // Even on error, preserve the user if we have a session
             if (currentUser) setUser(currentUser);
             setAuthError(err);
             setIsLoadingAuth(false);
