@@ -28,3 +28,12 @@ dist-ssr
 *.sw?
 
 .env
+.env.*
+*.env
+
+# Gemini/Antigravity
+.gemini/
+.claude/
+
+# Vercel
+.vercel/
