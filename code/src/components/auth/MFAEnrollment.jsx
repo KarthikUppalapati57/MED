@@ -185,6 +185,23 @@ export function MFAEnrollment({ onComplete, onCancel }) {
           <p className="text-sm text-slate-500 font-medium">Initializing secure enrollment...</p>
         </div>
       )}
+
+      {!isLoading && step === 1 && error && (
+        <div className="flex flex-col items-center justify-center py-10 gap-4">
+          <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-800 text-left max-w-sm">
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
+          <Button 
+            className="bg-teal-600 hover:bg-teal-700 mt-2" 
+            onClick={() => {
+              initialized.current = false;
+              startEnrollment();
+            }}
+          >
+            Retry Verification
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
