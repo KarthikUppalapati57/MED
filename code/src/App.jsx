@@ -103,12 +103,16 @@ function SignupPage() {
         </div>
 
         {success ? (
-          <div className="text-center py-6">
+          <div className="text-center py-6 animate-in fade-in zoom-in duration-300">
             <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
               <svg width="24" height="24" fill="none" stroke="#16a34a" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
             </div>
             <p className="text-green-700 font-medium">Account created successfully!</p>
-            <p className="text-sm text-slate-500 mt-1">Redirecting to login...</p>
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+              {!!user 
+                ? "Starting secure account setup..." 
+                : "Please check your email to confirm your account before setting up authentication."}
+            </p>
           </div>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
