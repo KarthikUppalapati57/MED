@@ -10,12 +10,13 @@ import {
   ShieldCheck, 
   Zap, 
   BarChart3, 
-  FileText, 
   Layers,
   CheckCircle2,
   Clock,
   Sparkles,
-  Loader2
+  Loader2,
+  ChevronRight,
+  Database
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -24,7 +25,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -72,42 +72,42 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white selection:bg-teal-500/30">
+    <div className="min-h-screen bg-white text-slate-900 selection:bg-brand-teal/30 font-sans antialiased">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-slate-950/50 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-[#15181e]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-teal-500 flex items-center justify-center">
-                <Layers className="h-5 w-5 text-slate-950" />
+              <div className="h-6 w-6 rounded-sm bg-[#14c6cb] flex items-center justify-center">
+                <Database className="h-4 w-4 text-[#15181e]" />
               </div>
-              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                EdgeOps
+              <span className="text-lg font-bold tracking-tighter text-white">
+                EDGEOPS
               </span>
             </div>
             
-            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+            <div className="hidden md:flex items-center gap-8 text-[13px] font-medium tracking-wider text-slate-400 uppercase">
               <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#showcase" className="hover:text-white transition-colors">Showcase</a>
+              <a href="#showcase" className="hover:text-white transition-colors">Docs</a>
               <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-              <Button 
-                variant="ghost" 
-                className="text-slate-400 hover:text-white hover:bg-white/5"
+              <div className="h-4 w-[1px] bg-white/10 mx-2" />
+              <button 
+                className="hover:text-white transition-colors"
                 onClick={() => navigate('/login')}
               >
                 Log in
-              </Button>
+              </button>
               <Button 
-                className="bg-teal-500 text-slate-950 hover:bg-teal-400 font-semibold"
+                className="bg-[#14c6cb] text-[#15181e] hover:bg-[#12adb1] font-bold text-[12px] h-8 px-4 rounded-sm transition-all"
                 onClick={() => setIsDemoModalOpen(true)}
               >
-                Request Demo
+                BOOK DEMO
               </Button>
             </div>
 
             <div className="md:hidden">
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-slate-400">
-                {isMenuOpen ? <X /> : <Menu />}
+                {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
@@ -115,309 +115,322 @@ export default function LandingPage() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="md:hidden bg-slate-900 border-b border-white/5 p-4 space-y-4">
-            <a href="#features" className="block text-slate-400 hover:text-white">Features</a>
-            <a href="#showcase" className="block text-slate-400 hover:text-white">Showcase</a>
-            <a href="#pricing" className="block text-slate-400 hover:text-white">Pricing</a>
+          <div className="md:hidden bg-[#15181e] border-b border-white/5 p-4 space-y-4">
+            <a href="#features" className="block text-slate-400 hover:text-white text-sm uppercase tracking-widest">Features</a>
+            <a href="#showcase" className="block text-slate-400 hover:text-white text-sm uppercase tracking-widest">Docs</a>
+            <a href="#pricing" className="block text-slate-400 hover:text-white text-sm uppercase tracking-widest">Pricing</a>
             <hr className="border-white/5" />
-            <Button variant="ghost" className="w-full justify-start text-slate-400 px-0" onClick={() => navigate('/login')}>Log in</Button>
-            <Button className="w-full bg-teal-500 text-slate-950 hover:bg-teal-400" onClick={() => navigate('/login?mode=signup')}>Get Started</Button>
+            <Button variant="ghost" className="w-full justify-start text-slate-400 px-0 h-auto" onClick={() => navigate('/login')}>Log in</Button>
+            <Button className="w-full bg-[#14c6cb] text-[#15181e] hover:bg-[#12adb1] rounded-sm" onClick={() => navigate('/login?mode=signup')}>Get Started</Button>
           </div>
         )}
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        {/* Glow Effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[500px] opacity-20 pointer-events-none">
-          <div className="absolute inset-x-0 top-0 h-full bg-teal-500/30 blur-[120px] rounded-full" />
-        </div>
+      <section className="relative pt-32 pb-24 bg-[#15181e] overflow-hidden text-white">
+        {/* Technical Grid Pattern Overlay */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+             style={{ backgroundImage: 'radial-gradient(#14c6cb 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-sm bg-[#14c6cb]/10 border border-[#14c6cb]/20 text-[10px] font-bold tracking-[2px] uppercase text-[#14c6cb] mb-8">
+              <Sparkles className="h-3 w-3" />
+              Operational Automation System
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-8 text-white leading-[0.95]">
+              Infrastructure <br /> for your kitchen.
+            </h1>
+            
+            <p className="max-w-xl text-lg text-slate-400 mb-10 leading-relaxed font-medium">
+              Automated invoice extraction, real-time inventory synchronization, and AI-driven ordering lifecycle management. Built for the modern hospitality enterprise.
+            </p>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-teal-400 mb-8">
-            <Sparkles className="h-3 w-3" />
-            AI-Powered Operational Excellence
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <Button size="lg" className="h-11 px-8 bg-[#14c6cb] text-[#15181e] hover:bg-[#12adb1] font-bold text-sm tracking-widest rounded-sm transition-all" onClick={() => setIsDemoModalOpen(true)}>
+                REQUEST DEMO <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+              <Button size="lg" variant="outline" className="h-11 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-sm tracking-widest rounded-sm" onClick={() => document.getElementById('features').scrollIntoView({behavior: 'smooth'})}>
+                VIEW DOCS
+              </Button>
+            </div>
           </div>
-          
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-500">
-            Automate your kitchen <br className="hidden md:block" /> with intelligence.
-          </h1>
-          
-          <p className="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed">
-            EdgeOps transforms how restaurants handle data. Automate invoice processing, 
-            track inventory in real-time, and optimize your ordering cycles—all in one place.
-          </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
-            <Button size="lg" className="h-12 px-8 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold text-base transition-all hover:scale-105" onClick={() => setIsDemoModalOpen(true)}>
-              Request Demo <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-white font-medium" onClick={() => document.getElementById('features').scrollIntoView({behavior: 'smooth'})}>
-              Explore Platform
-            </Button>
-          </div>
-
-          {/* Interactive Interface Preview */}
-          <div className="relative max-w-5xl mx-auto group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-            <div className="relative rounded-[2rem] border border-white/10 overflow-hidden bg-slate-900 shadow-2xl">
-              <img src={dashboardImg} alt="Dashboard Preview" className="w-full object-cover" />
+          {/* Interactive Interface Preview with Frame */}
+          <div className="mt-20 relative group">
+            <div className="absolute -inset-1 bg-[#14c6cb]/20 rounded-lg blur-2xl opacity-20 pointer-events-none" />
+            <div className="relative rounded-sm border border-white/10 overflow-hidden bg-[#1a1d24] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
+              <div className="h-8 border-b border-white/5 bg-[#15181e] flex items-center px-4 gap-1.5 leading-none">
+                <div className="w-2 h-2 rounded-full bg-white/10" />
+                <div className="w-2 h-2 rounded-full bg-white/10" />
+                <div className="w-2 h-2 rounded-full bg-white/10" />
+                <div className="ml-4 h-3 w-32 bg-white/5 rounded-full" />
+              </div>
+              <img src={dashboardImg} alt="Dashboard Preview" className="w-full object-cover filter brightness-95" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-12 border-y border-white/5 bg-slate-900/50">
+      {/* Stats Bar */}
+      <section className="py-6 border-y border-slate-100 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold mb-1">99%</div>
-              <div className="text-sm text-slate-500 uppercase tracking-wider">Accuracy</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="flex flex-col items-center md:items-start">
+              <div className="text-xl font-bold tracking-tighter">99.8%</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Extraction Accuracy</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold mb-1">10k+</div>
-              <div className="text-sm text-slate-500 uppercase tracking-wider">Invoices Processed</div>
+            <div className="flex flex-col items-center md:items-start">
+              <div className="text-xl font-bold tracking-tighter">1.4ms</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Sync Latency</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold mb-1">20h</div>
-              <div className="text-sm text-slate-500 uppercase tracking-wider">Weekly Time Saved</div>
+            <div className="flex flex-col items-center md:items-start">
+              <div className="text-xl font-bold tracking-tighter">12k+</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Daily Operations</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold mb-1">24/7</div>
-              <div className="text-sm text-slate-500 uppercase tracking-wider">Support</div>
+            <div className="flex flex-col items-center md:items-start">
+              <div className="text-xl font-bold tracking-tighter">SLA</div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Five Nines Uptime</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Showcase Section */}
-      <section id="showcase" className="py-24 overflow-hidden">
+      <section id="showcase" className="py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-16">
+          <div className="flex flex-col lg:flex-row items-center gap-24">
             <div className="flex-1 space-y-8">
-              <div className="inline-flex items-center gap-2 text-teal-400 font-semibold text-sm">
-                <CheckCircle2 className="h-4 w-4" />
-                Mobile First Workflow
+              <div className="text-[11px] text-[#14c6cb] font-bold tracking-[3px] uppercase">
+                Edge Processing
               </div>
-              <h2 className="text-4xl font-bold leading-tight">
-                Scan on the go. <br /> Sync everywhere.
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tighter leading-[1.1]">
+                Scan at the source. <br /> Orchestrate everywhere.
               </h2>
-              <p className="text-slate-400 text-lg">
-                Our AI-driven mobile interface allows you to capture invoices and inventory sheets directly from the kitchen floor. 
-                Everything syncs instantly to your central dashboard.
+              <p className="text-slate-600 text-lg leading-relaxed max-w-lg">
+                Our vision-driven edge interface allows kitchen staff to synchronize physical logistics with digital records in real-time.
               </p>
-              <ul className="space-y-4">
-                <li className="flex items-center gap-3 text-slate-300">
-                  <div className="h-2 w-2 rounded-full bg-teal-500" />
-                  Instant OCR extraction for items & pricing
-                </li>
-                <li className="flex items-center gap-3 text-slate-300">
-                  <div className="h-2 w-2 rounded-full bg-teal-500" />
-                  Offline mode for weak kitchen signals
-                </li>
-                <li className="flex items-center gap-3 text-slate-300">
-                  <div className="h-2 w-2 rounded-full bg-teal-500" />
-                  Batch processing for high-volume days
-                </li>
-              </ul>
+              
+              <div className="space-y-6 pt-4">
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                    <CheckCircle2 className="h-3 w-3 text-[#14c6cb]" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm tracking-tight mb-1">Low-latency OCR</h4>
+                    <p className="text-xs text-slate-500">Sub-second extraction of line items and pricing deltas.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="mt-1 h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                    <CheckCircle2 className="h-3 w-3 text-[#14c6cb]" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm tracking-tight mb-1">State Persistence</h4>
+                    <p className="text-xs text-slate-500">Offline-first local buffers for intermittent kitchen connectivity.</p>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <div className="flex-1 relative">
-                <div className="absolute inset-0 bg-teal-500/20 blur-[80px] rounded-full pointer-events-none" />
-                <img src={scannerImg} alt="Mobile Scanner" className="relative z-10 w-full max-w-sm mx-auto shadow-2xl rounded-[3rem] border-8 border-slate-800" />
+                <div className="absolute inset-0 bg-[#14c6cb]/5 blur-3xl rounded-full pointer-events-none" />
+                <div className="relative p-2 rounded-lg border border-slate-200 shadow-xl bg-white">
+                  <img src={scannerImg} alt="Mobile Scanner" className="rounded-sm w-full max-w-xs mx-auto aspect-[9/16] object-cover" />
+                </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Grid */}
-      <section id="features" className="py-24 border-t border-white/5 bg-slate-900/20">
+      <section id="features" className="py-32 border-t border-slate-100 bg-slate-50/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Powerful from day one</h2>
-            <p className="text-slate-400 max-w-xl mx-auto">Everything you need to run a data-driven kitchen without the manual spreadsheet hell.</p>
+          <div className="mb-20">
+            <h2 className="text-3xl font-bold tracking-tighter mb-4">Enterprise Modules</h2>
+            <div className="h-1 w-12 bg-[#14c6cb]" />
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-y-16 gap-x-12">
             <FeatureCard 
-              icon={<Zap className="h-6 w-6 text-teal-400" />}
+              icon={<Zap className="h-5 w-5 text-[#14c6cb]" />}
               title="Automated Extraction"
-              description="Upload invoices and let our AI extract items, prices, and tax automatically. Integrated directly with your accounting."
+              description="Transform paper invoices into structured JSON entities using multi-model visual analysis."
             />
             <FeatureCard 
-              icon={<BarChart3 className="h-6 w-6 text-teal-400" />}
-              title="Real-time Inventory"
-              description="Keep track of stock levels across multiple locations. Get alerts when supplies are running low."
+              icon={<BarChart3 className="h-5 w-5 text-[#14c6cb]" />}
+              title="Telemetry & Inventory"
+              description="Real-time observability into ingredient cycles and replenishment thresholds across nodes."
             />
             <FeatureCard 
-              icon={<ShieldCheck className="h-6 w-6 text-teal-400" />}
-              title="Secure Payments"
-              description="Pay vendors directly through the platform with enterprise-grade security and automated reconciliation."
+              icon={<ShieldCheck className="h-5 w-5 text-[#14c6cb]" />}
+              title="Identity & Access"
+              description="Granular RBAC and audit logging for every operational transaction within the platform."
             />
             <FeatureCard 
-              icon={<Clock className="h-6 w-6 text-teal-400" />}
-              title="Auto-Ordering"
-              description="Set par levels and let EdgeOps suggest or place orders automatically based on historical data."
+              icon={<Clock className="h-5 w-5 text-[#14c6cb]" />}
+              title="Ordering Lifecycle"
+              description="Automated reconciliation between predicted demand and supply-chain logistics."
             />
             <FeatureCard 
-              icon={<Layers className="h-6 w-6 text-teal-400" />}
-              title="Multi-unit Management"
-              description="Manage multiple restaurants or ghost kitchens from a single unified administrator interface."
+              icon={<Layers className="h-5 w-5 text-[#14c6cb]" />}
+              title="Orchestration"
+              description="Centralized command and control for multi-unit operators and ghost kitchen networks."
             />
             <FeatureCard 
-              icon={<Sparkles className="h-6 w-6 text-teal-400" />}
-              title="Insightful Analytics"
-              description="Visualize food cost trends, ingredient price fluctuations, and vendor performance over time."
+              icon={<Sparkles className="h-5 w-5 text-[#14c6cb]" />}
+              title="ML Analytics"
+              description="Historical delta analysis to optimize procurement costs and minimize wastage overhead."
             />
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24">
+      <section id="pricing" className="py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Simple, transparent pricing</h2>
-            <p className="text-slate-400">Scale with your business. No hidden fees.</p>
+          <div className="text-center mb-20">
+            <h2 className="text-3xl font-bold tracking-tighter mb-4">Scalable Licensing</h2>
+            <p className="text-slate-500 text-sm">Predictable infrastructure costs for growing teams.</p>
           </div>
 
-          <div className="max-w-md mx-auto p-8 rounded-3xl bg-slate-900 border border-teal-500/20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4">
-              <span className="bg-teal-500 text-slate-950 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-widest">Early Access</span>
-            </div>
-            <div className="mb-8">
-              <h3 className="text-2xl font-bold mb-2">Platform Unlimited</h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold">$149</span>
-                <span className="text-slate-500">/mo</span>
+          <div className="max-w-sm mx-auto">
+            <div className="p-8 rounded-sm bg-white border border-slate-200 relative group hover:border-[#14c6cb] transition-all duration-300">
+              <div className="absolute top-0 right-0 p-4">
+                <span className="bg-[#14c6cb]/10 text-[#14c6cb] text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-widest">Early Access</span>
               </div>
+              <div className="mb-8">
+                <h3 className="text-lg font-bold tracking-tight mb-4">Platform Unlimited</h3>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-bold tracking-tighter">$149</span>
+                  <span className="text-slate-400 font-bold text-xs uppercase tracking-widest ml-1">USD / Month</span>
+                </div>
+              </div>
+              <ul className="space-y-4 mb-10">
+                {[
+                  "Unlimited visual extractions",
+                  "Universal user access",
+                  "Cross-module telemetry",
+                  "Dedicated API endpoint",
+                  "24/7 technical support"
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3 text-slate-600 text-[13px] font-medium">
+                    <ChevronRight className="h-4 w-4 text-[#14c6cb]" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button className="w-full h-11 bg-[#14c6cb] text-[#15181e] hover:bg-[#12adb1] font-bold text-xs tracking-[2px] rounded-sm uppercase" onClick={() => setIsDemoModalOpen(true)}>
+                INITIATE ONBOARDING
+              </Button>
             </div>
-            <ul className="space-y-4 mb-8">
-              {[
-                "Unlimited invoice processing",
-                "Unlimited users",
-                "All modules included",
-                "Custom vendor integrations",
-                "Priority 24/7 support"
-              ].map((item, i) => (
-                <li key={i} className="flex items-center gap-3 text-slate-300 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-teal-500" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <Button className="w-full h-12 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold" onClick={() => setIsDemoModalOpen(true)}>
-              Join Waitlist / Request Demo
-            </Button>
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-teal-500/10 to-transparent opacity-50" />
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative text-center">
-              <h2 className="text-4xl md:text-5xl font-bold mb-8">Ready to reclaim your time?</h2>
-              <p className="text-slate-400 text-lg mb-10">Join forward-thinking restaurants already using EdgeOps to automate their backend.</p>
-              <Button size="lg" className="h-14 px-10 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold text-lg" onClick={() => navigate('/login?mode=signup')}>
-                  Start Your 14-Day Free Trial
-              </Button>
-          </div>
-      </section>
-
       {/* Footer */}
-      <footer className="py-12 border-t border-white/5 bg-slate-950">
+      <footer className="py-20 bg-[#15181e] border-t border-white/5 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-8">
-            <div className="flex items-center gap-2 opacity-80">
-              <Layers className="h-5 w-5 text-teal-500" />
-              <span className="text-xl font-bold">EdgeOps</span>
+          <div className="grid md:grid-cols-4 gap-12 mb-20">
+            <div className="col-span-2">
+              <div className="flex items-center gap-2 mb-6 opacity-90">
+                <Database className="h-5 w-5 text-[#14c6cb]" />
+                <span className="text-xl font-bold tracking-tighter uppercase leading-none">EdgeOps</span>
+              </div>
+              <p className="text-slate-500 text-sm max-w-xs leading-relaxed">
+                Platform infrastructure for high-performance hospitality logistics and operational intelligence.
+              </p>
             </div>
-            <div className="flex gap-8 text-sm text-slate-500">
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#showcase" className="hover:text-white transition-colors">Showcase</a>
-              <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <div>
+              <h5 className="text-[10px] font-bold uppercase tracking-[3px] text-slate-500 mb-6">Product</h5>
+              <ul className="space-y-4 text-sm text-slate-400">
+                <li><a href="#features" className="hover:text-[#14c6cb] transition-colors">Infrastructure</a></li>
+                <li><a href="#" className="hover:text-[#14c6cb] transition-colors">Telemetry</a></li>
+                <li><a href="#" className="hover:text-[#14c6cb] transition-colors">Security</a></li>
+              </ul>
+            </div>
+            <div>
+              <h5 className="text-[10px] font-bold uppercase tracking-[3px] text-slate-500 mb-6">Connect</h5>
+              <ul className="space-y-4 text-sm text-slate-400">
+                <li><a href="#" className="hover:text-[#14c6cb] transition-colors">Docs</a></li>
+                <li><a href="#" className="hover:text-[#14c6cb] transition-colors">Status</a></li>
+                <li><a href="#" className="hover:text-[#14c6cb] transition-colors">Support</a></li>
+              </ul>
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-white/5 gap-4">
-            <p className="text-sm text-slate-600">© 2026 EdgeOps. All rights reserved.</p>
-            <div className="flex gap-6 text-sm text-slate-500">
+            <p className="text-xs text-slate-600 font-medium tracking-tight">© 2026 EDGEOPS INC. ALL RIGHTS RESERVED.</p>
+            <div className="flex gap-8 text-[11px] font-bold uppercase tracking-widest text-slate-500">
                 <a href="#" className="hover:text-white transition-colors">Privacy</a>
                 <a href="#" className="hover:text-white transition-colors">Terms</a>
-                <a href="#" className="hover:text-white transition-colors">Status</a>
+                <a href="#" className="hover:text-white transition-colors">Security</a>
             </div>
           </div>
         </div>
       </footer>
+
       {/* Demo Request Modal */}
       <Dialog open={isDemoModalOpen} onOpenChange={setIsDemoModalOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-slate-900 border-white/10 text-white">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-emerald-400">
-              Request a Demo
-            </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Fill out the form below and our team will get back to you with a custom walkthrough of the platform.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleDemoSubmit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-sm font-medium text-slate-300">Full Name</Label>
-              <Input 
-                id="fullName" 
-                required 
-                value={demoForm.fullName}
-                onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})}
-                placeholder="John Doe" 
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-slate-300">Business Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                required 
-                value={demoForm.email}
-                onChange={(e) => setDemoForm({...demoForm, email: e.target.value})}
-                placeholder="john@restaurant.com" 
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="companyName" className="text-sm font-medium text-slate-300">Company Name</Label>
-              <Input 
-                id="companyName" 
-                required 
-                value={demoForm.companyName}
-                onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})}
-                placeholder="Acme Hospitality" 
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm font-medium text-slate-300">Phone Number</Label>
-              <Input 
-                id="phone" 
-                type="tel" 
-                value={demoForm.phone}
-                onChange={(e) => setDemoForm({...demoForm, phone: e.target.value})}
-                placeholder="+1 (555) 000-0000" 
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
-              />
-            </div>
-            <DialogFooter className="pt-4">
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-full bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold py-6 text-lg"
-              >
-                {isSubmitting ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting...</>
-                ) : "Submit Request"}
-              </Button>
-            </DialogFooter>
-          </form>
+        <DialogContent className="sm:max-w-[425px] bg-[#15181e] border-white/10 text-white p-0 overflow-hidden rounded-sm">
+          <div className="h-1 bg-[#14c6cb] w-full" />
+          <div className="p-8">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-2xl font-bold tracking-tighter text-white">
+                Request Deployment
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-sm">
+                Initialize a custom environment walkthrough with our solutions team.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleDemoSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Full name</Label>
+                <Input 
+                  id="fullName" 
+                  required 
+                  value={demoForm.fullName}
+                  onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})}
+                  placeholder="JOHN DOE" 
+                  className="bg-white/5 border-white/5 text-white placeholder:text-slate-700 focus:ring-[#14c6cb] rounded-sm uppercase text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Business email</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  required 
+                  value={demoForm.email}
+                  onChange={(e) => setDemoForm({...demoForm, email: e.target.value})}
+                  placeholder="JOHN@HOSPITALITY.COM" 
+                  className="bg-white/5 border-white/5 text-white placeholder:text-slate-700 focus:ring-[#14c6cb] rounded-sm uppercase text-xs"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Company name</Label>
+                <Input 
+                  id="companyName" 
+                  required 
+                  value={demoForm.companyName}
+                  onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})}
+                  placeholder="ACME HOSPITALITY" 
+                  className="bg-white/5 border-white/5 text-white placeholder:text-slate-700 focus:ring-[#14c6cb] rounded-sm uppercase text-xs"
+                />
+              </div>
+              <DialogFooter className="pt-4">
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full bg-[#14c6cb] text-[#15181e] hover:bg-[#12adb1] font-bold py-6 text-xs tracking-[2px] rounded-sm uppercase"
+                >
+                  {isSubmitting ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> INITIALIZING...</>
+                  ) : "SUBMIT REQUEST"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -425,13 +438,16 @@ export default function LandingPage() {
 }
 
 const FeatureCard = ({ icon, title, description }) => (
-  <div className="p-8 rounded-2xl bg-white/5 border border-white/10 hover:border-teal-500/30 transition-all group">
-    <div className="h-12 w-12 rounded-xl bg-teal-500/10 flex items-center justify-center mb-6 group-hover:bg-teal-500/20 transition-colors">
+  <div className="group relative">
+    <div className="mb-6 h-10 w-10 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-sm group-hover:border-[#14c6cb]/30 group-hover:bg-[#14c6cb]/5 transition-all duration-300">
       {icon}
     </div>
-    <h3 className="text-xl font-semibold mb-3">{title}</h3>
-    <p className="text-slate-400 leading-relaxed text-sm">
+    <h3 className="text-base font-bold tracking-tight mb-2 uppercase">{title}</h3>
+    <p className="text-slate-500 text-[13px] leading-relaxed pr-4">
       {description}
     </p>
+    <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="h-[1px] w-8 bg-[#14c6cb]" />
+    </div>
   </div>
 );
