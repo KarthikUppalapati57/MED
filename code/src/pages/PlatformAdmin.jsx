@@ -179,7 +179,6 @@ export default function PlatformAdmin() {
       return data || [];
     },
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
-    refetchOnWindowFocus: false,
   });
 
   // ── Contact Requests ───────────────────────────────────────
@@ -194,7 +193,6 @@ export default function PlatformAdmin() {
       return data || [];
     },
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
-    refetchOnWindowFocus: false,
   });
 
   // ── Demo Requests ──────────────────────────────────────────
@@ -209,7 +207,6 @@ export default function PlatformAdmin() {
       return data || [];
     },
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
-    refetchOnWindowFocus: false,
   });
 
   // ── Organizations ──────────────────────────────────────────
