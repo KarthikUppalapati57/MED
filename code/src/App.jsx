@@ -41,7 +41,7 @@ function SignupPage() {
   React.useEffect(() => {
     if (!token) return;
     const fetchInvite = async () => {
-      const { default: { supabase } } = await import('@/lib/supabaseClient');
+      const { supabase } = await import('@/lib/supabaseClient');
       const { data } = await supabase
         .from('invitations')
         .select('*')
