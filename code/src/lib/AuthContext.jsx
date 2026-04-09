@@ -112,33 +112,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
 
-    // Extract MFA information directly from the session object.
-    // IMPORTANT: Do NOT call supabase.auth.mfa.* methods inside onAuthStateChange —
-    // they internally call _getSession() which competes for the same browser lock,
-    // causing a deadlock that hangs the app.
-    const extractMFAFromSession = (session) => {
-      if (!session?.user) {
-        setMfaLevel({ current: 'aal1', next: 'aal1' });
-        setMfaFactors([]);
-        return;
-      }
-
-      // Read factors from the user object (populated by Supabase)
-      const allFactors = session.user.factors || [];
-      setMfaFactors(allFactors);
-
-      // Determine AAL levels from the JWT and factors
-      const verifiedTotpFactors = allFactors.filter(
-        f => f.status === 'verified' && f.factor_type === 'totp'
-      );
-      
-      // Read the AAL from the access token's amr claims
-      const aal = session.user?.aal || 'aal1';
-      const nextLevel = verifiedTotpFactors.length > 0 ? 'aal2' : 'aal1';
-      
-      setMfaLevel({ current: aal, next: nextLevel });
-    };
-
     const loadProfile = async (sessionUser) => {
       if (!sessionUser) {
         setUser(null);
@@ -161,6 +134,29 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
+    // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
+    // to avoid the browser lock deadlock. Uses setTimeout(0) to yield the lock.
+    const deferredMFARefresh = () => {
+      setTimeout(async () => {
+        if (!isMounted) return;
+        try {
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (!isMounted) return;
+          if (aal) {
+            setMfaLevel({ current: aal.currentLevel, next: aal.nextLevel });
+          }
+          
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          if (!isMounted) return;
+          if (factors) {
+            setMfaFactors(factors.all || []);
+          }
+        } catch (err) {
+          console.warn('Deferred MFA refresh error (non-fatal):', err);
+        }
+      }, 0);
+    };
+
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
@@ -170,15 +166,39 @@ export const AuthProvider = ({ children }) => {
         try {
           if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
             if (currentUser) {
-              // 1. Set user and MFA state SYNCHRONOUSLY from the session
-              //    No async calls here — no deadlocks possible
+              // 1. Set the user IMMEDIATELY from the session
               setUser(currentUser);
-              extractMFAFromSession(session);
               
-              // 2. Loading complete — user + MFA are ready for routing
+              // 2. Set MFA from session data SYNCHRONOUSLY
+              const factors = currentUser.factors || [];
+              setMfaFactors(factors);
+              const verifiedTotp = factors.filter(
+                f => f.status === 'verified' && f.factor_type === 'totp'
+              );
+              
+              // Decode the JWT to get the current AAL level
+              // The access_token contains an 'aal' claim that tells us
+              // whether this session has passed MFA verification
+              let currentAAL = 'aal1';
+              try {
+                if (session.access_token) {
+                  const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+                  currentAAL = payload.aal || 'aal1';
+                }
+              } catch (e) {
+                // If JWT decoding fails, fall back to aal1
+              }
+              
+              const nextLevel = verifiedTotp.length > 0 ? 'aal2' : 'aal1';
+              setMfaLevel({ current: currentAAL, next: nextLevel });
+              
+              // 3. Kick off accurate MFA refresh outside the lock (will correct if needed)
+              deferredMFARefresh();
+              
+              // 4. Loading complete — user + MFA are ready for routing
               if (isMounted) setIsLoadingAuth(false);
               
-              // 3. Background work (non-blocking)
+              // 5. Background work (non-blocking)
               try {
                 await processPendingInvitationRef.current(currentUser.email, currentUser.id);
               } catch (inviteErr) {
@@ -209,7 +229,7 @@ export const AuthProvider = ({ children }) => {
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
               setUser(currentUser);
-              extractMFAFromSession(session);
+              deferredMFARefresh();
               await loadProfile(currentUser);
             }
           }
