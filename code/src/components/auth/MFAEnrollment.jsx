@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,10 +18,21 @@ export function MFAEnrollment({ onComplete, onCancel }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const initialized = useRef(false);
+
   const startEnrollment = async () => {
     setIsLoading(true);
     setError('');
     try {
+      // Clean up any stale unverified factors first to prevent hitting the 10-factor limit on page refresh
+      const { data: factors, error: fetchError } = await supabase.auth.mfa.listFactors();
+      if (!fetchError && factors?.all) {
+        const unverified = factors.all.filter(f => f.status === 'unverified');
+        for (const factor of unverified) {
+          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        }
+      }
+
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: `Authenticator (${new Date().toLocaleDateString()})`
@@ -69,7 +80,10 @@ export function MFAEnrollment({ onComplete, onCancel }) {
   };
 
   useEffect(() => {
-    startEnrollment();
+    if (!initialized.current) {
+      initialized.current = true;
+      startEnrollment();
+    }
   }, []);
 
   return (
