@@ -91,9 +91,26 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user?.id, fetchProfile]);
 
+  // Use refs so the useEffect closure always calls the latest version of these
+  // without needing them in the dependency array (which would cause re-subscription).
+  const fetchProfileRef = React.useRef(fetchProfile);
+  const processPendingInvitationRef = React.useRef(processPendingInvitation);
+  const refreshMFAStatusRef = React.useRef(refreshMFAStatus);
+  
+  useEffect(() => {
+    fetchProfileRef.current = fetchProfile;
+  }, [fetchProfile]);
+  
+  useEffect(() => {
+    processPendingInvitationRef.current = processPendingInvitation;
+  }, [processPendingInvitation]);
+  
+  useEffect(() => {
+    refreshMFAStatusRef.current = refreshMFAStatus;
+  }, [refreshMFAStatus]);
+
   useEffect(() => {
     let isMounted = true;
-    let isInitialized = false;
 
     const loadProfile = async (sessionUser) => {
       if (!sessionUser) {
@@ -105,7 +122,7 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      const profile = await fetchProfile(sessionUser.id);
+      const profile = await fetchProfileRef.current(sessionUser.id);
             
       if (profile) {
         setUser(sessionUser);
@@ -113,31 +130,61 @@ export const AuthProvider = ({ children }) => {
         setActiveOrg(profile.organization);
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
-        await refreshMFAStatus();
+        await refreshMFAStatusRef.current();
       } else {
         setUser(sessionUser);
         setUserProfile(null);
-        await refreshMFAStatus();
+        await refreshMFAStatusRef.current();
       }
     };
 
+    // Primary initialization: explicitly get the session first
+    const initialize = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!isMounted) return;
+        if (error) throw error;
+        
+        if (session?.user) {
+          await processPendingInvitationRef.current(session.user.email, session.user.id);
+          await loadProfile(session.user);
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.warn('Auth init error:', err);
+        setAuthError(err);
+        setUser(null);
+        setUserProfile(null);
+      } finally {
+        if (isMounted) {
+          setIsLoadingAuth(false);
+        }
+      }
+    };
+
+    initialize();
+
+    // Secondary: listen for subsequent auth events (login, logout, token refresh)
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
+        // Skip INITIAL_SESSION since we handle it ourselves above
+        if (event === 'INITIAL_SESSION') return;
+        
         try {
           const currentUser = session?.user ?? null;
           
-          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          if (event === 'SIGNED_IN') {
              setIsLoadingAuth(true);
              if (currentUser) {
-               await processPendingInvitation(currentUser.email, currentUser.id);
+               await processPendingInvitationRef.current(currentUser.email, currentUser.id);
                await loadProfile(currentUser);
-             } else {
-               setUser(null);
-               setUserProfile(null);
              }
-             setIsLoadingAuth(false);
+             if (isMounted) setIsLoadingAuth(false);
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setUserProfile(null);
@@ -154,8 +201,10 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (err) {
           console.warn('Auth state change error:', err);
-          setAuthError(err);
-          setIsLoadingAuth(false);
+          if (isMounted) {
+            setAuthError(err);
+            setIsLoadingAuth(false);
+          }
         }
       }
     );
@@ -164,7 +213,9 @@ export const AuthProvider = ({ children }) => {
       isMounted = false;
       subscription?.subscription?.unsubscribe?.();
     };
-  }, [fetchProfile, processPendingInvitation]);
+  // Empty dependency array — runs exactly once. Uses refs for latest function versions.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loginWithEmail = async (email, password) => {
     setAuthError(null);
