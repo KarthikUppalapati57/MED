@@ -156,26 +156,36 @@ export const AuthProvider = ({ children }) => {
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
-        if (event === 'INITIAL_SESSION') return; // Handled by initializeSequence
         
-        const currentUser = session?.user ?? null;
-        
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setUserProfile(null);
-          setActiveOrg(null);
-          setActiveBrand(null);
-          setActiveLocation(null);
-          setMfaLevel({ current: 'aal1', next: 'aal1' });
-          setMfaFactors([]);
-        } else if (currentUser) {
-           if (event === 'SIGNED_IN') {
-             // Process invitation before loading profile on a fresh sign in
-             await processPendingInvitation(currentUser.email, currentUser.id);
-             await loadProfile(currentUser);
-           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-             await loadProfile(currentUser);
-           }
+        try {
+          if (event === 'INITIAL_SESSION') return;
+          
+          const currentUser = session?.user ?? null;
+          
+          if (event === 'SIGNED_OUT') {
+            setUser(null);
+            setUserProfile(null);
+            setActiveOrg(null);
+            setActiveBrand(null);
+            setActiveLocation(null);
+            setMfaLevel({ current: 'aal1', next: 'aal1' });
+            setMfaFactors([]);
+            setIsLoadingAuth(false);
+          } else if (currentUser) {
+             if (event === 'SIGNED_IN') {
+               setIsLoadingAuth(true);
+               await processPendingInvitation(currentUser.email, currentUser.id);
+               await loadProfile(currentUser);
+               setIsLoadingAuth(false);
+             } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+               await loadProfile(currentUser);
+             }
+          } else {
+            setIsLoadingAuth(false);
+          }
+        } catch (err) {
+          console.warn('Auth state change error:', err);
+          setIsLoadingAuth(false);
         }
       }
     );
@@ -203,13 +213,19 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     setIsLoadingAuth(true);
+    // Clear state locally first to trigger immediate unmount of protected UIs
+    setUser(null);
+    setUserProfile(null);
+    setActiveOrg(null);
+    setActiveBrand(null);
+    setActiveLocation(null);
+    setMfaLevel({ current: 'aal1', next: 'aal1' });
+    setMfaFactors([]);
+    
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) setAuthError(error);
-      setUser(null);
-      setUserProfile(null);
-      setActiveOrg(null);
+      await supabase.auth.signOut();
     } catch (err) {
+      console.warn('Sign out error:', err);
       setAuthError(err);
     } finally {
       setIsLoadingAuth(false);
