@@ -101,10 +101,10 @@ export function MFAEnrollment({ onComplete, onCancel }) {
           </div>
 
           <div className="bg-white p-4 rounded-xl border-2 border-slate-100 inline-block">
-             {/* Supabase returns an SVG string. We can set it as innerHTML or use a data URI. */}
-             <div 
-               className="w-48 h-48 mx-auto"
-               dangerouslySetInnerHTML={{ __html: qrCodeSvg }} 
+             <img 
+               src={qrCodeSvg} 
+               alt="MFA QR Code" 
+               className="w-48 h-48 mx-auto object-contain" 
              />
           </div>
 
