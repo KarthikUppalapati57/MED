@@ -30,7 +30,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 function SignupPage() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, user } = useAuth();
   const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState(null);
