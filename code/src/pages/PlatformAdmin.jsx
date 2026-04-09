@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Pencil, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
+import { toast } from "sonner";
 
 export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
@@ -43,7 +44,7 @@ export default function PlatformAdmin() {
   const [generatedInviteLink, setGeneratedInviteLink] = useState("");
   const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
   const [isApprovingId, setIsApprovingId] = useState(null);
-  const authChecked = !!user || true;
+  const authChecked = !!user;
 
   // ── Platform Admins Query ──────────────────────────────────
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useQuery({
@@ -515,12 +516,12 @@ export default function PlatformAdmin() {
   };
 
   // ── Computed ───────────────────────────────────────────────
-  const accessReqs   = requests.filter(r => r.request_type !== 'demo');
-  const contactReqs  = contactRequests;
+  const accessReqs   = (requests || []).filter(r => r.request_type !== 'demo');
+  const contactReqs  = (contactRequests || []);
 
   const pendingAccessCount = accessReqs.filter(r => r.status === 'pending_approval').length;
   const pendingContactCount = contactReqs.filter(r => r.status === 'pending_approval').length;
-  const pendingOrgCount = orgs.filter(o => ['under_review', 'pending_approval', 'onboarding'].includes(o.status)).length;
+  const pendingOrgCount = (orgs || []).filter(o => ['under_review', 'pending_approval', 'onboarding'].includes(o.status)).length;
   const pendingCount = pendingAccessCount + pendingContactCount + pendingOrgCount;
 
   // ── Guards ─────────────────────────────────────────────────
@@ -733,9 +734,9 @@ export default function PlatformAdmin() {
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Total Organizations</p><p className="text-2xl font-bold">{orgs.length}</p><p className="text-[10px] text-emerald-500">Registered orgs</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Demo Requests</p><p className="text-2xl font-bold">{demoRequests.length}</p><p className="text-[10px] text-violet-500">{demoRequests.filter(r => r.demo_viewed).length} viewed</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Platform Admins</p><p className="text-2xl font-bold">{platformAdmins.length}</p><p className="text-[10px] text-blue-500">Active administrators</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Total Organizations</p><p className="text-2xl font-bold">{(orgs || []).length}</p><p className="text-[10px] text-emerald-500">Registered orgs</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Demo Requests</p><p className="text-2xl font-bold">{(demoRequests || []).length}</p><p className="text-[10px] text-violet-500">{(demoRequests || []).filter(r => r.demo_viewed).length} viewed</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Platform Admins</p><p className="text-2xl font-bold">{(platformAdmins || []).length}</p><p className="text-[10px] text-blue-500">Active administrators</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Pending Approvals</p><p className="text-2xl font-bold">{pendingCount}</p><p className="text-[10px] text-slate-400">{pendingOrgCount > 0 ? `${pendingOrgCount} org${pendingOrgCount > 1 ? 's' : ''} awaiting activation` : 'Access and contact requests'}</p></CardContent></Card>
       </div>
 
@@ -915,17 +916,17 @@ export default function PlatformAdmin() {
                 <p className="text-xs text-slate-400">Owner → Organizations → Brands → Locations. Click to expand.</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Badge variant="outline" className="text-[10px]">{orgs.length} orgs</Badge>
-                <Badge variant="outline" className="text-[10px]">{allBrands.length} brands</Badge>
-                <Badge variant="outline" className="text-[10px]">{allLocations.length} locations</Badge>
+                <Badge variant="outline" className="text-[10px]">{(orgs || []).length} orgs</Badge>
+                <Badge variant="outline" className="text-[10px]">{(allBrands || []).length} brands</Badge>
+                <Badge variant="outline" className="text-[10px]">{(allLocations || []).length} locations</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {orgs.length === 0 ? (
+              {(orgs || []).length === 0 ? (
                 <div className="text-center py-12 text-sm text-slate-400">No organizations</div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {[...orgs].sort((a, b) => {
+                  {[...(orgs || [])].sort((a, b) => {
                     const pendingStatuses = ['under_review', 'pending_approval', 'onboarding'];
                     const aP = pendingStatuses.includes(a.status);
                     const bP = pendingStatuses.includes(b.status);
@@ -1258,7 +1259,6 @@ export default function PlatformAdmin() {
               onClick={async () => {
                 const link = generatedInviteLink;
                 navigator.clipboard.writeText(link);
-                const { toast } = await import('sonner');
                 toast.success('Link copied to clipboard');
               }}
             >

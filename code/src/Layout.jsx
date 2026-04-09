@@ -57,6 +57,7 @@ const roleBadgeColors = {
   owner: 'bg-purple-100 text-purple-700',
   manager: 'bg-blue-100 text-blue-700',
   ground_staff: 'bg-slate-100 text-slate-700',
+  platform_admin: 'bg-indigo-100 text-indigo-700',
 };
 
 export default function Layout({ children, currentPageName }) {
