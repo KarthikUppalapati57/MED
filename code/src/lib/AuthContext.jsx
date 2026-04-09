@@ -112,6 +112,33 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
 
+    // Extract MFA information directly from the session object.
+    // IMPORTANT: Do NOT call supabase.auth.mfa.* methods inside onAuthStateChange —
+    // they internally call _getSession() which competes for the same browser lock,
+    // causing a deadlock that hangs the app.
+    const extractMFAFromSession = (session) => {
+      if (!session?.user) {
+        setMfaLevel({ current: 'aal1', next: 'aal1' });
+        setMfaFactors([]);
+        return;
+      }
+
+      // Read factors from the user object (populated by Supabase)
+      const allFactors = session.user.factors || [];
+      setMfaFactors(allFactors);
+
+      // Determine AAL levels from the JWT and factors
+      const verifiedTotpFactors = allFactors.filter(
+        f => f.status === 'verified' && f.factor_type === 'totp'
+      );
+      
+      // Read the AAL from the access token's amr claims
+      const aal = session.user?.aal || 'aal1';
+      const nextLevel = verifiedTotpFactors.length > 0 ? 'aal2' : 'aal1';
+      
+      setMfaLevel({ current: aal, next: nextLevel });
+    };
+
     const loadProfile = async (sessionUser) => {
       if (!sessionUser) {
         setUser(null);
@@ -132,13 +159,8 @@ export const AuthProvider = ({ children }) => {
       } else {
         setUserProfile(null);
       }
-      // NOTE: refreshMFAStatus is NOT called here anymore.
-      // It's called immediately after setUser in the event handler.
     };
 
-    // Use ONLY onAuthStateChange for ALL auth initialization.
-    // Do NOT call getSession() — it competes for the same browser lock
-    // and can deadlock, causing the app to hang on "Loading..." forever.
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
@@ -148,22 +170,15 @@ export const AuthProvider = ({ children }) => {
         try {
           if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
             if (currentUser) {
-              // 1. Set the user IMMEDIATELY from the session token
+              // 1. Set user and MFA state SYNCHRONOUSLY from the session
+              //    No async calls here — no deadlocks possible
               setUser(currentUser);
+              extractMFAFromSession(session);
               
-              // 2. Refresh MFA status IMMEDIATELY — this calls Supabase Auth
-              //    (not the database), so it's fast and won't be blocked by
-              //    slow profile/invitation queries.
-              try {
-                await refreshMFAStatusRef.current();
-              } catch (mfaErr) {
-                console.warn('MFA status refresh error (non-fatal):', mfaErr);
-              }
-              
-              // 3. Mark loading as complete NOW — user and MFA are ready
+              // 2. Loading complete — user + MFA are ready for routing
               if (isMounted) setIsLoadingAuth(false);
               
-              // 4. Do slower async work in the background (non-blocking)
+              // 3. Background work (non-blocking)
               try {
                 await processPendingInvitationRef.current(currentUser.email, currentUser.id);
               } catch (inviteErr) {
@@ -178,6 +193,8 @@ export const AuthProvider = ({ children }) => {
             } else {
               setUser(null);
               setUserProfile(null);
+              setMfaLevel({ current: 'aal1', next: 'aal1' });
+              setMfaFactors([]);
               if (isMounted) setIsLoadingAuth(false);
             }
           } else if (event === 'SIGNED_OUT') {
@@ -192,7 +209,7 @@ export const AuthProvider = ({ children }) => {
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
               setUser(currentUser);
-              await refreshMFAStatusRef.current();
+              extractMFAFromSession(session);
               await loadProfile(currentUser);
             }
           }
