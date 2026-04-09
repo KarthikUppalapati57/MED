@@ -5,77 +5,50 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 220 15% 5%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 220 15% 5%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --popover-foreground: 220 15% 5%;
+    --primary: 220 15% 5%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --secondary: 220 15% 96%;
+    --secondary-foreground: 220 15% 5%;
+    --muted: 220 10% 96%;
+    --muted-foreground: 220 15% 45%;
+    --accent: 181 82% 44%; /* Waypoint Teal */
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 181 82% 44%;
+    --radius: 0.3rem; /* Tighter radius */
+    
+    /* Technical Brand Colors */
+    --brand-charcoal: 225 18% 10%; /* #15181e */
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 225 18% 10%; /* Use user specified brand charcoal */
+    --foreground: 220 5% 95%;
+    --card: 225 18% 12%;
+    --card-foreground: 220 5% 95%;
+    --popover: 225 18% 10%;
+    --popover-foreground: 220 5% 95%;
+    --primary: 220 5% 95%;
+    --primary-foreground: 225 18% 10%;
+    --secondary: 225 15% 15%;
+    --secondary-foreground: 220 5% 95%;
+    --muted: 225 15% 15%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 181 82% 44%;
+    --accent-foreground: 0 0% 100%;
+    --border: 225 15% 20%;
+    --input: 225 15% 20%;
+    --ring: 181 82% 44%;
   }
 }
-
-
 
 @layer base {
   * {
@@ -84,27 +57,38 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
     scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tighter font-semibold;
+    line-height: 1.15;
   }
 }
 
 @layer utilities {
+  .text-brand-teal { color: #14c6cb; }
+  .bg-brand-teal { background-color: #14c6cb; }
+  .border-brand-teal { border-color: #14c6cb; }
+  
+  .bg-brand-charcoal { background-color: #15181e; }
+  
+  .enterprise-border {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .enterprise-border-dark {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.8s ease-out forwards;
   }
   
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0px); }
-  }
-}
+}
