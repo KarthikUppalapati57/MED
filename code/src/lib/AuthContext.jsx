@@ -121,44 +121,24 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    const initializeSequence = async () => {
-      if (isInitialized) return;
-      isInitialized = true;
-      setIsLoadingAuth(true);
-      setAuthError(null);
-
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        if (session?.user) {
-          // Process any pending invitations synchronously before loading the profile
-          await processPendingInvitation(session.user.email, session.user.id);
-          await loadProfile(session.user);
-        } else {
-          setUser(null);
-          setUserProfile(null);
-        }
-      } catch (err) {
-        setAuthError(err);
-        setUser(null);
-        setUserProfile(null);
-      } finally {
-        setIsLoadingAuth(false);
-      }
-    };
-
-    initializeSequence();
-
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
         try {
-          if (event === 'INITIAL_SESSION') return;
-          
           const currentUser = session?.user ?? null;
           
-          if (event === 'SIGNED_OUT') {
+          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+             setIsLoadingAuth(true);
+             if (currentUser) {
+               await processPendingInvitation(currentUser.email, currentUser.id);
+               await loadProfile(currentUser);
+             } else {
+               setUser(null);
+               setUserProfile(null);
+             }
+             setIsLoadingAuth(false);
+          } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setUserProfile(null);
             setActiveOrg(null);
@@ -167,20 +147,14 @@ export const AuthProvider = ({ children }) => {
             setMfaLevel({ current: 'aal1', next: 'aal1' });
             setMfaFactors([]);
             setIsLoadingAuth(false);
-          } else if (currentUser) {
-             if (event === 'SIGNED_IN') {
-               setIsLoadingAuth(true);
-               await processPendingInvitation(currentUser.email, currentUser.id);
-               await loadProfile(currentUser);
-               setIsLoadingAuth(false);
-             } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-               await loadProfile(currentUser);
-             }
-          } else {
-            setIsLoadingAuth(false);
+          } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+            if (currentUser) {
+              await loadProfile(currentUser);
+            }
           }
         } catch (err) {
           console.warn('Auth state change error:', err);
+          setAuthError(err);
           setIsLoadingAuth(false);
         }
       }
