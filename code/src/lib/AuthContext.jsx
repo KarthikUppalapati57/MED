@@ -138,47 +138,28 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Primary initialization: explicitly get the session first
-    const initialize = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        if (error) throw error;
-        
-        if (session?.user) {
-          await processPendingInvitationRef.current(session.user.email, session.user.id);
-          await loadProfile(session.user);
-        } else {
-          setUser(null);
-          setUserProfile(null);
-        }
-      } catch (err) {
-        if (!isMounted) return;
-        console.warn('Auth init error:', err);
-        setAuthError(err);
-        setUser(null);
-        setUserProfile(null);
-      } finally {
-        if (isMounted) {
-          setIsLoadingAuth(false);
-        }
-      }
-    };
-
-    initialize();
-
-    // Secondary: listen for subsequent auth events (login, logout, token refresh)
+    // Use ONLY onAuthStateChange for ALL auth initialization.
+    // Do NOT call getSession() — it competes for the same browser lock
+    // and can deadlock, causing the app to hang on "Loading..." forever.
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
         
-        // Skip INITIAL_SESSION since we handle it ourselves above
-        if (event === 'INITIAL_SESSION') return;
-        
         try {
           const currentUser = session?.user ?? null;
           
-          if (event === 'SIGNED_IN') {
+          if (event === 'INITIAL_SESSION') {
+            // This fires exactly once when the listener is first set up.
+            // It carries the current session (or null if not logged in).
+            if (currentUser) {
+              await processPendingInvitationRef.current(currentUser.email, currentUser.id);
+              await loadProfile(currentUser);
+            } else {
+              setUser(null);
+              setUserProfile(null);
+            }
+            if (isMounted) setIsLoadingAuth(false);
+          } else if (event === 'SIGNED_IN') {
              setIsLoadingAuth(true);
              if (currentUser) {
                await processPendingInvitationRef.current(currentUser.email, currentUser.id);
@@ -209,8 +190,23 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
+    // Safety net: if INITIAL_SESSION never fires within 5 seconds
+    // (e.g., due to a Supabase SDK bug), force loading to complete.
+    const safetyTimeout = setTimeout(() => {
+      if (isMounted) {
+        setIsLoadingAuth((current) => {
+          if (current) {
+            console.warn('Auth initialization safety timeout — forcing loading to complete');
+            return false;
+          }
+          return current;
+        });
+      }
+    }, 5000);
+
     return () => {
       isMounted = false;
+      clearTimeout(safetyTimeout);
       subscription?.subscription?.unsubscribe?.();
     };
   // Empty dependency array — runs exactly once. Uses refs for latest function versions.
