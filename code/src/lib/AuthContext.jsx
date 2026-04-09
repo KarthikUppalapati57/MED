@@ -145,27 +145,33 @@ export const AuthProvider = ({ children }) => {
       async (event, session) => {
         if (!isMounted) return;
         
+        const currentUser = session?.user ?? null;
+        
         try {
-          const currentUser = session?.user ?? null;
-          
-          if (event === 'INITIAL_SESSION') {
-            // This fires exactly once when the listener is first set up.
-            // It carries the current session (or null if not logged in).
+          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+            // CRITICAL: Set the user FIRST from the session token.
+            // This ensures the user is never null if a session exists,
+            // even if profile loading or invitation processing fails below.
             if (currentUser) {
-              await processPendingInvitationRef.current(currentUser.email, currentUser.id);
-              await loadProfile(currentUser);
+              setUser(currentUser);
+              
+              // Now do async work — errors here won't lose the user
+              try {
+                await processPendingInvitationRef.current(currentUser.email, currentUser.id);
+              } catch (inviteErr) {
+                console.warn('Invitation processing error (non-fatal):', inviteErr);
+              }
+              
+              try {
+                await loadProfile(currentUser);
+              } catch (profileErr) {
+                console.warn('Profile loading error (non-fatal):', profileErr);
+              }
             } else {
               setUser(null);
               setUserProfile(null);
             }
             if (isMounted) setIsLoadingAuth(false);
-          } else if (event === 'SIGNED_IN') {
-             setIsLoadingAuth(true);
-             if (currentUser) {
-               await processPendingInvitationRef.current(currentUser.email, currentUser.id);
-               await loadProfile(currentUser);
-             }
-             if (isMounted) setIsLoadingAuth(false);
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
             setUserProfile(null);
@@ -177,12 +183,15 @@ export const AuthProvider = ({ children }) => {
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
+              setUser(currentUser);
               await loadProfile(currentUser);
             }
           }
         } catch (err) {
           console.warn('Auth state change error:', err);
           if (isMounted) {
+            // Even on error, preserve the user if we have a session
+            if (currentUser) setUser(currentUser);
             setAuthError(err);
             setIsLoadingAuth(false);
           }
