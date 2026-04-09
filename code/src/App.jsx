@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigat
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import OnboardingPage from './pages/OnboardingPage';
+import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import React, { useState, useEffect } from 'react';
@@ -440,8 +441,9 @@ const AuthenticatedApp = () => {
       {/* Protected routes */}
       {!user ? (
         <>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </>
       ) : needsOnboarding ? (
         // Redirect to onboarding if authenticated but no org
