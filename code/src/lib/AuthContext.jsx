@@ -11,7 +11,23 @@ export const AuthProvider = ({ children }) => {
   const [activeLocation, setActiveLocation] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [mfaLevel, setMfaLevel] = useState({ current: 'aal1', next: 'aal1' });
+  const [mfaFactors, setMfaFactors] = useState([]);
   const inviteLock = React.useRef(false);
+
+  const refreshMFAStatus = useCallback(async () => {
+    try {
+      const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aalError) throw aalError;
+      setMfaLevel({ current: aal.currentLevel, next: aal.nextLevel });
+
+      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+      if (factorsError) throw factorsError;
+      setMfaFactors(factors.all || []);
+    } catch (err) {
+      console.warn('MFA status check error:', err);
+    }
+  }, []);
 
   const processPendingInvitation = useCallback(async (email, userId) => {
     if (!email || !userId || inviteLock.current) return;
@@ -99,13 +115,11 @@ export const AuthProvider = ({ children }) => {
         setActiveOrg(profile.organization);
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
-
-        // NOTE: JWT metadata sync is now handled server-side by the
-        // admin_update_user_role() RPC function. Client-side metadata
-        // updates have been removed to prevent privilege escalation.
+        await refreshMFAStatus();
       } else {
         setUser(sessionUser);
         setUserProfile(null);
+        await refreshMFAStatus();
       }
     };
 
@@ -152,6 +166,8 @@ export const AuthProvider = ({ children }) => {
           setActiveOrg(null);
           setActiveBrand(null);
           setActiveLocation(null);
+          setMfaLevel({ current: 'aal1', next: 'aal1' });
+          setMfaFactors([]);
         } else if (currentUser) {
            if (event === 'SIGNED_IN') {
              // Process invitation before loading profile on a fresh sign in
@@ -256,6 +272,14 @@ export const AuthProvider = ({ children }) => {
         hasPermission,
         fetchProfile,
         refreshProfile,
+        mfaLevel,
+        mfaFactors,
+        refreshMFAStatus,
+        unenrollMFA: async (factorId) => {
+          const { error } = await supabase.auth.mfa.unenroll({ factorId });
+          if (!error) await refreshMFAStatus();
+          return { error };
+        }
       }}
     >
       {children}
