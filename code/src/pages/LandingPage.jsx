@@ -31,6 +31,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+export default function LandingPage() {
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isDemoModalOpen, setIsDemoModalOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -433,5 +435,6 @@ const FeatureCard = ({ icon, title, description }) => (
     </p>
   </div>
 );
-
-export default LandingPage;
+    </div>
+  );
+}
