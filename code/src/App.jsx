@@ -11,6 +11,7 @@ import PaymentVerification from './pages/PaymentVerification';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
+import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import React, { useState, useEffect } from 'react';
 
 // Initialize global error monitoring
@@ -418,12 +419,15 @@ function LoginPage() {
 
 // ── Authenticated App ──────────────────────────────────────
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, user, userProfile, role } = useAuth();
+  const { isLoadingAuth, user, userProfile, role, mfaLevel } = useAuth();
+  
+  // MFA Interceptor
+  const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1';
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const needsPaymentVerification = user && !isPlatformAdmin && !userProfile?.payment_verified;
-  const needsOnboarding = user && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
+  const needsPaymentVerification = user && !needsMFAChallenge && !isPlatformAdmin && !userProfile?.payment_verified;
+  const needsOnboarding = user && !needsMFAChallenge && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
 
   if (isLoadingAuth) {
     return (
@@ -434,6 +438,11 @@ const AuthenticatedApp = () => {
         </div>
       </div>
     );
+  }
+
+  // Show MFA challenge if session is enrolled but not yet verified with a second factor
+  if (needsMFAChallenge) {
+    return <MFAChallenge />;
   }
 
   return (
