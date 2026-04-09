@@ -69,7 +69,7 @@ function SignupPage() {
       return;
     }
     setLoading(true);
-    const { error: signUpError } = await signUp(form.email, form.password, {
+    const { data, error: signUpError } = await signUp(form.email, form.password, {
       full_name: form.full_name,
       role: inviteInfo?.role || 'ground_staff',
       invite_token: token,
@@ -79,7 +79,10 @@ function SignupPage() {
       setError(signUpError.message);
     } else {
       setSuccess(true);
-      setTimeout(() => navigate('/'), 2000);
+      // If the user is automatically logged in (session exists), go to root/dashboard
+      // Otherwise (email confirmation required), go to login page
+      const destination = data?.session ? '/' : '/login';
+      setTimeout(() => navigate(destination), 2000);
     }
   };
 
