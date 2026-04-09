@@ -431,7 +431,8 @@ const AuthenticatedApp = () => {
   
   // MFA Interceptor
   const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1';
-  const needsMFASetup = user && mfaFactors.length === 0;
+  const verifiedFactors = mfaFactors.filter(f => f.status === 'verified');
+  const needsMFASetup = user && verifiedFactors.length === 0;
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
