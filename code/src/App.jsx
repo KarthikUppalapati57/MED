@@ -7,6 +7,7 @@ import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigat
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import OnboardingPage from './pages/OnboardingPage';
+import PaymentVerification from './pages/PaymentVerification';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
@@ -417,7 +418,9 @@ const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role } = useAuth();
 
   // SaaS Redirection Logic
-  const needsOnboarding = user && !role?.includes('platform_admin') && !userProfile?.organization_id;
+  const isPlatformAdmin = role?.includes('platform_admin');
+  const needsPaymentVerification = user && !isPlatformAdmin && !userProfile?.payment_verified;
+  const needsOnboarding = user && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
 
   if (isLoadingAuth) {
     return (
@@ -435,7 +438,8 @@ const AuthenticatedApp = () => {
       {/* Public routes */}
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
 
-      {/* Onboarding route (explicit) */}
+      {/* Onboarding & Verification routes (explicit) */}
+      <Route path="/verify-payment" element={user ? <PaymentVerification /> : <Navigate to="/" />} />
       <Route path="/onboarding" element={user ? <OnboardingPage /> : <Navigate to="/" />} />
 
       {/* Protected routes */}
@@ -445,8 +449,11 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
+      ) : needsPaymentVerification ? (
+        // Redirect to payment if authenticated but not verified
+        <Route path="*" element={<Navigate to="/verify-payment" replace />} />
       ) : needsOnboarding ? (
-        // Redirect to onboarding if authenticated but no org
+        // Redirect to onboarding if verified but no org
         <Route path="*" element={<Navigate to="/onboarding" replace />} />
       ) : (
         <>

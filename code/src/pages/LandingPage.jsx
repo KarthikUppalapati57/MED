@@ -14,12 +14,60 @@ import {
   Layers,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
-const LandingPage = () => {
-  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isDemoModalOpen, setIsDemoModalOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [demoForm, setDemoForm] = React.useState({
+    fullName: '',
+    email: '',
+    companyName: '',
+    phone: '',
+    plan: 'platform_unlimited'
+  });
+
+  const handleDemoSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('demo_requests')
+        .insert([{
+          full_name: demoForm.fullName,
+          email: demoForm.email,
+          company_name: demoForm.companyName,
+          phone: demoForm.phone,
+          plan: demoForm.plan,
+          status: 'new'
+        }]);
+
+      if (error) throw error;
+
+      toast.success("Demo request submitted! Our team will contact you soon.");
+      setIsDemoModalOpen(false);
+      setDemoForm({ fullName: '', email: '', companyName: '', phone: '', plan: 'platform_unlimited' });
+    } catch (err) {
+      toast.error(err.message || "Failed to submit request");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white selection:bg-teal-500/30">
@@ -49,9 +97,9 @@ const LandingPage = () => {
               </Button>
               <Button 
                 className="bg-teal-500 text-slate-950 hover:bg-teal-400 font-semibold"
-                onClick={() => navigate('/login?mode=signup')}
+                onClick={() => setIsDemoModalOpen(true)}
               >
-                Get Started
+                Request Demo
               </Button>
             </div>
 
@@ -99,8 +147,8 @@ const LandingPage = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
-            <Button size="lg" className="h-12 px-8 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold text-base transition-all hover:scale-105" onClick={() => navigate('/login?mode=signup')}>
-              Start Free Trial <ArrowRight className="ml-2 h-5 w-5" />
+            <Button size="lg" className="h-12 px-8 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold text-base transition-all hover:scale-105" onClick={() => setIsDemoModalOpen(true)}>
+              Request Demo <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button size="lg" variant="outline" className="h-12 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-white font-medium" onClick={() => document.getElementById('features').scrollIntoView({behavior: 'smooth'})}>
               Explore Platform
@@ -256,8 +304,8 @@ const LandingPage = () => {
                 </li>
               ))}
             </ul>
-            <Button className="w-full h-12 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold" onClick={() => navigate('/login?mode=signup')}>
-              Get Started Now
+            <Button className="w-full h-12 bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold" onClick={() => setIsDemoModalOpen(true)}>
+              Join Waitlist / Request Demo
             </Button>
           </div>
         </div>
@@ -299,6 +347,77 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+      {/* Demo Request Modal */}
+      <Dialog open={isDemoModalOpen} onOpenChange={setIsDemoModalOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-slate-900 border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-emerald-400">
+              Request a Demo
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Fill out the form below and our team will get back to you with a custom walkthrough of the platform.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleDemoSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName" className="text-sm font-medium text-slate-300">Full Name</Label>
+              <Input 
+                id="fullName" 
+                required 
+                value={demoForm.fullName}
+                onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})}
+                placeholder="John Doe" 
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-slate-300">Business Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                required 
+                value={demoForm.email}
+                onChange={(e) => setDemoForm({...demoForm, email: e.target.value})}
+                placeholder="john@restaurant.com" 
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyName" className="text-sm font-medium text-slate-300">Company Name</Label>
+              <Input 
+                id="companyName" 
+                required 
+                value={demoForm.companyName}
+                onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})}
+                placeholder="Acme Hospitality" 
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-medium text-slate-300">Phone Number</Label>
+              <Input 
+                id="phone" 
+                type="tel" 
+                value={demoForm.phone}
+                onChange={(e) => setDemoForm({...demoForm, phone: e.target.value})}
+                placeholder="+1 (555) 000-0000" 
+                className="bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-teal-500"
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full bg-teal-500 text-slate-950 hover:bg-teal-400 font-bold py-6 text-lg"
+              >
+                {isSubmitting ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting...</>
+                ) : "Submit Request"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

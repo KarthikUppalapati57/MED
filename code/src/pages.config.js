@@ -60,6 +60,7 @@ import UserManagement from './pages/UserManagement';
 import OrgManagement from './pages/OrgManagement';
 import Vendors from './pages/Vendors';
 import AuditLogs from './pages/AuditLogs';
+import PaymentVerification from './pages/PaymentVerification';
 import __Layout from './Layout.jsx';
 
 
@@ -77,6 +78,7 @@ export const PAGES = {
     "UserManagement": UserManagement,
     "Vendors": Vendors,
     "AuditLogs": AuditLogs,
+    "PaymentVerification": PaymentVerification,
 }
 
 export const pagesConfig = {

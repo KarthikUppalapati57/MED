@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Pencil } from "lucide-react";
+import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Pencil, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 
@@ -40,6 +40,9 @@ export default function PlatformAdmin() {
   const [newLocationName, setNewLocationName] = useState('');
   const [newLocationAddress, setNewLocationAddress] = useState('');
   const [savingEntity, setSavingEntity] = useState(false);
+  const [generatedInviteLink, setGeneratedInviteLink] = useState("");
+  const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
+  const [isApprovingId, setIsApprovingId] = useState(null);
   const authChecked = !!user || true;
 
   // ── Platform Admins Query ──────────────────────────────────
@@ -324,6 +327,48 @@ export default function PlatformAdmin() {
       toast.error(e.message || 'Failed to create location');
     }
     setSavingEntity(false);
+  };
+
+  const handleApproveDemo = async (req) => {
+    setIsApprovingId(req.id);
+    try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // 1. Create invitation
+      const { error: inviteError } = await supabase
+        .from('invitations')
+        .insert([{
+          email: req.email,
+          token,
+          role: 'owner',
+          invited_by: user?.id,
+          expires_at: expiresAt.toISOString()
+        }]);
+
+      if (inviteError) throw inviteError;
+
+      // 2. Update demo request status
+      const { error: updateError } = await supabase
+        .from('demo_requests')
+        .update({ status: 'approved' })
+        .eq('id', req.id);
+
+      if (updateError) throw updateError;
+
+      const link = `${window.location.origin}/signup/${token}`;
+      setGeneratedInviteLink(link);
+      setIsInviteLinkDialogOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+      const { toast } = await import('sonner');
+      toast.success('Demo request approved and invitation link generated');
+    } catch (err) {
+      const { toast } = await import('sonner');
+      toast.error(err.message || 'Failed to approve demo request');
+    } finally {
+      setIsApprovingId(null);
+    }
   };
 
   // ── Mutations ──────────────────────────────────────────────
@@ -758,7 +803,18 @@ export default function PlatformAdmin() {
                       <TableCell className="text-sm text-slate-500">
                         {r.created_at ? new Date(r.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-1 justify-end">
+                        {r.status !== 'approved' && (
+                          <Button
+                            size="sm"
+                            className="text-[10px] h-7 bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                            onClick={() => handleApproveDemo(r)}
+                            disabled={isApprovingId === r.id}
+                          >
+                            {isApprovingId === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                            Approve
+                          </Button>
+                        )}
                         <Button
                           size="sm" variant="ghost"
                           className="text-xs h-7 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50"
@@ -767,7 +823,7 @@ export default function PlatformAdmin() {
                             const { error } = await supabase.from('demo_requests').delete().eq('id', r.id);
                             if (!error) {
                               queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
-                              import('sonner').then(({ toast }) => toast.success('Demo request deleted'));
+                              toast.success('Demo request deleted');
                             }
                           }}
                         >
@@ -1174,6 +1230,49 @@ export default function PlatformAdmin() {
             <Button onClick={handleInvitePlatformAdmin} disabled={platformInviting || !platformInviteEmail} className="bg-blue-600 hover:bg-blue-700">
               {platformInviting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Invite Admin
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isInviteLinkDialogOpen} onOpenChange={setIsInviteLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle>Invitation Link Generated</DialogTitle>
+            <DialogDescription>
+              Copy the link below and send it to the user. This link will expire in 7 days.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 mt-4">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="invite-link" className="sr-only">Link</Label>
+              <Input
+                id="invite-link"
+                readOnly
+                value={generatedInviteLink}
+                className="font-mono text-[10px] bg-slate-50 text-slate-800 border-slate-200"
+              />
+            </div>
+            <Button 
+              size="sm" 
+              className="px-3 bg-teal-600 hover:bg-teal-700 text-white"
+              onClick={async () => {
+                const link = generatedInviteLink;
+                navigator.clipboard.writeText(link);
+                const { toast } = await import('sonner');
+                toast.success('Link copied to clipboard');
+              }}
+            >
+              <span className="sr-only">Copy</span>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <DialogFooter className="sm:justify-start pt-4 border-t mt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsInviteLinkDialogOpen(false)}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
