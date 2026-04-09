@@ -14,7 +14,7 @@ const InteractiveScene = () => {
 
     // CAMERA
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.z = 6;
 
     // RENDERER
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -26,50 +26,60 @@ const InteractiveScene = () => {
     const group = new THREE.Group();
     scene.add(group);
 
-    // Faceted Icosahedron
-    const geometry = new THREE.IcosahedronGeometry(1.8, 1);
+    // High detail Icosahedron for that "mathematical" feel
+    const geometry = new THREE.IcosahedronGeometry(2, 2);
     const wireframeMaterial = new THREE.MeshBasicMaterial({
-      color: 0x14c6cb,
+      color: 0x000000,
       wireframe: true,
       transparent: true,
-      opacity: 0.3,
-      blending: THREE.AdditiveBlending
+      opacity: 0.15,
+      blending: THREE.MultiplyBlending
     });
 
     const sphere = new THREE.Mesh(geometry, wireframeMaterial);
     group.add(sphere);
 
-    // Vertex points (glow effect)
+    // Vertex points (Orange technical dots)
     const pointsMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.05,
+      color: 0xff5c35, // Mistral Orange
+      size: 0.06,
       transparent: true,
       opacity: 0.6
     });
     const points = new THREE.Points(geometry, pointsMaterial);
     group.add(points);
 
+    // INNER CORE (Subtle glow)
+    const innerGeometry = new THREE.IcosahedronGeometry(1.95, 2);
+    const innerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff5c35,
+      transparent: true,
+      opacity: 0.05,
+    });
+    const innerSphere = new THREE.Mesh(innerGeometry, innerMaterial);
+    group.add(innerSphere);
+
     // SECONDARY BACKGROUND PARTICLES (Depth)
-    const particlesCount = 200;
+    const particlesCount = 300;
     const particlesGeometry = new THREE.BufferGeometry();
     const posArray = new Float32Array(particlesCount * 3);
 
     for(let i = 0; i < particlesCount * 3; i++) {
-        posArray[i] = (Math.random() - 0.5) * 15;
+        posArray[i] = (Math.random() - 0.5) * 20;
     }
 
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     const particlesMaterial = new THREE.PointsMaterial({
-        size: 0.015,
-        color: 0x14c6cb,
+        size: 0.02,
+        color: 0x000000,
         transparent: true,
-        opacity: 0.2
+        opacity: 0.1
     });
 
     const particles = new THREE.Points(particlesGeometry, particlesMaterial);
     scene.add(particles);
 
-    // MOUSE INTERACTION
+    // INTERACTION STATE
     let mouseX = 0;
     let mouseY = 0;
     let targetX = 0;
@@ -90,22 +100,25 @@ const InteractiveScene = () => {
 
     // ANIMATION
     const animate = () => {
-      // Smoothing
       targetX += (mouseX - targetX) * 0.05;
       targetY += (mouseY - targetY) * 0.05;
 
-      // Base auto-rotation influenced by scroll
-      group.rotation.y += 0.002 + (scrollY * 0.02);
-      group.rotation.x = targetY * 0.3;
-      group.rotation.z = targetX * 0.2;
+      // Base auto-rotation influenced by scroll (DrinkSOM style)
+      group.rotation.y += 0.0015 + (scrollY * 0.03);
+      group.rotation.x = targetY * 0.4;
+      group.rotation.z = targetX * 0.1 + (scrollY * 0.5);
 
       // Background particles motion
-      particles.rotation.y += 0.0005;
-      particles.position.y = scrollY * 2;
+      particles.rotation.y += 0.0003;
+      particles.position.y = scrollY * 3;
 
-      // Scaling core based on scroll
-      const scale = 1 + scrollY * 0.5;
+      // Subtle scaling core based on scroll
+      const scale = 1 + scrollY * 0.3;
       group.scale.set(scale, scale, scale);
+      
+      // Dynamic Opacity based on scroll
+      sphere.material.opacity = 0.15 + (scrollY * 0.1);
+      points.material.opacity = 0.6 - (scrollY * 0.3);
 
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
@@ -113,7 +126,6 @@ const InteractiveScene = () => {
 
     animate();
 
-    // RESIZE
     const handleResize = () => {
       if (!mountRef.current) return;
       width = mountRef.current.clientWidth;
@@ -125,7 +137,6 @@ const InteractiveScene = () => {
 
     window.addEventListener('resize', handleResize);
 
-    // CLEANUP
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('scroll', onScroll);
@@ -139,10 +150,12 @@ const InteractiveScene = () => {
       pointsMaterial.dispose();
       particlesGeometry.dispose();
       particlesMaterial.dispose();
+      innerGeometry.dispose();
+      innerMaterial.dispose();
     };
   }, []);
 
-  return <div ref={mountRef} className="w-full h-full min-h-[500px]" />;
+  return <div ref={mountRef} className="w-full h-full" />;
 };
 
 export default InteractiveScene;

@@ -4,49 +4,41 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 220 15% 5%;
+    --background: 36 67% 97.5%; /* #fdf8f1 */
+    --foreground: 0 0% 0%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 5%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 5%;
-    --primary: 220 15% 5%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 220 15% 96%;
-    --secondary-foreground: 220 15% 5%;
-    --muted: 220 10% 96%;
-    --muted-foreground: 220 15% 45%;
-    --accent: 181 82% 44%; /* Waypoint Teal */
-    --accent-foreground: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    
+    --popover: 36 67% 97.5%;
+    --popover-foreground: 0 0% 0%;
+    
+    --primary: 11 100% 60.5%; /* #ff5c35 Mistral Orange */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 36 15% 91%; /* #eee9e2 */
+    --secondary-foreground: 0 0% 20%;
+    
+    --muted: 36 15% 94%;
+    --muted-foreground: 0 0% 45%;
+    
+    --accent: 36 67% 97.5%;
+    --accent-foreground: 0 0% 10%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 181 82% 44%;
-    --radius: 0.3rem; /* Tighter radius */
-    
-    /* Technical Brand Colors */
-    --brand-charcoal: 225 18% 10%; /* #15181e */
-  }
 
-  .dark {
-    --background: 225 18% 10%; /* Use user specified brand charcoal */
-    --foreground: 220 5% 95%;
-    --card: 225 18% 12%;
-    --card-foreground: 220 5% 95%;
-    --popover: 225 18% 10%;
-    --popover-foreground: 220 5% 95%;
-    --primary: 220 5% 95%;
-    --primary-foreground: 225 18% 10%;
-    --secondary: 225 15% 15%;
-    --secondary-foreground: 220 5% 95%;
-    --muted: 225 15% 15%;
-    --muted-foreground: 220 10% 60%;
-    --accent: 181 82% 44%;
-    --accent-foreground: 0 0% 100%;
-    --border: 225 15% 20%;
-    --input: 225 15% 20%;
-    --ring: 181 82% 44%;
+    --border: 36 15% 91%;
+    --input: 36 15% 91%;
+    --ring: 11 100% 60.5%;
+    
+    --radius: 0.25rem; /* Tighter radius for industrial look */
+    
+    /* Custom Design Tokens */
+    --brand-beige: #fdf8f1;
+    --brand-black: #000000;
+    --brand-orange: #ff5c35;
+    --brand-stone: #eee9e2;
   }
 }
 
