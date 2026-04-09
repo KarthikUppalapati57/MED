@@ -238,6 +238,21 @@ export default function OrgManagement() {
   const getBrandStaffCount = (brandId) => profiles.filter(p => p.brand_id === brandId).length;
   const getLocationStaffCount = (locationId) => profiles.filter(p => p.location_id === locationId).length;
 
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Organization Management</h1>
+            <p className="text-sm text-slate-500">Manage your brands and locations hierarchy</p>
+          </div>
+        </div>
+      </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-slate-100/50 p-1">
           <TabsTrigger value="hierarchy" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
