@@ -195,21 +195,21 @@ export const AuthProvider = ({ children }) => {
               // 3. Kick off accurate MFA refresh outside the lock (will correct if needed)
               deferredMFARefresh();
               
-              // 4. Loading complete — user + MFA are ready for routing
-              if (isMounted) setIsLoadingAuth(false);
-              
-              // 5. Background work (non-blocking)
+              // 4. Background work (non-blocking for invitations, but we await profile so role is accurate)
               try {
-                await processPendingInvitationRef.current(currentUser.email, currentUser.id);
-              } catch (inviteErr) {
-                console.warn('Invitation processing error (non-fatal):', inviteErr);
-              }
+                processPendingInvitationRef.current(currentUser.email, currentUser.id).catch(err => {
+                  console.warn('Invitation processing error (non-fatal):', err);
+                });
+              } catch (inviteErr) {}
               
               try {
                 await loadProfile(currentUser);
               } catch (profileErr) {
                 console.warn('Profile loading error (non-fatal):', profileErr);
               }
+
+              // 5. Loading complete — user, auth state, and profile are ready for routing
+              if (isMounted) setIsLoadingAuth(false);
             } else {
               setUser(null);
               setUserProfile(null);
