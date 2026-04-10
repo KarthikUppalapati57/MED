@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -72,6 +72,51 @@ export default function Invoices() {
 
   const { userProfile } = useAuth();
   const queryClient = useQueryClient();
+
+  // Resizing state
+  const [sheetWidth, setSheetWidth] = useState(() => {
+    const saved = localStorage.getItem('invoice_editor_width');
+    return saved ? parseInt(saved, 10) : 800;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const sheetRef = useRef(null);
+
+  const startResizing = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e) => {
+    if (isResizing) {
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth > 400 && newWidth < window.innerWidth * 0.95) {
+        setSheetWidth(newWidth);
+        localStorage.setItem('invoice_editor_width', newWidth.toString());
+      }
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+      // Change body cursor while resizing
+      document.body.style.cursor = 'w-resize';
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.cursor = 'default';
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+      document.body.style.cursor = 'default';
+    };
+  }, [isResizing, resize, stopResizing]);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['invoices'],
@@ -519,8 +564,23 @@ export default function Invoices() {
 
       {/* Editor Sheet */}
       <Sheet open={editorOpen} onOpenChange={setEditorOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
+        <SheetContent 
+          className="p-0 sm:max-w-none overflow-hidden flex flex-col"
+          style={{ width: `${sheetWidth}px`, maxWidth: '100vw' }}
+        >
+          {/* Resize Handle */}
+          <div
+            onMouseDown={startResizing}
+            className={cn(
+              "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-teal-500/30 active:bg-teal-500/50 z-50 flex items-center justify-center",
+              isResizing && "bg-teal-500/40"
+            )}
+          >
+             <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
+          </div>
+
+          <div className="p-6 overflow-y-auto flex-1 h-full">
+            <SheetHeader>
             <SheetTitle>
               {editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
             </SheetTitle>
@@ -567,8 +627,8 @@ export default function Invoices() {
                   Validate
                 </Button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </SheetContent>
       </Sheet>
 
