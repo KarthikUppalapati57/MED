@@ -111,7 +111,16 @@ export async function extractInvoiceData(file, onProgress) {
       delivery_fee: result.delivery_fee || 0,
       other_charges: result.other_charges || 0,
       total_amount: result.total_amount || 0,
-      line_items: result.line_items || [],
+      line_items: (result.line_items || []).map(item => ({
+        product_id: item.product_id || '',
+        description: item.description || '',
+        quantity: item.quantity || 0,
+        unit: item.unit || 'ea',
+        unit_price: item.unit_price || 0,
+        discount: item.discount || 0,
+        adjustment: item.adjustment || 0,
+        extended_price: item.extended_price || 0,
+      })),
       extraction_method: result.extraction_method || 'gemini',
       raw_text: result.raw_text || '',
     };

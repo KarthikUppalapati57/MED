@@ -41,11 +41,13 @@ export default function InvoiceEditor({ invoice, onChange }) {
     const newItems = [...(invoice.line_items || [])];
     newItems[index] = { ...newItems[index], [field]: value };
 
-    // Auto-calculate extended price
-    if (field === 'quantity' || field === 'unit_price') {
-      const qty = parseFloat(field === 'quantity' ? value : newItems[index].quantity) || 0;
-      const price = parseFloat(field === 'unit_price' ? value : newItems[index].unit_price) || 0;
-      newItems[index].extended_price = qty * price;
+    // Auto-calculate extended price: (qty * price) + adj - disc
+    if (['quantity', 'unit_price', 'discount', 'adjustment'].includes(field)) {
+      const qty = parseFloat(newItems[index].quantity) || 0;
+      const price = parseFloat(newItems[index].unit_price) || 0;
+      const disc = parseFloat(newItems[index].discount) || 0;
+      const adj = parseFloat(newItems[index].adjustment) || 0;
+      newItems[index].extended_price = (qty * price) + adj - disc;
     }
 
     const totals = recalculateTotals(newItems, invoice);
@@ -59,6 +61,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
       quantity: 1,
       unit: 'ea',
       unit_price: 0,
+      discount: 0,
+      adjustment: 0,
       extended_price: 0
     }];
     onChange({ ...invoice, line_items: newItems });
@@ -205,6 +209,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
                   <TableHead className="w-[80px]">Qty</TableHead>
                   <TableHead className="w-[80px]">Unit</TableHead>
                   <TableHead className="w-[100px]">Unit Price</TableHead>
+                  <TableHead className="w-[80px]">Discount</TableHead>
+                  <TableHead className="w-[80px]">Adjustment</TableHead>
                   <TableHead className="w-[100px]">Extended</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -247,6 +253,24 @@ export default function InvoiceEditor({ invoice, onChange }) {
                         step="0.01"
                         value={item.unit_price || ''}
                         onChange={(e) => handleLineItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        className="h-8"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.discount || ''}
+                        onChange={(e) => handleLineItemChange(index, 'discount', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-red-500"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.adjustment || ''}
+                        onChange={(e) => handleLineItemChange(index, 'adjustment', parseFloat(e.target.value) || 0)}
                         className="h-8"
                       />
                     </TableCell>
