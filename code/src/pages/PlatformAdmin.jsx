@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,7 +85,7 @@ export default function PlatformAdmin() {
   }, [authChecked, userRole, queryClient]);
 
   // ── Platform Admins Query ──────────────────────────────────
-  const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useQuery({
+  const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({
     queryKey: ['platform-admins'],
     queryFn: async () => {
       // Try memberships-based query first (CRE-style)
@@ -196,7 +197,7 @@ export default function PlatformAdmin() {
   };
 
   // ── Access Requests ────────────────────────────────────────
-  const { data: requests = [], isLoading } = useQuery({
+  const { data: requests = [], isLoading } = useAuthQuery({
     queryKey: ['access-requests'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -211,7 +212,7 @@ export default function PlatformAdmin() {
   });
 
   // ── Contact Requests ───────────────────────────────────────
-  const { data: contactRequests = [], isLoading: isLoadingContact } = useQuery({
+  const { data: contactRequests = [], isLoading: isLoadingContact } = useAuthQuery({
     queryKey: ['contact-requests'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -225,7 +226,7 @@ export default function PlatformAdmin() {
   });
 
   // ── Demo Requests ──────────────────────────────────────────
-  const { data: demoRequests = [], isLoading: isLoadingDemo } = useQuery({
+  const { data: demoRequests = [], isLoading: isLoadingDemo } = useAuthQuery({
     queryKey: ['demo-requests'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -239,7 +240,7 @@ export default function PlatformAdmin() {
   });
 
   // ── Organizations ──────────────────────────────────────────
-  const { data: orgs = [] } = useQuery({
+  const { data: orgs = [] } = useAuthQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
       // Try memberships join first (CRE-style)
@@ -282,7 +283,7 @@ export default function PlatformAdmin() {
   });
 
   // ── Brands & Locations for tree view ───────────────────────
-  const { data: allBrands = [] } = useQuery({
+  const { data: allBrands = [] } = useAuthQuery({
     queryKey: ['all-brands'],
     queryFn: async () => {
       const { data, error } = await supabase.from('brands').select('*').order('name');
@@ -292,7 +293,7 @@ export default function PlatformAdmin() {
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
   });
 
-  const { data: allLocations = [] } = useQuery({
+  const { data: allLocations = [] } = useAuthQuery({
     queryKey: ['all-locations'],
     queryFn: async () => {
       const { data, error } = await supabase.from('locations').select('*').order('name');

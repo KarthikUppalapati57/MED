@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import { Search, ShieldAlert, Database, User } from 'lucide-react';
@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 export default function AuditLogs() {
   const [search, setSearch] = useState('');
 
-  const { data: logs = [], isLoading, isError } = useQuery({
+  const { data: logs = [], isLoading, isError } = useAuthQuery({
     queryKey: ['audit_logs'],
     queryFn: async () => {
       try {

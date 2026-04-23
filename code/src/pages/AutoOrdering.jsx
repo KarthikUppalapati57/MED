@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import {
   ShoppingCart,
@@ -49,17 +50,17 @@ export default function AutoOrdering() {
 
   const queryClient = useQueryClient();
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading } = useAuthQuery({
     queryKey: ['auto-orders'],
     queryFn: () => api.entities.AutoOrder.list('-created_at'),
   });
 
-  const { data: inventory = [] } = useQuery({
+  const { data: inventory = [] } = useAuthQuery({
     queryKey: ['inventory'],
     queryFn: () => api.entities.Inventory.list(),
   });
 
-  const { data: vendors = [] } = useQuery({
+  const { data: vendors = [] } = useAuthQuery({
     queryKey: ['vendors'],
     queryFn: () => api.entities.Vendor.list(),
   });

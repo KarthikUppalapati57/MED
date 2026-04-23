@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -75,12 +76,12 @@ export default function Recipes() {
 
   const queryClient = useQueryClient();
 
-  const { data: recipes = [], isLoading } = useQuery({
+  const { data: recipes = [], isLoading } = useAuthQuery({
     queryKey: ['recipes'],
     queryFn: () => api.entities.Recipe.list('-created_at'),
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [] } = useAuthQuery({
     queryKey: ['products'],
     queryFn: () => api.entities.Product.list(),
   });

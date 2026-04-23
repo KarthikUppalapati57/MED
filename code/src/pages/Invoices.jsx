@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
@@ -119,7 +120,7 @@ export default function Invoices() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading } = useAuthQuery({
     queryKey: ['invoices'],
     queryFn: () => api.entities.Invoice.list('-created_at'),
   });

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { logAudit } from '@/lib/audit';
@@ -851,7 +852,7 @@ export default function UserManagement() {
   const activeOrgId = userProfile?.organization_id;
 
   // ── Fetch team members ─────────────────────────────────────
-  const { data: members = [], isLoading } = useQuery({
+  const { data: members = [], isLoading } = useAuthQuery({
     queryKey: ['team-members', activeOrgId],
     queryFn: async () => {
       // Try memberships table first (CRE-style)

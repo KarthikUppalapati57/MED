@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { resetQueryCache } from '@/lib/query-client';
 
 const AuthContext = createContext(null);
 
@@ -132,6 +133,9 @@ export const AuthProvider = ({ children }) => {
       setActiveBrand(profile.brand);
       setActiveLocation(profile.location);
       setCachedProfile(profile);
+      // Flush react-query cache so all data queries re-fetch
+      // with the now-valid auth session + profile context
+      resetQueryCache();
     }
   }, [user?.id, fetchProfile]);
 
@@ -164,6 +168,7 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(null);
         setActiveLocation(null);
         clearCachedProfile();
+        resetQueryCache();
         return;
       }
       
@@ -179,6 +184,9 @@ export const AuthProvider = ({ children }) => {
         setUserProfile(null);
         clearCachedProfile();
       }
+      // Flush react-query cache so all data queries will re-fetch
+      // with the now-valid Supabase session headers
+      resetQueryCache();
     };
 
     // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
@@ -273,6 +281,8 @@ export const AuthProvider = ({ children }) => {
             setMfaLevel({ current: 'aal1', next: 'aal1' });
             setMfaFactors([]);
             clearCachedProfile();
+            // Clear all cached query data to prevent data leaks after logout
+            resetQueryCache();
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {

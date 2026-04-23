@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -83,7 +84,7 @@ export default function Vendors() {
 
   const queryClient = useQueryClient();
 
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], isLoading } = useAuthQuery({
     queryKey: ['vendors'],
     queryFn: () => api.entities.Vendor.list('-created_at'),
   });

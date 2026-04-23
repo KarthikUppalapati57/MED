@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { confirmBankTransfer } from '@/lib/paymentService';
 import { format } from 'date-fns';
@@ -82,12 +83,12 @@ export default function Payments() {
 
   const queryClient = useQueryClient();
 
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+  const { data: invoices = [], isLoading: invoicesLoading } = useAuthQuery({
     queryKey: ['invoices-payments'],
     queryFn: () => api.entities.Invoice.list('-created_at'),
   });
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useAuthQuery({
     queryKey: ['payments'],
     queryFn: () => api.entities.Payment.list('-created_at'),
   });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
@@ -77,12 +78,12 @@ export default function Inventory() {
 
   const queryClient = useQueryClient();
 
-  const { data: inventory = [], isLoading } = useQuery({
+  const { data: inventory = [], isLoading } = useAuthQuery({
     queryKey: ['inventory'],
     queryFn: () => api.entities.Inventory.list(),
   });
 
-  const { data: wastageLogs = [] } = useQuery({
+  const { data: wastageLogs = [] } = useAuthQuery({
     queryKey: ['wastage'],
     queryFn: () => api.entities.WastageLog.list('-created_at', 50),
   });

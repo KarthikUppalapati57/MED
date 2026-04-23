@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -26,22 +26,22 @@ import {
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444'];
 
 export default function Dashboard() {
-  const { data: invoices = [] } = useQuery({
+  const { data: invoices = [] } = useAuthQuery({
     queryKey: ['invoices'],
     queryFn: () => api.entities.Invoice.list('-created_at'),
   });
 
-  const { data: payments = [] } = useQuery({
+  const { data: payments = [] } = useAuthQuery({
     queryKey: ['payments'],
     queryFn: () => api.entities.Payment.list('-created_at'),
   });
 
-  const { data: inventory = [] } = useQuery({
+  const { data: inventory = [] } = useAuthQuery({
     queryKey: ['inventory'],
     queryFn: () => api.entities.Inventory.list(),
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: products = [] } = useAuthQuery({
     queryKey: ['products'],
     queryFn: () => api.entities.Product.list(),
   });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,7 +44,7 @@ export default function OrgManagement() {
   const [saving, setSaving] = useState(false);
 
   // Fetch organizations the user can access
-  const { data: orgs = [], isLoading: isLoadingOrgs } = useQuery({
+  const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['my-organizations'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -57,7 +58,7 @@ export default function OrgManagement() {
   });
 
   // Fetch all brands the user can access
-  const { data: brands = [], isLoading: isLoadingBrands } = useQuery({
+  const { data: brands = [], isLoading: isLoadingBrands } = useAuthQuery({
     queryKey: ['my-brands'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -71,7 +72,7 @@ export default function OrgManagement() {
   });
 
   // Fetch all locations the user can access
-  const { data: locations = [], isLoading: isLoadingLocations } = useQuery({
+  const { data: locations = [], isLoading: isLoadingLocations } = useAuthQuery({
     queryKey: ['my-locations'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -85,7 +86,7 @@ export default function OrgManagement() {
   });
 
   // Fetch user profiles in the org for staff counts
-  const { data: profiles = [] } = useQuery({
+  const { data: profiles = [] } = useAuthQuery({
     queryKey: ['org-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase
