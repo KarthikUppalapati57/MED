@@ -147,6 +147,13 @@ export default function Invoices() {
     // Remove extremely large texts that cause Supabase timeout errors
     delete cleaned.raw_text;
     
+    // Convert empty date strings to null (PostgreSQL rejects "" for date columns)
+    ['invoice_date', 'due_date', 'approved_date'].forEach(field => {
+      if (cleaned[field] === '' || cleaned[field] === undefined) {
+        cleaned[field] = null;
+      }
+    });
+
     // Remove fields that are not in the DB schema
     delete cleaned.id; // Don't send id on create, it's auto-generated
     // Ensure numeric fields are properly typed
