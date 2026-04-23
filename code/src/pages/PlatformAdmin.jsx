@@ -54,6 +54,35 @@ export default function PlatformAdmin() {
   const [isApprovingId, setIsApprovingId] = useState(null);
   const authChecked = !!user;
 
+  // ── Real-Time Subscriptions ────────────────────────────────
+  // Automatically refresh data when new demo/contact/access requests come in.
+  React.useEffect(() => {
+    if (!authChecked || (userRole !== 'admin' && userRole !== 'platform_admin')) return;
+
+    const channel = supabase
+      .channel('platform-admin-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'demo_requests' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['contact-requests'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'access_requests' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['access-requests'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authChecked, userRole, queryClient]);
+
   // ── Platform Admins Query ──────────────────────────────────
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useQuery({
     queryKey: ['platform-admins'],

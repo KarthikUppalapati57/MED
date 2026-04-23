@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 
 export default function OnboardingPage() {
@@ -19,29 +20,72 @@ export default function OnboardingPage() {
   const [csvFile, setCsvFile] = useState(null);
   const [csvData, setCsvData] = useState([]);
 
-  const [formData, setFormData] = useState({
-    orgName: '',
-    orgSlug: '',
-    brandName: '',
-    locationName: '',
-    address: '',
-    orgSlugManual: false,
-  });
+  // Organization (single)
+  const [orgName, setOrgName] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
+  const [orgSlugManual, setOrgSlugManual] = useState(false);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => {
-      const newData = { ...prev, [name]: value };
-      // Auto-generate slug from org name if slug hasn't been manually edited
-      if (name === 'orgName' && !prev.orgSlugManual) {
-        newData.orgSlug = value.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      }
-      return newData;
-    });
+  // Brands — array of { name, locations: [{ name, address }] }
+  const [brands, setBrands] = useState([
+    { name: '', locations: [{ name: '', address: '' }] }
+  ]);
+
+  const handleOrgNameChange = (value) => {
+    setOrgName(value);
+    if (!orgSlugManual) {
+      setOrgSlug(value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+    }
+  };
+
+  // Brand helpers
+  const addBrand = () => {
+    setBrands(prev => [...prev, { name: '', locations: [{ name: '', address: '' }] }]);
+  };
+
+  const removeBrand = (idx) => {
+    if (brands.length <= 1) return;
+    setBrands(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const updateBrandName = (idx, name) => {
+    setBrands(prev => prev.map((b, i) => i === idx ? { ...b, name } : b));
+  };
+
+  // Location helpers
+  const addLocation = (brandIdx) => {
+    setBrands(prev => prev.map((b, i) =>
+      i === brandIdx ? { ...b, locations: [...b.locations, { name: '', address: '' }] } : b
+    ));
+  };
+
+  const removeLocation = (brandIdx, locIdx) => {
+    setBrands(prev => prev.map((b, i) => {
+      if (i !== brandIdx) return b;
+      if (b.locations.length <= 1) return b;
+      return { ...b, locations: b.locations.filter((_, li) => li !== locIdx) };
+    }));
+  };
+
+  const updateLocation = (brandIdx, locIdx, field, value) => {
+    setBrands(prev => prev.map((b, i) => {
+      if (i !== brandIdx) return b;
+      return {
+        ...b,
+        locations: b.locations.map((loc, li) =>
+          li === locIdx ? { ...loc, [field]: value } : loc
+        )
+      };
+    }));
   };
 
   const nextStep = () => setStep((s) => s + 1);
   const prevStep = () => setStep((s) => s - 1);
+
+  // Validation helpers
+  const hasValidBrands = brands.length > 0 && brands[0].name.trim() !== '';
+  const hasValidLocations = brands.every(b =>
+    b.locations.length > 0 && b.locations[0].name.trim() !== ''
+  );
 
   const handleCsvUpload = (e) => {
     const file = e.target.files[0];
@@ -84,29 +128,87 @@ export default function OnboardingPage() {
       toast.error('You must be logged in to complete onboarding');
       return;
     }
-    
+
     setLoading(true);
     try {
-      if (!formData.orgName || !formData.orgSlug || !formData.brandName || !formData.locationName) {
+      if (!orgName || !orgSlug || !hasValidBrands || !hasValidLocations) {
         throw new Error('Please fill in all required fields');
       }
 
-      await api.onboarding.setupOrgAndFirstLocation(
+      // Step 1: Create org + first brand + first location via the atomic RPC
+      const firstBrand = brands[0];
+      const firstLocation = firstBrand.locations[0];
+
+      const result = await api.onboarding.setupOrgAndFirstLocation(
         user.id,
-        { name: formData.orgName, slug: formData.orgSlug },
-        formData.brandName,
-        { name: formData.locationName, address: formData.address }
+        { name: orgName, slug: orgSlug },
+        firstBrand.name,
+        { name: firstLocation.name, address: firstLocation.address }
       );
 
-      toast.success('Onboarding complete! Welcome to the platform.');
+      const orgId = result.org.id;
+      const firstBrandId = result.brand.id;
+
+      // Step 2: Create additional locations for the first brand
+      if (firstBrand.locations.length > 1) {
+        const extraLocations = firstBrand.locations.slice(1)
+          .filter(loc => loc.name.trim())
+          .map(loc => ({
+            organization_id: orgId,
+            brand_id: firstBrandId,
+            name: loc.name.trim(),
+            address: loc.address.trim() || 'Address pending',
+          }));
+
+        if (extraLocations.length > 0) {
+          const { error } = await supabase.from('locations').insert(extraLocations);
+          if (error) console.warn('Extra locations insert warning:', error.message);
+        }
+      }
+
+      // Step 3: Create additional brands (each with their own locations)
+      for (let i = 1; i < brands.length; i++) {
+        const brand = brands[i];
+        if (!brand.name.trim()) continue;
+
+        const { data: newBrand, error: brandErr } = await supabase
+          .from('brands')
+          .insert({ organization_id: orgId, name: brand.name.trim() })
+          .select()
+          .single();
+
+        if (brandErr) {
+          console.warn(`Brand "${brand.name}" creation warning:`, brandErr.message);
+          continue;
+        }
+
+        const locs = brand.locations
+          .filter(loc => loc.name.trim())
+          .map(loc => ({
+            organization_id: orgId,
+            brand_id: newBrand.id,
+            name: loc.name.trim(),
+            address: loc.address.trim() || 'Address pending',
+          }));
+
+        if (locs.length > 0) {
+          const { error: locErr } = await supabase.from('locations').insert(locs);
+          if (locErr) console.warn('Locations insert warning:', locErr.message);
+        }
+      }
+
+      const totalBrands = brands.filter(b => b.name.trim()).length;
+      const totalLocations = brands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
+      toast.success(`Onboarding complete! Created ${totalBrands} brand(s) and ${totalLocations} location(s).`);
       await refreshProfile();
-      setTimeout(() => navigate('/'), 500);
+      navigate('/');
     } catch (error) {
       console.error('Onboarding failed:', error);
-      const message = error.message?.includes('organizations_slug_key') 
-        ? 'This organization slug is already taken. Please try a different one.' 
+      const message = error.message?.includes('organizations_slug_key')
+        ? 'This organization slug is already taken. Please try a different one.'
         : (error.message || 'Failed to complete onboarding');
       toast.error(message, { duration: 5000 });
+    } finally {
       setLoading(false);
     }
   };
@@ -124,43 +226,48 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      for (const row of csvData) {
+      // Find the first valid row — onboarding binds the user to ONE primary organization.
+      // Additional orgs/brands/locations from remaining rows can be added from the dashboard later.
+      const firstValidRow = csvData.find(row => {
         const orgName = row['Organization Name'] || row.orgName || row.organization_name;
         const brandName = row['Brand Name'] || row.brandName || row.brand_name;
         const locationName = row['Location Name'] || row.locationName || row.location_name;
-        const locationAddress = row['Location Address'] || row.locationAddress || row.address || 'Address pending';
+        return orgName && brandName && locationName;
+      });
 
-        if (!orgName || !brandName || !locationName) {
-          console.warn('Skipping invalid row:', row);
-          continue;
-        }
-
-        const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
-
-        try {
-          await api.onboarding.setupOrgAndFirstLocation(
-            user.id,
-            { name: orgName, slug: orgSlug },
-            brandName,
-            { name: locationName, address: locationAddress }
-          );
-        } catch (rowErr) {
-          console.error(`Failed to create org ${orgName}:`, rowErr);
-          // If first row throws because they already have an org, continue might fail. 
-          // The RPC prevents taking ownership if they already belong to an org!
-          // We rely on the first successful one binding them to the platform.
-          // Wait, the RPC `setup_organization_full` throws if user already belongs to an org.
-          // So bulk uploading multiple orgs assigned to the SAME owner using this RPC will fail on the SECOND entity!
-          throw new Error(`Cannot bulk create disconnected primary organizations for a single owner via onboarding. An owner can only have one primary organization initially.`);
-        }
+      if (!firstValidRow) {
+        throw new Error('No valid rows found. Each row needs: Organization Name, Brand Name, and Location Name.');
       }
 
-      toast.success('Bulk Onboarding complete! Additional entities can be linked from your dashboard.');
+      const orgName = firstValidRow['Organization Name'] || firstValidRow.orgName || firstValidRow.organization_name;
+      const brandName = firstValidRow['Brand Name'] || firstValidRow.brandName || firstValidRow.brand_name;
+      const locationName = firstValidRow['Location Name'] || firstValidRow.locationName || firstValidRow.location_name;
+      const locationAddress = firstValidRow['Location Address'] || firstValidRow.locationAddress || firstValidRow.address || 'Address pending';
+      const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
+
+      await api.onboarding.setupOrgAndFirstLocation(
+        user.id,
+        { name: orgName, slug: orgSlug },
+        brandName,
+        { name: locationName, address: locationAddress }
+      );
+
+      const skippedCount = csvData.length - 1;
+      const successMsg = skippedCount > 0
+        ? `Onboarding complete! ${skippedCount} additional row(s) were skipped — you can add more locations from your dashboard.`
+        : 'Onboarding complete! Welcome to the platform.';
+      
+      toast.success(successMsg);
       await refreshProfile();
-      setTimeout(() => navigate('/'), 500);
+      navigate('/');
     } catch (error) {
       console.error('CSV Onboarding failed:', error);
-      toast.error(error.message || 'Failed to complete bulk onboarding', { duration: 5000 });
+      const message = error.message?.includes('organizations_slug_key')
+        ? 'This organization name generated a slug that is already taken. Please rename and try again.'
+        : (error.message || 'Failed to complete onboarding');
+      toast.error(message, { duration: 5000 });
+    } finally {
+      // ALWAYS reset loading — prevents infinite spinner
       setLoading(false);
     }
   };
@@ -307,7 +414,7 @@ export default function OnboardingPage() {
                   {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
                 </div>
                 <span className={`text-xs font-medium ${step >= i ? 'text-teal-700' : 'text-slate-400'}`}>
-                  {i === 1 ? 'Organization' : i === 2 ? 'Brand' : 'Location'}
+                  {i === 1 ? 'Organization' : i === 2 ? 'Brands' : 'Locations'}
                 </span>
               </div>
               {i < 3 && (
@@ -318,30 +425,30 @@ export default function OnboardingPage() {
         </div>
 
         <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50">
-          <CardHeader className="space-y-1 pb-8">
+          <CardHeader className="space-y-1 pb-6">
             <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
               {step === 1 && <><Building2 className="w-6 h-6 text-teal-600" /> Let's start with your company</>}
-              {step === 2 && <><Store className="w-6 h-6 text-teal-600" /> Define your brand</>}
-              {step === 3 && <><MapPin className="w-6 h-6 text-teal-600" /> Your first location</>}
+              {step === 2 && <><Store className="w-6 h-6 text-teal-600" /> Define your brands</>}
+              {step === 3 && <><MapPin className="w-6 h-6 text-teal-600" /> Add locations</>}
             </CardTitle>
             <CardDescription className="text-slate-500 text-base">
               {step === 1 && "What's the name of your overall business entity?"}
-              {step === 2 && "Brands represent your restaurant concepts within the organization."}
-              {step === 3 && "Where is your physical store or kitchen located?"}
+              {step === 2 && "Add all your restaurant brands. You need at least one."}
+              {step === 3 && "Add locations for each brand. Each brand needs at least one."}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6">
+            {/* ── Step 1: Organization ── */}
             {step === 1 && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="space-y-2">
                   <Label htmlFor="orgName">Organization Name</Label>
                   <Input 
                     id="orgName" 
-                    name="orgName" 
                     placeholder="e.g. Acme Hospitality Group" 
-                    value={formData.orgName} 
-                    onChange={handleInputChange}
+                    value={orgName} 
+                    onChange={(e) => handleOrgNameChange(e.target.value)}
                     className="h-12 text-lg"
                   />
                 </div>
@@ -351,12 +458,11 @@ export default function OnboardingPage() {
                     <span className="text-slate-400 text-sm">edgeops.io/</span>
                     <Input 
                       id="orgSlug" 
-                      name="orgSlug" 
                       placeholder="acme-hospitality" 
-                      value={formData.orgSlug} 
+                      value={orgSlug} 
                       onChange={(e) => {
-                        handleInputChange(e);
-                        setFormData(prev => ({ ...prev, orgSlugManual: true }));
+                        setOrgSlug(e.target.value);
+                        setOrgSlugManual(true);
                       }}
                       className="h-10 text-sm italic text-teal-700 font-medium"
                     />
@@ -365,48 +471,99 @@ export default function OnboardingPage() {
               </div>
             )}
 
+            {/* ── Step 2: Brands ── */}
             {step === 2 && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="space-y-2">
-                  <Label htmlFor="brandName">Brand Name</Label>
-                  <Input 
-                    id="brandName" 
-                    name="brandName" 
-                    placeholder="e.g. Acme Burgers" 
-                    value={formData.brandName} 
-                    onChange={handleInputChange}
-                    className="h-12 text-lg"
-                  />
-                  <p className="text-xs text-slate-400">You can add more brands later in your settings.</p>
-                </div>
+                {brands.map((brand, idx) => (
+                  <div key={idx} className="flex items-center gap-2 group">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
+                          Brand {idx + 1}
+                        </span>
+                      </div>
+                      <Input 
+                        placeholder={idx === 0 ? "e.g. Acme Burgers" : "e.g. Acme Pizza"} 
+                        value={brand.name} 
+                        onChange={(e) => updateBrandName(idx, e.target.value)}
+                        className="h-12 text-lg"
+                      />
+                    </div>
+                    {brands.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 mt-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeBrand(idx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button 
+                  variant="outline" 
+                  onClick={addBrand}
+                  className="w-full border-dashed border-2 border-teal-200 text-teal-600 hover:bg-teal-50 hover:border-teal-400 transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" /> Add Another Brand
+                </Button>
               </div>
             )}
 
+            {/* ── Step 3: Locations (grouped by brand) ── */}
             {step === 3 && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="space-y-2">
-                  <Label htmlFor="locationName">Branch/Location Name</Label>
-                  <Input 
-                    id="locationName" 
-                    name="locationName" 
-                    placeholder="e.g. Downtown Branch" 
-                    value={formData.locationName} 
-                    onChange={handleInputChange}
-                    className="h-12 text-lg"
-                  />
-                  <p className="text-xs text-slate-400">You can add more locations later in your dashboard.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Full Address</Label>
-                  <Input 
-                    id="address" 
-                    name="address" 
-                    placeholder="123 Street, City, State, ZIP" 
-                    value={formData.address} 
-                    onChange={handleInputChange}
-                    className="h-12"
-                  />
-                </div>
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {brands.filter(b => b.name.trim()).map((brand, brandIdx) => (
+                  <div key={brandIdx} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-teal-500" />
+                      <h3 className="text-sm font-bold text-slate-700">{brand.name}</h3>
+                      <span className="text-xs text-slate-400">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
+                    </div>
+
+                    <div className="pl-4 border-l-2 border-teal-100 space-y-3">
+                      {brand.locations.map((loc, locIdx) => (
+                        <div key={locIdx} className="group bg-slate-50 rounded-lg p-3 border border-slate-100 hover:border-teal-200 transition-colors">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 space-y-2">
+                              <Input 
+                                placeholder={locIdx === 0 ? "e.g. Downtown Branch" : "e.g. Airport Location"} 
+                                value={loc.name} 
+                                onChange={(e) => updateLocation(brandIdx, locIdx, 'name', e.target.value)}
+                                className="h-10 bg-white"
+                              />
+                              <Input 
+                                placeholder="123 Street, City, State, ZIP" 
+                                value={loc.address} 
+                                onChange={(e) => updateLocation(brandIdx, locIdx, 'address', e.target.value)}
+                                className="h-9 bg-white text-sm text-slate-500"
+                              />
+                            </div>
+                            {brand.locations.length > 1 && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeLocation(brandIdx, locIdx)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => addLocation(brandIdx)}
+                        className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 text-xs w-full border border-dashed border-teal-200"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Location to {brand.name}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
@@ -425,8 +582,8 @@ export default function OnboardingPage() {
                 onClick={nextStep} 
                 className="bg-teal-600 hover:bg-teal-700 text-white min-w-[120px]"
                 disabled={
-                  (step === 1 && !formData.orgName) || 
-                  (step === 2 && !formData.brandName)
+                  (step === 1 && !orgName) || 
+                  (step === 2 && !hasValidBrands)
                 }
               >
                 Next <ArrowRight className="w-4 h-4 ml-2" />
@@ -435,7 +592,7 @@ export default function OnboardingPage() {
               <Button 
                 onClick={handleManualSubmit} 
                 className="bg-teal-600 hover:bg-teal-700 text-white min-w-[140px]"
-                disabled={loading || !formData.locationName}
+                disabled={loading || !hasValidLocations}
               >
                 {loading ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Setting up...</>

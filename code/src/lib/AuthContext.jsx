@@ -3,12 +3,55 @@ import { supabase } from '@/lib/supabaseClient';
 
 const AuthContext = createContext(null);
 
+// ── Session cache helpers ────────────────────────────────────
+// Cache the user profile in sessionStorage so that on page reload
+// the role is available IMMEDIATELY (no flash of 'ground_staff').
+const PROFILE_CACHE_KEY = 'edgeops_profile_cache';
+
+function getCachedProfile() {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore parse errors */ }
+  return null;
+}
+
+function setCachedProfile(profile) {
+  try {
+    if (profile) {
+      // Only cache the fields we need for instant role/org resolution
+      sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({
+        id: profile.id,
+        role: profile.role,
+        organization_id: profile.organization_id,
+        brand_id: profile.brand_id,
+        location_id: profile.location_id,
+        full_name: profile.full_name,
+        email: profile.email,
+        payment_verified: profile.payment_verified,
+        organization: profile.organization,
+        brand: profile.brand,
+        location: profile.location,
+      }));
+    } else {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    }
+  } catch { /* ignore storage errors */ }
+}
+
+function clearCachedProfile() {
+  try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
+}
+
 export const AuthProvider = ({ children }) => {
+  // Hydrate from cache so role is correct on first render after reload
+  const cachedProfile = React.useMemo(() => getCachedProfile(), []);
+  
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [activeOrg, setActiveOrg] = useState(null);
-  const [activeBrand, setActiveBrand] = useState(null);
-  const [activeLocation, setActiveLocation] = useState(null);
+  const [userProfile, setUserProfile] = useState(cachedProfile);
+  const [activeOrg, setActiveOrg] = useState(cachedProfile?.organization || null);
+  const [activeBrand, setActiveBrand] = useState(cachedProfile?.brand || null);
+  const [activeLocation, setActiveLocation] = useState(cachedProfile?.location || null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [mfaLevel, setMfaLevel] = useState({ current: 'aal1', next: 'aal1' });
@@ -88,6 +131,7 @@ export const AuthProvider = ({ children }) => {
       setActiveOrg(profile.organization);
       setActiveBrand(profile.brand);
       setActiveLocation(profile.location);
+      setCachedProfile(profile);
     }
   }, [user?.id, fetchProfile]);
 
@@ -119,6 +163,7 @@ export const AuthProvider = ({ children }) => {
         setActiveOrg(null);
         setActiveBrand(null);
         setActiveLocation(null);
+        clearCachedProfile();
         return;
       }
       
@@ -129,8 +174,10 @@ export const AuthProvider = ({ children }) => {
         setActiveOrg(profile.organization);
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
+        setCachedProfile(profile);
       } else {
         setUserProfile(null);
+        clearCachedProfile();
       }
     };
 
@@ -225,6 +272,7 @@ export const AuthProvider = ({ children }) => {
             setActiveLocation(null);
             setMfaLevel({ current: 'aal1', next: 'aal1' });
             setMfaFactors([]);
+            clearCachedProfile();
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
@@ -246,6 +294,7 @@ export const AuthProvider = ({ children }) => {
 
     // Safety net: if INITIAL_SESSION never fires within 5 seconds
     // (e.g., due to a Supabase SDK bug), force loading to complete.
+    // Reduced from 5s to 3s — cached profile makes the UI usable faster
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
@@ -256,7 +305,7 @@ export const AuthProvider = ({ children }) => {
           return current;
         });
       }
-    }, 5000);
+    }, 3000);
 
     return () => {
       isMounted = false;
@@ -292,6 +341,7 @@ export const AuthProvider = ({ children }) => {
     setActiveLocation(null);
     setMfaLevel({ current: 'aal1', next: 'aal1' });
     setMfaFactors([]);
+    clearCachedProfile();
     
     try {
       await supabase.auth.signOut();
@@ -325,8 +375,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Robust role detection
-  const role = userProfile?.role || user?.user_metadata?.role || 'ground_staff';
+  // Robust role detection — NEVER default to 'ground_staff'
+  // The fallback chain: DB profile role → auth metadata role → null
+  // When role is null, the loading spinner stays up (isLoadingAuth is still true)
+  const role = userProfile?.role || user?.user_metadata?.role || null;
   const isAuthenticated = !!user;
 
   // Permission helpers

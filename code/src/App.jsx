@@ -434,10 +434,30 @@ const AuthenticatedApp = () => {
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
   const needsMFASetup = user && verifiedFactors.length === 0;
 
+  // Check if this device is trusted (MFA remembered for 30 days)
+  const isDeviceTrusted = React.useMemo(() => {
+    if (!user || !needsMFAChallenge) return false;
+    try {
+      const raw = localStorage.getItem('edgeops_mfa_trust');
+      if (!raw) return false;
+      const token = JSON.parse(raw);
+      // Validate: correct user, not expired
+      if (token.userId !== user.id) return false;
+      if (Date.now() > token.expiresAt) {
+        localStorage.removeItem('edgeops_mfa_trust');
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, [user, needsMFAChallenge]);
+
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const needsPaymentVerification = user && !needsMFAChallenge && !needsMFASetup && !isPlatformAdmin && !userProfile?.payment_verified;
-  const needsOnboarding = user && !needsMFAChallenge && !needsMFASetup && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
+  const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
+  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && !userProfile?.payment_verified;
+  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
 
   if (isLoadingAuth) {
     return (
@@ -451,7 +471,8 @@ const AuthenticatedApp = () => {
   }
 
   // Show MFA challenge if session is enrolled but not yet verified with a second factor
-  if (needsMFAChallenge) {
+  // UNLESS the device is trusted (remembered for 30 days)
+  if (needsMFAChallenge && !isDeviceTrusted) {
     return <MFAChallenge />;
   }
 

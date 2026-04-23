@@ -62,7 +62,7 @@ const roleBadgeColors = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, logout, role } = useAuth();
   const { hasMinRole } = usePermissions();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -142,7 +142,7 @@ export default function Layout({ children, currentPageName }) {
   const filteredNavigation = navigation.filter(item => hasMinRole(item.minRole));
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
-  const role = userProfile?.role || 'ground_staff';
+  const displayRole = role || 'loading';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -213,8 +213,8 @@ export default function Layout({ children, currentPageName }) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-white truncate">{displayName}</p>
-              <Badge className={cn("text-[10px] px-1.5 py-0", roleBadgeColors[role])}>
-                {role.replace('_', ' ')}
+              <Badge className={cn("text-[10px] px-1.5 py-0", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
+                {(displayRole || '').replace('_', ' ')}
               </Badge>
             </div>
           </div>
@@ -299,7 +299,7 @@ export default function Layout({ children, currentPageName }) {
                       {displayName}
                     </span>
                     <span className="block text-[10px] text-slate-400 capitalize">
-                      {role.replace('_', ' ')}
+                      {(displayRole || '').replace('_', ' ')}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -316,7 +316,7 @@ export default function Layout({ children, currentPageName }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer">
                   <Shield className="h-4 w-4 mr-2" />
-                  <span className="capitalize">{role.replace('_', ' ')}</span>
+                  <span className="capitalize">{(displayRole || '').replace('_', ' ')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">

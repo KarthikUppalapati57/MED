@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
-import { ShieldCheck, LogOut, Loader2 } from 'lucide-react';
+import { ShieldCheck, LogOut, Loader2, Monitor } from 'lucide-react';
 
 export function MFAChallenge() {
   const { logout, refreshMFAStatus, mfaFactors } = useAuth();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(false);
 
   const onSubmit = async (e) => {
     e?.preventDefault();
@@ -44,6 +45,19 @@ export function MFAChallenge() {
 
       // Successfully verified AAL2
       await refreshMFAStatus();
+
+      // If "Remember this device" was checked, store a trust token
+      if (rememberDevice) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const trustToken = {
+            userId: user.id,
+            trustedAt: Date.now(),
+            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+          };
+          localStorage.setItem('edgeops_mfa_trust', JSON.stringify(trustToken));
+        }
+      }
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');
       setCode('');
@@ -97,6 +111,20 @@ export function MFAChallenge() {
           <p className="text-xs text-center text-slate-500">
             Open your Microsoft Authenticator, Google Authenticator, or similar app to get your code.
           </p>
+
+          {/* Remember this device */}
+          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(e) => setRememberDevice(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+            />
+            <div className="flex items-center gap-2">
+              <Monitor className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-700">Remember this device for 30 days</span>
+            </div>
+          </label>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           <Button 
