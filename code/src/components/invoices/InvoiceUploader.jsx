@@ -93,8 +93,8 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
       onOpenChange(false);
 
       const method = extractedData.extraction_method;
-      if (method === 'docling') {
-        toast.success('Invoice extracted with Docling AI! Please review the details.');
+      if (method === 'gemini') {
+        toast.success('Invoice extracted with Gemini AI! Please review the details.');
       } else {
         toast.success('Invoice uploaded. Please fill in the details manually.');
       }
@@ -186,7 +186,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                     <span className="text-xs text-amber-600 font-medium">
-                      Docling AI-Powered Extraction
+                      Gemini AI-Powered Extraction
                     </span>
                   </div>
                   <Input

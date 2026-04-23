@@ -46,6 +46,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import InvoiceUploader from '../components/invoices/InvoiceUploader';
 import InvoiceEditor from '../components/invoices/InvoiceEditor';
@@ -581,51 +582,52 @@ export default function Invoices() {
 
           <div className="p-6 overflow-y-auto flex-1 h-full">
             <SheetHeader>
-            <SheetTitle>
-              {editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
-            </SheetTitle>
-          </SheetHeader>
-          {editingInvoice && (
-            <div className="mt-6">
-              <InvoiceEditor
-                invoice={editingInvoice}
-                onChange={setEditingInvoice}
-              />
-              <div className="flex flex-wrap gap-3 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditorOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleEditorSave}
-                  className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
-                >
-                  <Save className="h-4 w-4 mr-1" /> Save
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleEditorReject}
-                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                >
-                  <X className="h-4 w-4 mr-1" /> Reject
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleEditorApprove}
-                  className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
-                >
-                  <Check className="h-4 w-4 mr-1" /> Approve
-                </Button>
-                <Button
-                  onClick={handleAcceptInvoice}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700"
-                >
-                  Validate
-                </Button>
+              <SheetTitle>
+                {editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
+              </SheetTitle>
+            </SheetHeader>
+            {editingInvoice && (
+              <div className="mt-6">
+                <InvoiceEditor
+                  invoice={editingInvoice}
+                  onChange={setEditingInvoice}
+                />
+                <div className="flex flex-wrap gap-3 mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditorOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleEditorSave}
+                    className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    <Save className="h-4 w-4 mr-1" /> Save
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleEditorReject}
+                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4 mr-1" /> Reject
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleEditorApprove}
+                    className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+                  >
+                    <Check className="h-4 w-4 mr-1" /> Approve
+                  </Button>
+                  <Button
+                    onClick={handleAcceptInvoice}
+                    className="flex-1 bg-teal-600 hover:bg-teal-700"
+                  >
+                    Validate
+                  </Button>
+                </div>
               </div>
             )}
           </div>

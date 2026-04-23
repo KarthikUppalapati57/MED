@@ -54,7 +54,7 @@ export async function extractInvoiceData(file, onProgress) {
     headers['Authorization'] = `Bearer ${accessToken || SUPABASE_ANON_KEY}`;
 
     console.log('[extractInvoiceData] Getting ready to call Edge Function...');
-    onProgress?.('Sending to AI for extraction...');
+    onProgress?.('Sending to Gemini AI for extraction...');
 
     // 130 second client-side timeout (server has 150s limit)
     const controller = new AbortController();
