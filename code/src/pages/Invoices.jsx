@@ -223,17 +223,27 @@ export default function Invoices() {
   };
 
   const handleSaveValidated = async (validatedInvoice) => {
-    if (editingInvoice.id) {
-      await updateMutation.mutateAsync({ id: editingInvoice.id, data: validatedInvoice });
-    } else {
-      await createMutation.mutateAsync(validatedInvoice);
+    try {
+      let savedInvoice = validatedInvoice;
+      if (editingInvoice.id) {
+        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data: validatedInvoice });
+      } else {
+        savedInvoice = await createMutation.mutateAsync(validatedInvoice);
+        // Important: Update local state with the new ID so we don't recreate it if sync fails
+        setEditingInvoice(savedInvoice);
+      }
+      
+      if (savedInvoice.status === 'approved') {
+        await syncInvoiceToProductsAndInventory(savedInvoice);
+        toast.success('Invoice approved & products/inventory updated');
+      }
+      
+      setEditorOpen(false);
+      setEditingInvoice(null);
+    } catch (err) {
+      console.error('Save validated invoice failed:', err);
+      toast.error(`Failed to process invoice: ${err.message}`);
     }
-    if (validatedInvoice.status === 'approved') {
-      await syncInvoiceToProductsAndInventory(validatedInvoice);
-      toast.success('Invoice approved & products/inventory updated');
-    }
-    setEditorOpen(false);
-    setEditingInvoice(null);
   };
 
   const syncInvoiceToProductsAndInventory = async (invoice) => {
@@ -348,10 +358,12 @@ export default function Invoices() {
 
   const handleEditorSave = async () => {
     try {
+      let savedInvoice;
       if (editingInvoice.id) {
-        await updateMutation.mutateAsync({ id: editingInvoice.id, data: editingInvoice });
+        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data: editingInvoice });
       } else {
-        await createMutation.mutateAsync(editingInvoice);
+        savedInvoice = await createMutation.mutateAsync(editingInvoice);
+        setEditingInvoice(savedInvoice);
       }
       toast.success('Invoice saved for later');
       setEditorOpen(false);
@@ -365,12 +377,14 @@ export default function Invoices() {
   const handleEditorApprove = async () => {
     try {
       const data = { ...editingInvoice, status: 'approved' };
+      let savedInvoice;
       if (editingInvoice.id) {
-        await updateMutation.mutateAsync({ id: editingInvoice.id, data });
+        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });
       } else {
-        await createMutation.mutateAsync(data);
+        savedInvoice = await createMutation.mutateAsync(data);
+        setEditingInvoice(savedInvoice);
       }
-      await syncInvoiceToProductsAndInventory(editingInvoice);
+      await syncInvoiceToProductsAndInventory(savedInvoice);
       toast.success('Invoice approved & products/inventory updated');
       setEditorOpen(false);
       setEditingInvoice(null);
@@ -381,14 +395,19 @@ export default function Invoices() {
   };
 
   const handleEditorReject = async () => {
-    const data = { ...editingInvoice, status: 'rejected' };
-    if (editingInvoice.id) {
-      await updateMutation.mutateAsync({ id: editingInvoice.id, data });
-    } else {
-      await createMutation.mutateAsync(data);
+    try {
+      const data = { ...editingInvoice, status: 'rejected' };
+      if (editingInvoice.id) {
+        await updateMutation.mutateAsync({ id: editingInvoice.id, data });
+      } else {
+        await createMutation.mutateAsync(data);
+      }
+      setEditorOpen(false);
+      setEditingInvoice(null);
+    } catch (err) {
+      console.error('Editor reject failed:', err);
+      toast.error(`Failed to reject invoice: ${err.message}`);
     }
-    setEditorOpen(false);
-    setEditingInvoice(null);
   };
 
   const filteredInvoices = invoices.filter(inv => {
