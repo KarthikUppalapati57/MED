@@ -75,8 +75,6 @@ export default function ValidationDialog({
     delivery_match: 'checking',
   });
 
-  // Use refs to handle async state safely across re-renders
-  const isRunningRef = useRef(false);
   const currentInvoiceRef = useRef(invoice);
   
   // Keep ref up to date
@@ -85,9 +83,8 @@ export default function ValidationDialog({
   }, [invoice]);
 
   const runValidation = useCallback(async () => {
-    if (!open || !currentInvoiceRef.current || isRunningRef.current) return;
+    if (!open || !currentInvoiceRef.current) return;
     
-    isRunningRef.current = true;
     setValidating(true);
     setResults({
       duplicate_check: 'checking',
@@ -138,8 +135,6 @@ export default function ValidationDialog({
       console.error("[Validation] Global failure:", err);
     } finally {
       setValidating(false);
-      // Wait a bit before allowing another run to prevent flicker
-      setTimeout(() => { isRunningRef.current = false; }, 1000);
     }
   }, [open]);
 
@@ -149,8 +144,6 @@ export default function ValidationDialog({
       setStep('validating');
       setApprovalNotes('');
       runValidation();
-    } else {
-      isRunningRef.current = false;
     }
   }, [open, runValidation]);
 
