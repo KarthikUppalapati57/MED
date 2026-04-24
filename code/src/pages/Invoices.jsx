@@ -269,7 +269,8 @@ export default function Invoices() {
 
       // Upsert product
       const existingProduct = existingProducts.find(
-        p => p.name?.toLowerCase() === name.toLowerCase()
+        p => (itemProductId && p.product_id === `PRD-${itemProductId}`) || 
+             (p.name?.toLowerCase() === name.toLowerCase())
       );
 
       let productId;
