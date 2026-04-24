@@ -296,6 +296,8 @@ export default function Invoices() {
           is_inventoried: true,
           accounting_category: 'food',
           vendor_name: vendorName,
+          organization_id: invoice.organization_id,
+          location_id: invoice.location_id,
           price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
         });
         productId = newProd.product_id;
@@ -327,6 +329,8 @@ export default function Invoices() {
           previous_quantity: 0,
           previous_value: 0,
           location: invoice.location || '',
+          organization_id: invoice.organization_id,
+          location_id: invoice.location_id,
         });
       }
     }
