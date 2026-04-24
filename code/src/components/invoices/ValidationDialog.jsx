@@ -75,77 +75,81 @@ export default function ValidationDialog({
     delivery_match: 'checking',
   });
 
-  const currentInvoiceRef = useRef(invoice);
-  
-  // Keep ref up to date
+  const lastValidatedRef = useRef(null);
+
   useEffect(() => {
-    currentInvoiceRef.current = invoice;
-  }, [invoice]);
+    if (open && invoice) {
+      // Prevent running multiple times for the same invoice while open
+      if (lastValidatedRef.current === invoice) return;
+      lastValidatedRef.current = invoice;
 
-  const runValidation = useCallback(async () => {
-    if (!open || !currentInvoiceRef.current) return;
-    
-    setValidating(true);
-    setResults({
-      duplicate_check: 'checking',
-      fraud_detection: 'checking',
-      price_deviation: 'checking',
-      delivery_match: 'checking',
-    });
+      let isMounted = true;
+      
+      const doValidation = async () => {
+        setStep('validating');
+        setApprovalNotes('');
+        setValidating(true);
+        setResults({
+          duplicate_check: 'checking',
+          fraud_detection: 'checking',
+          price_deviation: 'checking',
+          delivery_match: 'checking',
+        });
 
-    const inv = currentInvoiceRef.current;
-
-
-    try {
-      // 1. Duplicate Check
-      await new Promise(r => setTimeout(r, 800));
-      let duplicateStatus = 'pass';
-      if (inv?.invoice_number && inv?.vendor_name) {
         try {
-          const existing = await api.entities.Invoice.filter({
-            invoice_number: inv.invoice_number,
-            vendor_name: inv.vendor_name
-          });
-          if (existing && existing.length > 0) {
-            // Check if it's the same record
-            const isSame = existing.some(e => e.id === inv.id);
-            if (!isSame) duplicateStatus = 'fail';
+          // 1. Duplicate Check
+          await new Promise(r => setTimeout(r, 800));
+          let duplicateStatus = 'pass';
+          if (invoice.invoice_number && invoice.vendor_name) {
+            try {
+              const existing = await api.entities.Invoice.filter({
+                invoice_number: invoice.invoice_number,
+                vendor_name: invoice.vendor_name
+              });
+              if (existing && existing.length > 0) {
+                const isSame = existing.some(e => e.id === invoice.id);
+                if (!isSame) duplicateStatus = 'fail';
+              }
+            } catch (e) {
+              console.error("[Validation] Duplicate check error:", e);
+              duplicateStatus = 'warning';
+            }
           }
-        } catch (e) {
-          console.error("[Validation] Duplicate check error:", e);
-          duplicateStatus = 'warning';
+          if (!isMounted) return;
+          setResults(prev => ({ ...prev, duplicate_check: duplicateStatus }));
+
+          // 2. Fraud & Price
+          await new Promise(r => setTimeout(r, 600));
+          if (!isMounted) return;
+          setResults(prev => ({ ...prev, fraud_detection: 'pass' }));
+          
+          await new Promise(r => setTimeout(r, 600));
+          const priceStatus = (invoice.total_amount > 5000) ? 'warning' : 'pass';
+          if (!isMounted) return;
+          setResults(prev => ({ ...prev, price_deviation: priceStatus }));
+
+          // 3. Delivery
+          await new Promise(r => setTimeout(r, 600));
+          if (!isMounted) return;
+          setResults(prev => ({ ...prev, delivery_match: 'pass' }));
+        } catch (err) {
+          console.error("[Validation] Global failure:", err);
+        } finally {
+          if (isMounted) {
+            setValidating(false);
+          }
         }
-      }
-      setResults(prev => ({ ...prev, duplicate_check: duplicateStatus }));
+      };
 
-      // 2. Fraud & Price (Simulated)
-      await new Promise(r => setTimeout(r, 600));
-      setResults(prev => ({ ...prev, fraud_detection: 'pass' }));
-      
-      await new Promise(r => setTimeout(r, 600));
-      const priceStatus = (inv?.total_amount > 5000) ? 'warning' : 'pass';
-      setResults(prev => ({ ...prev, price_deviation: priceStatus }));
+      doValidation();
 
-      // 3. Delivery
-      await new Promise(r => setTimeout(r, 600));
-      setResults(prev => ({ ...prev, delivery_match: 'pass' }));
-      
-
-    } catch (err) {
-      console.error("[Validation] Global failure:", err);
-    } finally {
-      setValidating(false);
+      return () => {
+        isMounted = false;
+      };
+    } else {
+      lastValidatedRef.current = null;
     }
-  }, [open]);
-
-  // Reset and run when OPENS
-  useEffect(() => {
-    if (open) {
-      setStep('validating');
-      setApprovalNotes('');
-      runValidation();
-    }
-  }, [open, runValidation]);
+  }, [open, invoice]);
 
   const hasFailures = Object.values(results).some(r => r === 'fail');
   const hasWarnings = Object.values(results).some(r => r === 'warning');
