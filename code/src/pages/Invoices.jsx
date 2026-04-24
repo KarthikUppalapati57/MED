@@ -274,15 +274,19 @@ export default function Invoices() {
 
       let productId;
       if (existingProduct) {
-        await api.entities.Product.update(existingProduct.id, {
-          latest_price: unitPrice,
-          vendor_name: vendorName,
-          description: name,
-          price_history: [
-            ...(existingProduct.price_history || []),
-            { price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }
-          ]
-        });
+        try {
+          await api.entities.Product.update(existingProduct.id, {
+            latest_price: unitPrice,
+            vendor_name: vendorName,
+            description: name,
+            price_history: [
+              ...(existingProduct.price_history || []),
+              { price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }
+            ]
+          });
+        } catch (e) {
+          console.warn('Could not update product (likely ground_staff RLS):', e);
+        }
         productId = existingProduct.product_id;
       } else {
         const genProductId = itemProductId ? `PRD-${itemProductId}` : `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -301,6 +305,7 @@ export default function Invoices() {
           price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
         });
         productId = newProd.product_id;
+        existingProducts.push(newProd);
       }
 
       // Upsert inventory
@@ -310,11 +315,15 @@ export default function Invoices() {
 
       if (existingInv) {
         const newQty = (existingInv.current_quantity || 0) + qty;
-        await api.entities.Inventory.update(existingInv.id, {
-          current_quantity: newQty,
-          unit_cost: unitPrice,
-          current_value: newQty * unitPrice,
-        });
+        try {
+          await api.entities.Inventory.update(existingInv.id, {
+            current_quantity: newQty,
+            unit_cost: unitPrice,
+            current_value: newQty * unitPrice,
+          });
+        } catch (e) {
+          console.warn('Could not update inventory (likely ground_staff RLS):', e);
+        }
       } else {
         await api.entities.Inventory.create({
           product_id: productId,
@@ -331,6 +340,13 @@ export default function Invoices() {
           location: invoice.location || '',
           organization_id: invoice.organization_id,
           location_id: invoice.location_id,
+        });
+        existingInventory.push({
+          id: 'temp-' + Date.now(),
+          product_name: name,
+          current_quantity: qty,
+          unit_cost: unitPrice,
+          current_value: qty * unitPrice,
         });
       }
     }
