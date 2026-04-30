@@ -80,7 +80,7 @@ export default function PlatformAdmin() {
   // Invite State
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
-  const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS]);
+  const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS].filter(k => k !== 'platform'));
   const [inviteAccessLevels, setInviteAccessLevels] = useState({
     read: true,
     write: false,
@@ -269,7 +269,7 @@ export default function PlatformAdmin() {
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
       toast.success("Onboarding link generated!");
     } catch (e) {
-      console.error('Invite error:', e);
+      console.error('Invite generation failed:', e);
       toast.error(e.message || "Failed to generate invitation");
     }
     setInviting(false);
@@ -449,13 +449,16 @@ export default function PlatformAdmin() {
                   variant="ghost" 
                   size="sm" 
                   className="h-6 text-[10px] text-teal-600 font-bold"
-                  onClick={() => setInviteSelectedModules(prev => prev.length === ALL_MODULE_KEYS.length ? [] : [...ALL_MODULE_KEYS])}
+                  onClick={() => {
+                    const clientModules = ALL_MODULE_KEYS.filter(k => k !== 'platform');
+                    setInviteSelectedModules(prev => prev.length === clientModules.length ? [] : [...clientModules]);
+                  }}
                 >
                   {inviteSelectedModules.length === ALL_MODULE_KEYS.length ? "Clear All" : "Select All"}
                 </Button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {ALL_MODULE_KEYS.map(key => {
+                {ALL_MODULE_KEYS.filter(k => k !== 'platform').map(key => {
                   const mod = MODULE_DEFINITIONS[key];
                   const isSelected = inviteSelectedModules.includes(key);
                   return (
