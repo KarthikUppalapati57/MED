@@ -16,8 +16,7 @@ import {
   MessageSquare,
   Sparkles,
   Settings,
-  FileText,
-  Plus
+  FileText
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,7 +44,6 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
 
 import { toast } from "sonner";

@@ -51,7 +51,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
 
 const paymentMethodIcons = {
