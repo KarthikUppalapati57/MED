@@ -193,34 +193,13 @@ function SignupPage() {
   );
 }
 
-// ── Login / Signup Page ───────────────────────────────────
+// ── Login Page ──────────────────────────────────────────────
 function LoginPage() {
-  const { loginWithEmail, signUp, authError } = useAuth();
-  const [mode, setMode] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('mode') === 'signup' ? 'signup' : 'login';
-  }); // 'login' | 'signup'
+  const { loginWithEmail, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
-  const [signupSuccess, setSignupSuccess] = useState(false);
-
-  const resetForm = () => {
-    setEmail('');
-    setPassword('');
-    setFullName('');
-    setConfirmPassword('');
-    setLocalError('');
-    setSignupSuccess(false);
-  };
-
-  const toggleMode = () => {
-    resetForm();
-    setMode(mode === 'login' ? 'signup' : 'login');
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -241,30 +220,6 @@ function LoginPage() {
     }
   }, []);
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    setLocalError('');
-    if (password !== confirmPassword) {
-      setLocalError('Passwords do not match');
-      return;
-    }
-    if (password.length < 6) {
-      setLocalError('Password must be at least 6 characters');
-      return;
-    }
-    setIsSubmitting(true);
-    const { error } = await signUp(email, password, {
-      full_name: fullName,
-      role: 'ground_staff',
-    });
-    setIsSubmitting(false);
-    if (error) {
-      setLocalError(error.message);
-    } else {
-      setSignupSuccess(true);
-    }
-  };
-
   const displayError = localError || (authError?.message);
 
   return (
@@ -275,152 +230,49 @@ function LoginPage() {
             <svg width="24" height="24" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {mode === 'login' ? 'Welcome to EdgeOps' : 'Create Your Account'}
+            Welcome to EdgeOps
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            {mode === 'login'
-              ? 'Sign in with your credentials'
-              : 'Get started with your restaurant management'}
+            Sign in with your credentials
           </p>
         </div>
 
-        {signupSuccess ? (
-          <div className="text-center py-6">
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <svg width="24" height="24" fill="none" stroke="#16a34a" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-            </div>
-            <p className="text-green-700 font-medium">Account created successfully!</p>
-            <p className="text-sm text-slate-500 mt-1">Check your email for a confirmation link, then sign in.</p>
-            <button
-              onClick={() => { resetForm(); setMode('login'); }}
-              className="mt-4 text-sm text-teal-600 hover:text-teal-700 font-medium"
-            >
-              ← Back to Sign In
-            </button>
+        <form className="space-y-4" onSubmit={handleLogin}>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              placeholder="you@restaurant.com"
+              required
+            />
           </div>
-        ) : mode === 'login' ? (
-          /* ── Sign In Form ── */
-          <form className="space-y-4" onSubmit={handleLogin}>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="you@restaurant.com"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            {displayError && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-                {displayError}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
-            </button>
-            <div className="text-center pt-2">
-              <p className="text-sm text-slate-500">
-                Don't have an account?{' '}
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="text-teal-600 hover:text-teal-700 font-medium"
-                >
-                  Sign Up
-                </button>
-              </p>
-            </div>
-          </form>
-        ) : (
-          /* ── Sign Up Form ── */
-          <form className="space-y-4" onSubmit={handleSignup}>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Full Name</label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="you@restaurant.com"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="Min. 6 characters"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Confirm Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            {displayError && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-                {displayError}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting ? 'Creating account...' : 'Create Account'}
-            </button>
-            <div className="text-center pt-2">
-              <p className="text-sm text-slate-500">
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={toggleMode}
-                  className="text-teal-600 hover:text-teal-700 font-medium"
-                >
-                  Sign In
-                </button>
-              </p>
-            </div>
-          </form>
-        )}
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          {displayError && (
+            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+              {displayError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          >
+            {isSubmitting ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -457,8 +309,12 @@ const AuthenticatedApp = () => {
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
-  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && !userProfile?.payment_verified;
-  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && (userProfile?.payment_verified || isPlatformAdmin) && !userProfile?.organization_id;
+  
+  // Only users who do not belong to an organization yet (i.e. new tenant creators) need onboarding/payment.
+  // Staff invited to an org will already have an organization_id assigned.
+  const isUnassignedUser = !userProfile?.organization_id;
+  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && !userProfile?.payment_verified;
+  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && userProfile?.payment_verified;
 
   if (isLoadingAuth) {
     return (

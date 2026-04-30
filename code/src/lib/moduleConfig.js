@@ -14,13 +14,13 @@
 export const MODULE_DEFINITIONS = {
   dashboard:  { label: "Dashboard",       pages: ["Dashboard"],                                  minRole: "ground_staff",     icon: "LayoutDashboard" },
   invoices:   { label: "Invoices",        pages: ["Invoices"],                                   minRole: "ground_staff",     icon: "FileText" },
-  payments:   { label: "Bill Pay",        pages: ["Payments"],                                   minRole: "branch_manager",   icon: "CreditCard" },
+  payments:   { label: "Bill Pay",        pages: ["Payments"],                                   minRole: "location_manager", icon: "CreditCard" },
   products:   { label: "Products",        pages: ["Products"],                                   minRole: "ground_staff",     icon: "Package" },
-  inventory:  { label: "Inventory",       pages: ["Inventory"],                                  minRole: "location_manager", icon: "Warehouse" },
+  inventory:  { label: "Inventory",       pages: ["Inventory"],                                  minRole: "ground_staff",     icon: "Warehouse" },
   orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
   recipes:    { label: "Recipes",         pages: ["Recipes"],                                    minRole: "location_manager", icon: "ChefHat" },
-  vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "branch_manager",   icon: "Store" },
-  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "org_owner",     icon: "Users" },
+  vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "location_manager", icon: "Store" },
+  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin"],                              minRole: "platform_admin",   icon: "Shield" },
 };
 

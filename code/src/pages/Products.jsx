@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -66,6 +67,7 @@ const categoryColors = {
 };
 
 export default function Products() {
+  const { isGroundStaff } = usePermissions();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -240,16 +242,18 @@ export default function Products() {
           <h1 className="text-2xl font-bold text-slate-900">Products</h1>
           <p className="text-slate-500 mt-1">Manage your product catalog</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-teal-600 hover:bg-teal-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
-        </div>
+        {!isGroundStaff && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-teal-600 hover:bg-teal-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -352,10 +356,12 @@ export default function Products() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[40px]">
-                    <Checkbox
-                      checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
-                      onCheckedChange={toggleSelectAll}
-                    />
+                    {!isGroundStaff && (
+                      <Checkbox
+                        checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    )}
                   </TableHead>
                   <TableHead>Product ID</TableHead>
                   <TableHead>Description</TableHead>
@@ -382,10 +388,12 @@ export default function Products() {
                   filteredProducts.map((product) => (
                     <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-teal-50" : ""}>
                       <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(product.id)}
-                          onCheckedChange={() => toggleSelect(product.id)}
-                        />
+                        {!isGroundStaff && (
+                          <Checkbox
+                            checked={selectedIds.has(product.id)}
+                            onCheckedChange={() => toggleSelect(product.id)}
+                          />
+                        )}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{product.product_id}</TableCell>
                       <TableCell>
@@ -408,24 +416,26 @@ export default function Products() {
                         ${product.latest_price?.toFixed(2) || '0.00'}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(product)}>
-                              <Edit2 className="h-4 w-4 mr-2" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => deleteMutation.mutate(product.id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {!isGroundStaff && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEdit(product)}>
+                                <Edit2 className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => deleteMutation.mutate(product.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -492,9 +502,11 @@ export default function Products() {
                           </TableCell>
                           <TableCell>{p.report_by_unit || 'ea'}</TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
-                              <Edit2 className="h-3 w-3 mr-1" /> Review
-                            </Button>
+                            {!isGroundStaff && (
+                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
+                                <Edit2 className="h-3 w-3 mr-1" /> Review
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -514,9 +526,11 @@ export default function Products() {
                 <CardTitle className="text-base">Purchase Report</CardTitle>
                 <p className="text-xs text-slate-400">Aggregated purchase data by product</p>
               </div>
-              <Button variant="outline" size="sm" onClick={exportToCSV}>
-                <Download className="h-4 w-4 mr-1" /> Export
-              </Button>
+              {!isGroundStaff && (
+                <Button variant="outline" size="sm" onClick={exportToCSV}>
+                  <Download className="h-4 w-4 mr-1" /> Export
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <Table>

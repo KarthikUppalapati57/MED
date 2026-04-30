@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import {
@@ -63,6 +64,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function Inventory() {
+  const { isGroundStaff } = usePermissions();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -321,14 +323,16 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
           <p className="text-slate-500 mt-1">Track and manage stock levels</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" /> Export
-          </Button>
-          <Button onClick={() => setAddDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
-            <Plus className="h-4 w-4 mr-2" /> Add Item
-          </Button>
-        </div>
+        {!isGroundStaff && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Button onClick={() => setAddDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
+              <Plus className="h-4 w-4 mr-2" /> Add Item
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -449,10 +453,12 @@ export default function Inventory() {
                   <TableHeader>
                    <TableRow>
                      <TableHead className="w-[40px]">
-                       <Checkbox
-                         checked={filteredInventory.length > 0 && selectedIds.size === filteredInventory.length}
-                         onCheckedChange={toggleSelectAll}
-                       />
+                       {!isGroundStaff && (
+                         <Checkbox
+                           checked={filteredInventory.length > 0 && selectedIds.size === filteredInventory.length}
+                           onCheckedChange={toggleSelectAll}
+                         />
+                       )}
                      </TableHead>
                      <TableHead>Category</TableHead>
                      <TableHead>Item</TableHead>
@@ -487,10 +493,12 @@ export default function Inventory() {
                         return (
                           <TableRow key={item.id} className={cn(isLow && "bg-red-50", selectedIds.has(item.id) && "bg-teal-50")}>
                              <TableCell>
-                               <Checkbox
-                                 checked={selectedIds.has(item.id)}
-                                 onCheckedChange={() => toggleSelect(item.id)}
-                               />
+                               {!isGroundStaff && (
+                                 <Checkbox
+                                   checked={selectedIds.has(item.id)}
+                                   onCheckedChange={() => toggleSelect(item.id)}
+                                 />
+                               )}
                              </TableCell>
                              <TableCell>
                                <Badge variant="secondary">{item.accounting_category}</Badge>
@@ -512,7 +520,7 @@ export default function Inventory() {
                                  <span className="text-xs text-slate-500">Reorder: <span className={cn("font-medium", isLow ? "text-red-600" : "text-slate-700")}>{item.reorder_point ?? '—'}</span></span>
                                </div>
                              </TableCell>
-                             <TableCell>
+                              <TableCell>
                                <span className={cn(
                                 "font-medium",
                                 change > 0 && "text-green-600",
@@ -522,27 +530,29 @@ export default function Inventory() {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleEdit(item)}>
-                                    <Edit2 className="h-4 w-4 mr-2" /> Edit Item
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleConvert(item)}>
-                                    <RefreshCw className="h-4 w-4 mr-2" /> Convert Unit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleLogWastage(item)}>
-                                    <Trash2 className="h-4 w-4 mr-2" /> Log Wastage
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
-                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {!isGroundStaff && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                      <Edit2 className="h-4 w-4 mr-2" /> Edit Item
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleConvert(item)}>
+                                      <RefreshCw className="h-4 w-4 mr-2" /> Convert Unit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleLogWastage(item)}>
+                                      <Trash2 className="h-4 w-4 mr-2" /> Log Wastage
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
                             </TableCell>
                           </TableRow>
                         );

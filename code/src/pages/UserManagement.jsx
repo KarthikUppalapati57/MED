@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { logAudit } from '@/lib/audit';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -851,18 +852,23 @@ export default function UserManagement() {
 
   const queryClient = useQueryClient();
   const { user: currentUser, role: userRole, userProfile } = useAuth();
+  const { isPlatformAdmin, isBranchManager, isLocationManager, roleLevel } = usePermissions();
   const activeOrgId = userProfile?.organization_id;
+  const activeBrandId = userProfile?.brand_id;
+  const activeLocationId = userProfile?.location_id;
 
   // ── Fetch team members ─────────────────────────────────────
   const { data: members = [], isLoading } = useAuthQuery({
-    queryKey: ['team-members', activeOrgId, showArchived],
+    queryKey: ['team-members', activeOrgId, activeBrandId, activeLocationId, showArchived],
     queryFn: async () => {
       // Try memberships table first (CRE-style)
       try {
-        const { data, error } = await supabase
+        let memQuery = supabase
           .from('memberships')
-          .select('*, profiles(id, email, full_name, phone, last_sign_in_at)')
+          .select('*, profiles(id, email, full_name, phone, last_sign_in_at, location_id, brand_id)')
           .eq('org_id', activeOrgId);
+          
+        const { data, error } = await memQuery;
         
         if (!error && data && data.length > 0) {
           return data.map(m => ({
@@ -870,6 +876,8 @@ export default function UserManagement() {
             membership_id: m.id,
             email: m.profiles?.email,
             full_name: m.profiles?.full_name,
+            location_id: m.profiles?.location_id || m.location_id,
+            brand_id: m.profiles?.brand_id || m.brand_id,
           }));
         }
       } catch { /* fall through */ }
@@ -899,9 +907,19 @@ export default function UserManagement() {
     staleTime: 30000,
   });
 
+  // Client-side filtering for scope if needed (since memberships query might not filter by brand_id/location_id at DB level if they reside in profiles)
+  const scopedMembers = useMemo(() => {
+    return members.filter(m => {
+      if (isPlatformAdmin || !userRole || userRole === 'org_owner' || userRole === 'owner' || userRole === 'admin') return true;
+      if (isBranchManager) return m.brand_id === activeBrandId || m.profiles?.brand_id === activeBrandId;
+      if (isLocationManager) return m.location_id === activeLocationId || m.profiles?.location_id === activeLocationId;
+      return false; // Ground staff shouldn't be here, but just in case
+    });
+  }, [members, isPlatformAdmin, userRole, isBranchManager, isLocationManager, activeBrandId, activeLocationId]);
+
   // ── Filtering ──────────────────────────────────────────────
   const filteredMembers = useMemo(() => {
-    return members.filter(m => {
+    return scopedMembers.filter(m => {
       const name = (m.profiles?.full_name || m.full_name || '').toLowerCase();
       const email = (m.profiles?.email || m.email || '').toLowerCase();
       const matchSearch = !search || name.includes(search.toLowerCase()) || email.includes(search.toLowerCase());
@@ -909,23 +927,32 @@ export default function UserManagement() {
       const matchRole = roleFilter === 'all' || memberRole === roleFilter;
       return matchSearch && matchRole;
     });
-  }, [members, search, roleFilter]);
+  }, [scopedMembers, search, roleFilter]);
 
   // ── Stats ──────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const total = members.length;
-    const active = members.filter(m => m.status === 'active').length;
-    const invited = members.filter(m => m.status === 'invited').length;
-    const admins = members.filter(m => ['admin', 'owner', 'platform_admin', 'super_admin', 'org_admin'].includes(m.role || m.capabilities?.role)).length;
+    const total = scopedMembers.length;
+    const active = scopedMembers.filter(m => m.status === 'active').length;
+    const invited = scopedMembers.filter(m => m.status === 'invited').length;
+    const admins = scopedMembers.filter(m => ['admin', 'owner', 'platform_admin', 'super_admin', 'org_admin'].includes(m.role || m.capabilities?.role)).length;
     return { total, active, invited, admins };
-  }, [members]);
+  }, [scopedMembers]);
 
   const canEdit = (targetMember) => {
-    if (userRole === 'platform_admin' || userRole === 'admin') return true;
-    if (userRole === 'owner') {
-      const targetRole = targetMember.role || targetMember.capabilities?.role;
-      return !['platform_admin', 'admin', 'super_admin'].includes(targetRole);
-    }
+    if (isPlatformAdmin) return true;
+    const targetRole = targetMember.role || targetMember.capabilities?.role || 'ground_staff';
+    const myLevel = roleLevel?.[userRole] ?? 0;
+    const targetLevel = roleLevel?.[targetRole] ?? 0;
+    
+    // Org Owner can edit anyone in their org except Platform Admin
+    if (myLevel >= 3 && targetLevel < 4) return true;
+    
+    // Branch Manager can edit Location Managers and Ground Staff (in their branch)
+    if (myLevel === 2 && targetLevel < 2) return true;
+    
+    // Location Manager can edit Ground Staff (in their location)
+    if (myLevel === 1 && targetLevel < 1) return true;
+    
     return false;
   };
 

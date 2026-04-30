@@ -318,16 +318,34 @@ function BranchManagerDashboard() {
   const { brand, location } = useAuth();
 
   const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryKey: ['invoices', 'brand', brand?.id],
+    queryFn: async () => {
+      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
+      if (brand?.id) q = q.eq('brand_id', brand.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!brand?.id
   });
   const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['inventory'],
-    queryFn: () => api.entities.Inventory.list(),
+    queryKey: ['inventory', 'brand', brand?.id],
+    queryFn: async () => {
+      let q = supabase.from('inventory').select('*');
+      if (brand?.id) q = q.eq('brand_id', brand.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!brand?.id
   });
   const { data: products = [] } = useAuthQuery({
-    queryKey: ['products'],
-    queryFn: () => api.entities.Product.list(),
+    queryKey: ['products', 'brand', brand?.id],
+    queryFn: async () => {
+      let q = supabase.from('products').select('*');
+      if (brand?.id) q = q.eq('brand_id', brand.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!brand?.id
   });
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
@@ -400,14 +418,109 @@ function BranchManagerDashboard() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Location Manager Dashboard — Location-level metrics
+// ═══════════════════════════════════════════════════════════════
+function LocationManagerDashboard() {
+  const { location } = useAuth();
+
+  const { data: invoices = [] } = useAuthQuery({
+    queryKey: ['invoices', 'location', location?.id],
+    queryFn: async () => {
+      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
+      if (location?.id) q = q.eq('location_id', location.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!location?.id
+  });
+  const { data: inventory = [] } = useAuthQuery({
+    queryKey: ['inventory', 'location', location?.id],
+    queryFn: async () => {
+      let q = supabase.from('inventory').select('*');
+      if (location?.id) q = q.eq('location_id', location.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!location?.id
+  });
+  const { data: products = [] } = useAuthQuery({
+    queryKey: ['products', 'location', location?.id],
+    queryFn: async () => {
+      let q = supabase.from('products').select('*');
+      if (location?.id) q = q.eq('location_id', location.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!location?.id
+  });
+
+  const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
+  const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+
+  const recentInvoices = invoices.slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">
+          {location?.name || 'Location'} Dashboard
+        </h1>
+        <p className="text-slate-500 mt-1">Location operations overview</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-orange-100" iconColor="text-orange-600" linkTo="Invoices" linkText="View invoices" />
+        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-yellow-100" iconColor="text-yellow-600" linkTo="Inventory" linkText="View inventory" />
+        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="Products" linkText="View products" />
+      </div>
+
+      {/* Quick Actions */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Link to={createPageUrl('Invoices')}>
+              <Button className="gap-2 bg-teal-600 hover:bg-teal-700">
+                <Upload className="h-4 w-4" />
+                Upload Invoice
+              </Button>
+            </Link>
+            <Link to={createPageUrl('AutoOrdering')}>
+              <Button variant="outline" className="gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Auto-Order
+              </Button>
+            </Link>
+            <Link to={createPageUrl('Recipes')}>
+              <Button variant="outline" className="gap-2">
+                <ChefHat className="h-4 w-4" />
+                Recipes
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Ground Level Dashboard — Minimal view
 // ═══════════════════════════════════════════════════════════════
 function GroundLevelDashboard() {
   const { location } = useAuth();
 
   const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryKey: ['invoices', 'location', location?.id],
+    queryFn: async () => {
+      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
+      if (location?.id) q = q.eq('location_id', location.id);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!location?.id
   });
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review');
@@ -489,10 +602,11 @@ function GroundLevelDashboard() {
 // Main Dashboard — Routes to the correct role-specific view
 // ═══════════════════════════════════════════════════════════════
 export default function Dashboard() {
-  const { isPlatformAdmin, isOrgOwner, isBranchManager } = usePermissions();
+  const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 
   if (isPlatformAdmin) return <PlatformDashboard />;
   if (isOrgOwner)      return <OrgOwnerDashboard />;
   if (isBranchManager) return <BranchManagerDashboard />;
+  if (isLocationManager) return <LocationManagerDashboard />;
   return <GroundLevelDashboard />;
 }
