@@ -210,7 +210,8 @@ export default function PlatformAdmin() {
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
     queryKey: ['platform-audit-logs', logModuleFilter],
     queryFn: async () => {
-      let q = supabase.from('audit_logs').select('*, profiles(email)');
+      let q = supabase.from('audit_logs').select('*, profiles(email)')
+        .is('organization_id', null); // Focus on platform-level actions
       if (logModuleFilter !== 'All') q = q.eq('table_name', logModuleFilter);
       const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
@@ -282,12 +283,34 @@ export default function PlatformAdmin() {
   const handleDeleteInvite = async (id) => {
     if (!window.confirm("Revoke this invitation?")) return;
     try {
-      const { error } = await supabase.from('invitations').delete().eq('id', id);
+      const { error } = await supabase
+        .from('invitations')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
       toast.success("Invitation revoked");
     } catch (err) {
-      toast.error("Failed to delete");
+      toast.error("Failed to revoke invitation");
+    }
+  };
+
+  const handleDeleteOrg = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to deactivate ${name}? This will restrict access for all users in this organization.`)) return;
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({ 
+          status: 'archived', 
+          deleted_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      toast.success(`${name} has been deactivated`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to deactivate organization");
     }
   };
 
@@ -748,7 +771,12 @@ export default function PlatformAdmin() {
                               <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg" onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
                                 <Package className="w-3.5 h-3.5 mr-2" /> Modules
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-8 px-3 text-[10px] font-bold rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteOrg(org.id, org.name); }}
+                              >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>

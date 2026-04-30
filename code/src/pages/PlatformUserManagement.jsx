@@ -60,11 +60,11 @@ export default function PlatformUserManagement() {
   const { data: pendingInvites = [], isLoading: isLoadingInvites } = useAuthQuery({
     queryKey: ['platform-admin-invites'],
     queryFn: async () => {
-      const { data, error } = await supabase
         .from("invitations")
         .select("*")
         .eq("role", "platform_admin")
         .is("accepted_at", null)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data || [];
@@ -322,7 +322,7 @@ export default function PlatformUserManagement() {
                           className="text-xs h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-50"
                           onClick={async () => {
                             if (!window.confirm(`Delete invitation for ${invite.email}?`)) return;
-                            await supabase.from('invitations').delete().eq('id', invite.id);
+                            await supabase.from('invitations').update({ deleted_at: new Date().toISOString() }).eq('id', invite.id);
                             queryClient.invalidateQueries({ queryKey: ['platform-admin-invites'] });
                             toast.success('Invitation deleted');
                           }}
