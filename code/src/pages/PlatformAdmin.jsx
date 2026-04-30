@@ -240,6 +240,7 @@ export default function PlatformAdmin() {
     if (!inviteEmail) { toast.error("Email is required"); return; }
     if (inviteSelectedModules.length === 0) { toast.error("Select at least one module"); return; }
     
+    const toastId = toast.loading("Generating secure onboarding link...");
     setInviting(true);
     try {
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -254,6 +255,9 @@ export default function PlatformAdmin() {
           role: "owner",
           invited_by: user?.id,
           expires_at: expiresAt.toISOString(),
+          organization_id: null,
+          brand_id: null,
+          location_id: null,
           metadata: { 
             modules: inviteSelectedModules,
             access: inviteAccessLevels 
@@ -267,10 +271,10 @@ export default function PlatformAdmin() {
       setIsInviteLinkDialogOpen(true);
       setInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
-      toast.success("Onboarding link generated!");
+      toast.success("Onboarding link generated!", { id: toastId });
     } catch (e) {
       console.error('Invite generation failed:', e);
-      toast.error(e.message || "Failed to generate invitation");
+      toast.error(e.message || "Failed to generate invitation", { id: toastId });
     }
     setInviting(false);
   };
