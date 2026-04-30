@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -22,11 +22,10 @@ const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
 };
 
-function VerificationForm() {
+function VerificationForm({ onVerified }) {
   const stripe = useStripe();
   const elements = useElements();
-  const { user, refreshProfile } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -51,10 +50,8 @@ function VerificationForm() {
       if (updateError) throw updateError;
 
       toast.success('Payment details verified successfully!');
-      await refreshProfile();
-      
-      // Redirect to onboarding
-      setTimeout(() => navigate('/onboarding'), 1000);
+      // Signal parent that verification is done
+      onVerified();
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');
       toast.error('Verification failed');
@@ -100,7 +97,42 @@ function VerificationForm() {
 
 export default function PaymentVerification() {
   const stripePromise = getStripe();
-  const { userProfile } = useAuth();
+  const { userProfile, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const [completed, setCompleted] = useState(false);
+  const retryCountRef = useRef(0);
+
+  // ── After verification completes, poll refreshProfile until payment_verified is confirmed ──
+  useEffect(() => {
+    if (!completed) return;
+    let cancelled = false;
+
+    const pollUntilReady = async () => {
+      const MAX_RETRIES = 8;
+      while (!cancelled && retryCountRef.current < MAX_RETRIES) {
+        retryCountRef.current += 1;
+        try {
+          await refreshProfile();
+        } catch (e) {
+          console.warn('Profile refresh attempt failed:', e);
+        }
+        await new Promise(r => setTimeout(r, 600));
+      }
+      if (!cancelled) {
+        window.location.replace('/onboarding');
+      }
+    };
+
+    pollUntilReady();
+    return () => { cancelled = true; };
+  }, [completed, refreshProfile]);
+
+  // ── Once profile state confirms payment_verified, navigate cleanly ──
+  useEffect(() => {
+    if (completed && userProfile?.payment_verified) {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [completed, userProfile?.payment_verified, navigate]);
 
   // Guard: If already has an organization, no verification needed.
   if (userProfile?.organization_id) {
@@ -108,8 +140,24 @@ export default function PaymentVerification() {
   }
 
   // Guard: If already verified, move to onboarding
-  if (userProfile?.payment_verified) {
+  if (userProfile?.payment_verified && !completed) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // ── Success screen while waiting for profile to update ──
+  if (completed) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <ShieldCheck className="w-8 h-8 text-teal-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Payment Verified!</h2>
+          <p className="text-slate-500">Redirecting to organization setup…</p>
+          <Loader2 className="w-6 h-6 text-teal-600 animate-spin mx-auto" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -133,7 +181,7 @@ export default function PaymentVerification() {
           <CardContent>
             {stripePromise ? (
               <Elements stripe={stripePromise}>
-                <VerificationForm />
+                <VerificationForm onVerified={() => setCompleted(true)} />
               </Elements>
             ) : (
               <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">

@@ -342,13 +342,9 @@ const AuthenticatedApp = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
-
-      {/* Onboarding & Verification routes (explicit) */}
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
-      <Route path="/verify-payment" element={user ? <PaymentVerification /> : <Navigate to="/" />} />
-      <Route path="/onboarding" element={user ? <OnboardingPage /> : <Navigate to="/" />} />
 
-      {/* Protected routes */}
+      {/* Conditional route blocks — each state gets ONLY its relevant routes */}
       {!user ? (
         <>
           <Route path="/" element={<LandingPage />} />
@@ -356,15 +352,21 @@ const AuthenticatedApp = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
       ) : needsPaymentVerification ? (
-        // Redirect to payment if authenticated but not verified
-        <Route path="*" element={<Navigate to="/verify-payment" replace />} />
+        <>
+          <Route path="/verify-payment" element={<PaymentVerification />} />
+          <Route path="*" element={<Navigate to="/verify-payment" replace />} />
+        </>
       ) : needsOnboarding ? (
-        // Redirect to onboarding if verified but no org
-        <Route path="*" element={<Navigate to="/onboarding" replace />} />
+        <>
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="*" element={<Navigate to="/onboarding" replace />} />
+        </>
       ) : (
         <>
-          {/* Redirect /login to / when already authenticated (handles post-verification redirect) */}
+          {/* Redirect away from onboarding/payment pages once fully set up */}
           <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/verify-payment" element={<Navigate to="/" replace />} />
+          <Route path="/onboarding" element={<Navigate to="/" replace />} />
           <Route
             path="/"
             element={

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -15,12 +15,10 @@ export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
-  // Guard: If the user already has an organization assigned, they don't need onboarding.
-  if (userProfile?.organization_id) {
-    return <Navigate to="/" replace />;
-  }
+  // ── All hooks MUST be called before any conditional returns (React rules of hooks) ──
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState(null); // 'manual' or 'csv'
   const [csvFile, setCsvFile] = useState(null);
   const [csvData, setCsvData] = useState([]);
@@ -34,6 +32,63 @@ export default function OnboardingPage() {
   const [brands, setBrands] = useState([
     { name: '', locations: [{ name: '', address: '' }] }
   ]);
+
+  const retryCountRef = useRef(0);
+
+  // ── After onboarding completes, poll refreshProfile until org_id is confirmed, then redirect ──
+  useEffect(() => {
+    if (!completed) return;
+    let cancelled = false;
+
+    const pollUntilReady = async () => {
+      const MAX_RETRIES = 8;
+      while (!cancelled && retryCountRef.current < MAX_RETRIES) {
+        retryCountRef.current += 1;
+        try {
+          await refreshProfile();
+        } catch (e) {
+          console.warn('Profile refresh attempt failed:', e);
+        }
+        // Wait 600ms between retries to let DB commit propagate
+        await new Promise(r => setTimeout(r, 600));
+      }
+      // After max retries, force a hard reload to re-initialize everything
+      if (!cancelled) {
+        window.location.replace('/');
+      }
+    };
+
+    pollUntilReady();
+    return () => { cancelled = true; };
+  }, [completed, refreshProfile]);
+
+  // ── If profile org_id becomes available (from polling above), navigate cleanly ──
+  useEffect(() => {
+    if (completed && userProfile?.organization_id) {
+      navigate('/', { replace: true });
+    }
+  }, [completed, userProfile?.organization_id, navigate]);
+
+  // Guard: If the user already has an organization assigned, they don't need onboarding.
+  if (userProfile?.organization_id && !completed) {
+    return <Navigate to="/" replace />;
+  }
+
+  // ── Success screen while waiting for profile to update ──
+  if (completed) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <CheckCircle2 className="w-8 h-8 text-teal-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900">Onboarding Complete!</h2>
+          <p className="text-slate-500">Setting up your workspace. Redirecting shortly…</p>
+          <Loader2 className="w-6 h-6 text-teal-600 animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
 
   const handleOrgNameChange = (value) => {
     setOrgName(value);
@@ -224,8 +279,8 @@ export default function OnboardingPage() {
       const totalBrands = brands.filter(b => b.name.trim()).length;
       const totalLocations = brands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
       toast.success(`Onboarding complete! Created ${totalBrands} brand(s) and ${totalLocations} location(s).`);
-      await refreshProfile();
-      navigate('/');
+      // Signal completion — the useEffect will poll refreshProfile and redirect
+      setCompleted(true);
     } catch (error) {
       console.error('Onboarding failed:', error);
       const message = error.message?.includes('organizations_slug_key')
@@ -301,8 +356,8 @@ export default function OnboardingPage() {
         : 'Onboarding complete! Welcome to the platform.';
       
       toast.success(successMsg);
-      await refreshProfile();
-      navigate('/');
+      // Signal completion — the useEffect will poll refreshProfile and redirect
+      setCompleted(true);
     } catch (error) {
       console.error('CSV Onboarding failed:', error);
       const message = error.message?.includes('organizations_slug_key')
