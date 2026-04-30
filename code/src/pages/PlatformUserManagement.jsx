@@ -60,6 +60,7 @@ export default function PlatformUserManagement() {
   const { data: pendingInvites = [], isLoading: isLoadingInvites } = useAuthQuery({
     queryKey: ['platform-admin-invites'],
     queryFn: async () => {
+      const { data, error } = await supabase
         .from("invitations")
         .select("*")
         .eq("role", "platform_admin")
