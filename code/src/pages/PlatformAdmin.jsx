@@ -888,6 +888,7 @@ export default function PlatformAdmin() {
                       <TableCell>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id === user?.id} onClick={async () => {
                           if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
+                          try {
                             // Soft-delete the profile
                             const { error } = await supabase.from("profiles").update({ status: 'archived', deleted_at: new Date().toISOString() }).eq("id", admin.user_id);
                             if (error) throw error;
