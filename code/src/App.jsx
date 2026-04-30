@@ -15,6 +15,7 @@ import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import MFASetupPage from './pages/MFASetupPage';
 import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
 // Initialize global error monitoring
 initGlobalErrorHandlers();
