@@ -302,20 +302,21 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
-    // Safety net: if INITIAL_SESSION never fires within 5 seconds
-    // (e.g., due to a Supabase SDK bug), force loading to complete.
-    // Reduced from 5s to 3s — cached profile makes the UI usable faster
+    // Safety net: if INITIAL_SESSION + profile loading hasn't completed
+    // within the timeout, force loading to complete so the UI isn't stuck.
+    // The cached profile (sessionStorage) makes the UI usable immediately
+    // even when this safety net fires — the fresh profile will arrive shortly after.
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
           if (current) {
-            console.warn('Auth initialization safety timeout — forcing loading to complete');
+            console.debug('[AuthContext] Safety timeout — completing auth init with cached profile');
             return false;
           }
           return current;
         });
       }
-    }, 3000);
+    }, 5000);
 
     return () => {
       isMounted = false;

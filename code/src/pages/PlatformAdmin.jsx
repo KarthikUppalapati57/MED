@@ -88,24 +88,6 @@ export default function PlatformAdmin() {
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({
     queryKey: ['platform-admins'],
     queryFn: async () => {
-      // Try memberships-based query first (CRE-style)
-      try {
-        const { data, error } = await supabase
-          .from("memberships")
-          .select("id, user_id, role, profiles(id, email, full_name)")
-          .eq("role", "super_admin");
-        if (!error && data) {
-          return (data || []).map(m => ({
-            membership_id: m.id,
-            user_id: m.user_id,
-            email: m.profiles?.email || "—",
-            full_name: m.profiles?.full_name || "—",
-            role: "super_admin"
-          }));
-        }
-      } catch { /* fall through */ }
-      
-      // Fallback: query profiles table (MEVS-style)
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, role")
@@ -243,41 +225,15 @@ export default function PlatformAdmin() {
   const { data: orgs = [] } = useAuthQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
-      // Try memberships join first (CRE-style)
-      try {
-        const { data, error } = await supabase
-          .from('organizations')
-          .select(`*, memberships(role, profiles(email))`)
-          .order('created_at', { ascending: false });
-        
-        if (!error && data) {
-          return data.map(org => ({
-            ...org,
-            admin_email: org.memberships?.find(m => m.role === 'org_admin')?.profiles?.email || 
-                         org.memberships?.[0]?.profiles?.email || 
-                         org.primary_contact_email || '—'
-          }));
-        }
-      } catch { /* fall through */ }
-
-      // Fallback: simple select with owner join
-      try {
-        const { data, error } = await supabase
-          .from('organizations')
-          .select('*, owner:owner_id(email)')
-          .order('created_at', { ascending: false });
-        if (!error && data) {
-          return data.map(org => ({ ...org, admin_email: org.owner?.email || '—' }));
-        }
-      } catch { /* fall through */ }
-
-      // Final fallback: no joins
       const { data, error } = await supabase
         .from('organizations')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []).map(o => ({ ...o, admin_email: '—' }));
+      return (data || []).map(org => ({
+        ...org,
+        admin_email: org.primary_contact_email || '—'
+      }));
     },
     enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
   });
@@ -1392,6 +1348,7 @@ export default function PlatformAdmin() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite Client</DialogTitle>
+            <DialogDescription>Send an invitation email to onboard a new client organization.</DialogDescription>
           </DialogHeader>
           {inviteSuccess ? (
             <div className="text-center py-4">
@@ -1429,6 +1386,7 @@ export default function PlatformAdmin() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite Platform Administrator</DialogTitle>
+            <DialogDescription>Grant platform-wide admin access to a new user.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
