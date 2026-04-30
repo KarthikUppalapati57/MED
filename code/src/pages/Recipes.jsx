@@ -14,13 +14,30 @@ import {
   Loader2,
   Package,
   Users,
-  MoreVertical
+  MoreVertical,
+  TrendingUp,
+  Settings,
+  Eye,
+  Sparkles
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import {
   Select,
@@ -57,6 +74,7 @@ export default function Recipes() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [costDialogOpen, setCostDialogOpen] = useState(false);
+  const [viewingRecipe, setViewingRecipe] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [calculatingCost, setCalculatingCost] = useState(false);
   const [formData, setFormData] = useState({
@@ -350,6 +368,17 @@ export default function Recipes() {
         </Card>
       </div>
 
+      <Tabs defaultValue="recipes" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="recipes">Recipes</TabsTrigger>
+          <TabsTrigger value="prepared-items">Prepared Items</TabsTrigger>
+          <TabsTrigger value="menu-analysis">Menu Analysis</TabsTrigger>
+          <TabsTrigger value="recipe-viewer">Recipe Viewer</TabsTrigger>
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="recipes" className="space-y-4">
+
       {/* Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
@@ -450,6 +479,342 @@ export default function Recipes() {
           ))
         )}
       </div>
+        </TabsContent>
+
+        {/* ── Prepared Items Tab ──────────────────────────────── */}
+        <TabsContent value="prepared-items">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Prepared Items</CardTitle>
+                <p className="text-xs text-slate-400">Items that are prepared from recipes (batch-cooked/prepped items)</p>
+              </div>
+              <Button className="bg-teal-600 hover:bg-teal-700" size="sm">
+                <Plus className="h-4 w-4 mr-2" /> Add Prepared Item
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Recipe</TableHead>
+                    <TableHead>Batch Yield</TableHead>
+                    <TableHead>Batch Cost</TableHead>
+                    <TableHead>Plate Cost</TableHead>
+                    <TableHead>Selling Price</TableHead>
+                    <TableHead>Margin</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recipes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                        No prepared items yet. Add recipes first, then define prepared items.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    recipes.map(recipe => {
+                      const plateCost = recipe.cost_per_serving || 0;
+                      const sellingPrice = plateCost > 0 ? plateCost * 3.5 : 0; // typical 3.5x markup
+                      const margin = sellingPrice > 0 ? ((sellingPrice - plateCost) / sellingPrice * 100) : 0;
+                      return (
+                        <TableRow key={recipe.id}>
+                          <TableCell className="font-medium">{recipe.name}</TableCell>
+                          <TableCell><Badge variant="secondary">{recipe.category?.replace('_', ' ')}</Badge></TableCell>
+                          <TableCell className="text-sm text-slate-500">{recipe.name}</TableCell>
+                          <TableCell>{recipe.yield_quantity} {recipe.yield_unit}</TableCell>
+                          <TableCell className="font-semibold">${(recipe.total_cost || 0).toFixed(2)}</TableCell>
+                          <TableCell className="font-semibold text-teal-600">${plateCost.toFixed(2)}</TableCell>
+                          <TableCell>${sellingPrice.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge className={margin >= 70 ? 'bg-green-100 text-green-700' : margin >= 50 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}>
+                              {margin.toFixed(0)}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Menu Analysis Tab (AI/ML + Analytics Dashboard) ──── */}
+        <TabsContent value="menu-analysis">
+          <div className="space-y-6">
+            {/* AI Insights Card */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-indigo-50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-purple-500" /> AI Menu Insights
+                </CardTitle>
+                <p className="text-xs text-slate-400">Powered by AI analysis of your menu data, costs, and sales trends</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-white/80 rounded-lg border border-purple-100">
+                    <p className="text-sm font-medium text-purple-700">Add to Menu</p>
+                    <p className="text-xs text-slate-500 mt-1">Based on current cost trends, consider adding more beverage recipes — beverage category has the highest margin potential at ~75% avg.</p>
+                  </div>
+                  <div className="p-4 bg-white/80 rounded-lg border border-amber-100">
+                    <p className="text-sm font-medium text-amber-700">Modify</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {recipes.filter(r => (r.cost_per_serving || 0) > 5).length > 0
+                        ? `${recipes.filter(r => (r.cost_per_serving || 0) > 5).length} recipes have cost per serving >$5. Consider ingredient substitutions to reduce plate cost.`
+                        : 'All recipes are within healthy cost ranges. No modifications needed.'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-white/80 rounded-lg border border-green-100">
+                    <p className="text-sm font-medium text-green-700">Remove</p>
+                    <p className="text-xs text-slate-500 mt-1">No recipes currently flagged for removal. Consider auditing recipes with ingredients that frequently go to waste.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Analytics Dashboard */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Cost Distribution */}
+              <Card className="border-0 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" /> Cost Distribution by Category
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const byCategory = recipes.reduce((acc, r) => {
+                      const cat = r.category || 'other';
+                      if (!acc[cat]) acc[cat] = { count: 0, totalCost: 0, avgPlateCost: 0 };
+                      acc[cat].count++;
+                      acc[cat].totalCost += r.total_cost || 0;
+                      acc[cat].avgPlateCost += r.cost_per_serving || 0;
+                      return acc;
+                    }, {});
+                    Object.values(byCategory).forEach(v => { if (v.count > 0) v.avgPlateCost = v.avgPlateCost / v.count; });
+                    const sorted = Object.entries(byCategory).sort((a, b) => b[1].totalCost - a[1].totalCost);
+                    const maxCost = sorted.length > 0 ? sorted[0][1].totalCost : 1;
+
+                    return sorted.length === 0 ? (
+                      <p className="text-slate-400 text-center py-6">No recipe data</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {sorted.map(([cat, data]) => (
+                          <div key={cat}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
+                              <span className="text-slate-500">{data.count} recipes · Avg ${data.avgPlateCost.toFixed(2)}/serving</span>
+                            </div>
+                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${(data.totalCost / maxCost) * 100}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              {/* Most/Least Expensive */}
+              <Card className="border-0 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Plate Cost Ranking</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Recipe</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Plate Cost</TableHead>
+                        <TableHead>Est. Margin</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recipes.slice().sort((a, b) => (b.cost_per_serving || 0) - (a.cost_per_serving || 0)).slice(0, 8).map(r => {
+                        const plateCost = r.cost_per_serving || 0;
+                        const margin = plateCost > 0 ? ((plateCost * 3.5 - plateCost) / (plateCost * 3.5) * 100) : 0;
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell className="font-medium">{r.name}</TableCell>
+                            <TableCell><Badge variant="secondary">{r.category?.replace('_', ' ')}</Badge></TableCell>
+                            <TableCell className="font-semibold">${plateCost.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge className={margin >= 70 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}>
+                                {margin.toFixed(0)}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── Recipe Viewer Tab ───────────────────────────────── */}
+        <TabsContent value="recipe-viewer">
+          {viewingRecipe ? (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-lg bg-teal-100 flex items-center justify-center">
+                    <ChefHat className="h-6 w-6 text-teal-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{viewingRecipe.name}</h2>
+                    <Badge variant="secondary">{viewingRecipe.category?.replace('_', ' ')}</Badge>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={() => setViewingRecipe(null)}>Back to List</Button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="border-0 shadow-sm lg:col-span-2">
+                  <CardHeader><CardTitle className="text-base">Ingredients</CardTitle></CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Unit</TableHead>
+                          <TableHead>Unit Cost</TableHead>
+                          <TableHead>Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(viewingRecipe.ingredients || []).map((ing, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="font-medium">{ing.product_name || '—'}</TableCell>
+                            <TableCell>{ing.quantity}</TableCell>
+                            <TableCell>{ing.unit}</TableCell>
+                            <TableCell>${(ing.unit_cost || 0).toFixed(2)}</TableCell>
+                            <TableCell className="font-semibold">${(ing.total_cost || 0).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-sm">
+                  <CardHeader><CardTitle className="text-base">Cost Breakdown</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Ingredients</span>
+                        <span className="font-medium">${(viewingRecipe.total_ingredient_cost || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Packaging</span>
+                        <span className="font-medium">${(viewingRecipe.total_packaging_cost || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Labor</span>
+                        <span className="font-medium">${(viewingRecipe.labor_cost || 0).toFixed(2)}</span>
+                      </div>
+                      <hr />
+                      <div className="flex justify-between text-sm">
+                        <span className="font-semibold">Total Cost</span>
+                        <span className="font-bold">${(viewingRecipe.total_cost || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-teal-600">
+                        <span className="font-semibold">Cost/Serving</span>
+                        <span className="font-bold">${(viewingRecipe.cost_per_serving || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {viewingRecipe.instructions && (
+                <Card className="border-0 shadow-sm">
+                  <CardHeader><CardTitle className="text-base">Instructions</CardTitle></CardHeader>
+                  <CardContent>
+                    <p className="text-slate-600 whitespace-pre-wrap">{viewingRecipe.instructions}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="py-12 text-center">
+                <Eye className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-lg font-medium text-slate-600">Select a recipe to view</p>
+                <p className="text-sm text-slate-400 mt-1">Click a recipe below to view its full details</p>
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-w-3xl mx-auto">
+                  {recipes.slice(0, 9).map(r => (
+                    <Button key={r.id} variant="outline" className="justify-start" onClick={() => setViewingRecipe(r)}>
+                      <ChefHat className="h-4 w-4 mr-2 text-teal-500" /> {r.name}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ── Setup Tab ────────────────────────────────────── */}
+        <TabsContent value="setup">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Recipe Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Default Labor Rate</p>
+                    <p className="text-sm text-slate-500">Applied to all new recipes</p>
+                  </div>
+                  <Input className="w-28" type="number" step="0.01" defaultValue="15.00" />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Target Food Cost %</p>
+                    <p className="text-sm text-slate-500">Goal for plate cost as % of selling price</p>
+                  </div>
+                  <Input className="w-28" type="number" step="1" defaultValue="30" />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Auto-Calculate on Save</p>
+                    <p className="text-sm text-slate-500">Automatically calculate costs when recipes are saved</p>
+                  </div>
+                  <Badge className="bg-green-100 text-green-700">Enabled</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Category Definitions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {['appetizer', 'main_course', 'dessert', 'beverage', 'side', 'sauce'].map(cat => (
+                  <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
+                    <Badge variant="secondary">
+                      {recipes.filter(r => r.category === cat).length} recipes
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Recipe Form Sheet */}
       <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>

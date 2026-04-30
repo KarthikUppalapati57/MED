@@ -391,14 +391,17 @@ export const AuthProvider = ({ children }) => {
   const role = userProfile?.role || user?.user_metadata?.role || null;
   const isAuthenticated = !!user;
 
-  // Permission helpers
+  // Permission helpers — new role hierarchy with backward-compatible aliases
   const hasPermission = (action) => {
     const permissions = {
-      ground_staff: ['view', 'upload'],
-      manager: ['view', 'upload', 'edit', 'approve', 'create'],
-      owner: ['view', 'upload', 'edit', 'approve', 'create', 'delete'],
-      admin: ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users'],
-      platform_admin: ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform'],
+      ground_staff:     ['view', 'upload'],
+      location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
+      manager:          ['view', 'upload', 'edit', 'approve', 'create'],           // alias → location_manager
+      branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
+      org_owner:        ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
+      owner:            ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users'], // alias → org_owner
+      admin:            ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users'], // alias → org_owner
+      platform_admin:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform', 'manage_subscriptions', 'manage_accounting'],
     };
     return (permissions[role] || []).includes(action);
   };

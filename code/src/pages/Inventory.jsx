@@ -382,8 +382,11 @@ export default function Inventory() {
       <Tabs defaultValue="inventory" className="space-y-6">
         <TabsList>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="summary">Summary by Category</TabsTrigger>
+          <TabsTrigger value="summary">Inventory Summary</TabsTrigger>
           <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
+          <TabsTrigger value="counts">Inventory Counts</TabsTrigger>
+          <TabsTrigger value="waste-summary">Waste Summary</TabsTrigger>
+          <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="inventory" className="space-y-4">
@@ -555,7 +558,7 @@ export default function Inventory() {
         <TabsContent value="summary">
           <Card className="border-0 shadow-sm">
             <CardHeader>
-              <CardTitle>Inventory Summary by Category</CardTitle>
+              <CardTitle>Inventory Summary</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -615,6 +618,269 @@ export default function Inventory() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Inventory Counts Tab ────────────────────────────── */}
+        <TabsContent value="counts">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Inventory Counts</CardTitle>
+              <Button className="bg-teal-600 hover:bg-teal-700" size="sm">
+                <Plus className="h-4 w-4 mr-2" /> New Count
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Food</TableHead>
+                    <TableHead>N/A Bev</TableHead>
+                    <TableHead>Other</TableHead>
+                    <TableHead>Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    // Derive count snapshots from current inventory grouped by date
+                    const today = new Date().toISOString().split('T')[0];
+                    const foodValue = inventory.filter(i => i.accounting_category === 'food').reduce((s, i) => s + (i.current_value || 0), 0);
+                    const bevValue = inventory.filter(i => i.accounting_category === 'beverage').reduce((s, i) => s + (i.current_value || 0), 0);
+                    const otherValue = totalValue - foodValue - bevValue;
+                    return (
+                      <TableRow>
+                        <TableCell className="font-medium">{format(new Date(), 'MMM d, yyyy')}</TableCell>
+                        <TableCell><Badge variant="secondary">All</Badge></TableCell>
+                        <TableCell><Badge className="bg-emerald-100 text-emerald-700">Current</Badge></TableCell>
+                        <TableCell>${foodValue.toLocaleString()}</TableCell>
+                        <TableCell>${bevValue.toLocaleString()}</TableCell>
+                        <TableCell>${otherValue.toLocaleString()}</TableCell>
+                        <TableCell className="font-semibold">${totalValue.toLocaleString()}</TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Waste Summary Tab ───────────────────────────────── */}
+        <TabsContent value="waste-summary">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Waste Reasons */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Top Waste Reasons</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const byReason = wastageLogs.reduce((acc, w) => {
+                    const reason = w.reason || 'other';
+                    if (!acc[reason]) acc[reason] = { count: 0, value: 0 };
+                    acc[reason].count++;
+                    acc[reason].value += w.value || 0;
+                    return acc;
+                  }, {});
+                  const sorted = Object.entries(byReason).sort((a, b) => b[1].value - a[1].value);
+                  const maxValue = sorted.length > 0 ? sorted[0][1].value : 1;
+                  return sorted.length === 0 ? (
+                    <p className="text-slate-400 text-center py-8">No waste data available</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {sorted.map(([reason, data]) => (
+                        <div key={reason}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium capitalize">{reason.replace(/_/g, ' ')}</span>
+                            <span className="text-slate-500">{data.count} entries · ${data.value.toFixed(2)}</span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-orange-500 rounded-full transition-all"
+                              style={{ width: `${(data.value / maxValue) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Most Expensive Waste Items */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Most Expensive Waste</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Reason</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {wastageLogs
+                      .slice()
+                      .sort((a, b) => (b.value || 0) - (a.value || 0))
+                      .slice(0, 10)
+                      .map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="font-medium">{log.product_name}</TableCell>
+                          <TableCell>{log.quantity} {log.unit}</TableCell>
+                          <TableCell className="text-red-600 font-semibold">${log.value?.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="capitalize">{log.reason?.replace(/_/g, ' ')}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    {wastageLogs.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-slate-400">No waste data</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Waste Summary Stats */}
+            <Card className="border-0 shadow-sm lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base">Waste Trend Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="p-4 bg-red-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-red-600">${totalWastageValue.toFixed(2)}</p>
+                    <p className="text-xs text-red-500 mt-1 font-medium">Total Waste Value</p>
+                  </div>
+                  <div className="p-4 bg-orange-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-orange-600">{wastageLogs.length}</p>
+                    <p className="text-xs text-orange-500 mt-1 font-medium">Waste Entries</p>
+                  </div>
+                  <div className="p-4 bg-amber-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-amber-600">
+                      {wastageLogs.length > 0 ? `$${(totalWastageValue / wastageLogs.length).toFixed(2)}` : '$0.00'}
+                    </p>
+                    <p className="text-xs text-amber-500 mt-1 font-medium">Avg Waste per Entry</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-slate-700">
+                      {totalValue > 0 ? `${((totalWastageValue / totalValue) * 100).toFixed(1)}%` : '0%'}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">Waste as % of Inventory</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ── Count Sheets Tab ────────────────────────────────── */}
+        <TabsContent value="count-sheets">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Items Added Today (new inventory received) */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Today's Received Items</CardTitle>
+                <p className="text-xs text-slate-400">{format(new Date(), 'EEEE, MMM d, yyyy')}</p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Count</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead>Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      const todayItems = inventory.filter(i =>
+                        i.last_counted_date === today || i.created_at?.startsWith(today)
+                      );
+                      return todayItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                            No items received today
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        todayItems.map(item => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.product_name}</TableCell>
+                            <TableCell><Badge variant="secondary">{item.accounting_category}</Badge></TableCell>
+                            <TableCell>{item.current_quantity}</TableCell>
+                            <TableCell>{item.current_unit}</TableCell>
+                            <TableCell className="font-semibold">${(item.current_value || 0).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))
+                      );
+                    })()}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Previous Inventory Snapshot */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Previous Inventory Snapshot</CardTitle>
+                <p className="text-xs text-slate-400">Last recorded counts before today's changes</p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Prev Count</TableHead>
+                      <TableHead>Prev Value</TableHead>
+                      <TableHead>Current Count</TableHead>
+                      <TableHead>Δ Change</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventory.filter(i => i.previous_quantity != null && i.previous_quantity !== i.current_quantity).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                          No count changes recorded
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      inventory
+                        .filter(i => i.previous_quantity != null && i.previous_quantity !== i.current_quantity)
+                        .map(item => {
+                          const delta = (item.current_quantity || 0) - (item.previous_quantity || 0);
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.product_name}</TableCell>
+                              <TableCell>{item.previous_quantity}</TableCell>
+                              <TableCell>${(item.previous_value || 0).toFixed(2)}</TableCell>
+                              <TableCell className="font-semibold">{item.current_quantity}</TableCell>
+                              <TableCell>
+                                <span className={cn("font-medium", delta > 0 && "text-green-600", delta < 0 && "text-red-600")}>
+                                  {delta > 0 ? '+' : ''}{delta}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

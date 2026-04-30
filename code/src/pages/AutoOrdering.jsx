@@ -14,7 +14,10 @@ import {
   Loader2,
   Mail,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Settings,
+  FileText,
+  Plus
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +38,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 
 import { toast } from "sonner";
@@ -217,8 +228,8 @@ export default function AutoOrdering() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Auto Ordering</h1>
-          <p className="text-slate-500 mt-1">AI-powered order suggestions based on inventory</p>
+          <h1 className="text-2xl font-bold text-slate-900">Orders</h1>
+          <p className="text-slate-500 mt-1">Manage purchase orders and vendor communications</p>
         </div>
         <Button 
           onClick={generateOrder} 
@@ -233,6 +244,99 @@ export default function AutoOrdering() {
           Generate Order
         </Button>
       </div>
+
+      <Tabs defaultValue="all-orders" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="all-orders">Orders</TabsTrigger>
+          <TabsTrigger value="place-order">Place New Order</TabsTrigger>
+          <TabsTrigger value="invoice-approval">Invoice Approval</TabsTrigger>
+          <TabsTrigger value="order-setup">Order Setup</TabsTrigger>
+        </TabsList>
+
+        {/* ── All Orders Tab ──────────────────────────────── */}
+        <TabsContent value="all-orders">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">All Orders</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order #</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                        Loading orders...
+                      </TableCell>
+                    </TableRow>
+                  ) : orders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                        No orders yet. Generate one from the "Place New Order" tab.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orders.map(order => {
+                      const statusColors = {
+                        pending_approval: 'bg-orange-100 text-orange-700',
+                        approved: 'bg-green-100 text-green-700',
+                        sent: 'bg-blue-100 text-blue-700',
+                        cancelled: 'bg-red-100 text-red-700',
+                        received: 'bg-emerald-100 text-emerald-700',
+                      };
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium font-mono">{order.order_number}</TableCell>
+                          <TableCell>{order.vendor_name}</TableCell>
+                          <TableCell>{order.items?.length || 0} items</TableCell>
+                          <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge className={statusColors[order.status] || 'bg-slate-100 text-slate-700'}>
+                              {order.status?.replace(/_/g, ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-500">
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell>
+                            {order.status === 'pending_approval' && (
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(order)}>
+                                  <Check className="h-3 w-3 mr-1" /> Approve
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => handleReject(order)}>
+                                  <X className="h-3 w-3 mr-1" /> Reject
+                                </Button>
+                              </div>
+                            )}
+                            {order.status === 'approved' && (
+                              <Button size="sm" className="h-7 text-xs bg-teal-600" onClick={() => { setSelectedOrder(order); setSendDialogOpen(true); }}>
+                                <Send className="h-3 w-3 mr-1" /> Send
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Place New Order Tab (existing content) ────────── */}
+        <TabsContent value="place-order" className="space-y-6">
 
       {/* External Suggestions */}
       {suggestions.length > 0 && (
@@ -430,6 +534,123 @@ export default function AutoOrdering() {
           </Table>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* ── Invoice Approval Tab ──────────────────────────── */}
+        <TabsContent value="invoice-approval">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-5 w-5" /> Invoice Approval Queue
+              </CardTitle>
+              <p className="text-xs text-slate-400">Match received invoices against purchase orders for approval</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>PO Reference</TableHead>
+                    <TableHead>Invoice Total</TableHead>
+                    <TableHead>PO Total</TableHead>
+                    <TableHead>Variance</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.filter(o => o.status === 'sent' || o.status === 'received').length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                        No invoices pending approval. Invoices will appear here once orders are sent and invoices received.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    orders.filter(o => o.status === 'sent' || o.status === 'received').map(order => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-mono text-sm">INV-{order.order_number?.replace('ORD-', '')}</TableCell>
+                        <TableCell className="font-medium">{order.vendor_name}</TableCell>
+                        <TableCell className="font-mono text-sm">{order.order_number}</TableCell>
+                        <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
+                        <TableCell>${order.total_amount?.toFixed(2)}</TableCell>
+                        <TableCell><Badge className="bg-green-100 text-green-700">$0.00</Badge></TableCell>
+                        <TableCell><Badge className="bg-amber-100 text-amber-700">Pending Review</Badge></TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Order Setup Tab ───────────────────────────────── */}
+        <TabsContent value="order-setup">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Approval Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Require Manager Approval</p>
+                    <p className="text-sm text-slate-500">Orders above threshold need manager sign-off</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Approval Threshold</p>
+                    <p className="text-sm text-slate-500">Orders above this amount need approval</p>
+                  </div>
+                  <Input className="w-28" type="number" step="100" defaultValue="500" />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Auto-Approve Below Threshold</p>
+                    <p className="text-sm text-slate-500">Automatically approve small orders</p>
+                  </div>
+                  <Switch />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Email & Delivery Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Send Order Confirmation</p>
+                    <p className="text-sm text-slate-500">Email order details to manager after approval</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Default Send Method</p>
+                    <p className="text-sm text-slate-500">Default channel for vendor orders</p>
+                  </div>
+                  <Badge className="bg-teal-100 text-teal-700">Email</Badge>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Recurring Orders</p>
+                    <p className="text-sm text-slate-500">Set up automatic recurring order schedules</p>
+                  </div>
+                  <Badge variant="secondary">Not Configured</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Chat Dialog */}
       <Dialog open={!!selectedOrder && !sendDialogOpen} onOpenChange={() => setSelectedOrder(null)}>

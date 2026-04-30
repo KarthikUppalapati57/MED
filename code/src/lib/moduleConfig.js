@@ -2,8 +2,13 @@ export const MODULE_DEFINITIONS = {
   dashboard:      { label: "Dashboard",         pages: ["Dashboard"] },
   invoices:       { label: "Invoices",          pages: ["Invoices"] },
   inventory:      { label: "Inventory",         pages: ["Inventory"] },
+  orders:         { label: "Orders",            pages: ["AutoOrdering"] },
+  payments:       { label: "Bill Pay",          pages: ["Payments"] },
   recipes:        { label: "Recipes",           pages: ["Recipes"] },
-  admin:          { label: "Admin",              pages: ["SuperAdmin", "Stakeholders", "OrgSettings", "UserManagement"] },
+  vendors:        { label: "Vendors",           pages: ["Vendors"] },
+  products:       { label: "Products",          pages: ["Products"] },
+  admin:          { label: "Admin",             pages: ["UserManagement", "OrgManagement", "AuditLogs"] },
+  platform:       { label: "Platform Admin",    pages: ["PlatformAdmin"] },
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);

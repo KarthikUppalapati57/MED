@@ -19,7 +19,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -61,6 +67,7 @@ const statusColors = {
 export default function Vendors() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [periodFilter, setPeriodFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
@@ -251,6 +258,29 @@ export default function Vendors() {
         </Card>
       </div>
 
+      <Tabs defaultValue="vendors" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="vendors">Vendors</TabsTrigger>
+          <TabsTrigger value="vendor-items">Vendor Items</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="vendors" className="space-y-4">
+
+      {/* Period Filters */}
+      <div className="flex gap-2">
+        {['all', 'this_period', 'last_period', 'this_year'].map(period => (
+          <Button
+            key={period}
+            size="sm"
+            variant={periodFilter === period ? 'default' : 'outline'}
+            onClick={() => setPeriodFilter(period)}
+            className={periodFilter === period ? 'bg-teal-600 hover:bg-teal-700' : ''}
+          >
+            {period === 'all' ? 'All Time' : period === 'this_period' ? 'This Period' : period === 'last_period' ? 'Last Period' : 'This Year'}
+          </Button>
+        ))}
+      </div>
+
       {/* Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
@@ -384,6 +414,71 @@ export default function Vendors() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* ── Vendor Items Tab ────────────────────────────────── */}
+        <TabsContent value="vendor-items">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Vendor Items Catalog</CardTitle>
+                <p className="text-xs text-slate-400">Master list of all vendor catalog items across all vendors</p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Vendor Item Name</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Item Code</TableHead>
+                    <TableHead>Last Purchase</TableHead>
+                    <TableHead>Last Amount</TableHead>
+                    <TableHead>Order Guide</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vendors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                        No vendor items available. Items will appear here once vendors have associated products.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    vendors.flatMap(vendor =>
+                      (vendor.items || []).length > 0
+                        ? (vendor.items || []).map((item, idx) => (
+                            <TableRow key={`${vendor.id}-${idx}`}>
+                              <TableCell className="font-medium">{vendor.name}</TableCell>
+                              <TableCell>{item.vendor_item_name || item.name || '—'}</TableCell>
+                              <TableCell>{item.product_name || '—'}</TableCell>
+                              <TableCell><Badge variant="secondary">{item.category || '—'}</Badge></TableCell>
+                              <TableCell className="font-mono text-sm">{item.item_code || '—'}</TableCell>
+                              <TableCell className="text-sm text-slate-500">
+                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '—'}
+                              </TableCell>
+                              <TableCell className="font-semibold">${(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
+                              <TableCell>
+                                <Badge className={item.on_order_guide ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}>
+                                  {item.on_order_guide ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        : [<TableRow key={`${vendor.id}-empty`}>
+                            <TableCell className="font-medium">{vendor.name}</TableCell>
+                            <TableCell colSpan={7} className="text-slate-400 italic">No items cataloged</TableCell>
+                          </TableRow>]
+                    )
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Vendor Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

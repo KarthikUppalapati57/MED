@@ -4,9 +4,28 @@
  * Provides a centralised helper for recording audit trail entries.
  * Adapted from CRE Financial Suite for MEVS.
  * Never crashes the caller — audit failures are logged to console.
+ *
+ * Supports per-module filtering via the `module` field.
+ * Valid modules: 'users', 'organizations', 'inventory', 'orders',
+ *   'invoices', 'payments', 'products', 'vendors', 'recipes', 'platform', 'system'
  */
 
 import { supabase } from '@/lib/supabaseClient';
+
+/** Standard module constants for audit log categorization */
+export const AUDIT_MODULES = {
+  USERS: 'users',
+  ORGANIZATIONS: 'organizations',
+  INVENTORY: 'inventory',
+  ORDERS: 'orders',
+  INVOICES: 'invoices',
+  PAYMENTS: 'payments',
+  PRODUCTS: 'products',
+  VENDORS: 'vendors',
+  RECIPES: 'recipes',
+  PLATFORM: 'platform',
+  SYSTEM: 'system',
+};
 
 /**
  * Record an audit log entry.
@@ -14,6 +33,7 @@ import { supabase } from '@/lib/supabaseClient';
  *
  * @param {Object} entry
  * @param {string} [entry.action]           - Action performed (e.g. "update_user_permissions")
+ * @param {string} [entry.module]           - Module/page this action belongs to (e.g. "inventory", "users")
  * @param {string} [entry.target_user_id]   - ID of user being acted upon
  * @param {Object} [entry.details]          - Additional metadata
  * @param {string} [entry.entityType]       - Logical entity name
@@ -25,6 +45,7 @@ export async function logAudit(entry) {
     entity_type:   entry.entityType || entry.action || 'unknown',
     entity_id:     entry.entityId || entry.target_user_id || null,
     action:        entry.action || 'audit',
+    module:        entry.module || null,
     org_id:        entry.orgId || null,
     field_changed: entry.fieldChanged || null,
     old_value:     entry.oldValue != null ? String(entry.oldValue) : null,

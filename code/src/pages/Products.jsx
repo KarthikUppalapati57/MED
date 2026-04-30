@@ -15,7 +15,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -280,6 +286,14 @@ export default function Products() {
         </Card>
       </div>
 
+      <Tabs defaultValue="all-products" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="all-products">View All Products</TabsTrigger>
+          <TabsTrigger value="new-review">New Item Review</TabsTrigger>
+          <TabsTrigger value="purchase-report">Purchase Report</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all-products" className="space-y-4">
       {/* Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
@@ -421,6 +435,128 @@ export default function Products() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* ── New Item Review Tab ──────────────────────────────── */}
+        <TabsContent value="new-review">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base">New Item Review</CardTitle>
+              <p className="text-xs text-slate-400">Recently added products pending review and approval</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Created Date</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Category Type</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>On Inventory</TableHead>
+                    <TableHead>Tax Exempt</TableHead>
+                    <TableHead>Report By</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    // Show products created in last 7 days as "new items"
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    const newProducts = products.filter(p => {
+                      if (!p.created_at) return false;
+                      return new Date(p.created_at) >= sevenDaysAgo;
+                    });
+                    return newProducts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                          No new products added in the last 7 days
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      newProducts.map(p => (
+                        <TableRow key={p.id}>
+                          <TableCell className="text-sm text-slate-500">
+                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </TableCell>
+                          <TableCell className="font-medium">{p.name}</TableCell>
+                          <TableCell>{p.vendor_name || '—'}</TableCell>
+                          <TableCell><Badge className={categoryColors[p.accounting_category] || categoryColors.other}>{p.accounting_category}</Badge></TableCell>
+                          <TableCell>{p.category || '—'}</TableCell>
+                          <TableCell>
+                            {p.is_inventoried ? <Badge className="bg-green-100 text-green-700">Yes</Badge> : <Badge variant="secondary">No</Badge>}
+                          </TableCell>
+                          <TableCell>
+                            {p.is_tax_exempt ? <Badge className="bg-amber-100 text-amber-700">Exempt</Badge> : <Badge variant="secondary">No</Badge>}
+                          </TableCell>
+                          <TableCell>{p.report_by_unit || 'ea'}</TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
+                              <Edit2 className="h-3 w-3 mr-1" /> Review
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Purchase Report Tab ──────────────────────────────── */}
+        <TabsContent value="purchase-report">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Purchase Report</CardTitle>
+                <p className="text-xs text-slate-400">Aggregated purchase data by product</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-1" /> Export
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Category Type</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Report By</TableHead>
+                    <TableHead>Item Count</TableHead>
+                    <TableHead>Latest Price</TableHead>
+                    <TableHead>Avg Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                        No purchase data available
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    products.map(p => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.name}</TableCell>
+                        <TableCell><Badge className={categoryColors[p.accounting_category] || categoryColors.other}>{p.accounting_category}</Badge></TableCell>
+                        <TableCell>{p.category || '—'}</TableCell>
+                        <TableCell>{p.report_by_unit || 'ea'}</TableCell>
+                        <TableCell className="font-medium">{p.item_count || 1}</TableCell>
+                        <TableCell className="font-semibold">${(p.latest_price || 0).toFixed(2)}</TableCell>
+                        <TableCell className="font-semibold">${(p.latest_price || 0).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

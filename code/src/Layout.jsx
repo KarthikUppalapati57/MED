@@ -41,22 +41,25 @@ const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
   { name: 'Platform Admin', href: 'PlatformAdmin', icon: Shield, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
-  { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'manager' },
+  { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'branch_manager' },
   { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },
-  { name: 'Inventory', href: 'Inventory', icon: Warehouse, minRole: 'manager' },
-  { name: 'Auto Ordering', href: 'AutoOrdering', icon: ShoppingCart, minRole: 'manager' },
-  { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'manager' },
-  { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'manager' },
-  { name: 'My Organization', href: 'OrgManagement', icon: Building2, minRole: 'owner' },
-  { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'owner' },
-  { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'owner' },
+  { name: 'Inventory', href: 'Inventory', icon: Warehouse, minRole: 'location_manager' },
+  { name: 'Orders', href: 'AutoOrdering', icon: ShoppingCart, minRole: 'location_manager' },
+  { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'location_manager' },
+  { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'branch_manager' },
+  { name: 'My Organization', href: 'OrgManagement', icon: Building2, minRole: 'org_owner' },
+  { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
+  { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
 ];
 
 const roleBadgeColors = {
-  admin: 'bg-red-100 text-red-700',
-  owner: 'bg-purple-100 text-purple-700',
-  manager: 'bg-blue-100 text-blue-700',
   ground_staff: 'bg-slate-100 text-slate-700',
+  location_manager: 'bg-blue-100 text-blue-700',
+  manager: 'bg-blue-100 text-blue-700',           // alias
+  branch_manager: 'bg-cyan-100 text-cyan-700',
+  org_owner: 'bg-purple-100 text-purple-700',
+  owner: 'bg-purple-100 text-purple-700',          // alias
+  admin: 'bg-purple-100 text-purple-700',          // alias
   platform_admin: 'bg-indigo-100 text-indigo-700',
 };
 
