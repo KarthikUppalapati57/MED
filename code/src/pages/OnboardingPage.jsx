@@ -74,6 +74,11 @@ export default function OnboardingPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Guard: If payment is not verified, they must go back to verification
+  if (userProfile && !userProfile.payment_verified && !completed) {
+    return <Navigate to="/verify-payment" replace />;
+  }
+
   // ── Success screen while waiting for profile to update ──
   if (completed) {
     return (

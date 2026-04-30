@@ -311,8 +311,6 @@ const AuthenticatedApp = () => {
   const isPlatformAdmin = role?.includes('platform_admin');
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
   
-  // Only users who do not belong to an organization yet (i.e. new tenant creators) need onboarding/payment.
-  // Staff invited to an org will already have an organization_id assigned.
   const isUnassignedUser = !userProfile?.organization_id;
   const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && !userProfile?.payment_verified;
   const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && userProfile?.payment_verified;
@@ -352,15 +350,12 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : needsPaymentVerification ? (
+      ) : (isUnassignedUser && !isPlatformAdmin) ? (
         <>
+          {/* New users without an organization must complete payment verification THEN onboarding */}
           <Route path="/verify-payment" element={<PaymentVerification />} />
-          <Route path="*" element={<Navigate to="/verify-payment" replace />} />
-        </>
-      ) : needsOnboarding ? (
-        <>
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="*" element={<Navigate to="/onboarding" replace />} />
+          <Route path="/onboarding" element={userProfile?.payment_verified ? <OnboardingPage /> : <Navigate to="/verify-payment" replace />} />
+          <Route path="*" element={<Navigate to={userProfile?.payment_verified ? "/onboarding" : "/verify-payment"} replace />} />
         </>
       ) : (
         <>
