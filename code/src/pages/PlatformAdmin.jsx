@@ -848,37 +848,66 @@ export default function PlatformAdmin() {
           </TabsContent>
 
           <TabsContent value="accounting" className="mt-0 outline-none">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <Card className="border-0 shadow-sm">
-                 <CardHeader><CardTitle className="text-base">Revenue Breakdown</CardTitle></CardHeader>
-                 <CardContent>
-                    <div className="space-y-6">
-                      {plans.map(plan => {
-                        const count = orgs.filter(o => o.plan_id === plan.id).length;
-                        return (
-                          <div key={plan.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                               <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400">{plan.name[0]}</div>
-                               <div>
-                                  <p className="font-bold text-sm">{plan.name}</p>
-                                  <p className="text-[10px] text-slate-400">{count} Organizations</p>
-                               </div>
-                            </div>
-                            <p className="font-black text-slate-900">${(count * plan.price_monthly).toLocaleString()}</p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                 </CardContent>
-               </Card>
-               <Card className="border-0 shadow-sm">
-                 <CardHeader><CardTitle className="text-base">Platform Invoicing</CardTitle></CardHeader>
-                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4"><Receipt className="w-8 h-8 text-slate-300" /></div>
-                    <p className="font-bold text-slate-900">No pending invoices</p>
-                    <p className="text-xs text-slate-400 mt-1">All organization payments are up to date.</p>
-                 </CardContent>
-               </Card>
+             <div className="space-y-6">
+               <div className="flex gap-4 border-b border-slate-100 pb-4">
+                 <button 
+                  onClick={() => setAccountingSubTab('revenue')}
+                  className={cn(
+                    "text-xs font-bold px-4 py-2 rounded-lg transition-all",
+                    accountingSubTab === 'revenue' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  )}
+                 >
+                   Revenue Overview
+                 </button>
+                 <button 
+                  onClick={() => setAccountingSubTab('audit')}
+                  className={cn(
+                    "text-xs font-bold px-4 py-2 rounded-lg transition-all",
+                    accountingSubTab === 'audit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                  )}
+                 >
+                   Inventory Auditing
+                 </button>
+               </div>
+
+               {accountingSubTab === 'revenue' ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                   <Card className="border-0 shadow-sm">
+                     <CardHeader><CardTitle className="text-base">Revenue Breakdown</CardTitle></CardHeader>
+                     <CardContent>
+                        <div className="space-y-6">
+                          {plans.map(plan => {
+                            const count = orgs.filter(o => o.plan_id === plan.id).length;
+                            return (
+                              <div key={plan.id} className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                   <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400">{plan.name[0]}</div>
+                                   <div>
+                                      <p className="font-bold text-sm">{plan.name}</p>
+                                      <p className="text-[10px] text-slate-400">{count} Organizations</p>
+                                   </div>
+                                </div>
+                                <p className="font-black text-slate-900">${(count * plan.price_monthly).toLocaleString()}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                     </CardContent>
+                   </Card>
+                   <Card className="border-0 shadow-sm">
+                     <CardHeader><CardTitle className="text-base">Platform Invoicing</CardTitle></CardHeader>
+                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                        <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4"><Receipt className="w-8 h-8 text-slate-300" /></div>
+                        <p className="font-bold text-slate-900">No pending invoices</p>
+                        <p className="text-xs text-slate-400 mt-1">All organization payments are up to date.</p>
+                     </CardContent>
+                   </Card>
+                 </div>
+               ) : (
+                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <InventoryAudit />
+                 </div>
+               )}
              </div>
           </TabsContent>
 
