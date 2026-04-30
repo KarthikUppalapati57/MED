@@ -27,7 +27,7 @@ import { toast } from "sonner";
 export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
-  const [showInviteModal, setShowInviteModal] = useState(false);
+
   const [selectedModules, setSelectedModules] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS]);
@@ -37,10 +37,7 @@ export default function PlatformAdmin() {
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("access");
 
-  // Platform Admin Invite State
-  const [showPlatformInviteModal, setShowPlatformInviteModal] = useState(false);
-  const [platformInviteEmail, setPlatformInviteEmail] = useState("");
-  const [platformInviting, setPlatformInviting] = useState(false);
+
 
   const [showArchivedOrgs, setShowArchivedOrgs] = useState(false);
   const [editingOrgModules, setEditingOrgModules] = useState(null);
@@ -92,65 +89,9 @@ export default function PlatformAdmin() {
     };
   }, [authChecked, userRole, queryClient]);
 
-  // ── Platform Admins Query ──────────────────────────────────
-  const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({
-    queryKey: ['platform-admins'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, role")
-        .in("role", ["platform_admin", "admin"])
-        .is("deleted_at", null);
-      if (error) throw error;
-      return (data || []).map(p => ({
-        membership_id: p.id,
-        user_id: p.id,
-        email: p.email || "—",
-        full_name: p.full_name || "—",
-        role: p.role
-      }));
-    },
-    enabled: authChecked,
-  });
 
-  // ── Invite Platform Admin ──────────────────────────────────
-  const handleInvitePlatformAdmin = async () => {
-    if (!platformInviteEmail) return;
-    setPlatformInviting(true);
-    try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
 
-      const { data: userCurrent } = await supabase.auth.getUser();
-      const { error: insertErr } = await supabase
-        .from("invitations")
-        .insert([{
-          email: platformInviteEmail,
-          token,
-          role: "platform_admin",
-          access_level: "platform",
-          invited_by: userCurrent?.user?.id,
-          expires_at: expiresAt.toISOString(),
-        }]);
 
-      if (insertErr) throw insertErr;
-
-      const link = `${window.location.origin}/signup/${token}`;
-      setGeneratedInviteLink(link);
-      setShowPlatformInviteModal(false);
-      setIsInviteLinkDialogOpen(true);
-      setPlatformInviteEmail("");
-      queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-      const { toast } = await import("sonner");
-      toast.success("Platform admin invitation generated!");
-    } catch (e) {
-      console.error('Invite error:', e);
-      const { toast } = await import("sonner");
-      toast.error(e.message || "Failed to invite platform admin");
-    }
-    setPlatformInviting(false);
-  };
 
   // ── Invite Client ──────────────────────────────────────────
   const handleInviteClient = async () => {

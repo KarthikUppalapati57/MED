@@ -41,7 +41,9 @@ import ContextSwitcher from '@/components/ContextSwitcher';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
-  { name: 'Platform Admin', href: 'PlatformAdmin', icon: Shield, minRole: 'platform_admin' },
+  { name: 'Admin Console', href: 'PlatformAdmin', icon: Shield, minRole: 'platform_admin' },
+  { name: 'User Management', href: 'PlatformUserManagement', icon: Users, minRole: 'platform_admin' },
+  { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
   { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'branch_manager' },
   { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },

@@ -21,7 +21,7 @@ export const MODULE_DEFINITIONS = {
   recipes:    { label: "Recipes",         pages: ["Recipes"],                                    minRole: "location_manager", icon: "ChefHat" },
   vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "location_manager", icon: "Store" },
   admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
-  platform:   { label: "Platform Admin",  pages: ["PlatformAdmin"],                              minRole: "platform_admin",   icon: "Shield" },
+  platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformUserManagement", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
