@@ -428,6 +428,24 @@ export const AuthProvider = ({ children }) => {
         mfaLevel,
         mfaFactors,
         refreshMFAStatus,
+        switchContext: (type, entity) => {
+          if (type === 'organization') {
+            setActiveOrg(entity);
+            setActiveBrand(null);
+            setActiveLocation(null);
+          } else if (type === 'brand') {
+            setActiveBrand(entity);
+            setActiveLocation(null);
+          } else if (type === 'location') {
+            setActiveLocation(entity);
+          }
+          // Reset queries so the UI fetches data for the new context
+          resetQueryCache();
+        },
+        // Direct setters for ContextSwitcher / platform admin impersonation
+        setActiveOrg: (org) => { setActiveOrg(org); resetQueryCache(); },
+        setActiveBrand: (brand) => { setActiveBrand(brand); resetQueryCache(); },
+        setActiveLocation: (loc) => { setActiveLocation(loc); resetQueryCache(); },
         unenrollMFA: async (factorId) => {
           const { error } = await supabase.auth.mfa.unenroll({ factorId });
           if (!error) await refreshMFAStatus();

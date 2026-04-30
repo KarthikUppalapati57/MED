@@ -13,6 +13,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import MFASetupPage from './pages/MFASetupPage';
+import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 
 // Initialize global error monitoring
@@ -512,7 +513,9 @@ const AuthenticatedApp = () => {
             path="/"
             element={
               <LayoutWrapper currentPageName={mainPageKey}>
-                <MainPage />
+                <ProtectedModule pageName={mainPageKey}>
+                  <MainPage />
+                </ProtectedModule>
               </LayoutWrapper>
             }
           />
@@ -522,7 +525,9 @@ const AuthenticatedApp = () => {
               path={`/${path}`}
               element={
                 <LayoutWrapper currentPageName={path}>
-                  <Page />
+                  <ProtectedModule pageName={path}>
+                    <Page />
+                  </ProtectedModule>
                 </LayoutWrapper>
               }
             />

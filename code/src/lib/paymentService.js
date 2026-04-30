@@ -29,15 +29,30 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
     const { data, error } = await supabase.functions.invoke('create-payment-intent', {
       body: { amount: Math.round(amount * 100), currency, metadata },
     });
+
     if (error) throw error;
+
+    // Edge function may return an error in the JSON body
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    if (!data?.clientSecret) {
+      throw new Error('No client secret returned from payment service');
+    }
+
     return data; // { clientSecret }
   } catch (err) {
-    console.warn('[PaymentService] Edge function unavailable, using mock:', err.message);
-    // Mock for development — returns a fake client_secret
-    return {
-      clientSecret: `pi_mock_${Date.now()}_secret_mock`,
-      isMock: true,
-    };
+    // Only mock if the edge function is completely unreachable (e.g. local dev without Supabase)
+    if (err.message?.includes('FunctionsFetchError') || err.message?.includes('Failed to fetch')) {
+      console.warn('[PaymentService] Edge function unreachable, using mock for dev:', err.message);
+      return {
+        clientSecret: `pi_mock_${Date.now()}_secret_mock`,
+        isMock: true,
+      };
+    }
+    // Re-throw real Stripe errors so the UI can display them
+    throw err;
   }
 }
 

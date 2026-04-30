@@ -36,6 +36,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabaseClient';
+import { isPageInEnabledModules } from '@/lib/moduleConfig';
+import ContextSwitcher from '@/components/ContextSwitcher';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -65,8 +67,8 @@ const roleBadgeColors = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, userProfile, logout, role } = useAuth();
-  const { hasMinRole } = usePermissions();
+  const { user, userProfile, logout, role, organization } = useAuth();
+  const { hasMinRole, isPlatformAdmin } = usePermissions();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -141,8 +143,19 @@ export default function Layout({ children, currentPageName }) {
     navigate('/');
   };
 
-  // Filter navigation based on user role
-  const filteredNavigation = navigation.filter(item => hasMinRole(item.minRole));
+  // Filter navigation based on user role AND enabled modules
+  const filteredNavigation = navigation.filter(item => {
+    // Role check
+    if (!hasMinRole(item.minRole)) return false;
+    // Platform admins see all nav items
+    if (isPlatformAdmin) return true;
+    // Module check: if org has enabled_modules, only show nav items for enabled modules
+    const enabledModules = organization?.enabled_modules;
+    if (enabledModules && enabledModules.length > 0) {
+      return isPageInEnabledModules(item.href, enabledModules);
+    }
+    return true; // No module restrictions = show all
+  });
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = role || 'loading';
@@ -235,7 +248,9 @@ export default function Layout({ children, currentPageName }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1" />
+          <div className="flex-1 flex items-center px-4">
+            <ContextSwitcher />
+          </div>
 
           <div className="flex items-center gap-3">
             {/* Notifications */}

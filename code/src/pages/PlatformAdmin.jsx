@@ -54,6 +54,12 @@ export default function PlatformAdmin() {
   const [generatedInviteLink, setGeneratedInviteLink] = useState("");
   const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
   const [isApprovingId, setIsApprovingId] = useState(null);
+  // Plans CRUD state
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [planForm, setPlanForm] = useState({ id: '', name: '', description: '', price_monthly: 0, features: [], is_active: true });
+  // Logs state
+  const [logModuleFilter, setLogModuleFilter] = useState('All');
   const authChecked = !!user;
 
   // ── Real-Time Subscriptions ────────────────────────────────
@@ -271,6 +277,32 @@ export default function PlatformAdmin() {
 
   const getOrgBrands = (orgId) => allBrands.filter(b => b.organization_id === orgId);
   const getBrandLocations = (brandId) => allLocations.filter(l => l.brand_id === brandId);
+
+  // ── Plans Query ────────────────────────────────────────────
+  const { data: plans = [] } = useAuthQuery({
+    queryKey: ['plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('plans').select('*').order('price_monthly');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+  });
+
+  // ── Audit Logs Query ───────────────────────────────────────
+  const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
+    queryKey: ['audit-logs', logModuleFilter],
+    queryFn: async () => {
+      let q = supabase.from('audit_logs').select('*, profiles:user_id(email, full_name)').order('created_at', { ascending: false }).limit(100);
+      if (logModuleFilter !== 'All') {
+        q = q.eq('table_name', logModuleFilter.toLowerCase());
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+  });
 
   const toggleOrg = (orgId) => {
     setExpandedOrgs(prev => {
@@ -748,6 +780,8 @@ export default function PlatformAdmin() {
           <TabsTrigger value="contact">Contact Us {pendingContactCount > 0 && <Badge className="ml-1.5 bg-blue-500 text-white text-[10px] px-1.5">{pendingContactCount}</Badge>}</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="orgs">Organizations {pendingOrgCount > 0 && <Badge className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5">{pendingOrgCount}</Badge>}</TabsTrigger>
+          <TabsTrigger value="plans">Plans</TabsTrigger>
+          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="accounting">Accounting</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
@@ -1148,76 +1182,71 @@ export default function PlatformAdmin() {
           </Card>
         </TabsContent>
 
-        {/* ── Accounting Tab ────────────────────────────────── */}
-        <TabsContent value="accounting" className="mt-4">
-          <div className="space-y-6">
-            {/* Revenue Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-semibold">Monthly Revenue</p>
-                      <p className="text-2xl font-bold mt-1">$0.00</p>
-                      <p className="text-xs text-emerald-500 mt-1">Active subscriptions</p>
+        {/* ── Plans Tab ─────────────────────────────────────── */}
+        <TabsContent value="plans" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Pricing Plans</CardTitle>
+                <p className="text-xs text-slate-400">Create and manage subscription plans with module access</p>
+              </div>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 h-8 text-xs" onClick={() => {
+                setEditingPlan(null);
+                setPlanForm({ id: '', name: '', description: '', price_monthly: 0, features: [], is_active: true });
+                setShowPlanDialog(true);
+              }}>
+                <Plus className="w-3 h-3 mr-1" /> Create Plan
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {plans.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-sm">No plans created yet. Click "Create Plan" to get started.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {plans.map(plan => (
+                    <div key={plan.id} className={`p-5 border rounded-xl relative ${plan.is_active ? 'border-slate-200' : 'border-dashed border-slate-300 opacity-60'}`}>
+                      {!plan.is_active && <Badge className="absolute top-2 right-2 bg-slate-100 text-slate-500 text-[9px]">Inactive</Badge>}
+                      <p className="font-bold text-lg text-slate-900">{plan.name}</p>
+                      <p className="text-2xl font-bold text-teal-600 mt-1">${plan.price_monthly}<span className="text-sm text-slate-400 font-normal">/mo</span></p>
+                      {plan.description && <p className="text-xs text-slate-500 mt-2">{plan.description}</p>}
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {(plan.features || []).map(f => (
+                          <Badge key={f} variant="outline" className="text-[9px] py-0">{MODULE_DEFINITIONS[f]?.label || f}</Badge>
+                        ))}
+                        {(!plan.features || plan.features.length === 0) && <span className="text-[10px] text-slate-400 italic">No modules</span>}
+                      </div>
+                      <div className="flex gap-1 mt-4">
+                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {
+                          setEditingPlan(plan);
+                          setPlanForm({ id: plan.id, name: plan.name, description: plan.description || '', price_monthly: plan.price_monthly, features: plan.features || [], is_active: plan.is_active });
+                          setShowPlanDialog(true);
+                        }}>Edit</Button>
+                        <Button size="sm" variant="ghost" className="text-xs h-7" onClick={async () => {
+                          await supabase.from('plans').update({ is_active: !plan.is_active }).eq('id', plan.id);
+                          queryClient.invalidateQueries({ queryKey: ['plans'] });
+                          toast.success(plan.is_active ? 'Plan deactivated' : 'Plan activated');
+                        }}>{plan.is_active ? 'Deactivate' : 'Activate'}</Button>
+                      </div>
                     </div>
-                    <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <DollarSign className="h-5 w-5 text-emerald-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-semibold">Active Subscriptions</p>
-                      <p className="text-2xl font-bold mt-1">{(orgs || []).filter(o => o.subscription_status === 'active').length}</p>
-                      <p className="text-xs text-blue-500 mt-1">Paying organizations</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <TrendingUp className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-semibold">Trial Orgs</p>
-                      <p className="text-2xl font-bold mt-1">{(orgs || []).filter(o => !o.subscription_status || o.subscription_status === 'trial').length}</p>
-                      <p className="text-xs text-amber-500 mt-1">Free tier / trial</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <Building2 className="h-5 w-5 text-amber-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase font-semibold">Churn Rate</p>
-                      <p className="text-2xl font-bold mt-1">0%</p>
-                      <p className="text-xs text-slate-400 mt-1">Last 30 days</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <Activity className="h-5 w-5 text-slate-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Subscription Management */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Subscription Management</CardTitle>
-                  <p className="text-xs text-slate-400">Manage organization subscriptions and billing</p>
+                  ))}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Subscriptions Tab ────────────────────────────────── */}
+        <TabsContent value="subscriptions" className="mt-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              <Card className="border-0 shadow-sm"><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Total MRR</p><p className="text-2xl font-bold">${(() => { const pp = {}; plans.forEach(p => { pp[p.id] = p.price_monthly || 0; }); return (orgs || []).reduce((s, o) => s + (pp[o.plan_id] || 0), 0); })().toLocaleString()}</p></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Active Subs</p><p className="text-2xl font-bold">{(orgs || []).filter(o => o.subscription_status === 'active').length}</p></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Trials</p><p className="text-2xl font-bold">{(orgs || []).filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial').length}</p></CardContent></Card>
+              <Card className="border-0 shadow-sm"><CardContent className="p-4"><p className="text-[10px] font-semibold text-slate-500 uppercase">Total Orgs</p><p className="text-2xl font-bold">{(orgs || []).length}</p></CardContent></Card>
+            </div>
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Organization Subscriptions</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -1226,66 +1255,109 @@ export default function PlatformAdmin() {
                       <TableHead className="text-[11px]">ORGANIZATION</TableHead>
                       <TableHead className="text-[11px]">PLAN</TableHead>
                       <TableHead className="text-[11px]">STATUS</TableHead>
-                      <TableHead className="text-[11px]">LOCATIONS</TableHead>
+                      <TableHead className="text-[11px]">MODULES</TableHead>
                       <TableHead className="text-[11px]">MRR</TableHead>
-                      <TableHead className="text-[11px]">SINCE</TableHead>
+                      <TableHead className="text-[11px]">ACTIONS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {(orgs || []).length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-slate-400">No organizations yet</TableCell>
-                      </TableRow>
-                    ) : (
-                      (orgs || []).map(org => (
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-slate-400">No organizations</TableCell></TableRow>
+                    ) : (orgs || []).map(org => {
+                      const orgPlan = plans.find(p => p.id === org.plan_id);
+                      return (
                         <TableRow key={org.id}>
-                          <TableCell className="font-medium">{org.name}</TableCell>
+                          <TableCell className="font-medium text-sm">{org.name}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{org.subscription_plan || 'Free'}</Badge>
+                            <select
+                              className="text-xs border rounded px-2 py-1 bg-white"
+                              value={org.plan_id || 'free'}
+                              onChange={async (e) => {
+                                const newPlanId = e.target.value;
+                                const newPlan = plans.find(p => p.id === newPlanId);
+                                const newModules = newPlan?.features || [];
+                                await supabase.from('organizations').update({
+                                  plan_id: newPlanId,
+                                  subscription_plan: newPlan?.name || newPlanId,
+                                  enabled_modules: newModules,
+                                }).eq('id', org.id);
+                                queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                toast.success(`Plan updated to ${newPlan?.name || newPlanId}`);
+                              }}
+                            >
+                              {plans.filter(p => p.is_active).map(p => (
+                                <option key={p.id} value={p.id}>{p.name} (${p.price_monthly}/mo)</option>
+                              ))}
+                            </select>
                           </TableCell>
                           <TableCell>
                             <Badge className={org.subscription_status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}>
                               {org.subscription_status || 'trial'}
                             </Badge>
                           </TableCell>
-                          <TableCell>{org.brands?.reduce((sum, b) => sum + (b.locations?.length || 0), 0) || 0}</TableCell>
-                          <TableCell className="font-semibold">$0.00</TableCell>
-                          <TableCell className="text-sm text-slate-500">
-                            {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
+                          <TableCell className="text-xs text-slate-500">{org.enabled_modules?.length || 0} modules</TableCell>
+                          <TableCell className="font-semibold">${orgPlan?.price_monthly?.toLocaleString() || '0'}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" className="text-[10px] h-6 px-2" onClick={async () => {
+                                const newStatus = org.subscription_status === 'active' ? 'trialing' : 'active';
+                                await supabase.from('organizations').update({ subscription_status: newStatus }).eq('id', org.id);
+                                queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                toast.success(`Status changed to ${newStatus}`);
+                              }}>
+                                {org.subscription_status === 'active' ? 'Set Trial' : 'Activate'}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
 
-            {/* Pricing Configuration */}
+        {/* ── Accounting Tab ────────────────────────────────── */}
+        <TabsContent value="accounting" className="mt-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(() => {
+                const pp = {}; plans.forEach(p => { pp[p.id] = p.price_monthly || 0; });
+                const mrr = (orgs || []).reduce((s, o) => s + (pp[o.plan_id] || 0), 0);
+                const activeSubs = (orgs || []).filter(o => o.subscription_status === 'active').length;
+                const trialCount = (orgs || []).filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial').length;
+                return [
+                  { label: 'Monthly Revenue', value: `$${mrr.toLocaleString()}`, sub: 'Active subscriptions', icon: DollarSign, bg: 'bg-emerald-100', ic: 'text-emerald-600' },
+                  { label: 'Active Subscriptions', value: activeSubs, sub: 'Paying organizations', icon: TrendingUp, bg: 'bg-blue-100', ic: 'text-blue-600' },
+                  { label: 'Trial Orgs', value: trialCount, sub: 'Free tier / trial', icon: Building2, bg: 'bg-amber-100', ic: 'text-amber-600' },
+                  { label: 'Churn Rate', value: '0%', sub: 'Last 30 days', icon: Activity, bg: 'bg-slate-100', ic: 'text-slate-600' },
+                ].map(c => (
+                  <Card key={c.label} className="border-0 shadow-sm"><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-xs text-slate-500 uppercase font-semibold">{c.label}</p><p className="text-2xl font-bold mt-1">{c.value}</p><p className="text-xs text-emerald-500 mt-1">{c.sub}</p></div><div className={`h-10 w-10 rounded-lg ${c.bg} flex items-center justify-center`}><c.icon className={`h-5 w-5 ${c.ic}`} /></div></div></CardContent></Card>
+                ));
+              })()}
+            </div>
+
+            {/* Revenue by Plan */}
             <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Pricing Tiers</CardTitle>
-                <p className="text-xs text-slate-400">Current pricing structure for the platform</p>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-base">Revenue by Plan</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    { name: 'Starter', price: '$49', period: '/mo', features: ['1 location', '2 users', 'Core modules'] },
-                    { name: 'Professional', price: '$149', period: '/mo', features: ['5 locations', '10 users', 'All modules', 'Priority support'] },
-                    { name: 'Enterprise', price: 'Custom', period: '', features: ['Unlimited locations', 'Unlimited users', 'All modules', 'Dedicated support', 'Custom integrations'] },
-                  ].map(tier => (
-                    <div key={tier.name} className="p-4 border rounded-lg">
-                      <p className="font-bold text-lg">{tier.name}</p>
-                      <p className="text-2xl font-bold text-teal-600 mt-2">{tier.price}<span className="text-sm text-slate-400 font-normal">{tier.period}</span></p>
-                      <ul className="mt-3 space-y-1">
-                        {tier.features.map(f => (
-                          <li key={f} className="text-sm text-slate-500 flex items-center gap-2">
-                            <CheckCircle2 className="h-3 w-3 text-teal-500" /> {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                  {plans.filter(p => p.is_active).map(plan => {
+                    const subCount = (orgs || []).filter(o => o.plan_id === plan.id).length;
+                    return (
+                      <div key={plan.id} className="p-4 border rounded-lg">
+                        <p className="font-bold text-lg">{plan.name}</p>
+                        <p className="text-2xl font-bold text-teal-600 mt-2">${plan.price_monthly}<span className="text-sm text-slate-400 font-normal">/mo</span></p>
+                        <p className="text-xs text-slate-500 mt-1">{subCount} subscriber{subCount !== 1 ? 's' : ''}</p>
+                        <p className="text-sm font-semibold mt-2 text-slate-700">MRR: ${(subCount * plan.price_monthly).toLocaleString()}</p>
+                      </div>
+                    );
+                  })}
+                  {plans.filter(p => p.is_active).length === 0 && (
+                    <div className="col-span-3 text-center py-8 text-slate-400 text-sm">No active plans. Create plans in the Plans tab.</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1300,26 +1372,57 @@ export default function PlatformAdmin() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-5 w-5" /> Platform Audit Logs
                 </CardTitle>
-                <p className="text-xs text-slate-400">Per-module activity log across the entire platform</p>
+                <p className="text-xs text-slate-400">{auditLogs.length} entries · Filter by module</p>
               </div>
               <div className="flex gap-2">
                 <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search logs..." className="pl-9 w-48 h-8" /></div>
-                <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" />Export</Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const csv = ['Timestamp,User,Action,Table,Record ID', ...auditLogs.map(l => `${l.created_at},${l.profiles?.email || ''},${l.action},${l.table_name},${l.record_id || ''}`)].join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'audit_logs.csv'; a.click();
+                }}><Download className="w-4 h-4 mr-1" />Export</Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2 mb-4">
-                {['All', 'Users', 'Organizations', 'Inventory', 'Orders', 'Invoices', 'Payments', 'Products', 'Vendors', 'Recipes', 'System'].map(mod => (
-                  <Badge key={mod} variant="secondary" className="cursor-pointer hover:bg-teal-100 hover:text-teal-700 transition-colors">
-                    {mod}
+                {['All', 'invoices', 'payments', 'inventory', 'products', 'vendors', 'recipes', 'auto_orders', 'organizations', 'profiles'].map(mod => (
+                  <Badge key={mod} variant={logModuleFilter === mod ? 'default' : 'secondary'} className={`cursor-pointer transition-colors text-xs ${logModuleFilter === mod ? 'bg-teal-600 text-white' : 'hover:bg-teal-100 hover:text-teal-700'}`} onClick={() => setLogModuleFilter(mod)}>
+                    {mod === 'All' ? mod : mod.replace('_', ' ')}
                   </Badge>
                 ))}
               </div>
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">Audit logs will appear here</p>
-                <p className="text-sm text-slate-400 mt-1">Select a module filter above to view activity logs</p>
-              </div>
+              {isLoadingLogs ? (
+                <div className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400" /></div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">No audit logs{logModuleFilter !== 'All' ? ` for "${logModuleFilter}"` : ''}</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-[11px]">TIMESTAMP</TableHead>
+                      <TableHead className="text-[11px]">USER</TableHead>
+                      <TableHead className="text-[11px]">ACTION</TableHead>
+                      <TableHead className="text-[11px]">TABLE</TableHead>
+                      <TableHead className="text-[11px]">RECORD</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLogs.map(log => (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-xs text-slate-500">{log.created_at ? new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</TableCell>
+                        <TableCell className="text-xs">{log.profiles?.email || log.user_id?.slice(0, 8) || '—'}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-[10px] capitalize">{log.action}</Badge></TableCell>
+                        <TableCell><Badge variant="outline" className="text-[10px]">{log.table_name}</Badge></TableCell>
+                        <TableCell className="text-[10px] text-slate-400 font-mono">{log.record_id?.slice(0, 8) || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1483,6 +1586,69 @@ export default function PlatformAdmin() {
               onClick={() => setIsInviteLinkDialogOpen(false)}
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Plan Create/Edit Dialog */}
+      <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPlan ? 'Edit Plan' : 'Create New Plan'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold">Plan ID (slug)</Label>
+              <Input value={planForm.id} onChange={e => setPlanForm(p => ({ ...p, id: e.target.value.toLowerCase().replace(/\s+/g, '_') }))} disabled={!!editingPlan} placeholder="e.g. starter, professional" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Plan Name</Label>
+              <Input value={planForm.name} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Starter" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Description</Label>
+              <Input value={planForm.description} onChange={e => setPlanForm(p => ({ ...p, description: e.target.value }))} placeholder="Brief description" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Monthly Price ($)</Label>
+              <Input type="number" value={planForm.price_monthly} onChange={e => setPlanForm(p => ({ ...p, price_monthly: parseFloat(e.target.value) || 0 }))} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Included Modules</Label>
+              <p className="text-[10px] text-slate-400 mb-2">Select which modules are included in this plan</p>
+              <div className="space-y-1">
+                {ALL_MODULE_KEYS.map(key => {
+                  const mod = MODULE_DEFINITIONS[key];
+                  const checked = planForm.features.includes(key);
+                  return (
+                    <div key={key} className="flex items-center gap-3 px-3 py-1.5 rounded hover:bg-slate-50">
+                      <Checkbox checked={checked} onCheckedChange={val => {
+                        if (val) setPlanForm(p => ({ ...p, features: [...p.features, key] }));
+                        else setPlanForm(p => ({ ...p, features: p.features.filter(f => f !== key) }));
+                      }} />
+                      <span className="text-sm">{mod?.label || key}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPlanDialog(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700" disabled={!planForm.id || !planForm.name} onClick={async () => {
+              const payload = { id: planForm.id, name: planForm.name, description: planForm.description, price_monthly: planForm.price_monthly, features: planForm.features, is_active: planForm.is_active };
+              if (editingPlan) {
+                const { id, ...rest } = payload;
+                await supabase.from('plans').update(rest).eq('id', editingPlan.id);
+              } else {
+                await supabase.from('plans').insert(payload);
+              }
+              queryClient.invalidateQueries({ queryKey: ['plans'] });
+              toast.success(editingPlan ? 'Plan updated' : 'Plan created');
+              setShowPlanDialog(false);
+            }}>
+              {editingPlan ? 'Update Plan' : 'Create Plan'}
             </Button>
           </DialogFooter>
         </DialogContent>
