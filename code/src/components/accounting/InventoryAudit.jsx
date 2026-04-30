@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { CHART_OF_ACCOUNTS, getCOALabel } from '@/lib/accountingConfig';
 import { TrendingUp, Package, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
