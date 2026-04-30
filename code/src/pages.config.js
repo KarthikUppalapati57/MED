@@ -6,65 +6,27 @@
  * 
  * THE ONLY EDITABLE VALUE: mainPage
  * This controls which page is the landing page (shown when users visit the app).
- * 
- * Example file structure:
- * 
- *   import HomePage from './pages/HomePage';
- *   import Dashboard from './pages/Dashboard';
- *   import Settings from './pages/Settings';
- *   
- *   export const PAGES = {
- *       "HomePage": HomePage,
- *       "Dashboard": Dashboard,
- *       "Settings": Settings,
- *   }
- *   
- *   export const pagesConfig = {
- *       mainPage: "HomePage",
- *       Pages: PAGES,
- *   };
- * 
- * Example with Layout (wraps all pages):
- *
- *   import Home from './pages/Home';
- *   import Settings from './pages/Settings';
- *   import __Layout from './Layout.jsx';
- *
- *   export const PAGES = {
- *       "Home": Home,
- *       "Settings": Settings,
- *   }
- *
- *   export const pagesConfig = {
- *       mainPage: "Home",
- *       Pages: PAGES,
- *       Layout: __Layout,
- *   };
- *
- * To change the main page from HomePage to Dashboard, use find_replace:
- *   Old: mainPage: "HomePage",
- *   New: mainPage: "Dashboard",
- *
- * The mainPage value must match a key in the PAGES object exactly.
  */
-import AutoOrdering from './pages/AutoOrdering';
-import Dashboard from './pages/Dashboard';
-import Inventory from './pages/Inventory';
-import Invoices from './pages/Invoices';
-import Payments from './pages/Payments';
-import PlatformAdmin from './pages/PlatformAdmin';
-import Products from './pages/Products';
-import OnboardingPage from './pages/OnboardingPage';
-import Recipes from './pages/Recipes';
-import UserManagement from './pages/UserManagement';
-import OrgManagement from './pages/OrgManagement';
-import Vendors from './pages/Vendors';
-import AuditLogs from './pages/AuditLogs';
-import PlatformUserManagement from './pages/PlatformUserManagement';
-import PlatformAuditLogs from './pages/PlatformAuditLogs';
-import PaymentVerification from './pages/PaymentVerification';
+import React from 'react';
 import __Layout from './Layout.jsx';
 
+// Dynamically import pages using React.lazy for code-splitting
+const AutoOrdering = React.lazy(() => import('./pages/AutoOrdering'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Inventory = React.lazy(() => import('./pages/Inventory'));
+const Invoices = React.lazy(() => import('./pages/Invoices'));
+const Payments = React.lazy(() => import('./pages/Payments'));
+const PlatformAdmin = React.lazy(() => import('./pages/PlatformAdmin'));
+const Products = React.lazy(() => import('./pages/Products'));
+const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage'));
+const Recipes = React.lazy(() => import('./pages/Recipes'));
+const UserManagement = React.lazy(() => import('./pages/UserManagement'));
+const OrgManagement = React.lazy(() => import('./pages/OrgManagement'));
+const Vendors = React.lazy(() => import('./pages/Vendors'));
+const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
+const PlatformUserManagement = React.lazy(() => import('./pages/PlatformUserManagement'));
+const PlatformAuditLogs = React.lazy(() => import('./pages/PlatformAuditLogs'));
+const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
