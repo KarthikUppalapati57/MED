@@ -641,44 +641,44 @@ export default function PlatformAdmin() {
 
         <div className="space-y-6">
           <TabsContent value="access" className="mt-0 outline-none focus-visible:ring-0">
-            {renderRequestTable(accessReqs, \"Access Requests\", pendingAccessCount, \"access\")}
+            {renderRequestTable(accessReqs, "Access Requests", pendingAccessCount, "access")}
           </TabsContent>
 
           <TabsContent value="demo" className="mt-0 outline-none">
-            <Card className=\"border-0 shadow-sm\">
-              <CardHeader className=\"flex flex-row items-center justify-between pb-4\">
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div>
-                  <CardTitle className=\"text-base\">Demo Inquiries</CardTitle>
-                  <p className=\"text-xs text-slate-400\">Prospective clients interested in system walkthroughs</p>
+                  <CardTitle className="text-base">Demo Inquiries</CardTitle>
+                  <p className="text-xs text-slate-400">Prospective clients interested in system walkthroughs</p>
                 </div>
               </CardHeader>
-              <CardContent className=\"p-0\">
+              <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow className=\"bg-slate-50/50\">
-                      <TableHead className=\"text-[11px] font-bold\">APPLICANT</TableHead>
-                      <TableHead className=\"text-[11px] font-bold\">COMPANY</TableHead>
-                      <TableHead className=\"text-[11px] font-bold\">STATUS</TableHead>
-                      <TableHead className=\"text-[11px] font-bold\">SUBMITTED</TableHead>
-                      <TableHead className=\"text-[11px] font-bold\">ACTIONS</TableHead>
+                    <TableRow className="bg-slate-50/50">
+                      <TableHead className="text-[11px] font-bold">APPLICANT</TableHead>
+                      <TableHead className="text-[11px] font-bold">COMPANY</TableHead>
+                      <TableHead className="text-[11px] font-bold">STATUS</TableHead>
+                      <TableHead className="text-[11px] font-bold">SUBMITTED</TableHead>
+                      <TableHead className="text-[11px] font-bold">ACTIONS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {demoRequests.map(r => (
                       <TableRow key={r.id}>
                         <TableCell>
-                          <p className=\"font-bold text-sm\">{r.full_name}</p>
-                          <p className=\"text-[10px] text-slate-500\">{r.email}</p>
+                          <p className="font-bold text-sm">{r.full_name}</p>
+                          <p className="text-[10px] text-slate-500">{r.email}</p>
                         </TableCell>
-                        <TableCell className=\"text-sm\">{r.company_name}</TableCell>
+                        <TableCell className="text-sm">{r.company_name}</TableCell>
                         <TableCell>
-                          <Badge variant={r.demo_viewed ? \"secondary\" : \"default\"} className=\"text-[9px]\">
-                            {r.demo_viewed ? \"Viewed\" : \"New\"}
+                          <Badge variant={r.demo_viewed ? "secondary" : "default"} className="text-[9px]">
+                            {r.demo_viewed ? "Viewed" : "New"}
                           </Badge>
                         </TableCell>
-                        <TableCell className=\"text-xs text-slate-500\">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{new Date(r.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                           <Button size=\"sm\" variant=\"ghost\" className=\"h-8 w-8 p-0\"><History className=\"w-4 h-4\" /></Button>
+                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><History className="w-4 h-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -688,78 +688,78 @@ export default function PlatformAdmin() {
             </Card>
           </TabsContent>
 
-          <TabsContent value=\"contact\" className=\"mt-0 outline-none\">
-            {renderRequestTable(contactReqs, \"General Inquiries\", pendingContactCount, \"contact\")}
+          <TabsContent value="contact" className="mt-0 outline-none">
+            {renderRequestTable(contactReqs, "General Inquiries", pendingContactCount, "contact")}
           </TabsContent>
 
-          <TabsContent value=\"invite\" className=\"mt-0 outline-none\">
+          <TabsContent value="invite" className="mt-0 outline-none">
             {renderInviteTab()}
           </TabsContent>
 
-          <TabsContent value=\"orgs\" className=\"mt-0 outline-none\">
-             <Card className=\"border-0 shadow-sm\">
-              <CardHeader className=\"flex flex-row items-center justify-between pb-6\">
+          <TabsContent value="orgs" className="mt-0 outline-none">
+             <Card className="border-0 shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-6">
                 <div>
-                  <CardTitle className=\"text-base\">Organization Hierarchy</CardTitle>
-                  <p className=\"text-xs text-slate-400\">Global tenant distribution and structural breakdown</p>
+                  <CardTitle className="text-base">Organization Hierarchy</CardTitle>
+                  <p className="text-xs text-slate-400">Global tenant distribution and structural breakdown</p>
                 </div>
-                <div className=\"flex items-center gap-4\">
-                   <div className=\"flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100\">
-                    <Checkbox id=\"showArchived\" checked={showArchivedOrgs} onCheckedChange={setShowArchivedOrgs} />
-                    <Label htmlFor=\"showArchived\" className=\"text-[10px] font-bold text-slate-500 cursor-pointer\">Show Archived</Label>
+                <div className="flex items-center gap-4">
+                   <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    <Checkbox id="showArchived" checked={showArchivedOrgs} onCheckedChange={setShowArchivedOrgs} />
+                    <Label htmlFor="showArchived" className="text-[10px] font-bold text-slate-500 cursor-pointer">Show Archived</Label>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className=\"p-0\">
-                <div className=\"divide-y divide-slate-100\">
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100">
                    {orgs.map(org => {
                      const brands = getOrgBrands(org.id);
                      const isExp = expandedOrgs.has(org.id);
                      return (
-                       <div key={org.id} className=\"group\">
+                       <div key={org.id} className="group">
                          <div 
                           className={cn(
-                            \"flex items-center gap-4 p-4 px-6 cursor-pointer hover:bg-slate-50/80 transition-all\",
-                            isExp && \"bg-slate-50/50 shadow-inner\"
+                            "flex items-center gap-4 p-4 px-6 cursor-pointer hover:bg-slate-50/80 transition-all",
+                            isExp && "bg-slate-50/50 shadow-inner"
                           )}
                           onClick={() => toggleOrg(org.id)}
                          >
-                            <div className=\"w-6 h-6 flex items-center justify-center shrink-0 transition-transform\">
-                              {isExp ? <ChevronDown className=\"w-4 h-4 text-slate-900\" /> : <ChevronRight className=\"w-4 h-4 text-slate-400\" />}
+                            <div className="w-6 h-6 flex items-center justify-center shrink-0 transition-transform">
+                              {isExp ? <ChevronDown className="w-4 h-4 text-slate-900" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                             </div>
-                            <div className=\"w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center shadow-sm\">
-                              <Building2 className=\"w-5 h-5 text-slate-600\" />
+                            <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center shadow-sm">
+                              <Building2 className="w-5 h-5 text-slate-600" />
                             </div>
-                            <div className=\"flex-1\">
-                              <div className=\"flex items-center gap-2\">
-                                <p className=\"font-bold text-slate-900\">{org.name}</p>
-                                <Badge className=\"bg-emerald-50 text-emerald-700 text-[9px] font-bold border-none\">{org.status || 'Active'}</Badge>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-900">{org.name}</p>
+                                <Badge className="bg-emerald-50 text-emerald-700 text-[9px] font-bold border-none">{org.status || 'Active'}</Badge>
                               </div>
-                              <p className=\"text-[10px] text-slate-400 mt-0.5 font-medium\">{org.admin_email} · {brands.length} Brands</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{org.admin_email} · {brands.length} Brands</p>
                             </div>
-                            <div className=\"flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity\">
-                              <Button size=\"sm\" variant=\"ghost\" className=\"h-8 px-3 text-[10px] font-bold rounded-lg\" onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
-                                <Package className=\"w-3.5 h-3.5 mr-2\" /> Modules
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg" onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
+                                <Package className="w-3.5 h-3.5 mr-2" /> Modules
                               </Button>
-                              <Button size=\"sm\" variant=\"ghost\" className=\"h-8 px-3 text-[10px] font-bold rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50\">
-                                <Trash2 className=\"w-3.5 h-3.5\" />
+                              <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50">
+                                <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>
                          </div>
                          {isExp && (
-                           <div className=\"bg-white/50 px-12 pb-2\">
+                           <div className="bg-white/50 px-12 pb-2">
                              {brands.length === 0 ? (
-                               <p className=\"p-4 text-[10px] text-slate-400 italic\">No brands registered under this organization.</p>
+                               <p className="p-4 text-[10px] text-slate-400 italic">No brands registered under this organization.</p>
                              ) : brands.map(brand => (
-                               <div key={brand.id} className=\"py-3 border-l-2 border-slate-100 pl-6 flex items-center justify-between\">
-                                 <div className=\"flex items-center gap-3\">
-                                   <div className=\"w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center\"><Store className=\"w-4 h-4 text-violet-600\" /></div>
+                               <div key={brand.id} className="py-3 border-l-2 border-slate-100 pl-6 flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center"><Store className="w-4 h-4 text-violet-600" /></div>
                                    <div>
-                                      <p className=\"text-xs font-bold text-slate-800\">{brand.name}</p>
-                                      <p className=\"text-[9px] text-slate-400\">{getBrandLocations(brand.id).length} Locations</p>
+                                      <p className="text-xs font-bold text-slate-800">{brand.name}</p>
+                                      <p className="text-[9px] text-slate-400">{getBrandLocations(brand.id).length} Locations</p>
                                    </div>
                                  </div>
-                                 <Button size=\"sm\" variant=\"ghost\" className=\"h-7 text-[10px] font-bold\">+ Location</Button>
+                                 <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold">+ Location</Button>
                                </div>
                              ))}
                            </div>
@@ -772,58 +772,58 @@ export default function PlatformAdmin() {
              </Card>
           </TabsContent>
 
-          <TabsContent value=\"plans\" className=\"mt-0 outline-none\">
-             <div className=\"grid grid-cols-1 md:grid-cols-3 gap-6\">
+          <TabsContent value="plans" className="mt-0 outline-none">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                {plans.map(plan => (
-                 <Card key={plan.id} className=\"border-0 shadow-sm relative group overflow-hidden\">
-                   <CardHeader className=\"pb-2\">
-                     <div className=\"flex justify-between items-start\">
-                        <Badge className=\"bg-blue-50 text-blue-700 text-[10px] font-bold mb-2\">{plan.is_active ? 'Production' : 'Draft'}</Badge>
-                        <Button variant=\"ghost\" size=\"sm\" className=\"h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity\"><Plus className=\"w-4 h-4\" /></Button>
+                 <Card key={plan.id} className="border-0 shadow-sm relative group overflow-hidden">
+                   <CardHeader className="pb-2">
+                     <div className="flex justify-between items-start">
+                        <Badge className="bg-blue-50 text-blue-700 text-[10px] font-bold mb-2">{plan.is_active ? 'Production' : 'Draft'}</Badge>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"><Plus className="w-4 h-4" /></Button>
                      </div>
-                     <CardTitle className=\"text-xl font-black text-slate-900\">{plan.name}</CardTitle>
-                     <p className=\"text-4xl font-black text-slate-900 mt-2\">${plan.price_monthly}<span className=\"text-sm text-slate-400 font-normal\">/mo</span></p>
+                     <CardTitle className="text-xl font-black text-slate-900">{plan.name}</CardTitle>
+                     <p className="text-4xl font-black text-slate-900 mt-2">${plan.price_monthly}<span className="text-sm text-slate-400 font-normal">/mo</span></p>
                    </CardHeader>
                    <CardContent>
-                      <p className=\"text-xs text-slate-500 mb-6\">{plan.description || 'Global service level agreement'}</p>
-                      <div className=\"space-y-2\">
+                      <p className="text-xs text-slate-500 mb-6">{plan.description || 'Global service level agreement'}</p>
+                      <div className="space-y-2">
                         {(Array.isArray(plan.features) ? plan.features : []).map(f => (
-                          <div key={f} className=\"flex items-center gap-2\">
-                            <div className=\"w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center\"><CheckCircle2 className=\"w-2.5 h-2.5 text-emerald-600\" /></div>
-                            <span className=\"text-[11px] font-medium text-slate-600\">{MODULE_DEFINITIONS[f]?.label || f}</span>
+                          <div key={f} className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /></div>
+                            <span className="text-[11px] font-medium text-slate-600">{MODULE_DEFINITIONS[f]?.label || f}</span>
                           </div>
                         ))}
                       </div>
-                      <Button variant=\"outline\" className=\"w-full mt-8 rounded-xl border-slate-200 font-bold text-xs h-10\">Configure Plan</Button>
+                      <Button variant="outline" className="w-full mt-8 rounded-xl border-slate-200 font-bold text-xs h-10">Configure Plan</Button>
                    </CardContent>
-                   <div className=\"absolute -right-6 -top-6 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl\" />
+                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl" />
                  </Card>
                ))}
                <button 
                 onClick={() => setShowPlanDialog(true)}
-                className=\"border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:bg-slate-50 transition-all\"
+                className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:bg-slate-50 transition-all"
                >
-                 <div className=\"w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-4\"><Plus className=\"w-6 h-6\" /></div>
-                 <p className=\"font-bold\">Create New Plan</p>
-                 <p className=\"text-[10px] mt-1\">Standardize service tiers</p>
+                 <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-4"><Plus className="w-6 h-6" /></div>
+                 <p className="font-bold">Create New Plan</p>
+                 <p className="text-[10px] mt-1">Standardize service tiers</p>
                </button>
              </div>
           </TabsContent>
 
-          <TabsContent value=\"subscriptions\" className=\"mt-0 outline-none\">
-             <Card className=\"border-0 shadow-sm\">
+          <TabsContent value="subscriptions" className="mt-0 outline-none">
+             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                   <CardTitle className=\"text-base\">Active Subscriptions</CardTitle>
+                   <CardTitle className="text-base">Active Subscriptions</CardTitle>
                 </CardHeader>
-                <CardContent className=\"p-0\">
+                <CardContent className="p-0">
                   <Table>
                     <TableHeader>
-                      <TableRow className=\"bg-slate-50/50\">
-                        <TableHead className=\"text-[11px] font-bold\">ORGANIZATION</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">CURRENT PLAN</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">STATUS</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">NEXT BILLING</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">ACTIONS</TableHead>
+                      <TableRow className="bg-slate-50/50">
+                        <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
+                        <TableHead className="text-[11px] font-bold">CURRENT PLAN</TableHead>
+                        <TableHead className="text-[11px] font-bold">STATUS</TableHead>
+                        <TableHead className="text-[11px] font-bold">NEXT BILLING</TableHead>
+                        <TableHead className="text-[11px] font-bold">ACTIONS</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -831,12 +831,12 @@ export default function PlatformAdmin() {
                         const plan = plans.find(p => p.id === org.plan_id);
                         return (
                           <TableRow key={org.id}>
-                            <TableCell className=\"font-bold text-sm\">{org.name}</TableCell>
-                            <TableCell className=\"text-sm text-slate-600 font-medium\">{plan?.name || 'Standard'}</TableCell>
-                            <TableCell><Badge className=\"bg-green-50 text-green-700 text-[10px] font-bold border-none\">{org.subscription_status || 'active'}</Badge></TableCell>
-                            <TableCell className=\"text-xs text-slate-500\">May 15, 2026</TableCell>
+                            <TableCell className="font-bold text-sm">{org.name}</TableCell>
+                            <TableCell className="text-sm text-slate-600 font-medium">{plan?.name || 'Standard'}</TableCell>
+                            <TableCell><Badge className="bg-green-50 text-green-700 text-[10px] font-bold border-none">{org.subscription_status || 'active'}</Badge></TableCell>
+                            <TableCell className="text-xs text-slate-500">May 15, 2026</TableCell>
                             <TableCell>
-                               <Button variant=\"ghost\" size=\"sm\" className=\"h-8 w-8 p-0\"><RefreshCw className=\"w-4 h-4\" /></Button>
+                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><RefreshCw className="w-4 h-4" /></Button>
                             </TableCell>
                           </TableRow>
                         )
@@ -847,70 +847,70 @@ export default function PlatformAdmin() {
              </Card>
           </TabsContent>
 
-          <TabsContent value=\"accounting\" className=\"mt-0 outline-none\">
-             <div className=\"grid grid-cols-1 md:grid-cols-2 gap-8\">
-               <Card className=\"border-0 shadow-sm\">
-                 <CardHeader><CardTitle className=\"text-base\">Revenue Breakdown</CardTitle></CardHeader>
+          <TabsContent value="accounting" className="mt-0 outline-none">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <Card className="border-0 shadow-sm">
+                 <CardHeader><CardTitle className="text-base">Revenue Breakdown</CardTitle></CardHeader>
                  <CardContent>
-                    <div className=\"space-y-6\">
+                    <div className="space-y-6">
                       {plans.map(plan => {
                         const count = orgs.filter(o => o.plan_id === plan.id).length;
                         return (
-                          <div key={plan.id} className=\"flex items-center justify-between\">
-                            <div className=\"flex items-center gap-3\">
-                               <div className=\"w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400\">{plan.name[0]}</div>
+                          <div key={plan.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400">{plan.name[0]}</div>
                                <div>
-                                  <p className=\"font-bold text-sm\">{plan.name}</p>
-                                  <p className=\"text-[10px] text-slate-400\">{count} Organizations</p>
+                                  <p className="font-bold text-sm">{plan.name}</p>
+                                  <p className="text-[10px] text-slate-400">{count} Organizations</p>
                                </div>
                             </div>
-                            <p className=\"font-black text-slate-900\">${(count * plan.price_monthly).toLocaleString()}</p>
+                            <p className="font-black text-slate-900">${(count * plan.price_monthly).toLocaleString()}</p>
                           </div>
                         )
                       })}
                     </div>
                  </CardContent>
                </Card>
-               <Card className=\"border-0 shadow-sm\">
-                 <CardHeader><CardTitle className=\"text-base\">Platform Invoicing</CardTitle></CardHeader>
-                 <CardContent className=\"flex flex-col items-center justify-center py-12 text-center\">
-                    <div className=\"w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4\"><Receipt className=\"w-8 h-8 text-slate-300\" /></div>
-                    <p className=\"font-bold text-slate-900\">No pending invoices</p>
-                    <p className=\"text-xs text-slate-400 mt-1\">All organization payments are up to date.</p>
+               <Card className="border-0 shadow-sm">
+                 <CardHeader><CardTitle className="text-base">Platform Invoicing</CardTitle></CardHeader>
+                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4"><Receipt className="w-8 h-8 text-slate-300" /></div>
+                    <p className="font-bold text-slate-900">No pending invoices</p>
+                    <p className="text-xs text-slate-400 mt-1">All organization payments are up to date.</p>
                  </CardContent>
                </Card>
              </div>
           </TabsContent>
 
-          <TabsContent value=\"logs\" className=\"mt-0 outline-none\">
-             <Card className=\"border-0 shadow-sm\">
-              <CardHeader className=\"flex flex-row items-center justify-between pb-6\">
+          <TabsContent value="logs" className="mt-0 outline-none">
+             <Card className="border-0 shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-6">
                 <div>
-                  <CardTitle className=\"text-base\">Platform Activity Ledger</CardTitle>
-                  <p className=\"text-xs text-slate-400\">Immutable audit trail of administrative actions</p>
+                  <CardTitle className="text-base">Platform Activity Ledger</CardTitle>
+                  <p className="text-xs text-slate-400">Immutable audit trail of administrative actions</p>
                 </div>
-                <div className=\"flex items-center gap-2\">
-                  <Badge variant=\"secondary\" className=\"bg-slate-100 text-slate-600 font-bold rounded-lg px-3 py-1\">Filter: {logModuleFilter}</Badge>
-                  <Button variant=\"outline\" size=\"sm\" className=\"rounded-xl\"><Download className=\"w-3.5 h-3.5\" /></Button>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold rounded-lg px-3 py-1">Filter: {logModuleFilter}</Badge>
+                  <Button variant="outline" size="sm" className="rounded-xl"><Download className="w-3.5 h-3.5" /></Button>
                 </div>
               </CardHeader>
-              <CardContent className=\"p-0\">
+              <CardContent className="p-0">
                  <Table>
                     <TableHeader>
-                      <TableRow className=\"bg-slate-50/50\">
-                        <TableHead className=\"text-[11px] font-bold\">TIMESTAMP</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">ADMIN</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">ACTION</TableHead>
-                        <TableHead className=\"text-[11px] font-bold\">TARGET</TableHead>
+                      <TableRow className="bg-slate-50/50">
+                        <TableHead className="text-[11px] font-bold">TIMESTAMP</TableHead>
+                        <TableHead className="text-[11px] font-bold">ADMIN</TableHead>
+                        <TableHead className="text-[11px] font-bold">ACTION</TableHead>
+                        <TableHead className="text-[11px] font-bold">TARGET</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {auditLogs.map(log => (
                         <TableRow key={log.id}>
-                          <TableCell className=\"text-[10px] text-slate-500 font-medium font-mono\">{new Date(log.created_at).toLocaleString()}</TableCell>
-                          <TableCell className=\"text-xs font-bold\">{log.profiles?.email || 'System'}</TableCell>
-                          <TableCell><Badge variant=\"secondary\" className=\"text-[9px] uppercase font-bold\">{log.action}</Badge></TableCell>
-                          <TableCell className=\"text-[10px] text-slate-400 font-mono\">{log.table_name}</TableCell>
+                          <TableCell className="text-[10px] text-slate-500 font-medium font-mono">{new Date(log.created_at).toLocaleString()}</TableCell>
+                          <TableCell className="text-xs font-bold">{log.profiles?.email || 'System'}</TableCell>
+                          <TableCell><Badge variant="secondary" className="text-[9px] uppercase font-bold">{log.action}</Badge></TableCell>
+                          <TableCell className="text-[10px] text-slate-400 font-mono">{log.table_name}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -923,12 +923,12 @@ export default function PlatformAdmin() {
 
       {/* Dialogs */}
       <Dialog open={!!editingOrgModules} onOpenChange={() => setEditingOrgModules(null)}>
-        <DialogContent className=\"max-w-lg rounded-3xl border-none shadow-2xl p-8\">
+        <DialogContent className="max-w-lg rounded-3xl border-none shadow-2xl p-8">
           <DialogHeader>
-            <DialogTitle className=\"text-2xl font-black\">Configure Modules</DialogTitle>
+            <DialogTitle className="text-2xl font-black">Configure Modules</DialogTitle>
             <DialogDescription>Modify access for {editingOrgModules?.name}</DialogDescription>
           </DialogHeader>
-          <div className=\"grid grid-cols-2 gap-3 py-6\">
+          <div className="grid grid-cols-2 gap-3 py-6">
             {ALL_MODULE_KEYS.map(key => {
                const mod = MODULE_DEFINITIONS[key];
                const checked = selectedModules.includes(key);
@@ -937,22 +937,22 @@ export default function PlatformAdmin() {
                   key={key} 
                   onClick={() => setSelectedModules(prev => checked ? prev.filter(k => k !== key) : [...prev, key])}
                   className={cn(
-                    \"flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all\",
-                    checked ? \"bg-slate-900 border-slate-900 text-white shadow-lg\" : \"bg-white border-slate-100 hover:border-slate-200\"
+                    "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
+                    checked ? "bg-slate-900 border-slate-900 text-white shadow-lg" : "bg-white border-slate-100 hover:border-slate-200"
                   )}
                  >
-                    <Checkbox checked={checked} className={cn(\"border-slate-300\", checked && \"border-white bg-white text-slate-900\")} />
-                    <span className=\"text-xs font-bold\">{mod?.label || key}</span>
+                    <Checkbox checked={checked} className={cn("border-slate-300", checked && "border-white bg-white text-slate-900")} />
+                    <span className="text-xs font-bold">{mod?.label || key}</span>
                  </div>
                )
             })}
           </div>
           <DialogFooter>
-            <Button variant=\"ghost\" onClick={() => setEditingOrgModules(null)}>Cancel</Button>
-            <Button className=\"bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-8\" onClick={async () => {
+            <Button variant="ghost" onClick={() => setEditingOrgModules(null)}>Cancel</Button>
+            <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-8" onClick={async () => {
               await supabase.from('organizations').update({ enabled_modules: selectedModules }).eq('id', editingOrgModules.id);
               queryClient.invalidateQueries({ queryKey: ['organizations'] });
-              toast.success(\"Modules updated\");
+              toast.success("Modules updated");
               setEditingOrgModules(null);
             }}>Save Configuration</Button>
           </DialogFooter>
@@ -960,19 +960,19 @@ export default function PlatformAdmin() {
       </Dialog>
 
       <Dialog open={isInviteLinkDialogOpen} onOpenChange={setIsInviteLinkDialogOpen}>
-        <DialogContent className=\"rounded-3xl border-none shadow-2xl p-10 text-center\">
-          <div className=\"w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6\">
-            <CheckCircle2 className=\"w-10 h-10 text-emerald-600\" />
+        <DialogContent className="rounded-3xl border-none shadow-2xl p-10 text-center">
+          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
           </div>
-          <DialogTitle className=\"text-3xl font-black mb-2\">Link Generated!</DialogTitle>
-          <p className=\"text-slate-500 mb-8\">Share this onboarding link with the client to begin their registration.</p>
-          <div className=\"relative mb-8\">
-            <Input readOnly value={generatedInviteLink} className=\"bg-slate-50 h-12 pr-12 rounded-xl border-slate-100 font-mono text-xs\" />
-            <Button variant=\"ghost\" size=\"sm\" className=\"absolute right-1 top-1 h-10 w-10 p-0 hover:bg-white\" onClick={() => { navigator.clipboard.writeText(generatedInviteLink); toast.success(\"Copied to clipboard\"); }}>
-              <Copy className=\"w-4 h-4\" />
+          <DialogTitle className="text-3xl font-black mb-2">Link Generated!</DialogTitle>
+          <p className="text-slate-500 mb-8">Share this onboarding link with the client to begin their registration.</p>
+          <div className="relative mb-8">
+            <Input readOnly value={generatedInviteLink} className="bg-slate-50 h-12 pr-12 rounded-xl border-slate-100 font-mono text-xs" />
+            <Button variant="ghost" size="sm" className="absolute right-1 top-1 h-10 w-10 p-0 hover:bg-white" onClick={() => { navigator.clipboard.writeText(generatedInviteLink); toast.success("Copied to clipboard"); }}>
+              <Copy className="w-4 h-4" />
             </Button>
           </div>
-          <Button className=\"w-full bg-slate-900 h-12 rounded-xl font-bold\" onClick={() => setIsInviteLinkDialogOpen(false)}>Done</Button>
+          <Button className="w-full bg-slate-900 h-12 rounded-xl font-bold" onClick={() => setIsInviteLinkDialogOpen(false)}>Done</Button>
         </DialogContent>
       </Dialog>
     </div>
