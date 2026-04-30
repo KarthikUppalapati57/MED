@@ -41,6 +41,7 @@ export default function PlatformAdmin() {
   const [platformInviteEmail, setPlatformInviteEmail] = useState("");
   const [platformInviting, setPlatformInviting] = useState(false);
 
+  const [showArchivedOrgs, setShowArchivedOrgs] = useState(false);
   const [editingOrgModules, setEditingOrgModules] = useState(null);
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
   const [expandedBrands, setExpandedBrands] = useState(new Set());
@@ -91,7 +92,8 @@ export default function PlatformAdmin() {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, role")
-        .in("role", ["platform_admin", "admin"]);
+        .in("role", ["platform_admin", "admin"])
+        .is("deleted_at", null);
       if (error) throw error;
       return (data || []).map(p => ({
         membership_id: p.id,
@@ -223,12 +225,20 @@ export default function PlatformAdmin() {
 
   // ── Organizations ──────────────────────────────────────────
   const { data: orgs = [] } = useAuthQuery({
-    queryKey: ['organizations'],
+    queryKey: ['organizations', showArchivedOrgs],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('organizations')
         .select('*')
         .order('created_at', { ascending: false });
+      
+      if (showArchivedOrgs) {
+        q = q.not('deleted_at', 'is', null);
+      } else {
+        q = q.is('deleted_at', null);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return (data || []).map(org => ({
         ...org,
@@ -242,7 +252,7 @@ export default function PlatformAdmin() {
   const { data: allBrands = [] } = useAuthQuery({
     queryKey: ['all-brands'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('brands').select('*').order('name');
+      const { data, error } = await supabase.from('brands').select('*').is('deleted_at', null).order('name');
       if (error) throw error;
       return data || [];
     },
@@ -252,7 +262,7 @@ export default function PlatformAdmin() {
   const { data: allLocations = [] } = useAuthQuery({
     queryKey: ['all-locations'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('locations').select('*').order('name');
+      const { data, error } = await supabase.from('locations').select('*').is('deleted_at', null).order('name');
       if (error) throw error;
       return data || [];
     },
@@ -878,13 +888,10 @@ export default function PlatformAdmin() {
                       <TableCell>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id === user?.id} onClick={async () => {
                           if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
-                          try {
-                            // Try memberships table first
-                            const { error } = await supabase.from("memberships").delete().eq("id", admin.membership_id);
-                            if (error) {
-                              // Fallback: update profiles
-                              await supabase.from("profiles").update({ role: 'ground_staff' }).eq("id", admin.user_id);
-                            }
+                            // Soft-delete the profile
+                            const { error } = await supabase.from("profiles").update({ status: 'archived', deleted_at: new Date().toISOString() }).eq("id", admin.user_id);
+                            if (error) throw error;
+                            
                             queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
                             const { toast } = await import("sonner");
                             toast.success("Admin removed");
@@ -908,15 +915,27 @@ export default function PlatformAdmin() {
                 <CardTitle className="text-base">Organizations — Hierarchy View</CardTitle>
                 <p className="text-xs text-slate-400">Owner → Organizations → Brands → Locations. Click to expand.</p>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <Badge variant="outline" className="text-[10px]">{(orgs || []).length} orgs</Badge>
-                <Badge variant="outline" className="text-[10px]">{(allBrands || []).length} brands</Badge>
-                <Badge variant="outline" className="text-[10px]">{(allLocations || []).length} locations</Badge>
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="showArchived" 
+                    checked={showArchivedOrgs} 
+                    onCheckedChange={setShowArchivedOrgs} 
+                  />
+                  <Label htmlFor="showArchived" className="text-xs cursor-pointer">Show Archived</Label>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="text-[10px]">{(orgs || []).length} orgs</Badge>
+                  <Badge variant="outline" className="text-[10px]">{(allBrands || []).length} brands</Badge>
+                  <Badge variant="outline" className="text-[10px]">{(allLocations || []).length} locations</Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {(orgs || []).length === 0 ? (
-                <div className="text-center py-12 text-sm text-slate-400">No organizations</div>
+                <div className="text-center py-12 text-sm text-slate-400">
+                  {showArchivedOrgs ? "No archived organizations" : "No organizations"}
+                </div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {[...(orgs || [])].sort((a, b) => {
@@ -933,7 +952,7 @@ export default function PlatformAdmin() {
                     const isPending = ['pending_approval', 'under_review', 'onboarding'].includes(org.status);
 
                     return (
-                      <div key={org.id}>
+                      <div key={org.id} className={org.deleted_at ? "opacity-60" : ""}>
                         {/* ORG ROW */}
                         <div className={`flex items-center gap-3 p-3 px-5 cursor-pointer hover:bg-slate-50 transition-colors ${isPending ? 'bg-amber-50/40' : ''}`} onClick={() => toggleOrg(org.id)}>
                           <div className="w-6 h-6 flex items-center justify-center shrink-0">
@@ -998,30 +1017,49 @@ export default function PlatformAdmin() {
                               onClick={() => { setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
                               <Package className="w-3 h-3 mr-1" /> Modules
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              disabled={processingRequests.has(`del_org_${org.id}`)}
-                              onClick={async () => {
-                                if (!window.confirm(`Delete "${org.name}" and all its data?`)) return;
-                                setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
-                                try {
-                                  // Delete the organization itself. The database has ON DELETE CASCADE configured
-                                  // for all related tables (locations, brands, profiles, etc.)
-                                  const { error } = await supabase.from('organizations').delete().eq('id', org.id);
-                                  if (error) throw error;
-                                  queryClient.invalidateQueries({ queryKey: ['organizations'] });
-                                  queryClient.invalidateQueries({ queryKey: ['all-brands'] });
-                                  queryClient.invalidateQueries({ queryKey: ['all-locations'] });
-                                  const { toast } = await import("sonner");
-                                  toast.success(`"${org.name}" deleted`);
-                                } catch (err) {
-                                  const { toast } = await import("sonner");
-                                  toast.error(err.message || "Failed to delete");
-                                } finally {
-                                  setProcessingRequests(prev => { const n = new Set(prev); n.delete(`del_org_${org.id}`); return n; });
-                                }
-                              }}>
-                              {processingRequests.has(`del_org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                            </Button>
+                            {org.deleted_at ? (
+                              <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await supabase.from('organizations').update({ status: 'active', deleted_at: null }).eq('id', org.id);
+                                    await supabase.from('profiles').update({ status: 'active', deleted_at: null }).eq('organization_id', org.id);
+                                    queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                    const { toast } = await import("sonner");
+                                    toast.success(`"${org.name}" restored`);
+                                  } catch (err) { console.error(err); }
+                                }}>
+                                <RefreshCw className="w-3 h-3 mr-1" /> Restore
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                disabled={processingRequests.has(`del_org_${org.id}`)}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!window.confirm(`Archive "${org.name}" and deactivate all its users?`)) return;
+                                  setProcessingRequests(prev => new Set(prev).add(`del_org_${org.id}`));
+                                  try {
+                                    // Soft delete the organization and its profiles
+                                    const { error: orgErr } = await supabase.from('organizations').update({ status: 'archived', deleted_at: new Date().toISOString() }).eq('id', org.id);
+                                    if (orgErr) throw orgErr;
+                                    await supabase.from('profiles').update({ status: 'archived', deleted_at: new Date().toISOString() }).eq('organization_id', org.id);
+                                    
+                                    queryClient.invalidateQueries({ queryKey: ['organizations'] });
+                                    queryClient.invalidateQueries({ queryKey: ['all-brands'] });
+                                    queryClient.invalidateQueries({ queryKey: ['all-locations'] });
+                                    const { toast } = await import("sonner");
+                                    toast.success(`"${org.name}" archived`);
+                                  } catch (err) {
+                                    const { toast } = await import("sonner");
+                                    toast.error(err.message || "Failed to archive");
+                                  } finally {
+                                    setProcessingRequests(prev => { const n = new Set(prev); n.delete(`del_org_${org.id}`); return n; });
+                                  }
+                                }}>
+                                {processingRequests.has(`del_org_${org.id}`) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                                Archive
+                              </Button>
+                            )}
                           </div>
                         </div>
 
@@ -1054,13 +1092,13 @@ export default function PlatformAdmin() {
                                       </Button>
                                       <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                         onClick={async () => {
-                                          if (!window.confirm(`Delete brand "${brand.name}" and its locations?`)) return;
-                                          await supabase.from('locations').delete().eq('brand_id', brand.id);
-                                          await supabase.from('brands').delete().eq('id', brand.id);
+                                          if (!window.confirm(`Archive brand "${brand.name}" and its locations?`)) return;
+                                          await supabase.from('locations').update({ deleted_at: new Date().toISOString() }).eq('brand_id', brand.id);
+                                          await supabase.from('brands').update({ deleted_at: new Date().toISOString() }).eq('id', brand.id);
                                           queryClient.invalidateQueries({ queryKey: ['all-brands'] });
                                           queryClient.invalidateQueries({ queryKey: ['all-locations'] });
                                           const { toast } = await import("sonner");
-                                          toast.success(`Brand "${brand.name}" deleted`);
+                                          toast.success(`Brand "${brand.name}" archived`);
                                         }}>
                                         <Trash2 className="w-2.5 h-2.5" />
                                       </Button>
@@ -1083,11 +1121,11 @@ export default function PlatformAdmin() {
                                           </div>
                                           <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 shrink-0"
                                             onClick={async () => {
-                                              if (!window.confirm(`Delete location "${loc.name}"?`)) return;
-                                              await supabase.from('locations').delete().eq('id', loc.id);
+                                              if (!window.confirm(`Archive location "${loc.name}"?`)) return;
+                                              await supabase.from('locations').update({ deleted_at: new Date().toISOString() }).eq('id', loc.id);
                                               queryClient.invalidateQueries({ queryKey: ['all-locations'] });
                                               const { toast } = await import("sonner");
-                                              toast.success(`Location "${loc.name}" deleted`);
+                                              toast.success(`Location "${loc.name}" archived`);
                                             }}>
                                             <Trash2 className="w-2.5 h-2.5" />
                                           </Button>

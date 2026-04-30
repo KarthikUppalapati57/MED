@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, ChevronDown, ChevronRight,
   FileText, Settings, ShieldAlert, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle
+  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle, RefreshCw
 } from 'lucide-react';
 
 // ─── MEVS Roles ─────────────────────────────────────────────────────────────
@@ -106,6 +106,7 @@ const STATUS_CONFIG = {
   active:   { label: "Active",   badgeClass: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
   invited:  { label: "Invited",  badgeClass: "bg-amber-100 text-amber-700",     icon: Mail },
   inactive: { label: "Inactive", badgeClass: "bg-red-100 text-red-600",         icon: UserX },
+  archived: { label: "Archived", badgeClass: "bg-slate-200 text-slate-700",     icon: UserX },
   no_access:{ label: "No Access",badgeClass: "bg-slate-100 text-slate-500",     icon: AlertCircle },
 };
 
@@ -846,6 +847,7 @@ export default function UserManagement() {
   const [showCSV, setShowCSV] = useState(false);
   const [drawerMember, setDrawerMember] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [showArchived, setShowArchived] = useState(false);
 
   const queryClient = useQueryClient();
   const { user: currentUser, role: userRole, userProfile } = useAuth();
@@ -853,7 +855,7 @@ export default function UserManagement() {
 
   // ── Fetch team members ─────────────────────────────────────
   const { data: members = [], isLoading } = useAuthQuery({
-    queryKey: ['team-members', activeOrgId],
+    queryKey: ['team-members', activeOrgId, showArchived],
     queryFn: async () => {
       // Try memberships table first (CRE-style)
       try {
@@ -873,10 +875,18 @@ export default function UserManagement() {
       } catch { /* fall through */ }
 
       // Fallback: profiles table (MEVS-style)
-      const { data, error } = await supabase
+      let q = supabase
         .from('profiles')
         .select('*')
         .eq('organization_id', activeOrgId);
+        
+      if (showArchived) {
+        q = q.not('deleted_at', 'is', null);
+      } else {
+        q = q.is('deleted_at', null);
+      }
+      
+      const { data, error } = await q;
       if (error) throw error;
       return (data || []).map(p => ({
         ...p,
@@ -972,30 +982,42 @@ export default function UserManagement() {
 
       {/* Table & Controls Section */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-teal-600" />
-            <Input
-              placeholder="Filter by name or email address..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-11 h-12 rounded-2xl border-slate-200 bg-white/50 backdrop-blur-sm focus:bg-white transition-all shadow-sm"
-            />
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="flex-1 flex flex-col md:flex-row gap-4 w-full">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 transition-colors group-focus-within:text-teal-600" />
+              <Input
+                placeholder="Filter by name or email address..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-11 h-12 rounded-2xl border-slate-200 bg-white/50 backdrop-blur-sm focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full md:w-56 h-12 rounded-2xl border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-slate-400" />
+                  <SelectValue placeholder="All Roles" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-slate-100 shadow-xl">
+                <SelectItem value="all">All Access Levels</SelectItem>
+                {Object.entries(MEVS_ROLES).map(([r, def]) => (
+                  <SelectItem key={r} value={r}>{def.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="w-full md:w-56 h-12 rounded-2xl border-slate-200 bg-white shadow-sm">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-slate-400" />
-                <SelectValue placeholder="All Roles" />
-              </div>
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl border-slate-100 shadow-xl">
-              <SelectItem value="all">All Access Levels</SelectItem>
-              {Object.entries(MEVS_ROLES).map(([r, def]) => (
-                <SelectItem key={r} value={r}>{def.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 px-2 shrink-0">
+            <input 
+              type="checkbox" 
+              id="showArchived" 
+              checked={showArchived} 
+              onChange={e => setShowArchived(e.target.checked)} 
+              className="rounded border-slate-300 text-teal-600 focus:ring-teal-600 cursor-pointer w-4 h-4" 
+            />
+            <label htmlFor="showArchived" className="text-sm font-semibold text-slate-600 cursor-pointer">Show Past Users</label>
+          </div>
         </div>
 
         <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-white">
@@ -1099,25 +1121,39 @@ export default function UserManagement() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="rounded-2xl border-slate-100 shadow-xl p-2 w-48">
-                                <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-700">
-                                  <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-red-600 hover:bg-red-50"
-                                  onClick={async () => {
-                                    if (!window.confirm(`Deactivate ${member.profiles?.email || member.email}?`)) return;
-                                    try {
-                                      const membId = member.membership_id || member.id;
-                                      const { error } = await supabase.from('memberships').update({ status: 'inactive' }).eq('id', membId);
-                                      if (error) {
-                                        await supabase.from('profiles').update({ status: 'inactive' }).eq('id', member.user_id || member.id);
-                                      }
-                                      queryClient.invalidateQueries({ queryKey: ['team-members'] });
-                                      toast.success('User deactivated');
-                                    } catch (e) { toast.error(e.message); }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-3" /> Deactivate Account
-                                </DropdownMenuItem>
+                                {!member.deleted_at && (
+                                  <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-700">
+                                    <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
+                                  </DropdownMenuItem>
+                                )}
+                                {member.deleted_at ? (
+                                  <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-teal-600 hover:bg-teal-50"
+                                    onClick={async () => {
+                                      try {
+                                        const userId = member.user_id || member.id;
+                                        await supabase.from('profiles').update({ status: 'active', deleted_at: null }).eq('id', userId);
+                                        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                                        toast.success('User restored');
+                                      } catch (e) { toast.error(e.message); }
+                                    }}
+                                  >
+                                    <RefreshCw className="h-4 w-4 mr-3" /> Restore Account
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-600 hover:bg-slate-100"
+                                    onClick={async () => {
+                                      if (!window.confirm(`Archive ${member.profiles?.email || member.email}? They will lose access immediately.`)) return;
+                                      try {
+                                        const userId = member.user_id || member.id;
+                                        await supabase.from('profiles').update({ status: 'archived', deleted_at: new Date().toISOString() }).eq('id', userId);
+                                        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                                        toast.success('User archived');
+                                      } catch (e) { toast.error(e.message); }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-3" /> Archive Account
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
