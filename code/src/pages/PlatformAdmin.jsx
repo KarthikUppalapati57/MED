@@ -117,31 +117,32 @@ export default function PlatformAdmin() {
     if (!platformInviteEmail) return;
     setPlatformInviting(true);
     try {
-      // Try Edge Function first
-      const { data: result, error: fnError } = await supabase.functions.invoke('invite-user', {
-        body: { email: platformInviteEmail, role: "super_admin", onboarding_type: "invited" }
-      });
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
-      if (fnError) {
-        // Fallback: Direct invitation insert (MEVS legacy)
-        const { data: userCurrent } = await supabase.auth.getUser();
-        const { error: insertErr } = await supabase
-          .from("invitations")
-          .insert([{
-            email: platformInviteEmail,
-            role: "platform_admin",
-            access_level: "platform",
-            invited_by: userCurrent?.user?.id,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          }]);
-        if (insertErr) throw insertErr;
-      }
+      const { data: userCurrent } = await supabase.auth.getUser();
+      const { error: insertErr } = await supabase
+        .from("invitations")
+        .insert([{
+          email: platformInviteEmail,
+          token,
+          role: "platform_admin",
+          access_level: "platform",
+          invited_by: userCurrent?.user?.id,
+          expires_at: expiresAt.toISOString(),
+        }]);
 
-      const { toast } = await import("sonner");
-      toast.success("Platform admin invited successfully!");
+      if (insertErr) throw insertErr;
+
+      const link = `${window.location.origin}/signup/${token}`;
+      setGeneratedInviteLink(link);
       setShowPlatformInviteModal(false);
+      setIsInviteLinkDialogOpen(true);
       setPlatformInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+      const { toast } = await import("sonner");
+      toast.success("Platform admin invitation generated!");
     } catch (e) {
       console.error('Invite error:', e);
       const { toast } = await import("sonner");
@@ -155,33 +156,34 @@ export default function PlatformAdmin() {
     if (!inviteEmail) return;
     setInviting(true);
     try {
-      // Try Edge Function first
-      const { data: result, error: fnError } = await supabase.functions.invoke('invite-client', {
-        body: {
-          email: inviteEmail,
-          role: "owner",
-          onboarding_type: "owner"
-        }
-      });
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
-      if (fnError) {
-        // Fallback: Direct invitation insert
-        const { data: userCurrent } = await supabase.auth.getUser();
-        const { error: insertErr } = await supabase
-          .from("invitations")
-          .insert([{
-            email: inviteEmail,
-            role: "owner",
-            invited_by: userCurrent?.user?.id,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          }]);
-        if (insertErr) throw insertErr;
-      }
-      setInviteSuccess(true);
+      const { data: userCurrent } = await supabase.auth.getUser();
+      const { error: insertErr } = await supabase
+        .from("invitations")
+        .insert([{
+          email: inviteEmail,
+          token,
+          role: "owner",
+          invited_by: userCurrent?.user?.id,
+          expires_at: expiresAt.toISOString(),
+        }]);
+
+      if (insertErr) throw insertErr;
+
+      const link = `${window.location.origin}/signup/${token}`;
+      setGeneratedInviteLink(link);
+      setShowInviteModal(false);
+      setIsInviteLinkDialogOpen(true);
+      setInviteEmail("");
+      const { toast } = await import("sonner");
+      toast.success("Client invitation generated!");
     } catch (e) {
       console.error('Invite error:', e);
       const { toast } = await import("sonner");
-      toast.error(e.message || "Failed to send invitation");
+      toast.error(e.message || "Failed to generate invitation");
     }
     setInviting(false);
   };
