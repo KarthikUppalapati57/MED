@@ -91,6 +91,22 @@ export default function LandingPage() {
 
       if (error) throw error;
 
+      // Fire-and-forget: notify platform admins via Edge Function
+      try {
+        await supabase.functions.invoke('notify-demo-request', {
+          body: {
+            full_name: demoForm.fullName,
+            email: demoForm.email,
+            company_name: demoForm.companyName,
+            phone: demoForm.phone,
+            plan: demoForm.plan,
+          }
+        });
+      } catch (_notifyErr) {
+        // Non-blocking: notification failure shouldn't affect the user flow
+        console.warn('Demo notification dispatch failed (non-critical):', _notifyErr);
+      }
+
       toast.success("Demo request submitted! Our team will contact you soon.");
       setIsDemoModalOpen(false);
       setDemoForm({ fullName: '', email: '', companyName: '', phone: '', plan: 'platform_unlimited' });

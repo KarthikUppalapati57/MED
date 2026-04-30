@@ -19,7 +19,7 @@ import {
   DialogTrigger, 
   DialogDescription 
 } from "@/components/ui/dialog";
-import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Copy } from "lucide-react";
+import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Copy, DollarSign, FileText, TrendingUp, Activity } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
@@ -782,6 +782,8 @@ export default function PlatformAdmin() {
           <TabsTrigger value="contact">Contact Us {pendingContactCount > 0 && <Badge className="ml-1.5 bg-blue-500 text-white text-[10px] px-1.5">{pendingContactCount}</Badge>}</TabsTrigger>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="orgs">Organizations {pendingOrgCount > 0 && <Badge className="ml-1.5 bg-amber-500 text-white text-[10px] px-1.5">{pendingOrgCount}</Badge>}</TabsTrigger>
+          <TabsTrigger value="accounting">Accounting</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="access" className="mt-4">
@@ -1147,6 +1149,182 @@ export default function PlatformAdmin() {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Accounting Tab ────────────────────────────────── */}
+        <TabsContent value="accounting" className="mt-4">
+          <div className="space-y-6">
+            {/* Revenue Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-semibold">Monthly Revenue</p>
+                      <p className="text-2xl font-bold mt-1">$0.00</p>
+                      <p className="text-xs text-emerald-500 mt-1">Active subscriptions</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-emerald-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-semibold">Active Subscriptions</p>
+                      <p className="text-2xl font-bold mt-1">{(orgs || []).filter(o => o.subscription_status === 'active').length}</p>
+                      <p className="text-xs text-blue-500 mt-1">Paying organizations</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-semibold">Trial Orgs</p>
+                      <p className="text-2xl font-bold mt-1">{(orgs || []).filter(o => !o.subscription_status || o.subscription_status === 'trial').length}</p>
+                      <p className="text-xs text-amber-500 mt-1">Free tier / trial</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-amber-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500 uppercase font-semibold">Churn Rate</p>
+                      <p className="text-2xl font-bold mt-1">0%</p>
+                      <p className="text-xs text-slate-400 mt-1">Last 30 days</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <Activity className="h-5 w-5 text-slate-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Subscription Management */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Subscription Management</CardTitle>
+                  <p className="text-xs text-slate-400">Manage organization subscriptions and billing</p>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-[11px]">ORGANIZATION</TableHead>
+                      <TableHead className="text-[11px]">PLAN</TableHead>
+                      <TableHead className="text-[11px]">STATUS</TableHead>
+                      <TableHead className="text-[11px]">LOCATIONS</TableHead>
+                      <TableHead className="text-[11px]">MRR</TableHead>
+                      <TableHead className="text-[11px]">SINCE</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(orgs || []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-slate-400">No organizations yet</TableCell>
+                      </TableRow>
+                    ) : (
+                      (orgs || []).map(org => (
+                        <TableRow key={org.id}>
+                          <TableCell className="font-medium">{org.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{org.subscription_plan || 'Free'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={org.subscription_status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}>
+                              {org.subscription_status || 'trial'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{org.brands?.reduce((sum, b) => sum + (b.locations?.length || 0), 0) || 0}</TableCell>
+                          <TableCell className="font-semibold">$0.00</TableCell>
+                          <TableCell className="text-sm text-slate-500">
+                            {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Pricing Configuration */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Pricing Tiers</CardTitle>
+                <p className="text-xs text-slate-400">Current pricing structure for the platform</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { name: 'Starter', price: '$49', period: '/mo', features: ['1 location', '2 users', 'Core modules'] },
+                    { name: 'Professional', price: '$149', period: '/mo', features: ['5 locations', '10 users', 'All modules', 'Priority support'] },
+                    { name: 'Enterprise', price: 'Custom', period: '', features: ['Unlimited locations', 'Unlimited users', 'All modules', 'Dedicated support', 'Custom integrations'] },
+                  ].map(tier => (
+                    <div key={tier.name} className="p-4 border rounded-lg">
+                      <p className="font-bold text-lg">{tier.name}</p>
+                      <p className="text-2xl font-bold text-teal-600 mt-2">{tier.price}<span className="text-sm text-slate-400 font-normal">{tier.period}</span></p>
+                      <ul className="mt-3 space-y-1">
+                        {tier.features.map(f => (
+                          <li key={f} className="text-sm text-slate-500 flex items-center gap-2">
+                            <CheckCircle2 className="h-3 w-3 text-teal-500" /> {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ── Logs Tab ──────────────────────────────────────── */}
+        <TabsContent value="logs" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-5 w-5" /> Platform Audit Logs
+                </CardTitle>
+                <p className="text-xs text-slate-400">Per-module activity log across the entire platform</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search logs..." className="pl-9 w-48 h-8" /></div>
+                <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-1" />Export</Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {['All', 'Users', 'Organizations', 'Inventory', 'Orders', 'Invoices', 'Payments', 'Products', 'Vendors', 'Recipes', 'System'].map(mod => (
+                  <Badge key={mod} variant="secondary" className="cursor-pointer hover:bg-teal-100 hover:text-teal-700 transition-colors">
+                    {mod}
+                  </Badge>
+                ))}
+              </div>
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">Audit logs will appear here</p>
+                <p className="text-sm text-slate-400 mt-1">Select a module filter above to view activity logs</p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -19,6 +19,9 @@ import {
   Wallet,
   CheckCircle2,
   ArrowRightLeft,
+  Settings,
+  FileText,
+  Mail,
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +50,8 @@ import {
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
 
 const paymentMethodIcons = {
@@ -262,7 +267,7 @@ export default function Payments() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="invoices" className="gap-2">
             <DollarSign className="h-4 w-4" />
             Invoices
@@ -270,6 +275,14 @@ export default function Payments() {
           <TabsTrigger value="history" className="gap-2">
             <History className="h-4 w-4" />
             Payment History
+          </TabsTrigger>
+          <TabsTrigger value="reconciliation" className="gap-2">
+            <ArrowRightLeft className="h-4 w-4" />
+            Reconciliation
+          </TabsTrigger>
+          <TabsTrigger value="setup" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Setup
           </TabsTrigger>
         </TabsList>
 
@@ -480,6 +493,161 @@ export default function Payments() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Reconciliation Tab */}
+        <TabsContent value="reconciliation" className="mt-4">
+          <div className="space-y-6">
+            {/* Open Invoices for Reconciliation */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-teal-600" />
+                  Open Invoices Awaiting Reconciliation
+                </CardTitle>
+                <p className="text-xs text-slate-400">Invoices that have been paid but not yet reconciled with bank statements</p>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.filter(p => p.status === 'completed').length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                          No payments pending reconciliation
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      payments.filter(p => p.status === 'completed').slice(0, 10).map(p => {
+                        const MethodIcon = paymentMethodIcons[p.payment_method] || Banknote;
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-medium">{p.vendor_name}</TableCell>
+                            <TableCell>{p.invoice_number}</TableCell>
+                            <TableCell className="font-semibold">${p.amount?.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge className={paymentMethodColors[p.payment_method] || 'bg-slate-100 text-slate-700'}>
+                                <MethodIcon className="h-3 w-3 mr-1" />
+                                {p.payment_method?.replace(/_/g, ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-500">
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="bg-green-100 text-green-700">Paid</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button size="sm" variant="outline" className="h-7 text-xs">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> Reconcile
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Email Tracked Invoices */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-blue-600" />
+                  Email Awaiting
+                </CardTitle>
+                <p className="text-xs text-slate-400">Invoices received via email that need to be matched and processed</p>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Mail className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">No email invoices pending</p>
+                  <p className="text-sm text-slate-400 mt-1">Email invoices will appear here when the email integration is configured</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Setup Tab */}
+        <TabsContent value="setup" className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Payment Defaults
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Auto-Pay Approved Invoices</p>
+                    <p className="text-sm text-slate-500">Automatically process payment for approved invoices</p>
+                  </div>
+                  <Switch />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Default Payment Method</p>
+                    <p className="text-sm text-slate-500">Method used for automatic payments</p>
+                  </div>
+                  <Badge className="bg-purple-100 text-purple-700">
+                    <CreditCard className="h-3 w-3 mr-1" /> Stripe
+                  </Badge>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Payment Approval Threshold</p>
+                    <p className="text-sm text-slate-500">Auto-pay limit without manual approval</p>
+                  </div>
+                  <Input className="w-28" type="number" step="100" defaultValue="1000" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Payment Confirmation Email</p>
+                    <p className="text-sm text-slate-500">Send email when payment is processed</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Overdue Invoice Alerts</p>
+                    <p className="text-sm text-slate-500">Get notified when invoices become overdue</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Weekly Payment Summary</p>
+                    <p className="text-sm text-slate-500">Receive a weekly digest of all payment activity</p>
+                  </div>
+                  <Switch />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
