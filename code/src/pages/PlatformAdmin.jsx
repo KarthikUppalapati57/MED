@@ -10,14 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter, 
-  DialogTrigger, 
-  DialogDescription 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Copy, DollarSign, FileText, TrendingUp, Activity } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,12 +35,12 @@ export default function PlatformAdmin() {
   const [inviting, setInviting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState("access");
-  
+
   // Platform Admin Invite State
   const [showPlatformInviteModal, setShowPlatformInviteModal] = useState(false);
   const [platformInviteEmail, setPlatformInviteEmail] = useState("");
   const [platformInviting, setPlatformInviting] = useState(false);
-  
+
   const [editingOrgModules, setEditingOrgModules] = useState(null);
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
   const [expandedBrands, setExpandedBrands] = useState(new Set());
@@ -128,13 +128,13 @@ export default function PlatformAdmin() {
           }]);
         if (insertErr) throw insertErr;
       }
-      
+
       const { toast } = await import("sonner");
       toast.success("Platform admin invited successfully!");
       setShowPlatformInviteModal(false);
       setPlatformInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-    } catch(e) {
+    } catch (e) {
       console.error('Invite error:', e);
       const { toast } = await import("sonner");
       toast.error(e.message || "Failed to invite platform admin");
@@ -149,13 +149,13 @@ export default function PlatformAdmin() {
     try {
       // Try Edge Function first
       const { data: result, error: fnError } = await supabase.functions.invoke('invite-client', {
-        body: { 
-          email: inviteEmail, 
-          role: "org_admin", 
+        body: {
+          email: inviteEmail,
+          role: "org_admin",
           onboarding_type: "owner"
         }
       });
-      
+
       if (fnError) {
         // Fallback: Direct invitation insert
         const { data: userCurrent } = await supabase.auth.getUser();
@@ -170,7 +170,7 @@ export default function PlatformAdmin() {
         if (insertErr) throw insertErr;
       }
       setInviteSuccess(true);
-    } catch(e) { 
+    } catch (e) {
       console.error('Invite error:', e);
       const { toast } = await import("sonner");
       toast.error(e.message || "Failed to send invitation");
@@ -507,8 +507,8 @@ export default function PlatformAdmin() {
   };
 
   // ── Computed ───────────────────────────────────────────────
-  const accessReqs   = (requests || []).filter(r => r.request_type !== 'demo');
-  const contactReqs  = (contactRequests || []);
+  const accessReqs = (requests || []).filter(r => r.request_type !== 'demo');
+  const contactReqs = (contactRequests || []);
 
   const pendingAccessCount = accessReqs.filter(r => r.status === 'pending_approval').length;
   const pendingContactCount = contactReqs.filter(r => r.status === 'pending_approval').length;
@@ -560,7 +560,7 @@ export default function PlatformAdmin() {
           <TableHeader>
             <TableRow className="bg-slate-50">
               <TableHead className="w-10">
-                <Checkbox 
+                <Checkbox
                   checked={list.length > 0 && list.every(r => selectedRequests.has(r.id))}
                   onCheckedChange={(c) => toggleSelectAllList(c, list)}
                 />
@@ -583,7 +583,7 @@ export default function PlatformAdmin() {
               list.map(r => (
                 <TableRow key={r.id}>
                   <TableCell>
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedRequests.has(r.id)}
                       onCheckedChange={(c) => toggleSelect(r.id, c)}
                     />
@@ -599,7 +599,7 @@ export default function PlatformAdmin() {
                   <TableCell>
                     {r.request_type === 'demo'
                       ? <Badge className="bg-violet-100 text-violet-700 text-[10px] border-none font-bold">🎥 DEMO</Badge>
-                      : r.request_type === 'contact' 
+                      : r.request_type === 'contact'
                         ? <Badge className="bg-indigo-100 text-indigo-700 text-[10px] border-none font-bold">✉️ CONTACT</Badge>
                         : <Badge className="bg-emerald-100 text-emerald-700 text-[10px] border-none font-bold italic">⚡ ACCESS</Badge>
                     }
@@ -650,8 +650,8 @@ export default function PlatformAdmin() {
                       ) : (
                         <>
                           {r.status !== 'approved' && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                               disabled={processingRequests.has(r.id)}
                               onClick={(e) => { e.stopPropagation(); updateRequest.mutate({ id: r.id, approved: true }); }}>
@@ -660,7 +660,7 @@ export default function PlatformAdmin() {
                             </Button>
                           )}
                           {r.status !== 'rejected' && r.status !== 'approved' && (
-                            <Button 
+                            <Button
                               size="sm" variant="outline"
                               className="text-xs h-7 text-red-600 border-red-200 hover:bg-red-50"
                               disabled={processingRequests.has(r.id)}
@@ -670,7 +670,7 @@ export default function PlatformAdmin() {
                             </Button>
                           )}
                           {r.status === 'approved' && (
-                            <Button 
+                            <Button
                               size="sm" variant="outline"
                               className="text-xs h-7 text-amber-600 border-amber-200 hover:bg-amber-50"
                               disabled={processingRequests.has(r.id)}
@@ -681,7 +681,7 @@ export default function PlatformAdmin() {
                           )}
                         </>
                       )}
-                      <Button 
+                      <Button
                         size="sm" variant="ghost"
                         className="text-xs h-7 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50 ml-1"
                         disabled={processingRequests.has(r.id)}
@@ -1424,8 +1424,8 @@ export default function PlatformAdmin() {
                 className="font-mono text-[10px] bg-slate-50 text-slate-800 border-slate-200"
               />
             </div>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               className="px-3 bg-teal-600 hover:bg-teal-700 text-white"
               onClick={async () => {
                 const link = generatedInviteLink;
