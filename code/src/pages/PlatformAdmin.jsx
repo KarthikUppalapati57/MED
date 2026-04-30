@@ -30,6 +30,7 @@ export default function PlatformAdmin() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [selectedModules, setSelectedModules] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS]);
   const [processingRequests, setProcessingRequests] = useState(new Set());
   const [selectedRequests, setSelectedRequests] = useState(new Set());
   const [inviting, setInviting] = useState(false);
@@ -169,6 +170,7 @@ export default function PlatformAdmin() {
           role: "owner",
           invited_by: userCurrent?.user?.id,
           expires_at: expiresAt.toISOString(),
+          metadata: { modules: inviteSelectedModules }
         }]);
 
       if (insertErr) throw insertErr;
@@ -1506,6 +1508,27 @@ export default function PlatformAdmin() {
               <div>
                 <Label className="text-sm font-semibold text-slate-700">Client Email Address</Label>
                 <Input type="email" placeholder="client@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Enabled Modules</Label>
+                <div className="max-h-[200px] overflow-y-auto space-y-2 border p-3 rounded-md bg-slate-50">
+                  {ALL_MODULE_KEYS.map(key => {
+                    const mod = MODULE_DEFINITIONS[key];
+                    const checked = inviteSelectedModules.includes(key);
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            if (val) setInviteSelectedModules(prev => [...prev, key]);
+                            else setInviteSelectedModules(prev => prev.filter(m => m !== key));
+                          }}
+                        />
+                        <span className="text-sm font-medium">{mod?.label || key}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <p className="text-xs text-slate-400">The client will receive an invitation to sign in and complete onboarding.</p>
             </div>

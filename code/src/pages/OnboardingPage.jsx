@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -12,8 +12,13 @@ import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, Fi
 import Papa from 'papaparse';
 
 export default function OnboardingPage() {
-  const { user, refreshProfile } = useAuth();
+  const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
+
+  // Guard: If the user already has an organization assigned, they don't need onboarding.
+  if (userProfile?.organization_id) {
+    return <Navigate to="/" replace />;
+  }
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState(null); // 'manual' or 'csv'
@@ -197,6 +202,25 @@ export default function OnboardingPage() {
         }
       }
 
+      // Step 4: Apply modules from invitation
+      try {
+        const { data: invs } = await supabase
+          .from('invitations')
+          .select('metadata')
+          .eq('email', user.email)
+          .not('accepted_at', 'is', null)
+          .order('accepted_at', { ascending: false })
+          .limit(1);
+        if (invs && invs[0] && invs[0].metadata?.modules) {
+          await supabase
+            .from('organizations')
+            .update({ enabled_modules: invs[0].metadata.modules })
+            .eq('id', orgId);
+        }
+      } catch (err) {
+        console.warn('Failed to apply invitation modules:', err);
+      }
+
       const totalBrands = brands.filter(b => b.name.trim()).length;
       const totalLocations = brands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
       toast.success(`Onboarding complete! Created ${totalBrands} brand(s) and ${totalLocations} location(s).`);
@@ -245,12 +269,31 @@ export default function OnboardingPage() {
       const locationAddress = firstValidRow['Location Address'] || firstValidRow.locationAddress || firstValidRow.address || 'Address pending';
       const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
 
-      await api.onboarding.setupOrgAndFirstLocation(
+      const result = await api.onboarding.setupOrgAndFirstLocation(
         user.id,
         { name: orgName, slug: orgSlug },
         brandName,
         { name: locationName, address: locationAddress }
       );
+
+      // Apply modules from invitation
+      try {
+        const { data: invs } = await supabase
+          .from('invitations')
+          .select('metadata')
+          .eq('email', user.email)
+          .not('accepted_at', 'is', null)
+          .order('accepted_at', { ascending: false })
+          .limit(1);
+        if (invs && invs[0] && invs[0].metadata?.modules) {
+          await supabase
+            .from('organizations')
+            .update({ enabled_modules: invs[0].metadata.modules })
+            .eq('id', result.org.id);
+        }
+      } catch (err) {
+        console.warn('Failed to apply invitation modules:', err);
+      }
 
       const skippedCount = csvData.length - 1;
       const successMsg = skippedCount > 0

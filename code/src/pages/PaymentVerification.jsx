@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -100,6 +100,17 @@ function VerificationForm() {
 
 export default function PaymentVerification() {
   const stripePromise = getStripe();
+  const { userProfile } = useAuth();
+
+  // Guard: If already has an organization, no verification needed.
+  if (userProfile?.organization_id) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Guard: If already verified, move to onboarding
+  if (userProfile?.payment_verified) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
