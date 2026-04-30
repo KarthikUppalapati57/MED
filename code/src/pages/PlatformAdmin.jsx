@@ -151,7 +151,7 @@ export default function PlatformAdmin() {
       const { data: result, error: fnError } = await supabase.functions.invoke('invite-client', {
         body: {
           email: inviteEmail,
-          role: "org_admin",
+          role: "owner",
           onboarding_type: "owner"
         }
       });
