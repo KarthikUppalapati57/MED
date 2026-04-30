@@ -257,7 +257,7 @@ export default function OnboardingPage() {
         }
       }
 
-      // Step 4: Apply modules from invitation
+      // Step 4: Apply modules and permissions from invitation
       try {
         const { data: invs } = await supabase
           .from('invitations')
@@ -266,14 +266,39 @@ export default function OnboardingPage() {
           .not('accepted_at', 'is', null)
           .order('accepted_at', { ascending: false })
           .limit(1);
-        if (invs && invs[0] && invs[0].metadata?.modules) {
-          await supabase
-            .from('organizations')
-            .update({ enabled_modules: invs[0].metadata.modules })
-            .eq('id', orgId);
+
+        if (invs && invs[0]) {
+          const meta = invs[0].metadata || {};
+          const updates = {};
+          
+          if (meta.modules) {
+            await supabase
+              .from('organizations')
+              .update({ enabled_modules: meta.modules })
+              .eq('id', orgId);
+          }
+
+          if (meta.access) {
+            // Map diagram levels (read, write, update) to backend levels (read, full)
+            const access = meta.access;
+            const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
+            
+            // Construct permissions for all standard pages
+            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs'];
+            const perms = {};
+            allPages.forEach(p => perms[p] = level);
+
+            await supabase
+              .from('profiles')
+              .update({ 
+                permissions: perms,
+                access_level: level 
+              })
+              .eq('id', user.id);
+          }
         }
       } catch (err) {
-        console.warn('Failed to apply invitation modules:', err);
+        console.warn('Failed to apply invitation metadata:', err);
       }
 
       const totalBrands = brands.filter(b => b.name.trim()).length;
@@ -331,7 +356,7 @@ export default function OnboardingPage() {
         { name: locationName, address: locationAddress }
       );
 
-      // Apply modules from invitation
+      // Apply modules and permissions from invitation
       try {
         const { data: invs } = await supabase
           .from('invitations')
@@ -340,14 +365,33 @@ export default function OnboardingPage() {
           .not('accepted_at', 'is', null)
           .order('accepted_at', { ascending: false })
           .limit(1);
-        if (invs && invs[0] && invs[0].metadata?.modules) {
-          await supabase
-            .from('organizations')
-            .update({ enabled_modules: invs[0].metadata.modules })
-            .eq('id', result.org.id);
+
+        if (invs && invs[0]) {
+          const meta = invs[0].metadata || {};
+          if (meta.modules) {
+            await supabase
+              .from('organizations')
+              .update({ enabled_modules: meta.modules })
+              .eq('id', result.org.id);
+          }
+          if (meta.access) {
+            const access = meta.access;
+            const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
+            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs'];
+            const perms = {};
+            allPages.forEach(p => perms[p] = level);
+
+            await supabase
+              .from('profiles')
+              .update({ 
+                permissions: perms,
+                access_level: level 
+              })
+              .eq('id', user.id);
+          }
         }
       } catch (err) {
-        console.warn('Failed to apply invitation modules:', err);
+        console.warn('Failed to apply invitation metadata:', err);
       }
 
       const skippedCount = csvData.length - 1;
