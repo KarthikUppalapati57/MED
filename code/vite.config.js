@@ -14,14 +14,6 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom', 'lucide-react', '@tanstack/react-query'],
-          'ui-core': ['@radix-ui/react-tabs', '@radix-ui/react-dialog', '@radix-ui/react-checkbox', '@radix-ui/react-label', 'sonner'],
-        }
-      }
-    },
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1000,
   },
 });
