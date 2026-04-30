@@ -1210,15 +1210,15 @@ export default function PlatformAdmin() {
                       <p className="text-2xl font-bold text-teal-600 mt-1">${plan.price_monthly}<span className="text-sm text-slate-400 font-normal">/mo</span></p>
                       {plan.description && <p className="text-xs text-slate-500 mt-2">{plan.description}</p>}
                       <div className="mt-3 flex flex-wrap gap-1">
-                        {(plan.features || []).map(f => (
+                        {(Array.isArray(plan.features) ? plan.features : Object.keys(plan.features || {})).map(f => (
                           <Badge key={f} variant="outline" className="text-[9px] py-0">{MODULE_DEFINITIONS[f]?.label || f}</Badge>
                         ))}
-                        {(!plan.features || plan.features.length === 0) && <span className="text-[10px] text-slate-400 italic">No modules</span>}
+                        {(!plan.features || (Array.isArray(plan.features) ? plan.features.length === 0 : Object.keys(plan.features).length === 0)) && <span className="text-[10px] text-slate-400 italic">No modules</span>}
                       </div>
                       <div className="flex gap-1 mt-4">
                         <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => {
                           setEditingPlan(plan);
-                          setPlanForm({ id: plan.id, name: plan.name, description: plan.description || '', price_monthly: plan.price_monthly, features: plan.features || [], is_active: plan.is_active });
+                          setPlanForm({ id: plan.id, name: plan.name, description: plan.description || '', price_monthly: plan.price_monthly, features: Array.isArray(plan.features) ? plan.features : Object.keys(plan.features || {}), is_active: plan.is_active });
                           setShowPlanDialog(true);
                         }}>Edit</Button>
                         <Button size="sm" variant="ghost" className="text-xs h-7" onClick={async () => {
@@ -1275,7 +1275,8 @@ export default function PlatformAdmin() {
                               onChange={async (e) => {
                                 const newPlanId = e.target.value;
                                 const newPlan = plans.find(p => p.id === newPlanId);
-                                const newModules = newPlan?.features || [];
+                                const newModulesRaw = newPlan?.features || [];
+                                const newModules = Array.isArray(newModulesRaw) ? newModulesRaw : Object.keys(newModulesRaw);
                                 await supabase.from('organizations').update({
                                   plan_id: newPlanId,
                                   subscription_plan: newPlan?.name || newPlanId,
