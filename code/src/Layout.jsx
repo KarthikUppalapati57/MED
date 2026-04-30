@@ -147,8 +147,10 @@ export default function Layout({ children, currentPageName }) {
   const filteredNavigation = navigation.filter(item => {
     // Role check
     if (!hasMinRole(item.minRole)) return false;
-    // Platform admins see all nav items
-    if (isPlatformAdmin) return true;
+    // Platform admins should ONLY see Dashboard and platform_admin specific items
+    if (isPlatformAdmin) {
+      return item.minRole === 'platform_admin' || item.name === 'Dashboard';
+    }
     // Module check: if org has enabled_modules, only show nav items for enabled modules
     const enabledModules = organization?.enabled_modules;
     if (enabledModules && enabledModules.length > 0) {

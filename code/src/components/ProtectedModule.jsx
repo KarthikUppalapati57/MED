@@ -24,11 +24,17 @@ export default function ProtectedModule({ pageName, children }) {
   const { organization } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
 
-  // Platform admins bypass all module/role gating
-  if (isPlatformAdmin) return <>{children}</>;
-
   // Look up which module this page belongs to
   const moduleInfo = getModuleForPage(pageName);
+
+  // Platform Admins are STRICTLY restricted to only Platform Admin modules and Dashboard
+  if (isPlatformAdmin) {
+    const isDashboard = pageName === 'Dashboard';
+    if (!isDashboard && moduleInfo && moduleInfo.minRole !== 'platform_admin') {
+      return <AccessDenied reason="role" requiredRole="tenant_user" />;
+    }
+    return <>{children}</>;
+  }
 
   // If the page isn't in any module definition, allow it through
   // (handles pages like OnboardingPage, PaymentVerification that aren't module-gated)

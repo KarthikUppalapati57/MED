@@ -104,10 +104,7 @@ function PlatformDashboard() {
     },
   });
 
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['dash-invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
-  });
+  // Removed tenant invoices query to enforce data siloing
 
   const activeOrgs = allOrgs.filter(o => o.subscription_status === 'active');
   const trialOrgs = allOrgs.filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial');
