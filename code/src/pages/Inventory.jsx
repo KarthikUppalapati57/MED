@@ -62,6 +62,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getFlattenedCOA, getCOALabel, ACCOUNTING_GROUPS } from '@/lib/accountingConfig';
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
@@ -75,7 +76,7 @@ export default function Inventory() {
   const [editForm, setEditForm] = useState({});
   const [convertForm, setConvertForm] = useState({ fromUnit: '', toUnit: '', quantity: 0 });
   const [wastageForm, setWastageForm] = useState({ quantity: 0, unit: '', reason: 'spoiled', notes: '' });
-  const [addForm, setAddForm] = useState({ product_name: '', accounting_category: 'food', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
+  const [addForm, setAddForm] = useState({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const queryClient = useQueryClient();
@@ -105,7 +106,7 @@ export default function Inventory() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Item added to inventory');
       setAddDialogOpen(false);
-      setAddForm({ product_name: '', accounting_category: 'food', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
+      setAddForm({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
     },
   });
 
@@ -145,7 +146,7 @@ export default function Inventory() {
     setSelectedItem(item);
     setEditForm({
       product_name: item.product_name || '',
-      accounting_category: item.accounting_category || 'food',
+      accounting_category: item.accounting_category || '1210',
       current_quantity: item.current_quantity || 0,
       current_unit: item.current_unit || 'ea',
       unit_cost: item.unit_cost || 0,
@@ -412,12 +413,12 @@ export default function Inventory() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="food">Food</SelectItem>
-                    <SelectItem value="beverage">Beverage</SelectItem>
-                    <SelectItem value="supplies">Supplies</SelectItem>
-                    <SelectItem value="equipment">Equipment</SelectItem>
-                    <SelectItem value="packaging">Packaging</SelectItem>
+                    <SelectItem value="all">All Accounts</SelectItem>
+                    {getFlattenedCOA().map(coa => (
+                      <SelectItem key={coa.code} value={coa.code}>
+                        {coa.code} - {coa.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -501,7 +502,9 @@ export default function Inventory() {
                                )}
                              </TableCell>
                              <TableCell>
-                               <Badge variant="secondary">{item.accounting_category}</Badge>
+                               <Badge variant="secondary" className="font-mono text-[10px]">
+                                 {getCOALabel(item.accounting_category)}
+                               </Badge>
                              </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
@@ -574,7 +577,7 @@ export default function Inventory() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(byCategory).map(([category, data]) => (
                   <div key={category} className="p-4 bg-slate-50 rounded-lg">
-                    <p className="font-medium text-slate-900 capitalize">{category}</p>
+                    <p className="font-medium text-slate-900 font-mono text-xs mb-2">{getCOALabel(category)}</p>
                     <div className="mt-2 flex justify-between text-sm">
                       <span className="text-slate-500">{data.items} items</span>
                       <span className="font-semibold">${data.value.toLocaleString()}</span>
@@ -913,13 +916,11 @@ export default function Inventory() {
               <Select value={editForm.accounting_category} onValueChange={(v) => setEditForm({ ...editForm, accounting_category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="beverage">Beverage</SelectItem>
-                  <SelectItem value="supplies">Supplies</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="cleaning">Cleaning</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {getFlattenedCOA().map(coa => (
+                    <SelectItem key={coa.code} value={coa.code}>
+                      {coa.code} - {coa.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -977,13 +978,11 @@ export default function Inventory() {
               <Select value={addForm.accounting_category} onValueChange={(v) => setAddForm({ ...addForm, accounting_category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="beverage">Beverage</SelectItem>
-                  <SelectItem value="supplies">Supplies</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="cleaning">Cleaning</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {getFlattenedCOA().map(coa => (
+                    <SelectItem key={coa.code} value={coa.code}>
+                      {coa.code} - {coa.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

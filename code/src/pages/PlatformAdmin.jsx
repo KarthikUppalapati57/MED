@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import InventoryAudit from '@/components/accounting/InventoryAudit';
 
 const TABS = [
   { id: 'access', label: 'Access Request', icon: ShieldAlert },
@@ -90,6 +91,8 @@ export default function PlatformAdmin() {
 
   // Audit Logs State
   const [logModuleFilter, setLogModuleFilter] = useState('All');
+
+  const [accountingSubTab, setAccountingSubTab] = useState('revenue');
 
   const authChecked = !!user;
 

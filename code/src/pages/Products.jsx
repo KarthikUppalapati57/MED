@@ -55,6 +55,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
 const categoryColors = {
   food: 'bg-green-100 text-green-700',
@@ -159,7 +160,7 @@ export default function Products() {
       product_id: '',
       description: '',
       category: '',
-      accounting_category: 'food',
+      accounting_category: '5110',
       is_inventoried: true,
       is_tax_exempt: false,
       report_by_unit: 'ea',
@@ -177,7 +178,7 @@ export default function Products() {
       product_id: product.product_id || '',
       description: product.description || '',
       category: product.category || '',
-      accounting_category: product.accounting_category || 'food',
+      accounting_category: product.accounting_category || '5110',
       is_inventoried: product.is_inventoried ?? true,
       is_tax_exempt: product.is_tax_exempt ?? false,
       report_by_unit: product.report_by_unit || 'ea',
@@ -316,14 +317,12 @@ export default function Products() {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="food">Food</SelectItem>
-                <SelectItem value="beverage">Beverage</SelectItem>
-                <SelectItem value="supplies">Supplies</SelectItem>
-                <SelectItem value="equipment">Equipment</SelectItem>
-                <SelectItem value="packaging">Packaging</SelectItem>
-                <SelectItem value="cleaning">Cleaning</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="all">All Accounts</SelectItem>
+                {getFlattenedCOA().filter(c => c.code.startsWith('5')).map(coa => (
+                  <SelectItem key={coa.code} value={coa.code}>
+                    {coa.code} - {coa.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -492,7 +491,7 @@ export default function Products() {
                           </TableCell>
                           <TableCell className="font-medium">{p.name}</TableCell>
                           <TableCell>{p.vendor_name || '—'}</TableCell>
-                          <TableCell><Badge className={categoryColors[p.accounting_category] || categoryColors.other}>{p.accounting_category}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
                           <TableCell>{p.category || '—'}</TableCell>
                           <TableCell>
                             {p.is_inventoried ? <Badge className="bg-green-100 text-green-700">Yes</Badge> : <Badge variant="secondary">No</Badge>}
@@ -556,7 +555,7 @@ export default function Products() {
                     products.map(p => (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
-                        <TableCell><Badge className={categoryColors[p.accounting_category] || categoryColors.other}>{p.accounting_category}</Badge></TableCell>
+                        <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
                         <TableCell>{p.category || '—'}</TableCell>
                         <TableCell>{p.report_by_unit || 'ea'}</TableCell>
                         <TableCell className="font-medium">{p.item_count || 1}</TableCell>
@@ -618,13 +617,11 @@ export default function Products() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="beverage">Beverage</SelectItem>
-                  <SelectItem value="supplies">Supplies</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="cleaning">Cleaning</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {getFlattenedCOA().filter(c => c.code.startsWith('5')).map(coa => (
+                    <SelectItem key={coa.code} value={coa.code}>
+                      {coa.code} - {coa.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
