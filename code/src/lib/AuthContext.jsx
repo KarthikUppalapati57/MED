@@ -155,9 +155,6 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(profile.brand);
         setActiveLocation(profile.location);
         setCachedProfile(profile);
-        // Flush react-query cache so all data queries re-fetch
-        // with the now-valid auth session + profile context
-        resetQueryCache();
       }
       return profile;
     } catch (e) {
@@ -207,14 +204,10 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(data.brand);
         setActiveLocation(data.location);
         setCachedProfile(data);
-        // Flush react-query cache so all data queries will re-fetch
-        // with the now-valid Supabase session headers
-        resetQueryCache();
         return data;
       } else {
         setUserProfile(null);
         clearCachedProfile();
-        resetQueryCache();
       }
       return null;
     };
