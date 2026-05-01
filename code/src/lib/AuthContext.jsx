@@ -204,6 +204,15 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(data.brand);
         setActiveLocation(data.location);
         setCachedProfile(data);
+
+        // Sync Auth Metadata if it doesn't match the database role
+        // This fixes users who signed up with the wrong metadata role
+        if (sessionUser.user_metadata?.role !== data.role) {
+          supabase.auth.updateUser({
+            data: { role: data.role }
+          }).catch(err => console.warn('Auth metadata sync failed:', err));
+        }
+
         return data;
       } else {
         // If profile is missing but user is authenticated, create a skeleton profile
@@ -265,6 +274,16 @@ export const AuthProvider = ({ children }) => {
         try {
           if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
             if (currentUser) {
+              // 0. Safety Check: If the user ID has changed, or we're starting fresh, clear the stale cache
+              const currentCache = getCachedProfile();
+              if (!currentCache || currentCache.id !== currentUser.id) {
+                clearCachedProfile();
+                setUserProfile(null);
+                setActiveOrg(null);
+                setActiveBrand(null);
+                setActiveLocation(null);
+              }
+
               // 1. Set the user IMMEDIATELY from the session
               setUser(currentUser);
               

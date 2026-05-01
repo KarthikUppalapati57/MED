@@ -71,10 +71,15 @@ function SignupPage() {
       setError('Password must be at least 6 characters');
       return;
     }
+    if (!inviteInfo) {
+      setError('Please wait for invitation details to load.');
+      return;
+    }
+
     setLoading(true);
     const { data, error: signUpError } = await signUp(form.email, form.password, {
       full_name: form.full_name,
-      role: inviteInfo?.role || 'ground_staff',
+      role: inviteInfo.role, // No fallback to ground_staff here
       invite_token: token,
     });
     setLoading(false);
@@ -314,9 +319,12 @@ const AuthenticatedApp = () => {
   
   const isUnassignedUser = !userProfile?.organization_id;
   
-  // Only Owners/Admins without an organization hit the payment/onboarding flow
-  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isTenantOwner && isUnassignedUser && !userProfile?.payment_verified;
-  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isTenantOwner && isUnassignedUser && userProfile?.payment_verified;
+  // Setup is required for any non-platform-admin without an organization
+  const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser;
+  
+  // Within the setup flow, we distinguish between payment and organization creation
+  const needsPaymentVerification = needsSetupFlow && isTenantOwner && !userProfile?.payment_verified;
+  const needsOnboarding = needsSetupFlow && (userProfile?.payment_verified || !isTenantOwner);
 
   if (isLoadingAuth) {
     return (
