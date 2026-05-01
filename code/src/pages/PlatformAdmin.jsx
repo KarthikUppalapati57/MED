@@ -280,30 +280,45 @@ export default function PlatformAdmin() {
 
   const handleDeleteInvite = async (id) => {
     if (!window.confirm("Revoke this invitation?")) return;
+    
+    await queryClient.cancelQueries({ queryKey: ['pending-client-invites'] });
+    const prev = queryClient.getQueryData(['pending-client-invites']);
+    queryClient.setQueryData(['pending-client-invites'], old => old ? old.filter(i => i.id !== id) : []);
+
     try {
       const { error } = await supabase
         .from('invitations')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+      
       toast.success("Invitation revoked");
+      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
     } catch (err) {
+      if (prev) queryClient.setQueryData(['pending-client-invites'], prev);
       toast.error("Failed to revoke invitation");
     }
   };
 
   const handleDeleteOrg = async (id, name) => {
     if (!window.confirm(`Are you sure you want to deactivate ${name}? This will restrict access for all users in this organization.`)) return;
+    
+    await queryClient.cancelQueries({ queryKey: ['organizations'] });
+    const prev = queryClient.getQueryData(['organizations']);
+    // 'organizations' might be an array or an object depending on how it's cached, assuming array
+    queryClient.setQueryData(['organizations'], old => old ? old.filter(o => o.id !== id) : []);
+
     try {
       const { error } = await supabase
         .from('organizations')
         .delete()
         .eq('id', id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['organizations'] });
+      
       toast.success(`${name} has been deleted`);
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
     } catch (err) {
+      if (prev) queryClient.setQueryData(['organizations'], prev);
       console.error(err);
       toast.error("Failed to delete organization");
     }

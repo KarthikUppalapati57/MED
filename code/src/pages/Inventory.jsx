@@ -112,8 +112,24 @@ export default function Inventory() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Inventory.delete(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['inventory'] });
+      const previousData = queryClient.getQueryData(['inventory']);
+      queryClient.setQueryData(['inventory'], (old) => 
+        old ? old.filter(item => item.id !== deletedId) : []
+      );
+      return { previousData };
+    },
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['inventory'], context.previousData);
+      }
+      toast.error('Failed to delete');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    },
+    onSuccess: () => {
       toast.success('Item removed from inventory');
     },
   });

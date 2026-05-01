@@ -165,16 +165,28 @@ export default function OrgManagement() {
 
   const handleDeleteBrand = async (brand) => {
     if (!window.confirm(`Delete brand "${brand.name}" and all its locations? This cannot be undone.`)) return;
+    
+    await queryClient.cancelQueries({ queryKey: ['my-brands'] });
+    await queryClient.cancelQueries({ queryKey: ['my-locations'] });
+    const prevBrands = queryClient.getQueryData(['my-brands']);
+    const prevLocations = queryClient.getQueryData(['my-locations']);
+    
+    queryClient.setQueryData(['my-brands'], old => old ? old.filter(b => b.id !== brand.id) : []);
+    queryClient.setQueryData(['my-locations'], old => old ? old.filter(l => l.brand_id !== brand.id) : []);
+
     try {
       // Delete locations first
       await supabase.from('locations').delete().eq('brand_id', brand.id);
       const { error } = await supabase.from('brands').delete().eq('id', brand.id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['my-brands'] });
-      queryClient.invalidateQueries({ queryKey: ['my-locations'] });
+      
       const { toast } = await import('sonner');
       toast.success(`Brand "${brand.name}" deleted`);
+      queryClient.invalidateQueries({ queryKey: ['my-brands'] });
+      queryClient.invalidateQueries({ queryKey: ['my-locations'] });
     } catch (e) {
+      if (prevBrands) queryClient.setQueryData(['my-brands'], prevBrands);
+      if (prevLocations) queryClient.setQueryData(['my-locations'], prevLocations);
       const { toast } = await import('sonner');
       toast.error(e.message || 'Failed to delete brand');
     }
@@ -182,13 +194,20 @@ export default function OrgManagement() {
 
   const handleDeleteLocation = async (location) => {
     if (!window.confirm(`Delete location "${location.name}"? This cannot be undone.`)) return;
+    
+    await queryClient.cancelQueries({ queryKey: ['my-locations'] });
+    const prevLocations = queryClient.getQueryData(['my-locations']);
+    queryClient.setQueryData(['my-locations'], old => old ? old.filter(l => l.id !== location.id) : []);
+
     try {
       const { error } = await supabase.from('locations').delete().eq('id', location.id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['my-locations'] });
+      
       const { toast } = await import('sonner');
       toast.success(`Location "${location.name}" deleted`);
+      queryClient.invalidateQueries({ queryKey: ['my-locations'] });
     } catch (e) {
+      if (prevLocations) queryClient.setQueryData(['my-locations'], prevLocations);
       const { toast } = await import('sonner');
       toast.error(e.message || 'Failed to delete location');
     }

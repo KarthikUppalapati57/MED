@@ -262,15 +262,21 @@ export default function PlatformUserManagement() {
                       disabled={admin.user_id === user?.id || admin.isDeleting} 
                       onClick={async () => {
                         if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
-                        admin.isDeleting = true; // Temporary local flag
+                        
+                        await queryClient.cancelQueries({ queryKey: ['platform-admins'] });
+                        const previousAdmins = queryClient.getQueryData(['platform-admins']);
+                        queryClient.setQueryData(['platform-admins'], old => 
+                          old ? old.filter(a => a.user_id !== admin.user_id) : []
+                        );
+
                         try {
                           const { error } = await supabase.from("profiles").delete().eq("id", admin.user_id);
                           if (error) throw error;
                           
-                          // Force a fast invalidate to hide the item
-                          await queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
                           toast.success("Admin removed");
+                          queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
                         } catch (e) { 
+                          if (previousAdmins) queryClient.setQueryData(['platform-admins'], previousAdmins);
                           console.error(e); 
                           toast.error("Failed to remove admin"); 
                         }
@@ -333,9 +339,19 @@ export default function PlatformUserManagement() {
                           className="text-xs h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-50"
                           onClick={async () => {
                             if (!window.confirm(`Delete invitation for ${invite.email}?`)) return;
-                            await supabase.from('invitations').delete().eq('id', invite.id);
-                            queryClient.invalidateQueries({ queryKey: ['platform-admin-invites'] });
-                            toast.success('Invitation deleted');
+                            
+                            await queryClient.cancelQueries({ queryKey: ['platform-admin-invites'] });
+                            const prev = queryClient.getQueryData(['platform-admin-invites']);
+                            queryClient.setQueryData(['platform-admin-invites'], old => old ? old.filter(i => i.id !== invite.id) : []);
+
+                            try {
+                              await supabase.from('invitations').delete().eq('id', invite.id);
+                              toast.success('Invitation deleted');
+                              queryClient.invalidateQueries({ queryKey: ['platform-admin-invites'] });
+                            } catch (e) {
+                              if (prev) queryClient.setQueryData(['platform-admin-invites'], prev);
+                              toast.error('Failed to delete invitation');
+                            }
                           }}
                         >
                           <X className="w-3 h-3" />

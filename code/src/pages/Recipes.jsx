@@ -126,8 +126,24 @@ export default function Recipes() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Recipe.delete(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['recipes'] });
+      const previousData = queryClient.getQueryData(['recipes']);
+      queryClient.setQueryData(['recipes'], (old) => 
+        old ? old.filter(item => item.id !== deletedId) : []
+      );
+      return { previousData };
+    },
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['recipes'], context.previousData);
+      }
+      toast.error('Failed to delete');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+    onSuccess: () => {
       toast.success('Recipe deleted');
     },
   });

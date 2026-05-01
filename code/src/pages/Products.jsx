@@ -148,8 +148,24 @@ export default function Products() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Product.delete(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['products'] });
+      const previousData = queryClient.getQueryData(['products']);
+      queryClient.setQueryData(['products'], (old) => 
+        old ? old.filter(item => item.id !== deletedId) : []
+      );
+      return { previousData };
+    },
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['products'], context.previousData);
+      }
+      toast.error('Failed to delete');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onSuccess: () => {
       toast.success('Product deleted');
     },
   });

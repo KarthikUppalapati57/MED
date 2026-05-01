@@ -1150,13 +1150,24 @@ export default function UserManagement() {
                                 <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-red-600 hover:bg-red-50"
                                   onClick={async () => {
                                     if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
+                                    const userId = member.user_id || member.id;
+                                    
+                                    // Optimistic update
+                                    await queryClient.cancelQueries({ queryKey: ['team-members'] });
+                                    const previousMembers = queryClient.getQueryData(['team-members']);
+                                    queryClient.setQueryData(['team-members'], (old) => 
+                                      old ? old.filter(m => (m.user_id || m.id) !== userId) : []
+                                    );
+
                                     try {
-                                      const userId = member.user_id || member.id;
                                       const { error } = await supabase.from('profiles').delete().eq('id', userId);
                                       if (error) throw error;
-                                      queryClient.invalidateQueries({ queryKey: ['team-members'] });
                                       toast.success('User deleted');
-                                    } catch (e) { toast.error(e.message || 'Failed to delete user'); }
+                                      queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                                    } catch (e) { 
+                                      if (previousMembers) queryClient.setQueryData(['team-members'], previousMembers);
+                                      toast.error(e.message || 'Failed to delete user'); 
+                                    }
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4 mr-3" /> Delete Account

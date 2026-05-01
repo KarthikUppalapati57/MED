@@ -200,8 +200,24 @@ export default function Invoices() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Invoice.delete(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['invoices'] });
+      const previousData = queryClient.getQueryData(['invoices']);
+      queryClient.setQueryData(['invoices'], (old) => 
+        old ? old.filter(item => item.id !== deletedId) : []
+      );
+      return { previousData };
+    },
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['invoices'], context.previousData);
+      }
+      toast.error('Failed to delete');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+    onSuccess: () => {
       toast.success('Invoice deleted');
     },
   });

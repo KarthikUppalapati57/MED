@@ -118,8 +118,24 @@ export default function Vendors() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Vendor.delete(id),
-    onSuccess: () => {
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ['vendors'] });
+      const previousVendors = queryClient.getQueryData(['vendors']);
+      queryClient.setQueryData(['vendors'], (old) => 
+        old ? old.filter(vendor => vendor.id !== deletedId) : []
+      );
+      return { previousVendors };
+    },
+    onError: (err, deletedId, context) => {
+      if (context?.previousVendors) {
+        queryClient.setQueryData(['vendors'], context.previousVendors);
+      }
+      toast.error('Failed to delete vendor');
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+    },
+    onSuccess: () => {
       toast.success('Vendor deleted');
     },
   });
