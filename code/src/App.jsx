@@ -381,17 +381,20 @@ const AuthenticatedApp = () => {
               key={path}
               path={`/${path}`}
               element={
-                <React.Suspense fallback={
-                  <div className="flex-1 flex items-center justify-center p-12">
-                    <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
-                  </div>
-                }>
-                  <LayoutWrapper currentPageName={path}>
-                    <ProtectedModule pageName={path}>
+                <LayoutWrapper currentPageName={path}>
+                  <ProtectedModule pageName={path}>
+                    <React.Suspense fallback={
+                      <div className="flex-1 flex items-center justify-center p-12 min-h-[60vh]">
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+                          <p className="text-xs text-slate-400 font-medium">Loading {path.replace(/([A-Z])/g, ' $1').trim()}...</p>
+                        </div>
+                      </div>
+                    }>
                       <Page />
-                    </ProtectedModule>
-                  </LayoutWrapper>
-                </React.Suspense>
+                    </React.Suspense>
+                  </ProtectedModule>
+                </LayoutWrapper>
               }
             />
           ))}

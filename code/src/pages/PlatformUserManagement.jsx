@@ -255,15 +255,27 @@ export default function PlatformUserManagement() {
                     {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" disabled={admin.user_id === user?.id} onClick={async () => {
-                      if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
-                      try {
-                        const { error } = await supabase.from("profiles").delete().eq("id", admin.user_id);
-                        if (error) throw error;
-                        queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-                        toast.success("Admin removed");
-                      } catch (e) { console.error(e); toast.error("Failed to remove admin"); }
-                    }}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" 
+                      disabled={admin.user_id === user?.id || admin.isDeleting} 
+                      onClick={async () => {
+                        if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
+                        admin.isDeleting = true; // Temporary local flag
+                        try {
+                          const { error } = await supabase.from("profiles").delete().eq("id", admin.user_id);
+                          if (error) throw error;
+                          
+                          // Force a fast invalidate to hide the item
+                          await queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+                          toast.success("Admin removed");
+                        } catch (e) { 
+                          console.error(e); 
+                          toast.error("Failed to remove admin"); 
+                        }
+                      }}
+                    >
                       <X className="w-4 h-4" />
                     </Button>
                   </TableCell>
