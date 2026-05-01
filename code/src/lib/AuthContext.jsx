@@ -206,6 +206,27 @@ export const AuthProvider = ({ children }) => {
         setCachedProfile(data);
         return data;
       } else {
+        // If profile is missing but user is authenticated, create a skeleton profile
+        // This prevents the application from getting stuck in an inconsistent state
+        const role = sessionUser.user_metadata?.role || 'owner';
+        const { data: newProfile, error } = await supabase
+          .from('profiles')
+          .insert([{
+            id: sessionUser.id,
+            email: sessionUser.email,
+            full_name: sessionUser.user_metadata?.full_name || 'User',
+            role: role,
+            payment_verified: false
+          }])
+          .select()
+          .single();
+
+        if (!error && newProfile) {
+          setUserProfile(newProfile);
+          setCachedProfile(newProfile);
+          return newProfile;
+        }
+
         setUserProfile(null);
         clearCachedProfile();
       }

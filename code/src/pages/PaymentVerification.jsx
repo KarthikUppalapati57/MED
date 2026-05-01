@@ -41,11 +41,15 @@ function VerificationForm({ onVerified }) {
       // For this workflow, we simulate successful verification
       await new Promise(r => setTimeout(r, 2000));
 
-      // Update profile status
+      // Use upsert to ensure the profile exists and is marked as verified
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ payment_verified: true, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+        .upsert({ 
+          id: user.id,
+          email: user.email,
+          payment_verified: true, 
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'id' });
 
       if (updateError) throw updateError;
 
