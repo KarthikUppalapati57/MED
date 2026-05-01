@@ -105,7 +105,7 @@ export default function PlatformAdmin() {
 
   // ── Real-Time Subscriptions ────────────────────────────────
   React.useEffect(() => {
-    if (!authChecked || (userRole !== 'admin' && userRole !== 'platform_admin')) return;
+    if (!authChecked || userRole !== 'platform_admin') return;
 
     const channel = supabase
       .channel('platform-admin-realtime')
@@ -143,7 +143,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: demoRequests = [], isLoading: isLoadingDemo } = useAuthQuery({
@@ -156,7 +156,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: contactRequests = [], isLoading: isLoadingContact } = useAuthQuery({
@@ -169,7 +169,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
@@ -180,7 +180,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: allBrands = [] } = useAuthQuery({
@@ -190,7 +190,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: allLocations = [] } = useAuthQuery({
@@ -200,7 +200,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: plans = [] } = useAuthQuery({
@@ -210,7 +210,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
@@ -222,7 +222,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   const { data: pendingClientInvites = [] } = useAuthQuery({
@@ -231,13 +231,13 @@ export default function PlatformAdmin() {
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('role', 'owner')
+        .eq('role', 'org_owner')
         .is('accepted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   // ── Mutators & Handlers ─────────────────────────────────────

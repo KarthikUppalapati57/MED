@@ -314,7 +314,7 @@ const AuthenticatedApp = () => {
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const isTenantOwner = role === 'owner' || role === 'admin';
+  const isTenantOwner = role === 'org_owner';
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
   
   const isUnassignedUser = !userProfile?.organization_id;

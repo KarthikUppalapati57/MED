@@ -217,7 +217,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         // If profile is missing but user is authenticated, create a skeleton profile
         // This prevents the application from getting stuck in an inconsistent state
-        const role = sessionUser.user_metadata?.role || 'owner';
+        const role = sessionUser.user_metadata?.role || 'org_owner';
         const { data: newProfile, error } = await supabase
           .from('profiles')
           .insert([{
@@ -469,11 +469,8 @@ export const AuthProvider = ({ children }) => {
     const permissions = {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
-      manager:          ['view', 'upload', 'edit', 'approve', 'create'],           // alias → location_manager
       branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       org_owner:        ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
-      owner:            ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users'], // alias → org_owner
-      admin:            ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users'], // alias → org_owner
       platform_admin:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform', 'manage_subscriptions', 'manage_accounting'],
     };
     return (permissions[role] || []).includes(action);

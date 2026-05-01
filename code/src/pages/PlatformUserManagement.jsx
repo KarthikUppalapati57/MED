@@ -43,7 +43,7 @@ export default function PlatformUserManagement() {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, email, full_name, role, created_at, last_sign_in_at")
-        .in("role", ["platform_admin", "admin"]);
+        .eq("role", "platform_admin");
       if (error) throw error;
       return (data || []).map(p => ({
         membership_id: p.id,
@@ -154,7 +154,7 @@ export default function PlatformUserManagement() {
     );
   }
 
-  if (!user || (userRole !== 'admin' && userRole !== 'platform_admin')) {
+  if (!user || userRole !== 'platform_admin') {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center px-4">
         <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">

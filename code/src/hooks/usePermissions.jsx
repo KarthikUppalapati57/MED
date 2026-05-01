@@ -3,13 +3,8 @@ import { useAuth } from '@/lib/AuthContext';
 /**
  * Custom hook for role-based permission checks.
  * 
- * Roles hierarchy (new — per MG.drawio blueprint):
+ * Roles hierarchy:
  *   ground_staff < location_manager < branch_manager < org_owner < platform_admin
- * 
- * Backward-compatible aliases (old → new):
- *   manager      → location_manager  (level 1)
- *   owner        → org_owner         (level 3)
- *   admin        → org_owner         (level 3)
  * 
  * Permissions:
  *   ground_staff:     View data, upload invoices
@@ -21,15 +16,11 @@ import { useAuth } from '@/lib/AuthContext';
 export function usePermissions() {
   const { role, userProfile } = useAuth();
 
-  // New hierarchy with backward-compatible aliases
   const roleLevel = {
     ground_staff:     0,
     location_manager: 1,
-    manager:          1,  // backward compat → location_manager
     branch_manager:   2,
     org_owner:        3,
-    owner:            3,  // backward compat → org_owner
-    admin:            3,  // backward compat → org_owner
     platform_admin:   4,
   };
 
@@ -65,25 +56,16 @@ export function usePermissions() {
 
     // Role identity checks (new roles)
     isGroundStaff: role === 'ground_staff',
-    isLocationManager: role === 'location_manager' || role === 'manager',
+    isLocationManager: role === 'location_manager',
     isBranchManager: role === 'branch_manager',
-    isOrgOwner: role === 'org_owner' || role === 'owner' || role === 'admin',
+    isOrgOwner: role === 'org_owner',
     isPlatformAdmin: role === 'platform_admin',
-
-    // Backward-compatible aliases
-    isManager: role === 'location_manager' || role === 'manager',
-    isOwner: role === 'org_owner' || role === 'owner' || role === 'admin',
-    isAdmin: role === 'org_owner' || role === 'owner' || role === 'admin',
 
     // Level-based checks
     isLocationManagerOrAbove: currentLevel >= 1,
     isBranchManagerOrAbove: currentLevel >= 2,
     isOrgOwnerOrAbove: currentLevel >= 3,
     isPlatformAdminOrAbove: currentLevel >= 4,
-
-    // Backward-compatible aliases
-    isManagerOrAbove: currentLevel >= 1,
-    isOwnerOrAbove: currentLevel >= 3,
 
     // Check against a specific minimum role
     hasMinRole: (minRole) => currentLevel >= (roleLevel[minRole] ?? 0),

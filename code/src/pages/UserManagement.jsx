@@ -24,11 +24,11 @@ import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
 
 // ─── MEVS Roles ─────────────────────────────────────────────────────────────
 const MEVS_ROLES = {
-  admin:          { label: "System Admin",    color: "rose",   description: "Full system access across the entire organization",   icon: ShieldAlert },
-  owner:          { label: "Owner",           color: "purple", description: "Organization owner with billing and management access", icon: ShieldCheck },
-  manager:        { label: "Manager",         color: "blue",   description: "Manages daily operations, inventory, and approvals",   icon: UserCheck },
-  ground_staff:   { label: "Ground Staff",    color: "teal",   description: "Can upload invoices and perform inventory counts",     icon: Users },
-  platform_admin: { label: "Platform Admin",  color: "amber",  description: "Cross-platform architectural management (Super User)", icon: Globe },
+  org_owner:        { label: "Organization Owner", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
+  branch_manager:   { label: "Branch Manager",     color: "purple", description: "Manages multiple locations and local team members", icon: Building2 },
+  location_manager: { label: "Location Manager",   color: "blue",   description: "Manages daily operations, inventory, and approvals", icon: UserCheck },
+  ground_staff:     { label: "Ground Staff",       color: "teal",   description: "Can upload invoices and perform inventory counts",     icon: Users },
+  platform_admin:   { label: "Platform Admin",     color: "amber",  description: "Global architectural management (Super User)",        icon: Globe },
 };
 
 const ROLE_COLOR_CLASSES = {
@@ -906,7 +906,7 @@ export default function UserManagement() {
   // Client-side filtering for scope if needed (since memberships query might not filter by brand_id/location_id at DB level if they reside in profiles)
   const scopedMembers = useMemo(() => {
     return members.filter(m => {
-      if (isPlatformAdmin || !userRole || userRole === 'org_owner' || userRole === 'owner' || userRole === 'admin') return true;
+      if (isPlatformAdmin || !userRole || userRole === 'org_owner') return true;
       if (isBranchManager) return m.brand_id === activeBrandId || m.profiles?.brand_id === activeBrandId;
       if (isLocationManager) return m.location_id === activeLocationId || m.profiles?.location_id === activeLocationId;
       return false; // Ground staff shouldn't be here, but just in case
@@ -930,7 +930,7 @@ export default function UserManagement() {
     const total = scopedMembers.length;
     const active = scopedMembers.filter(m => m.status === 'active').length;
     const invited = scopedMembers.filter(m => m.status === 'invited').length;
-    const admins = scopedMembers.filter(m => ['admin', 'owner', 'platform_admin', 'super_admin', 'org_admin'].includes(m.role || m.capabilities?.role)).length;
+    const admins = scopedMembers.filter(m => ['org_owner', 'platform_admin'].includes(m.role || m.capabilities?.role)).length;
     return { total, active, invited, admins };
   }, [scopedMembers]);
 

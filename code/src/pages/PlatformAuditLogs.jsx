@@ -41,7 +41,7 @@ export default function PlatformAuditLogs() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && (userRole === 'admin' || userRole === 'platform_admin'),
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
   // Filter logs by search
@@ -91,7 +91,7 @@ export default function PlatformAuditLogs() {
     );
   }
 
-  if (!user || (userRole !== 'admin' && userRole !== 'platform_admin')) {
+  if (!user || userRole !== 'platform_admin') {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center px-4">
         <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">

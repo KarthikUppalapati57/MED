@@ -250,7 +250,7 @@ export default function OrgManagement() {
     setSaving(false);
   };
 
-  const canManage = ['owner', 'admin', 'platform_admin'].includes(userProfile?.role);
+  const canManage = ['org_owner', 'platform_admin'].includes(userProfile?.role);
 
   const getOrgBrands = (orgId) => brands.filter(b => b.organization_id === orgId);
   const getBrandLocations = (brandId) => locations.filter(l => l.brand_id === brandId);
