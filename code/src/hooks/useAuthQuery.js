@@ -29,5 +29,8 @@ export function useAuthQuery(options) {
   return useQuery({
     ...options,
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
+    // Ensure that when data is refetching in the background (e.g. via realtime),
+    // we keep the previous data on screen instead of flashing a loader.
+    placeholderData: (prev) => prev,
   });
 }
