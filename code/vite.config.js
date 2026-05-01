@@ -20,8 +20,10 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-ui': ['lucide-react', 'framer-motion', 'clsx', 'tailwind-merge'],
-          'vendor-utils': ['@tanstack/react-query', 'date-fns', 'sonner'],
+          'vendor-shared': [
+            'lucide-react', 'framer-motion', 'clsx', 'tailwind-merge',
+            '@tanstack/react-query', 'date-fns', 'sonner'
+          ],
         }
       }
     }
