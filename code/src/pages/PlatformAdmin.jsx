@@ -536,6 +536,7 @@ export default function PlatformAdmin() {
                 <TableHead className="text-[11px] font-bold">MODULES</TableHead>
                 <TableHead className="text-[11px] font-bold">ACCESS</TableHead>
                 <TableHead className="text-[11px] font-bold">CREATED</TableHead>
+                <TableHead className="text-[11px] font-bold">STATUS</TableHead>
                 <TableHead className="text-[11px] font-bold">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
@@ -562,6 +563,9 @@ export default function PlatformAdmin() {
                     </div>
                   </TableCell>
                   <TableCell className="text-[10px] text-slate-500">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <Badge className="bg-pink-100 text-pink-700 text-[9px] font-bold border-none">Delivered</Badge>
+                  </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
                       onClick={() => handleDeleteInvite(invite.id)}>

@@ -90,6 +90,27 @@ export const AuthProvider = ({ children }) => {
         // Use secure RPC to accept invitation (bypasses RLS on profiles update)
         const { api } = await import('@/lib/apiClient');
         await api.onboarding.acceptInvitation(invite.token);
+
+        // Apply pre-provisioned permissions from invitation metadata if available
+        const metadata = invite.metadata || {};
+        const permissions = metadata.page_permissions || invite.page_permissions;
+        const privileges = metadata.signing_privileges || invite.signing_privileges;
+
+        if (permissions || privileges) {
+          try {
+            // Update profile with the invited permissions
+            await supabase
+              .from('profiles')
+              .update({
+                permissions: permissions || {},
+                signing_privileges: privileges || {},
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', userId);
+          } catch (updateErr) {
+            console.warn('Failed to auto-provision permissions (non-fatal):', updateErr);
+          }
+        }
         return true;
       }
     } catch (err) {

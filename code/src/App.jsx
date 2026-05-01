@@ -309,11 +309,14 @@ const AuthenticatedApp = () => {
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
+  const isTenantOwner = role === 'owner' || role === 'admin';
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
   
   const isUnassignedUser = !userProfile?.organization_id;
-  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && !userProfile?.payment_verified;
-  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && userProfile?.payment_verified;
+  
+  // Only Owners/Admins without an organization hit the payment/onboarding flow
+  const needsPaymentVerification = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isTenantOwner && isUnassignedUser && !userProfile?.payment_verified;
+  const needsOnboarding = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isTenantOwner && isUnassignedUser && userProfile?.payment_verified;
 
   if (isLoadingAuth) {
     return (
@@ -350,7 +353,7 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : (isUnassignedUser && !isPlatformAdmin) ? (
+      ) : (needsPaymentVerification || needsOnboarding) ? (
         <>
           {/* New users without an organization must complete payment verification THEN onboarding */}
           <Route path="/verify-payment" element={<PaymentVerification />} />
