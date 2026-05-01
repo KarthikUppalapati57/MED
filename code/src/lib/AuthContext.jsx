@@ -309,9 +309,16 @@ export const AuthProvider = ({ children }) => {
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
+              const prevUser = user;
               setUser(currentUser);
               deferredMFARefresh();
-              await loadProfile(currentUser);
+              
+              // Only trigger a full profile reload if the user ID changed
+              // or if we don't have a profile yet. This prevents the "flash"
+              // during background token refreshes.
+              if (!userProfile || prevUser?.id !== currentUser.id) {
+                await loadProfile(currentUser);
+              }
             }
           }
         } catch (err) {
