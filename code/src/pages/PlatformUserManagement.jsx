@@ -32,6 +32,9 @@ export default function PlatformUserManagement() {
   const [generatedInviteLink, setGeneratedInviteLink] = useState("");
   const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Confirmation State
+  const [confirmDeleteAdmin, setConfirmDeleteAdmin] = useState(null);
 
   // ── Platform Admins Query ──────────────────────────────────
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({
@@ -107,6 +110,29 @@ export default function PlatformUserManagement() {
       toast.error(e.message || "Failed to invite platform admin");
     }
     setPlatformInviting(false);
+  };
+
+  const handleRemoveAdmin = async (adminId) => {
+    setConfirmDeleteAdmin(null);
+    const toastId = toast.loading("Removing admin access...");
+    
+    await queryClient.cancelQueries({ queryKey: ['platform-admins'] });
+    const previousAdmins = queryClient.getQueryData(['platform-admins']);
+    queryClient.setQueryData(['platform-admins'], old => 
+      old ? old.filter(a => a.user_id !== adminId) : []
+    );
+
+    try {
+      const { error } = await supabase.from("profiles").delete().eq("id", adminId);
+      if (error) throw error;
+      
+      toast.success("Admin removed", { id: toastId });
+      queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+    } catch (e) { 
+      if (previousAdmins) queryClient.setQueryData(['platform-admins'], previousAdmins);
+      console.error(e); 
+      toast.error("Failed to remove admin", { id: toastId }); 
+    }
   };
 
   // Filter admins by search
@@ -259,28 +285,8 @@ export default function PlatformUserManagement() {
                       variant="ghost" 
                       size="sm" 
                       className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" 
-                      disabled={admin.user_id === user?.id || admin.isDeleting} 
-                      onClick={async () => {
-                        if (!window.confirm(`Remove ${admin.email} from platform admins?`)) return;
-                        
-                        await queryClient.cancelQueries({ queryKey: ['platform-admins'] });
-                        const previousAdmins = queryClient.getQueryData(['platform-admins']);
-                        queryClient.setQueryData(['platform-admins'], old => 
-                          old ? old.filter(a => a.user_id !== admin.user_id) : []
-                        );
-
-                        try {
-                          const { error } = await supabase.from("profiles").delete().eq("id", admin.user_id);
-                          if (error) throw error;
-                          
-                          toast.success("Admin removed");
-                          queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-                        } catch (e) { 
-                          if (previousAdmins) queryClient.setQueryData(['platform-admins'], previousAdmins);
-                          console.error(e); 
-                          toast.error("Failed to remove admin"); 
-                        }
-                      }}
+                      disabled={admin.user_id === user?.id} 
+                      onClick={() => setConfirmDeleteAdmin(admin)}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -427,6 +433,21 @@ export default function PlatformUserManagement() {
             <Button type="button" variant="secondary" onClick={() => setIsInviteLinkDialogOpen(false)}>
               Close
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!confirmDeleteAdmin} onOpenChange={() => setConfirmDeleteAdmin(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Admin Access</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove admin access for {confirmDeleteAdmin?.full_name || confirmDeleteAdmin?.email}? 
+              This will revoke their access to the Platform Admin Console.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDeleteAdmin(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleRemoveAdmin(confirmDeleteAdmin?.id)}>Remove Access</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

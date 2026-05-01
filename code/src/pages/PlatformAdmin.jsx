@@ -96,6 +96,10 @@ export default function PlatformAdmin() {
   const [logModuleFilter, setLogModuleFilter] = useState('All');
 
   const [accountingSubTab, setAccountingSubTab] = useState('revenue');
+  
+  // Confirmation Dialog States
+  const [confirmDeleteInvite, setConfirmDeleteInvite] = useState(null); // stores invitation id
+  const [confirmDeleteOrg, setConfirmDeleteOrg] = useState(null); // stores { id, name }
 
   const authChecked = !!user;
 
@@ -212,7 +216,7 @@ export default function PlatformAdmin() {
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
     queryKey: ['platform-audit-logs', logModuleFilter],
     queryFn: async () => {
-      let q = supabase.from('audit_logs').select('*, profiles(email)');
+      let q = supabase.from('audit_logs').select('*, profiles:user_id(email)');
       if (logModuleFilter !== 'All') q = q.eq('table_name', logModuleFilter);
       const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
@@ -288,12 +292,13 @@ export default function PlatformAdmin() {
   };
 
   const handleDeleteInvite = async (id) => {
-    if (!window.confirm("Revoke this invitation?")) return;
+    setConfirmDeleteInvite(null);
+    const toastId = toast.loading("Revoking invitation...");
     
     await queryClient.cancelQueries({ queryKey: ['pending-client-invites'] });
     const prev = queryClient.getQueryData(['pending-client-invites']);
     queryClient.setQueryData(['pending-client-invites'], old => old ? old.filter(i => i.id !== id) : []);
-
+  
     try {
       const { error } = await supabase
         .from('invitations')
@@ -301,22 +306,22 @@ export default function PlatformAdmin() {
         .eq('id', id);
       if (error) throw error;
       
-      toast.success("Invitation revoked");
+      toast.success("Invitation revoked", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
     } catch (err) {
       if (prev) queryClient.setQueryData(['pending-client-invites'], prev);
-      toast.error("Failed to revoke invitation");
+      toast.error("Failed to revoke invitation", { id: toastId });
     }
   };
-
-  const handleDeleteOrg = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to deactivate ${name}? This will restrict access for all users in this organization.`)) return;
+  
+  const handleDeleteOrg = async (id) => {
+    setConfirmDeleteOrg(null);
+    const toastId = toast.loading("Deactivating organization...");
     
     await queryClient.cancelQueries({ queryKey: ['organizations'] });
     const prev = queryClient.getQueryData(['organizations']);
-    // 'organizations' might be an array or an object depending on how it's cached, assuming array
     queryClient.setQueryData(['organizations'], old => old ? old.filter(o => o.id !== id) : []);
-
+  
     try {
       const { error } = await supabase
         .from('organizations')
@@ -324,12 +329,12 @@ export default function PlatformAdmin() {
         .eq('id', id);
       if (error) throw error;
       
-      toast.success(`${name} has been deleted`);
+      toast.success("Organization deactivated", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
     } catch (err) {
       if (prev) queryClient.setQueryData(['organizations'], prev);
       console.error(err);
-      toast.error("Failed to delete organization");
+      toast.error("Failed to delete organization", { id: toastId });
     }
   };
 
@@ -586,8 +591,12 @@ export default function PlatformAdmin() {
                     <Badge className="bg-pink-100 text-pink-700 text-[9px] font-bold border-none">Delivered</Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
-                      onClick={() => handleDeleteInvite(invite.id)}>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      onClick={() => setConfirmDeleteInvite(invite.id)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </TableCell>
@@ -797,10 +806,13 @@ export default function PlatformAdmin() {
                                 <Package className="w-3.5 h-3.5 mr-2" /> Modules
                               </Button>
                               <Button 
-                                size="sm" 
                                 variant="ghost" 
-                                className="h-8 px-3 text-[10px] font-bold rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
-                                onClick={(e) => { e.stopPropagation(); handleDeleteOrg(org.id, org.name); }}
+                                size="sm" 
+                                className="h-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDeleteOrg({ id: org.id, name: org.name });
+                                }}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -1062,6 +1074,35 @@ export default function PlatformAdmin() {
             </Button>
           </div>
           <Button className="w-full bg-slate-900 h-12 rounded-xl font-bold" onClick={() => setIsInviteLinkDialogOpen(false)}>Done</Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!confirmDeleteInvite} onOpenChange={() => setConfirmDeleteInvite(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke Invitation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to revoke this onboarding link? The link will immediately become invalid.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDeleteInvite(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDeleteInvite(confirmDeleteInvite)}>Revoke Link</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDeleteOrg} onOpenChange={() => setConfirmDeleteOrg(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deactivate Organization</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to deactivate {confirmDeleteOrg?.name}? This will restrict access for all users in this organization.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOrg(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDeleteOrg(confirmDeleteOrg?.id)}>Deactivate</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
