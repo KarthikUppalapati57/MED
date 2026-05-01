@@ -41,26 +41,34 @@ export default function OnboardingPage() {
     let cancelled = false;
 
     const pollUntilReady = async () => {
-      const MAX_RETRIES = 8;
-      while (!cancelled && retryCountRef.current < MAX_RETRIES) {
-        retryCountRef.current += 1;
+      const MAX_RETRIES = 12; // Increased retries
+      let success = false;
+
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        if (cancelled) return;
+        
         try {
-          await refreshProfile();
+          const freshProfile = await refreshProfile();
+          if (freshProfile?.organization_id) {
+            success = true;
+            break;
+          }
         } catch (e) {
           console.warn('Profile refresh attempt failed:', e);
         }
-        // Wait 600ms between retries to let DB commit propagate
-        await new Promise(r => setTimeout(r, 600));
+        
+        await new Promise(r => setTimeout(r, 800 + (i * 100)));
       }
-      // After max retries, force a hard reload to re-initialize everything
-      if (!cancelled) {
-        window.location.replace('/');
+
+      if (!cancelled && !success) {
+        // Fallback to home anyway
+        navigate('/', { replace: true });
       }
     };
 
     pollUntilReady();
     return () => { cancelled = true; };
-  }, [completed, refreshProfile]);
+  }, [completed, refreshProfile, navigate]);
 
   // ── If profile org_id becomes available (from polling above), navigate cleanly ──
   useEffect(() => {

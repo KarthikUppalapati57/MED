@@ -108,24 +108,37 @@ export default function PaymentVerification() {
     let cancelled = false;
 
     const pollUntilReady = async () => {
-      const MAX_RETRIES = 8;
-      while (!cancelled && retryCountRef.current < MAX_RETRIES) {
-        retryCountRef.current += 1;
+      const MAX_RETRIES = 12; // Increased retries
+      let success = false;
+
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        if (cancelled) return;
+        
         try {
-          await refreshProfile();
+          const freshProfile = await refreshProfile();
+          // Check the return value directly to avoid stale closure issues with userProfile state
+          if (freshProfile?.payment_verified) {
+            success = true;
+            break;
+          }
         } catch (e) {
           console.warn('Profile refresh attempt failed:', e);
         }
-        await new Promise(r => setTimeout(r, 600));
+        
+        // Wait before next retry (exponential-ish backoff or steady intervals)
+        await new Promise(r => setTimeout(r, 800 + (i * 100)));
       }
-      if (!cancelled) {
-        window.location.replace('/onboarding');
+
+      if (!cancelled && !success) {
+        // If we still haven't confirmed, try one last navigation anyway
+        // But use navigate() to avoid a full app reload if possible
+        navigate('/onboarding', { replace: true });
       }
     };
 
     pollUntilReady();
     return () => { cancelled = true; };
-  }, [completed, refreshProfile]);
+  }, [completed, refreshProfile, navigate]);
 
   // ── Once profile state confirms payment_verified, navigate cleanly ──
   useEffect(() => {

@@ -147,16 +147,22 @@ export const AuthProvider = ({ children }) => {
 
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return;
-    const profile = await fetchProfile(user.id);
-    if (profile) {
-      setUserProfile(profile);
-      setActiveOrg(profile.organization);
-      setActiveBrand(profile.brand);
-      setActiveLocation(profile.location);
-      setCachedProfile(profile);
-      // Flush react-query cache so all data queries re-fetch
-      // with the now-valid auth session + profile context
-      resetQueryCache();
+    try {
+      const profile = await fetchProfile(user.id);
+      if (profile) {
+        setUserProfile(profile);
+        setActiveOrg(profile.organization);
+        setActiveBrand(profile.brand);
+        setActiveLocation(profile.location);
+        setCachedProfile(profile);
+        // Flush react-query cache so all data queries re-fetch
+        // with the now-valid auth session + profile context
+        resetQueryCache();
+      }
+      return profile;
+    } catch (e) {
+      console.warn('Refresh profile error:', e);
+      return null;
     }
   }, [user?.id, fetchProfile]);
 
@@ -193,21 +199,24 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      const profile = await fetchProfileRef.current(sessionUser.id);
+      const data = await fetchProfileRef.current(sessionUser.id);
             
-      if (profile) {
-        setUserProfile(profile);
-        setActiveOrg(profile.organization);
-        setActiveBrand(profile.brand);
-        setActiveLocation(profile.location);
-        setCachedProfile(profile);
+      if (data) {
+        setUserProfile(data);
+        setActiveOrg(data.organization);
+        setActiveBrand(data.brand);
+        setActiveLocation(data.location);
+        setCachedProfile(data);
+        // Flush react-query cache so all data queries will re-fetch
+        // with the now-valid Supabase session headers
+        resetQueryCache();
+        return data;
       } else {
         setUserProfile(null);
         clearCachedProfile();
+        resetQueryCache();
       }
-      // Flush react-query cache so all data queries will re-fetch
-      // with the now-valid Supabase session headers
-      resetQueryCache();
+      return null;
     };
 
     // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
