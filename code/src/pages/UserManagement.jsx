@@ -888,11 +888,7 @@ export default function UserManagement() {
         .select('*')
         .eq('organization_id', activeOrgId);
         
-      if (showArchived) {
-        q = q.not('deleted_at', 'is', null);
-      } else {
-        q = q.is('deleted_at', null);
-      }
+      // No deleted_at filter needed for hard deletes
       
       const { data, error } = await q;
       if (error) throw error;
@@ -1148,39 +1144,23 @@ export default function UserManagement() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="rounded-2xl border-slate-100 shadow-xl p-2 w-48">
-                                {!member.deleted_at && (
-                                  <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-700">
-                                    <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
-                                  </DropdownMenuItem>
-                                )}
-                                {member.deleted_at ? (
-                                  <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-teal-600 hover:bg-teal-50"
-                                    onClick={async () => {
-                                      try {
-                                        const userId = member.user_id || member.id;
-                                        await supabase.from('profiles').update({ status: 'active', deleted_at: null }).eq('id', userId);
-                                        queryClient.invalidateQueries({ queryKey: ['team-members'] });
-                                        toast.success('User restored');
-                                      } catch (e) { toast.error(e.message); }
-                                    }}
-                                  >
-                                    <RefreshCw className="h-4 w-4 mr-3" /> Restore Account
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-600 hover:bg-slate-100"
-                                    onClick={async () => {
-                                      if (!window.confirm(`Archive ${member.profiles?.email || member.email}? They will lose access immediately.`)) return;
-                                      try {
-                                        const userId = member.user_id || member.id;
-                                        await supabase.from('profiles').update({ status: 'archived', deleted_at: new Date().toISOString() }).eq('id', userId);
-                                        queryClient.invalidateQueries({ queryKey: ['team-members'] });
-                                        toast.success('User archived');
-                                      } catch (e) { toast.error(e.message); }
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-3" /> Archive Account
-                                  </DropdownMenuItem>
-                                )}
+                                <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-700">
+                                  <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-red-600 hover:bg-red-50"
+                                  onClick={async () => {
+                                    if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
+                                    try {
+                                      const userId = member.user_id || member.id;
+                                      const { error } = await supabase.from('profiles').delete().eq('id', userId);
+                                      if (error) throw error;
+                                      queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                                      toast.success('User deleted');
+                                    } catch (e) { toast.error(e.message || 'Failed to delete user'); }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-3" /> Delete Account
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}

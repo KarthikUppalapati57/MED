@@ -75,7 +75,7 @@ function PlatformDashboard() {
   const { data: allOrgs = [] } = useAuthQuery({
     queryKey: ['dash-orgs'],
     queryFn: async () => {
-      const { data } = await supabase.from('organizations').select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules').is('deleted_at', null);
+      const { data } = await supabase.from('organizations').select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
       return data || [];
     },
   });
@@ -83,7 +83,7 @@ function PlatformDashboard() {
   const { data: allProfiles = [] } = useAuthQuery({
     queryKey: ['dash-profiles'],
     queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('id, role, organization_id').is('deleted_at', null);
+      const { data } = await supabase.from('profiles').select('id, role, organization_id');
       return data || [];
     },
   });
@@ -214,7 +214,7 @@ function OrgOwnerDashboard() {
     queryKey: ['org-users', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      const { data } = await supabase.from('profiles').select('id, role').eq('organization_id', organization.id).is('deleted_at', null);
+      const { data } = await supabase.from('profiles').select('id, role').eq('organization_id', organization.id);
       return data || [];
     },
     enabled: !!organization?.id,

@@ -36,7 +36,6 @@ export default function ContextSwitcher() {
       const { data, error } = await supabase
         .from('organizations')
         .select('id, name, slug')
-        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data || [];
@@ -53,7 +52,6 @@ export default function ContextSwitcher() {
         .from('brands')
         .select('id, name, organization_id')
         .eq('organization_id', activeOrgId)
-        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data || [];
@@ -69,7 +67,6 @@ export default function ContextSwitcher() {
       let query = supabase
         .from('locations')
         .select('id, name, brand_id, organization_id, address')
-        .is('deleted_at', null)
         .order('name');
 
       if (isBranchManager && activeBrandId) {

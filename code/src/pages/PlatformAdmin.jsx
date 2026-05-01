@@ -169,7 +169,6 @@ export default function PlatformAdmin() {
     queryKey: ['organizations', showArchivedOrgs],
     queryFn: async () => {
       let q = supabase.from('organizations').select('*');
-      if (!showArchivedOrgs) q = q.is('deleted_at', null);
       const { data, error } = await q.order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -180,7 +179,7 @@ export default function PlatformAdmin() {
   const { data: allBrands = [] } = useAuthQuery({
     queryKey: ['all-brands'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('brands').select('*').is('deleted_at', null);
+      const { data, error } = await supabase.from('brands').select('*');
       if (error) throw error;
       return data || [];
     },
@@ -190,7 +189,7 @@ export default function PlatformAdmin() {
   const { data: allLocations = [] } = useAuthQuery({
     queryKey: ['all-locations'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('locations').select('*').is('deleted_at', null);
+      const { data, error } = await supabase.from('locations').select('*');
       if (error) throw error;
       return data || [];
     },
@@ -228,7 +227,6 @@ export default function PlatformAdmin() {
         .select('*')
         .eq('role', 'owner')
         .is('accepted_at', null)
-        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -285,7 +283,7 @@ export default function PlatformAdmin() {
     try {
       const { error } = await supabase
         .from('invitations')
-        .update({ deleted_at: new Date().toISOString() })
+        .delete()
         .eq('id', id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
@@ -300,17 +298,14 @@ export default function PlatformAdmin() {
     try {
       const { error } = await supabase
         .from('organizations')
-        .update({ 
-          status: 'archived', 
-          deleted_at: new Date().toISOString() 
-        })
+        .delete()
         .eq('id', id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
-      toast.success(`${name} has been deactivated`);
+      toast.success(`${name} has been deleted`);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to deactivate organization");
+      toast.error("Failed to delete organization");
     }
   };
 
