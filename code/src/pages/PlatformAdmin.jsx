@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
@@ -53,8 +54,10 @@ export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState("access");
+  // Tab State — persisted in URL search params so it survives navigation
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'access';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
   // Selection/Processing State
   const [processingRequests, setProcessingRequests] = useState(new Set());
@@ -166,7 +169,7 @@ export default function PlatformAdmin() {
   });
 
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
-    queryKey: ['organizations', showArchivedOrgs],
+    queryKey: ['organizations'],
     queryFn: async () => {
       let q = supabase.from('organizations').select('*');
       const { data, error } = await q.order('created_at', { ascending: false });
@@ -209,8 +212,7 @@ export default function PlatformAdmin() {
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
     queryKey: ['platform-audit-logs', logModuleFilter],
     queryFn: async () => {
-      let q = supabase.from('audit_logs').select('*, profiles(email)')
-        .is('organization_id', null); // Focus on platform-level actions
+      let q = supabase.from('audit_logs').select('*, profiles(email)');
       if (logModuleFilter !== 'All') q = q.eq('table_name', logModuleFilter);
       const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
@@ -238,6 +240,13 @@ export default function PlatformAdmin() {
   const handleInviteClient = async () => {
     if (!inviteEmail) { toast.error("Email is required"); return; }
     if (inviteSelectedModules.length === 0) { toast.error("Select at least one module"); return; }
+    
+    // Check for duplicate pending invitation
+    const existingInvite = pendingClientInvites.find(i => i.email?.toLowerCase() === inviteEmail.toLowerCase());
+    if (existingInvite) {
+      toast.error(`An invitation for ${inviteEmail} already exists. Revoke it first to send a new one.`);
+      return;
+    }
     
     const toastId = toast.loading("Generating secure onboarding link...");
     setInviting(true);
@@ -756,7 +765,9 @@ export default function PlatformAdmin() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-slate-100">
-                   {orgs.map(org => {
+                   {orgs
+                     .filter(org => showArchivedOrgs ? true : org.status !== 'archived')
+                     .map(org => {
                      const brands = getOrgBrands(org.id);
                      const isExp = expandedOrgs.has(org.id);
                      return (

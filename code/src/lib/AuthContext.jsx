@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { resetQueryCache } from '@/lib/query-client';
+import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/lib/query-client';
 
 const AuthContext = createContext(null);
 
@@ -192,7 +192,7 @@ export const AuthProvider = ({ children }) => {
         setActiveBrand(null);
         setActiveLocation(null);
         clearCachedProfile();
-        resetQueryCache();
+        clearAllQueries();
         return;
       }
       
@@ -215,7 +215,7 @@ export const AuthProvider = ({ children }) => {
     // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
     // to avoid the browser lock deadlock. Uses setTimeout(0) to yield the lock.
     const deferredMFARefresh = () => {
-      setTimeout(async () => {
+      setTimeout(async () => {  // 1.5s delay avoids auth lock contention with session restoration
         if (!isMounted) return;
         try {
           const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
@@ -232,7 +232,7 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           console.warn('Deferred MFA refresh error (non-fatal):', err);
         }
-      }, 0);
+      }, 1500);
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
@@ -305,7 +305,7 @@ export const AuthProvider = ({ children }) => {
             setMfaFactors([]);
             clearCachedProfile();
             // Clear all cached query data to prevent data leaks after logout
-            resetQueryCache();
+            clearAllQueries();
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
@@ -471,13 +471,13 @@ export const AuthProvider = ({ children }) => {
           } else if (type === 'location') {
             setActiveLocation(entity);
           }
-          // Reset queries so the UI fetches data for the new context
-          resetQueryCache();
+          // Invalidate only org-scoped queries — platform-level data is untouched
+          invalidateOrgScopedQueries();
         },
         // Direct setters for ContextSwitcher / platform admin impersonation
-        setActiveOrg: (org) => { setActiveOrg(org); resetQueryCache(); },
-        setActiveBrand: (brand) => { setActiveBrand(brand); resetQueryCache(); },
-        setActiveLocation: (loc) => { setActiveLocation(loc); resetQueryCache(); },
+        setActiveOrg: (org) => { setActiveOrg(org); invalidateOrgScopedQueries(); },
+        setActiveBrand: (brand) => { setActiveBrand(brand); invalidateOrgScopedQueries(); },
+        setActiveLocation: (loc) => { setActiveLocation(loc); invalidateOrgScopedQueries(); },
         unenrollMFA: async (factorId) => {
           const { error } = await supabase.auth.mfa.unenroll({ factorId });
           if (!error) await refreshMFAStatus();

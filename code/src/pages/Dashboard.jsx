@@ -75,7 +75,8 @@ function PlatformDashboard() {
   const { data: allOrgs = [] } = useAuthQuery({
     queryKey: ['dash-orgs'],
     queryFn: async () => {
-      const { data } = await supabase.from('organizations').select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
+      const { data, error } = await supabase.from('organizations').select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
+      if (error) throw error;
       return data || [];
     },
   });
@@ -83,7 +84,8 @@ function PlatformDashboard() {
   const { data: allProfiles = [] } = useAuthQuery({
     queryKey: ['dash-profiles'],
     queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('id, role, organization_id');
+      const { data, error } = await supabase.from('profiles').select('id, role, organization_id');
+      if (error) throw error;
       return data || [];
     },
   });
@@ -91,7 +93,8 @@ function PlatformDashboard() {
   const { data: allPlans = [] } = useAuthQuery({
     queryKey: ['dash-plans'],
     queryFn: async () => {
-      const { data } = await supabase.from('plans').select('*');
+      const { data, error } = await supabase.from('plans').select('*');
+      if (error) throw error;
       return data || [];
     },
   });
@@ -99,7 +102,8 @@ function PlatformDashboard() {
   const { data: recentLogs = [] } = useAuthQuery({
     queryKey: ['dash-recent-logs'],
     queryFn: async () => {
-      const { data } = await supabase.from('audit_logs').select('id, action, table_name, created_at, user_id').order('created_at', { ascending: false }).limit(8);
+      const { data, error } = await supabase.from('audit_logs').select('id, action, table_name, created_at, user_id').order('created_at', { ascending: false }).limit(8);
+      if (error) throw error;
       return data || [];
     },
   });
