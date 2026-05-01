@@ -417,9 +417,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Robust role detection — NEVER default to 'ground_staff'
-  // The fallback chain: DB profile role → auth metadata role → null
-  // When role is null, the loading spinner stays up (isLoadingAuth is still true)
-  const role = userProfile?.role || user?.user_metadata?.role || null;
+  // 1. Database profile role (most accurate)
+  // 2. Cached session storage role (persists through refresh)
+  // 3. User metadata role (from auth token)
+  // 4. Null (keeps queries disabled until profile loads)
+  const role = userProfile?.role || cachedProfile?.role || user?.user_metadata?.role || null;
   const isAuthenticated = !!user;
 
   // Permission helpers — new role hierarchy with backward-compatible aliases

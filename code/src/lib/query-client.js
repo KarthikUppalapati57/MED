@@ -17,5 +17,5 @@ export const queryClientInstance = new QueryClient({
  * to flush stale data and re-fetch with the new session.
  */
 export function resetQueryCache() {
-	queryClientInstance.removeQueries();
+	queryClientInstance.invalidateQueries();
 }
