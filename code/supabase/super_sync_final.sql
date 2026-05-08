@@ -113,6 +113,7 @@ END $$;
 -- Ensure storage bucket logic is also using the faster helpers
 DROP POLICY IF EXISTS "Tenant Isolation Invoices View" ON storage.objects;
 DROP POLICY IF EXISTS "Tenant Isolation Invoices Insert" ON storage.objects;
+DROP POLICY IF EXISTS "Storage_Org_Isolation_Select" ON storage.objects;
 
 CREATE POLICY "Storage_Org_Isolation_Select" ON storage.objects FOR SELECT USING (
     bucket_id IN ('invoices', 'avatars') AND (
@@ -131,6 +132,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Audit_Log_Isolation" ON public.audit_logs;
 CREATE POLICY "Audit_Log_Isolation" ON public.audit_logs FOR SELECT USING (
     organization_id = public.get_auth_org() OR public.get_auth_role() = 'platform_admin'
 );
