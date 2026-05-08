@@ -62,7 +62,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getFlattenedCOA, getCOALabel, ACCOUNTING_GROUPS } from '@/lib/accountingConfig';
+import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();

@@ -158,6 +158,7 @@ BEGIN
 END $$;
 
 -- 8. SYSTEM HEALTH CHECK
+DROP VIEW IF EXISTS public.health_monitor;
 CREATE OR REPLACE VIEW public.health_monitor AS
 SELECT 
     (SELECT count(*) FROM public.organizations) as total_orgs,

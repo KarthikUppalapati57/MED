@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
@@ -17,14 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
   DialogDescription
 } from "@/components/ui/dialog";
 import { 
-  Shield, Users, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, 
-  ChevronDown, ChevronRight, Building2, Store, MapPin, Plus, Copy, DollarSign, 
-  FileText, TrendingUp, Activity, ShieldAlert, Video, UserPlus, Sparkles, 
-  Receipt, History, UserCog, CreditCard, RefreshCw, Fingerprint 
+  Shield, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, 
+  ChevronDown, ChevronRight, Building2, Store, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, Sparkles, 
+  Receipt, History, CreditCard, RefreshCw, Fingerprint 
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";

@@ -18,8 +18,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, ChevronDown, ChevronRight,
-  FileText, Settings, ShieldAlert, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle, RefreshCw
+  FileText, Settings, ShieldCheck,
+  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle
 } from 'lucide-react';
 
 // ─── MEVS Roles ─────────────────────────────────────────────────────────────

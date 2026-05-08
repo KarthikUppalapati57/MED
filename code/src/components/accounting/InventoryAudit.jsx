@@ -4,8 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
-import { CHART_OF_ACCOUNTS, getCOALabel } from '@/lib/accountingConfig';
-import { TrendingUp, Package, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { getCOALabel } from '@/lib/accountingConfig';
+import { TrendingUp, AlertCircle, ArrowUpRight } from 'lucide-react';
 
 export default function InventoryAudit() {
   const { data: auditData = [], isLoading } = useAuthQuery({
