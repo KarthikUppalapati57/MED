@@ -36,6 +36,8 @@ export default function PlatformAuditLogs() {
         .limit(200);
       if (logModuleFilter !== 'All') {
         q = q.eq('table_name', logModuleFilter.toLowerCase());
+      } else {
+        q = q.in('table_name', ['organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations']);
       }
       const { data, error } = await q;
       if (error) throw error;
@@ -80,7 +82,7 @@ export default function PlatformAuditLogs() {
     }
   };
 
-  const moduleFilters = ['All', 'invoices', 'payments', 'inventory', 'products', 'vendors', 'recipes', 'auto_orders', 'organizations', 'profiles', 'invitations', 'brands', 'locations'];
+  const moduleFilters = ['All', 'organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations'];
 
   // ── Guards ─────────────────────────────────────────────────
   if (!authChecked) {

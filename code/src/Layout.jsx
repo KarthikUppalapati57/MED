@@ -41,9 +41,16 @@ import ContextSwitcher from '@/components/ContextSwitcher';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
-  { name: 'Admin Console', href: 'PlatformAdmin', icon: Shield, minRole: 'platform_admin' },
-  { name: 'User Management', href: 'PlatformUserManagement', icon: Users, minRole: 'platform_admin' },
-  { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
+  { 
+    name: 'Platform Management', 
+    icon: Shield, 
+    minRole: 'platform_admin',
+    subItems: [
+      { name: 'Admin Console', href: 'PlatformAdmin', icon: LayoutDashboard },
+      { name: 'User Management', href: 'PlatformUserManagement', icon: Users },
+      { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText }
+    ]
+  },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
   { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'branch_manager' },
   { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },
@@ -69,10 +76,13 @@ const roleBadgeColors = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState({});
   const { user, userProfile, logout, role, organization } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const toggleMenu = (name) => setExpandedMenus(prev => ({...prev, [name]: !prev[name]}));
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications', user?.id],
@@ -203,6 +213,53 @@ export default function Layout({ children, currentPageName }) {
 
         <nav className="p-4 space-y-1">
           {filteredNavigation.map((item) => {
+            if (item.subItems) {
+              const isActive = item.subItems.some(sub => currentPageName === sub.href);
+              const isExpanded = expandedMenus[item.name] ?? isActive;
+              return (
+                <div key={item.name} className="space-y-1">
+                  <button
+                    onClick={() => toggleMenu(item.name)}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                      isActive
+                        ? "bg-slate-800 text-white"
+                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="h-5 w-5" />
+                      {item.name}
+                    </div>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded ? "rotate-180" : "")} />
+                  </button>
+                  {isExpanded && (
+                    <div className="pl-10 pr-2 space-y-1 mt-1">
+                      {item.subItems.map(sub => {
+                        const isSubActive = currentPageName === sub.href;
+                        return (
+                          <Link
+                            key={sub.name}
+                            to={createPageUrl(sub.href)}
+                            onClick={() => setSidebarOpen(false)}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                              isSubActive
+                                ? "bg-teal-500/10 text-teal-400 shadow-sm"
+                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                            )}
+                          >
+                            <sub.icon className="h-4 w-4" />
+                            {sub.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             const isActive = currentPageName === item.href;
             return (
               <Link
@@ -253,7 +310,7 @@ export default function Layout({ children, currentPageName }) {
           </button>
 
           <div className="flex-1 flex items-center px-4">
-            <ContextSwitcher />
+            {!isPlatformAdmin && <ContextSwitcher />}
           </div>
 
           <div className="flex items-center gap-3">
