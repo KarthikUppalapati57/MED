@@ -45,11 +45,7 @@ function SignupPage() {
     const fetchInvite = async () => {
       const { supabase } = await import('@/lib/supabaseClient');
       const { data } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('token', token)
-        .is('accepted_at', null)
-        .single();
+        .rpc('get_invite_details', { invite_token: token });
       if (data) {
         setInviteInfo(data);
         setForm(f => ({ ...f, email: data.email || '' }));
