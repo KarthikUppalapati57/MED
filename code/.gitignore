@@ -36,4 +36,29 @@ dist-ssr
 .claude/
 
 # Vercel
-.vercel/
+.vercel/
+
+# Temporary / generated files
+tmp/
+tmp_*
+*.pdf
+folder_structure.txt
+
+# Python files (backend-only, not part of Vite build)
+*.pyc
+__pycache__/
+
+# Supabase temp
+supabase/.temp/
+
+# Deprecated SQL scripts (kept for reference but not tracked)
+supabase_diagnostic.sql
+supabase_final_fix.sql
+supabase_recovery.sql
+supabase_recursion_repair.sql
+
+# Codex / Zed / MCP config
+.codex/
+.zed/
+.mcp.json
+
