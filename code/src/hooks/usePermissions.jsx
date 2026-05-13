@@ -32,6 +32,7 @@ export function usePermissions() {
   return {
     role,
     userProfile,
+    roleLevel,
 
     // Basic permissions
     canView: true, 
