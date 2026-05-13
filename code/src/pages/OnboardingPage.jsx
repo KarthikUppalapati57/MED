@@ -196,7 +196,7 @@ export default function OnboardingPage() {
     document.body.removeChild(link);
   };
 
-  const handleManualSubmit = async () => {
+  const performOnboarding = async (finalOrgName, finalOrgSlug, finalBrands) => {
     if (!user) {
       toast.error('You must be logged in to complete onboarding');
       return;
@@ -204,17 +204,21 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      if (!orgName || !orgSlug || !hasValidBrands || !hasValidLocations) {
+      if (!finalOrgName || !finalOrgSlug || finalBrands.length === 0) {
         throw new Error('Please fill in all required fields');
       }
 
       // Step 1: Create org + first brand + first location via the atomic RPC
-      const firstBrand = brands[0];
+      const firstBrand = finalBrands[0];
       const firstLocation = firstBrand.locations[0];
+
+      if (!firstBrand || !firstLocation) {
+         throw new Error('You need at least one brand and one location');
+      }
 
       const result = await api.onboarding.setupOrgAndFirstLocation(
         user.id,
-        { name: orgName, slug: orgSlug },
+        { name: finalOrgName, slug: finalOrgSlug },
         firstBrand.name,
         { name: firstLocation.name, address: firstLocation.address }
       );
@@ -240,8 +244,8 @@ export default function OnboardingPage() {
       }
 
       // Step 3: Create additional brands (each with their own locations)
-      for (let i = 1; i < brands.length; i++) {
-        const brand = brands[i];
+      for (let i = 1; i < finalBrands.length; i++) {
+        const brand = finalBrands[i];
         if (!brand.name.trim()) continue;
 
         const { data: newBrand, error: brandErr } = await supabase
@@ -282,7 +286,6 @@ export default function OnboardingPage() {
 
         if (invs && invs[0]) {
           const meta = invs[0].metadata || {};
-          const updates = {};
           
           if (meta.modules) {
             await supabase
@@ -292,11 +295,9 @@ export default function OnboardingPage() {
           }
 
           if (meta.access) {
-            // Map diagram levels (read, write, update) to backend levels (read, full)
             const access = meta.access;
             const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
             
-            // Construct permissions for all standard pages
             const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs'];
             const perms = {};
             allPages.forEach(p => perms[p] = level);
@@ -314,10 +315,10 @@ export default function OnboardingPage() {
         console.warn('Failed to apply invitation metadata:', err);
       }
 
-      const totalBrands = brands.filter(b => b.name.trim()).length;
-      const totalLocations = brands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
+      const totalBrands = finalBrands.filter(b => b.name.trim()).length;
+      const totalLocations = finalBrands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
       toast.success(`Onboarding complete! Created ${totalBrands} brand(s) and ${totalLocations} location(s).`);
-      // Signal completion — the useEffect will poll refreshProfile and redirect
+      
       setCompleted(true);
     } catch (error) {
       console.error('Onboarding failed:', error);
@@ -330,101 +331,55 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleCsvSubmit = async () => {
-    if (!user) {
-      toast.error('You must be logged in to complete onboarding');
+  const handleManualSubmit = async () => {
+    if (!orgName || !orgSlug || !hasValidBrands || !hasValidLocations) {
+      toast.error('Please fill in all required fields');
       return;
     }
-    
-    if (csvData.length === 0) {
+    await performOnboarding(orgName, orgSlug, brands);
+  };
+
+  const handleCsvSubmit = async () => {
+    if (!csvData || csvData.length === 0) {
       toast.error('Please upload a valid CSV file first');
       return;
     }
 
-    setLoading(true);
-    try {
-      // Find the first valid row — onboarding binds the user to ONE primary organization.
-      // Additional orgs/brands/locations from remaining rows can be added from the dashboard later.
-      const firstValidRow = csvData.find(row => {
-        const orgName = row['Organization Name'] || row.orgName || row.organization_name;
-        const brandName = row['Brand Name'] || row.brandName || row.brand_name;
-        const locationName = row['Location Name'] || row.locationName || row.location_name;
-        return orgName && brandName && locationName;
-      });
+    const validRows = csvData.filter(row => {
+      const oName = row['Organization Name'] || row.orgName || row.organization_name;
+      const bName = row['Brand Name'] || row.brandName || row.brand_name;
+      const lName = row['Location Name'] || row.locationName || row.location_name;
+      return oName && bName && lName;
+    });
 
-      if (!firstValidRow) {
-        throw new Error('No valid rows found. Each row needs: Organization Name, Brand Name, and Location Name.');
-      }
-
-      const orgName = firstValidRow['Organization Name'] || firstValidRow.orgName || firstValidRow.organization_name;
-      const brandName = firstValidRow['Brand Name'] || firstValidRow.brandName || firstValidRow.brand_name;
-      const locationName = firstValidRow['Location Name'] || firstValidRow.locationName || firstValidRow.location_name;
-      const locationAddress = firstValidRow['Location Address'] || firstValidRow.locationAddress || firstValidRow.address || 'Address pending';
-      const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
-
-      const result = await api.onboarding.setupOrgAndFirstLocation(
-        user.id,
-        { name: orgName, slug: orgSlug },
-        brandName,
-        { name: locationName, address: locationAddress }
-      );
-
-      // Apply modules and permissions from invitation
-      try {
-        const { data: invs } = await supabase
-          .from('invitations')
-          .select('metadata')
-          .eq('email', user.email)
-          .not('accepted_at', 'is', null)
-          .order('accepted_at', { ascending: false })
-          .limit(1);
-
-        if (invs && invs[0]) {
-          const meta = invs[0].metadata || {};
-          if (meta.modules) {
-            await supabase
-              .from('organizations')
-              .update({ enabled_modules: meta.modules })
-              .eq('id', result.org.id);
-          }
-          if (meta.access) {
-            const access = meta.access;
-            const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
-            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs'];
-            const perms = {};
-            allPages.forEach(p => perms[p] = level);
-
-            await supabase
-              .from('profiles')
-              .update({ 
-                permissions: perms,
-                access_level: level 
-              })
-              .eq('id', user.id);
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to apply invitation metadata:', err);
-      }
-
-      const skippedCount = csvData.length - 1;
-      const successMsg = skippedCount > 0
-        ? `Onboarding complete! ${skippedCount} additional row(s) were skipped — you can add more locations from your dashboard.`
-        : 'Onboarding complete! Welcome to the platform.';
-      
-      toast.success(successMsg);
-      // Signal completion — the useEffect will poll refreshProfile and redirect
-      setCompleted(true);
-    } catch (error) {
-      console.error('CSV Onboarding failed:', error);
-      const message = error.message?.includes('organizations_slug_key')
-        ? 'This organization name generated a slug that is already taken. Please rename and try again.'
-        : (error.message || 'Failed to complete onboarding');
-      toast.error(message, { duration: 5000 });
-    } finally {
-      // ALWAYS reset loading — prevents infinite spinner
-      setLoading(false);
+    if (validRows.length === 0) {
+      toast.error('No valid rows found. Each row needs: Organization Name, Brand Name, and Location Name.');
+      return;
     }
+
+    const firstRow = validRows[0];
+    const finalOrgName = firstRow['Organization Name'] || firstRow.orgName || firstRow.organization_name;
+    const finalOrgSlug = finalOrgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
+
+    // Group valid rows by brand for the primary organization
+    const brandsMap = {};
+    validRows.forEach(row => {
+      const rowOrg = row['Organization Name'] || row.orgName || row.organization_name;
+      // We only process rows that match the first row's organization name
+      if (rowOrg !== finalOrgName) return;
+
+      const bName = row['Brand Name'] || row.brandName || row.brand_name;
+      const lName = row['Location Name'] || row.locationName || row.location_name;
+      const lAddr = row['Location Address'] || row.locationAddress || row.address || 'Address pending';
+
+      if (!brandsMap[bName]) {
+        brandsMap[bName] = { name: bName, locations: [] };
+      }
+      brandsMap[bName].locations.push({ name: lName, address: lAddr });
+    });
+
+    const parsedBrands = Object.values(brandsMap);
+    await performOnboarding(finalOrgName, finalOrgSlug, parsedBrands);
   };
 
   // Render initial selection screen

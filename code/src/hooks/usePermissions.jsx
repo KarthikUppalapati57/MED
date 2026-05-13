@@ -19,9 +19,12 @@ export function usePermissions() {
   const roleLevel = {
     ground_staff:     0,
     location_manager: 1,
+    manager:          2, // alias
     branch_manager:   2,
     org_owner:        3,
+    owner:            3, // alias
     platform_admin:   4,
+    admin:            4, // alias
   };
 
   const currentLevel = roleLevel[role] ?? 0;
@@ -56,10 +59,10 @@ export function usePermissions() {
 
     // Role identity checks (new roles)
     isGroundStaff: role === 'ground_staff',
-    isLocationManager: role === 'location_manager',
-    isBranchManager: role === 'branch_manager',
-    isOrgOwner: role === 'org_owner',
-    isPlatformAdmin: role === 'platform_admin',
+    isLocationManager: role === 'location_manager' || role === 'manager',
+    isBranchManager: role === 'branch_manager' || role === 'manager',
+    isOrgOwner: role === 'org_owner' || role === 'owner',
+    isPlatformAdmin: role === 'platform_admin' || role === 'admin',
 
     // Level-based checks
     isLocationManagerOrAbove: currentLevel >= 1,
