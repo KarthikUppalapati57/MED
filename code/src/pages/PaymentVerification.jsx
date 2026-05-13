@@ -41,15 +41,15 @@ function VerificationForm({ onVerified }) {
       // For this workflow, we simulate successful verification
       await new Promise(r => setTimeout(r, 2000));
 
-      // Use upsert to ensure the profile exists and is marked as verified
+      // Use update instead of upsert to avoid RLS INSERT violations
+      // The profile is already created by the database trigger during signup
       const { error: updateError } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: user.id,
-          email: user.email,
+        .update({ 
           payment_verified: true, 
           updated_at: new Date().toISOString() 
-        }, { onConflict: 'id' });
+        })
+        .eq('id', user.id);
 
       if (updateError) throw updateError;
 
