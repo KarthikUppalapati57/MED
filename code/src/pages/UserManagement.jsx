@@ -578,6 +578,7 @@ function InviteDialog({ open, onClose, orgId }) {
   const [signingPrivileges, setSigningPrivileges] = useState({});
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState(0); // 0=email, 1=role, 2=permissions, 3=signing
+  const [generatedLink, setGeneratedLink] = useState('');
 
   const handleSubmit = async () => {
     if (!email) { toast.error('Email is required'); return; }
@@ -595,9 +596,11 @@ function InviteDialog({ open, onClose, orgId }) {
         }
       });
 
+      let token = null;
+
       if (fnError) {
         // Fallback: Direct invitation insert
-        const { error: insertErr } = await supabase
+        const { data: insertData, error: insertErr } = await supabase
           .from("invitations")
           .insert([{
             email,
@@ -605,8 +608,13 @@ function InviteDialog({ open, onClose, orgId }) {
             invited_by: currentUser?.id,
             organization_id: orgId || userProfile?.organization_id,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          }]);
+          }])
+          .select('token')
+          .single();
         if (insertErr) throw insertErr;
+        token = insertData?.token;
+      } else if (result?.token) {
+        token = result.token;
       }
 
       try {
@@ -618,11 +626,18 @@ function InviteDialog({ open, onClose, orgId }) {
         });
       } catch { /* audit non-critical */ }
 
-      toast.success(`Invitation sent to ${email}`);
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
-      onClose();
+
+      if (token) {
+        const link = `${window.location.origin}/signup/${token}`;
+        setGeneratedLink(link);
+        toast.success(`Invitation generated for ${email}`);
+      } else {
+        toast.success(`Invitation sent to ${email}`);
+        setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
+        onClose();
+      }
     } catch (err) {
       toast.error('Invitation failed: ' + (err.message || 'Unknown error'));
     }
@@ -638,11 +653,39 @@ function InviteDialog({ open, onClose, orgId }) {
           </div>
           <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Expand Your Team</DialogTitle>
           <DialogDescription className="font-medium text-slate-500">
-            New members will receive an invite to secure their account.
+            {generatedLink ? "Share this secure link with the new team member." : "New members will receive an invite to secure their account."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        {generatedLink ? (
+          <div className="space-y-6 py-4">
+            <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
+              <p className="text-sm text-teal-800 font-medium mb-3">Copy this link and send it directly to <b>{email}</b> so they can complete their sign up.</p>
+              <div className="flex items-center gap-2">
+                <Input value={generatedLink} readOnly className="bg-white rounded-xl h-11 border-teal-200 text-slate-600" />
+                <Button 
+                  className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-11 px-4"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedLink);
+                    toast.success("Link copied to clipboard!");
+                  }}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <Button 
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-12"
+              onClick={() => {
+                setGeneratedLink(''); setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
+                onClose();
+              }}
+            >
+              Done
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-5 py-2">
           {/* Step 0: Email */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Email Address</Label>
@@ -712,8 +755,9 @@ function InviteDialog({ open, onClose, orgId }) {
             disabled={sending || !email}
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Mail className="w-4 h-4 mr-2" />}
-            Send Invitation
+            Generate Link
           </Button>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
