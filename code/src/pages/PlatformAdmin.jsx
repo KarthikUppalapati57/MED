@@ -31,15 +31,10 @@ import { cn } from "@/lib/utils";
 import InventoryAudit from '@/components/accounting/InventoryAudit';
 
 const TABS = [
-  { id: 'access', label: 'Access Request', icon: ShieldAlert },
-  { id: 'demo', label: 'Demo Requests', icon: Video },
-  { id: 'contact', label: 'Contact Us', icon: Mail },
+  { id: 'requests', label: 'Requests', icon: ShieldAlert },
   { id: 'invite', label: 'Invite Clients', icon: UserPlus },
   { id: 'orgs', label: 'Organisation', icon: Building2 },
-  { id: 'plans', label: 'Plans', icon: Sparkles },
-  { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
-  { id: 'accounting', label: 'Accounting', icon: Receipt },
-  { id: 'logs', label: 'Logs', icon: History },
+  { id: 'plans', label: 'Plans', icon: Sparkles }
 ];
 
 const ACCESS_LEVELS = [
@@ -54,7 +49,7 @@ export default function PlatformAdmin() {
 
   // Tab State — persisted in URL search params so it survives navigation
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'access';
+  const activeTab = searchParams.get('tab') || 'requests';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
   // Selection/Processing State
@@ -666,45 +661,12 @@ export default function PlatformAdmin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="bg-white p-1 rounded-2xl border border-slate-200 inline-flex shadow-sm mb-8">
-          {TABS.map(tab => {
-            let badge = 0;
-            if (tab.id === 'access') badge = pendingAccessCount;
-            if (tab.id === 'contact') badge = pendingContactCount;
-            if (tab.id === 'orgs') badge = pendingOrgCount;
-
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
-                  activeTab === tab.id 
-                    ? "bg-slate-900 text-white shadow-lg shadow-slate-200" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                )}
-              >
-                <tab.icon className={cn("w-4 h-4", activeTab === tab.id ? "text-white" : "text-slate-400")} />
-                {tab.label}
-                {badge > 0 && (
-                  <span className={cn(
-                    "ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-black",
-                    activeTab === tab.id ? "bg-white text-slate-900" : "bg-amber-500 text-white"
-                  )}>
-                    {badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        {/* Horizontal tabs removed in favor of sidebar navigation */}
 
         <div className="space-y-6">
-          <TabsContent value="access" className="mt-0 outline-none focus-visible:ring-0">
+          <TabsContent value="requests" className="mt-0 outline-none focus-visible:ring-0 space-y-6">
             {renderRequestTable(accessReqs, "Access Requests", pendingAccessCount, "access")}
-          </TabsContent>
-
-          <TabsContent value="demo" className="mt-0 outline-none">
+            
             <Card className="border-0 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div>

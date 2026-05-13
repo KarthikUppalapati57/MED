@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,7 +21,10 @@ import {
   User,
   Shield,
   Check,
-  Building2
+  Building2,
+  ShieldAlert,
+  UserPlus,
+  Sparkles
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,15 +45,18 @@ import ContextSwitcher from '@/components/ContextSwitcher';
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
   { 
-    name: 'Platform Management', 
+    name: 'Platform Admin', 
     icon: Shield, 
     minRole: 'platform_admin',
     subItems: [
-      { name: 'Admin Console', href: 'PlatformAdmin', icon: LayoutDashboard },
-      { name: 'User Management', href: 'PlatformUserManagement', icon: Users },
-      { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText }
+      { name: 'Requests', href: 'PlatformAdmin?tab=requests', icon: ShieldAlert },
+      { name: 'Invite Clients', href: 'PlatformAdmin?tab=invite', icon: UserPlus },
+      { name: 'Organisation', href: 'PlatformAdmin?tab=orgs', icon: Building2 },
+      { name: 'Plans', href: 'PlatformAdmin?tab=plans', icon: Sparkles }
     ]
   },
+  { name: 'User Management', href: 'PlatformUserManagement', icon: Users, minRole: 'platform_admin' },
+  { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
   { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'branch_manager' },
   { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },
@@ -80,6 +86,7 @@ export default function Layout({ children, currentPageName }) {
   const { user, userProfile, logout, role, organization } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
 
   const toggleMenu = (name) => setExpandedMenus(prev => ({...prev, [name]: !prev[name]}));
@@ -214,7 +221,12 @@ export default function Layout({ children, currentPageName }) {
         <nav className="p-4 space-y-1">
           {filteredNavigation.map((item) => {
             if (item.subItems) {
-              const isActive = item.subItems.some(sub => currentPageName === sub.href);
+              const isActive = item.subItems.some(sub => {
+                const [base, query] = sub.href.split('?');
+                if (currentPageName !== base) return false;
+                if (query) return location.search.includes(query.split('=')[1] || query);
+                return true;
+              });
               const isExpanded = expandedMenus[item.name] ?? isActive;
               return (
                 <div key={item.name} className="space-y-1">
@@ -236,7 +248,12 @@ export default function Layout({ children, currentPageName }) {
                   {isExpanded && (
                     <div className="pl-10 pr-2 space-y-1 mt-1">
                       {item.subItems.map(sub => {
-                        const isSubActive = currentPageName === sub.href;
+                        const isSubActive = (() => {
+                          const [base, query] = sub.href.split('?');
+                          if (currentPageName !== base) return false;
+                          if (query) return location.search.includes(query.split('=')[1] || query);
+                          return true;
+                        })();
                         return (
                           <Link
                             key={sub.name}
