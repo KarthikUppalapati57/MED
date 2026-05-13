@@ -129,10 +129,10 @@ function PlatformDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-blue-100" iconColor="text-blue-600" linkTo="PlatformAdmin" linkText="Manage" />
+        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-blue-100" iconColor="text-blue-600" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" />
         <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-100" iconColor="text-purple-600" linkTo="PlatformUserManagement" linkText="View users" />
-        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-emerald-100" iconColor="text-emerald-600" linkTo="PlatformAdmin" linkText="Accounting" />
-        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-teal-100" iconColor="text-teal-600" subtext={<><span className="text-amber-500 font-medium">{trialOrgs.length}</span> trials</>} />
+        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-emerald-100" iconColor="text-emerald-600" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" />
+        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-amber-500 font-medium">{trialOrgs.length}</span> trials</>} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
