@@ -71,11 +71,19 @@ function SignupPage() {
       setError('Please wait for invitation details to load.');
       return;
     }
-
     setLoading(true);
+
+    // Map deprecated role names to new role names to satisfy database constraints
+    const roleMapping = {
+      owner: 'org_owner',
+      admin: 'platform_admin',
+      manager: 'branch_manager',
+    };
+    const mappedRole = roleMapping[inviteInfo.role] || inviteInfo.role;
+
     const { data, error: signUpError } = await signUp(form.email, form.password, {
       full_name: form.full_name,
-      role: inviteInfo.role, // No fallback to ground_staff here
+      role: mappedRole, // Use the mapped role instead of the deprecated one
       invite_token: token,
     });
     setLoading(false);
@@ -100,7 +108,12 @@ function SignupPage() {
           <h1 className="text-2xl font-bold text-slate-900">Create Your Account</h1>
           <p className="text-slate-500 mt-1 text-sm">
             {inviteInfo
-              ? `You've been invited as ${inviteInfo.role?.replace('_', ' ')}`
+              ? `You've been invited as ${
+                  inviteInfo.role === 'owner' || inviteInfo.role === 'org_owner' ? 'organization owner' :
+                  inviteInfo.role === 'admin' || inviteInfo.role === 'platform_admin' ? 'platform admin' :
+                  inviteInfo.role === 'manager' || inviteInfo.role === 'branch_manager' ? 'branch manager' :
+                  inviteInfo.role?.replace('_', ' ')
+                }`
               : 'Join the team'}
           </p>
         </div>
