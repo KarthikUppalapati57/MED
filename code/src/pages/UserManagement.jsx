@@ -685,7 +685,8 @@ function InviteDialog({ open, onClose, orgId }) {
             </Button>
           </div>
         ) : (
-          <div className="space-y-5 py-2">
+          <>
+            <div className="space-y-5 py-2">
           {/* Step 0: Email */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-600 uppercase tracking-wider pl-1">Email Address</Label>
@@ -758,7 +759,8 @@ function InviteDialog({ open, onClose, orgId }) {
             Generate Link
           </Button>
         </div>
-        </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
