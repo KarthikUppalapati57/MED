@@ -456,6 +456,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const resetPassword = async (email) => {
+    setAuthError(null);
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      if (error) {
+        setAuthError(error);
+        return { data: null, error };
+      }
+      return { data, error: null };
+    } catch (err) {
+      setAuthError(err);
+      return { data: null, error: err };
+    }
+  };
+
+
   // Robust role detection — NEVER default to 'ground_staff'
   // 1. Database profile role (most accurate)
   // 2. Cached session storage role (persists through refresh)
@@ -490,6 +508,7 @@ export const AuthProvider = ({ children }) => {
         authError,
         loginWithEmail,
         signUp,
+        resetPassword,
         logout,
         hasPermission,
         fetchProfile,

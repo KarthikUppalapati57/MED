@@ -210,11 +210,13 @@ function SignupPage() {
 
 // ── Login Page ──────────────────────────────────────────────
 function LoginPage() {
-  const { loginWithEmail, authError } = useAuth();
+  const { loginWithEmail, resetPassword, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -224,18 +226,94 @@ function LoginPage() {
     setIsSubmitting(false);
   };
 
+  const handleReset = async (e) => {
+    e.preventDefault();
+    setLocalError('');
+    setIsSubmitting(true);
+    const { error } = await resetPassword(email);
+    setIsSubmitting(false);
+    if (error) {
+      setLocalError(error.message);
+    } else {
+      setResetSent(true);
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
       toast.success('Email verified successfully! You can now sign in.', {
         duration: 5000,
       });
-      // Clear the query param without refreshing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
   const displayError = localError || (authError?.message);
+
+  if (isResetMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-slate-900">Reset Password</h1>
+            <p className="text-slate-500 mt-1 text-sm">
+              Enter your email and we'll send you a reset link.
+            </p>
+          </div>
+          {resetSent ? (
+            <div className="text-center space-y-4">
+              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+                Reset link sent! Please check your email.
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsResetMode(false); setResetSent(false); }}
+                className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+              >
+                Back to sign in
+              </button>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleReset}>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  placeholder="you@restaurant.com"
+                  required
+                />
+              </div>
+              {displayError && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                  {displayError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                {isSubmitting ? 'Sending...' : 'Send Reset Link'}
+              </button>
+              <div className="text-center pt-2 border-t mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsResetMode(false)}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
@@ -265,7 +343,16 @@ function LoginPage() {
             />
           </div>
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-slate-700">Password</label>
+            <div className="flex justify-between items-center">
+              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <button 
+                type="button" 
+                onClick={() => setIsResetMode(true)}
+                className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               type="password"
               value={password}
@@ -286,6 +373,82 @@ function LoginPage() {
             className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Update Password Page ───────────────────────────────────
+function UpdatePasswordPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (password !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    const { supabase } = await import('@/lib/supabaseClient');
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      toast.success('Password updated successfully!');
+      navigate('/');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-slate-900">Update Password</h1>
+          <p className="text-slate-500 mt-1 text-sm">Enter your new password below.</p>
+        </div>
+        <form className="space-y-4" onSubmit={handleUpdate}>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700">New Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-slate-700">Confirm Password</label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              required
+            />
+          </div>
+          {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+          >
+            {loading ? 'Updating...' : 'Update Password'}
           </button>
         </form>
       </div>
@@ -362,6 +525,7 @@ const AuthenticatedApp = () => {
       {/* Public routes */}
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
+      <Route path="/update-password" element={user ? <UpdatePasswordPage /> : <Navigate to="/login" />} />
 
       {/* Conditional route blocks — each state gets ONLY its relevant routes */}
       {!user ? (

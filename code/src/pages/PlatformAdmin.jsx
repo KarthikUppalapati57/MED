@@ -22,7 +22,7 @@ import {
 import { 
   Shield, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, 
   ChevronDown, ChevronRight, Building2, Store, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, Sparkles, 
-  Receipt, History, CreditCard, RefreshCw, Fingerprint 
+  Receipt, History, CreditCard, RefreshCw, Fingerprint, Send
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
@@ -589,6 +589,7 @@ export default function PlatformAdmin() {
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        title="Copy Invite Link"
                         onClick={() => {
                           const link = `${window.location.origin}/signup/${invite.token}`;
                           navigator.clipboard.writeText(link);
@@ -600,7 +601,33 @@ export default function PlatformAdmin() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                        title="Resend Invite"
+                        onClick={async () => {
+                          toast.loading("Resending invite...", { id: 'resend-invite' });
+                          const { error } = await supabase.functions.invoke('invite-client', {
+                            body: {
+                              email: invite.email,
+                              full_name: invite.full_name || '',
+                              role: invite.role,
+                              org_id: invite.organization_id,
+                              resend: true
+                            }
+                          });
+                          if (error) {
+                            toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
+                          } else {
+                            toast.success("Invite resent successfully!", { id: 'resend-invite' });
+                          }
+                        }}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
                         className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        title="Delete Invite"
                         onClick={() => setConfirmDeleteInvite(invite.id)}
                       >
                         <Trash2 className="w-4 h-4" />

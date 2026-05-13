@@ -1226,16 +1226,40 @@ export default function UserManagement() {
                                   <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
                                 </DropdownMenuItem>
                                 {member.token && (
-                                  <DropdownMenuItem 
-                                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-blue-600 hover:bg-blue-50"
-                                    onClick={() => {
-                                      const link = `${window.location.origin}/signup/${member.token}`;
-                                      navigator.clipboard.writeText(link);
-                                      toast.success("Invite link copied to clipboard!");
-                                    }}
-                                  >
-                                    <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
-                                  </DropdownMenuItem>
+                                  <>
+                                    <DropdownMenuItem 
+                                      className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-blue-600 hover:bg-blue-50"
+                                      onClick={() => {
+                                        const link = `${window.location.origin}/signup/${member.token}`;
+                                        navigator.clipboard.writeText(link);
+                                        toast.success("Invite link copied to clipboard!");
+                                      }}
+                                    >
+                                      <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-teal-600 hover:bg-teal-50"
+                                      onClick={async () => {
+                                        toast.loading("Resending invite...", { id: 'resend-invite' });
+                                        const { error } = await supabase.functions.invoke('invite-user', {
+                                          body: {
+                                            email: member.email || member.profiles?.email,
+                                            full_name: member.full_name || member.profiles?.full_name,
+                                            role: member.role || member.profiles?.role,
+                                            org_id: activeOrgId,
+                                            resend: true
+                                          }
+                                        });
+                                        if (error) {
+                                          toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
+                                        } else {
+                                          toast.success("Invite resent successfully!", { id: 'resend-invite' });
+                                        }
+                                      }}
+                                    >
+                                      <Mail className="h-4 w-4 mr-3" /> Resend Invite
+                                    </DropdownMenuItem>
+                                  </>
                                 )}
                                 <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-red-600 hover:bg-red-50"
                                   onClick={async () => {
