@@ -905,7 +905,7 @@ export default function UserManagement() {
   const { data: members = [], isLoading } = useAuthQuery({
     queryKey: ['team-members', activeOrgId, activeBrandId, activeLocationId, showArchived],
     queryFn: async () => {
-      // Try memberships table first (CRE-style)
+      let finalUsers = [];
       try {
         let memQuery = supabase
           .from('memberships')
@@ -915,7 +915,7 @@ export default function UserManagement() {
         const { data, error } = await memQuery;
         
         if (!error && data && data.length > 0) {
-          return data.map(m => ({
+          finalUsers = data.map(m => ({
             ...m,
             membership_id: m.id,
             email: m.profiles?.email,
@@ -926,22 +926,54 @@ export default function UserManagement() {
         }
       } catch { /* fall through */ }
 
-      // Fallback: profiles table (MEVS-style)
-      let q = supabase
-        .from('profiles')
-        .select('*')
-        .eq('organization_id', activeOrgId);
-        
-      // No deleted_at filter needed for hard deletes
-      
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data || []).map(p => ({
-        ...p,
-        membership_id: p.id,
-        user_id: p.id,
-        profiles: p,
-      }));
+      if (finalUsers.length === 0) {
+        // Fallback: profiles table (MEVS-style)
+        let q = supabase
+          .from('profiles')
+          .select('*')
+          .eq('organization_id', activeOrgId);
+          
+        const { data, error } = await q;
+        if (error) throw error;
+        finalUsers = (data || []).map(p => ({
+          ...p,
+          membership_id: p.id,
+          user_id: p.id,
+          profiles: p,
+        }));
+      }
+
+      // Merge pending invitations
+      try {
+        const { data: invs } = await supabase.from('invitations')
+          .select('*')
+          .eq('organization_id', activeOrgId)
+          .is('accepted_at', null);
+          
+        if (invs) {
+          invs.forEach(inv => {
+            const existing = finalUsers.find(u => u.profiles?.email === inv.email || u.email === inv.email);
+            if (existing) {
+              existing.token = inv.token;
+              existing.status = 'invited';
+            } else {
+              finalUsers.push({
+                id: 'inv_' + inv.id,
+                membership_id: 'inv_' + inv.id,
+                user_id: 'inv_' + inv.id,
+                email: inv.email,
+                role: inv.role,
+                status: 'invited',
+                token: inv.token,
+                profiles: { email: inv.email, full_name: 'Pending Invite' },
+                created_at: inv.created_at
+              });
+            }
+          });
+        }
+      } catch (e) { /* ignore */ }
+
+      return finalUsers;
     },
     enabled: !!activeOrgId,
     staleTime: 30000,
@@ -1191,6 +1223,18 @@ export default function UserManagement() {
                                 <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-slate-700">
                                   <Edit2 className="h-4 w-4 mr-3 text-teal-600" /> Advanced Settings
                                 </DropdownMenuItem>
+                                {member.token && (
+                                  <DropdownMenuItem 
+                                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-blue-600 hover:bg-blue-50"
+                                    onClick={() => {
+                                      const link = `${window.location.origin}/signup/${member.token}`;
+                                      navigator.clipboard.writeText(link);
+                                      toast.success("Invite link copied to clipboard!");
+                                    }}
+                                  >
+                                    <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-red-600 hover:bg-red-50"
                                   onClick={async () => {
                                     if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;

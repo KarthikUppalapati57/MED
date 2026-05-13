@@ -584,14 +584,28 @@ export default function PlatformAdmin() {
                     <Badge className="bg-pink-100 text-pink-700 text-[9px] font-bold border-none">Delivered</Badge>
                   </TableCell>
                   <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                      onClick={() => setConfirmDeleteInvite(invite.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        onClick={() => {
+                          const link = `${window.location.origin}/signup/${invite.token}`;
+                          navigator.clipboard.writeText(link);
+                          toast.success("Invite link copied to clipboard!");
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        onClick={() => setConfirmDeleteInvite(invite.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
