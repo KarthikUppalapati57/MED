@@ -229,7 +229,12 @@ export default function Layout({ children, currentPageName }) {
               });
               const isExpanded = expandedMenus[item.name] ?? isActive;
               return (
-                <div key={item.name} className="space-y-1">
+                <div 
+                  key={item.name} 
+                  className="space-y-1"
+                  onMouseEnter={() => setExpandedMenus(prev => ({...prev, [item.name]: true}))}
+                  onMouseLeave={() => setExpandedMenus(prev => ({...prev, [item.name]: false}))}
+                >
                   <button
                     onClick={() => toggleMenu(item.name)}
                     className={cn(
