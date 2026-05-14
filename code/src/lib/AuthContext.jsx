@@ -272,7 +272,7 @@ export const AuthProvider = ({ children }) => {
         const currentUser = session?.user ?? null;
         
         try {
-          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
             if (currentUser) {
               // 0. Safety Check: If the user ID has changed, or we're starting fresh, clear the stale cache
               const currentCache = getCachedProfile();
@@ -333,7 +333,21 @@ export const AuthProvider = ({ children }) => {
               setUserProfile(null);
               setMfaLevel({ current: 'aal1', next: 'aal1' });
               setMfaFactors([]);
-              if (isMounted) setIsLoadingAuth(false);
+              
+              const hash = window.location.hash || '';
+              const search = window.location.search || '';
+              const hasAuthParams = hash.includes('access_token=') || hash.includes('type=recovery') || search.includes('code=');
+              
+              if (isMounted) {
+                if (hasAuthParams) {
+                  // Wait for the imminent SIGNED_IN or PASSWORD_RECOVERY event
+                  setTimeout(() => {
+                    if (isMounted) setIsLoadingAuth(false);
+                  }, 3000);
+                } else {
+                  setIsLoadingAuth(false);
+                }
+              }
             }
           } else if (event === 'SIGNED_OUT') {
             setUser(null);
