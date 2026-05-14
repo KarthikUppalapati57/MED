@@ -146,15 +146,29 @@ Deno.serve(async (req: Request) => {
         console.log(`[invite-user] Invited new user successfully: ${userId}`);
       }
     } else if (resend) {
-      // For existing users, generate a recovery/magic link to re-invite them
+      // For existing users, attempt to resend the invite or send a magic link
       console.log(`[invite-user] Resending invite for existing user: ${email}`);
       try {
-        const { error: linkErr } = await adminClient.auth.admin.generateLink({
-          type: "magiclink",
+        // Try resending the invite first (works if unconfirmed)
+        const { error: resendErr } = await adminClient.auth.resend({
+          type: "invite",
           email: email,
+          options: {
+            emailRedirectTo: loginLink,
+          }
         });
-        if (linkErr) {
-          console.warn("[invite-user] Magic link generation failed:", linkErr.message);
+        if (resendErr) {
+          console.warn("[invite-user] Resend invite failed, trying magic link...", resendErr.message);
+          // If already confirmed, send a magic link instead
+          const { error: otpErr } = await adminClient.auth.signInWithOtp({
+            email: email,
+            options: {
+              emailRedirectTo: loginLink,
+            }
+          });
+          if (otpErr) {
+            console.warn("[invite-user] Magic link fallback failed:", otpErr.message);
+          }
         }
       } catch (e: any) {
         console.warn("[invite-user] Re-invite fallback error:", e.message);
@@ -205,15 +219,21 @@ Deno.serve(async (req: Request) => {
       console.error("[invite-user] Invitation insert error:", invInsertErr);
       // If duplicate, try to fetch existing token
       if (invInsertErr.code === "23505") {
-        const { data: existingInv } = await adminClient
+        let query = adminClient
           .from("invitations")
           .select("token")
           .eq("email", email.toLowerCase())
-          .eq("organization_id", targetOrgId)
           .is("accepted_at", null)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+
+        if (targetOrgId) {
+          query = query.eq("organization_id", targetOrgId);
+        } else {
+          query = query.is("organization_id", null);
+        }
+
+        const { data: existingInv } = await query.maybeSingle();
         if (existingInv?.token) {
           return new Response(JSON.stringify({
             success: true,
