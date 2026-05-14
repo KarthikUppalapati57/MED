@@ -525,7 +525,7 @@ const AuthenticatedApp = () => {
       {/* Public routes */}
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
-      <Route path="/update-password" element={user ? <UpdatePasswordPage /> : <Navigate to="/login" />} />
+      <Route path="/update-password" element={<UpdatePasswordPage />} />
 
       {/* Conditional route blocks — each state gets ONLY its relevant routes */}
       {!user ? (
