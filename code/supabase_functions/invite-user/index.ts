@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { email, full_name, role, org_id, resend } = body;
+    const { email, full_name, role, org_id, resend, page_permissions, signing_privileges } = body;
 
     if (!email) {
       return new Response(JSON.stringify({ error: "Missing email" }), {
@@ -73,18 +73,37 @@ Deno.serve(async (req: Request) => {
     const targetOrgId = org_id || callerProfile.organization_id;
 
     const frontendUrl = Deno.env.get("FRONTEND_URL") || Deno.env.get("SITE_URL") || "http://localhost:5173";
-    // We want them to go to a special signup or login URL if possible
-    // Supabase invite automatically redirects to emailRedirectTo
     const loginLink = `${frontendUrl}/login`;
+
+    // ── Safety check: was this user previously deleted/archived? ──────────
+    const { data: existingProfile } = await adminClient
+      .from("profiles")
+      .select("id, status, role, organization_id, email")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (existingProfile && ["inactive", "archived"].includes(existingProfile.status)) {
+      console.warn(`[invite-user] User ${email} was previously ${existingProfile.status}`);
+      return new Response(JSON.stringify({
+        error: `This user (${email}) was previously ${existingProfile.status}. Please contact a platform admin to reinstate them before re-inviting.`,
+        code: "USER_PREVIOUSLY_REMOVED",
+        previous_status: existingProfile.status,
+        previous_org: existingProfile.organization_id,
+      }), {
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // 1. Check if user already exists in Auth
     let userId: string | null = null;
     let isNewUser = false;
 
     try {
-      const { data: userData, error: getUserErr } = await adminClient.auth.admin.listUsers();
-      const existing = userData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
-      
+      const { data: userData } = await adminClient.auth.admin.listUsers();
+      const existing = userData?.users?.find(
+        (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+      );
+
       if (existing) {
         userId = existing.id;
         console.log(`[invite-user] Found existing auth user: ${userId}`);
@@ -110,36 +129,35 @@ Deno.serve(async (req: Request) => {
         if (inviteError.message?.toLowerCase().includes("already registered")) {
           console.log("[invite-user] User actually exists (race condition), fetching again...");
           const { data: allUsers } = await adminClient.auth.admin.listUsers();
-          const found = allUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+          const found = allUsers?.users?.find(
+            (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+          );
           if (found) {
-             userId = found.id;
-             isNewUser = false;
+            userId = found.id;
+            isNewUser = false;
           } else {
-             throw inviteError;
+            throw inviteError;
           }
         } else {
           throw inviteError;
         }
-      } else {
+      } else if (inviteData?.user) {
         userId = inviteData.user.id;
         console.log(`[invite-user] Invited new user successfully: ${userId}`);
       }
     } else if (resend) {
-      // If resend is requested for an existing user but they haven't set a password or accepted:
-      // Since inviteUserByEmail fails for existing users, we can try to send a password reset link
-      // instead, or use generateLink to send an email manually if needed.
-      console.log(`[invite-user] Resending invite for existing user: ${email} via reset password`);
-      const { error: resetErr } = await adminClient.auth.admin.generateLink({
-        type: "invite",
-        email: email,
-        password: crypto.randomUUID().slice(0, 12) + "X1!" // provide a temp password if required
-      });
-      if (resetErr) {
-        console.log("[invite-user] Generating invite link failed, trying magiclink...", resetErr.message);
-        await adminClient.auth.admin.generateLink({
+      // For existing users, generate a recovery/magic link to re-invite them
+      console.log(`[invite-user] Resending invite for existing user: ${email}`);
+      try {
+        const { error: linkErr } = await adminClient.auth.admin.generateLink({
           type: "magiclink",
-          email: email
+          email: email,
         });
+        if (linkErr) {
+          console.warn("[invite-user] Magic link generation failed:", linkErr.message);
+        }
+      } catch (e: any) {
+        console.warn("[invite-user] Re-invite fallback error:", e.message);
       }
     }
 
@@ -147,28 +165,72 @@ Deno.serve(async (req: Request) => {
 
     // 2. Upsert profile
     console.log(`[invite-user] Upserting profile for ${userId}`);
-    const { error: upsertErr } = await adminClient.from("profiles").upsert({
+    const profilePayload: Record<string, any> = {
       id: userId,
       email: email.toLowerCase(),
       full_name: full_name || null,
       role: targetRole,
       organization_id: targetOrgId || null,
       status: "invited",
-    });
+    };
+    // Attach page permissions & signing privileges if provided
+    if (page_permissions && Object.keys(page_permissions).length > 0) {
+      profilePayload.permissions = page_permissions;
+    }
+    if (signing_privileges && Object.keys(signing_privileges).length > 0) {
+      profilePayload.signing_privileges = signing_privileges;
+    }
+
+    const { error: upsertErr } = await adminClient
+      .from("profiles")
+      .upsert(profilePayload, { onConflict: "id" });
     if (upsertErr) console.error("[invite-user] Profile upsert error:", upsertErr);
 
-    // 3. Log invitation in DB
+    // 3. Log invitation in DB — generate a proper token for the frontend
     console.log(`[invite-user] Logging invitation in DB`);
-    await adminClient.from("invitations").upsert({
+    const invitationToken = crypto.randomUUID();
+    const { error: invInsertErr } = await adminClient.from("invitations").insert({
       email: email.toLowerCase(),
       organization_id: targetOrgId || null,
       role: targetRole,
-      token: isNewUser ? "temp-password" : "existing-user",
+      token: invitationToken,
       invited_by: caller.id,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }, { onConflict: 'email,organization_id' }).catch(e => console.error("[invite-user] Invitation log err:", e));
+      metadata: {
+        page_permissions: page_permissions || {},
+        signing_privileges: signing_privileges || {},
+      },
+    });
+    if (invInsertErr) {
+      console.error("[invite-user] Invitation insert error:", invInsertErr);
+      // If duplicate, try to fetch existing token
+      if (invInsertErr.code === "23505") {
+        const { data: existingInv } = await adminClient
+          .from("invitations")
+          .select("token")
+          .eq("email", email.toLowerCase())
+          .eq("organization_id", targetOrgId)
+          .is("accepted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existingInv?.token) {
+          return new Response(JSON.stringify({
+            success: true,
+            userId,
+            token: existingInv.token,
+          }), {
+            status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
 
-    return new Response(JSON.stringify({ success: true, userId }), {
+    return new Response(JSON.stringify({
+      success: true,
+      userId,
+      token: invitationToken,
+    }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

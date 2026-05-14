@@ -4,6 +4,8 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { notifyManagers } from '@/lib/notificationService';
+import { sendInvoiceUploadNotification, sendInvoiceStatusEmail } from '@/lib/emailService';
 import { format } from 'date-fns';
 import {
   Search,
@@ -338,7 +340,8 @@ export default function Invoices() {
         existingProducts.push(newProd);
       }
 
-      // Upsert inventory
+      // Upsert inventory — stage with 24-hour pending review window
+      const pendingUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const existingInv = existingInventory.find(
         i => i.product_name?.toLowerCase() === name.toLowerCase()
       );
@@ -350,6 +353,8 @@ export default function Invoices() {
             current_quantity: newQty,
             unit_cost: unitPrice,
             current_value: newQty * unitPrice,
+            pending_until: pendingUntil,
+            pending_source_invoice: invoice.invoice_number || invoice.id,
           });
         } catch (e) {
           console.warn('Could not update inventory (likely ground_staff RLS):', e);
@@ -370,6 +375,8 @@ export default function Invoices() {
           location: invoice.location || '',
           organization_id: invoice.organization_id,
           location_id: invoice.location_id,
+          pending_until: pendingUntil,
+          pending_source_invoice: invoice.invoice_number || invoice.id,
         });
         existingInventory.push({
           id: 'temp-' + Date.now(),
@@ -416,6 +423,38 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       toast.success('Invoice saved for later');
+
+      // ── Notify managers (in-app + email) ──────────────────────
+      const orgId = savedInvoice?.organization_id || userProfile?.organization_id;
+      const uploaderName = userProfile?.full_name || userProfile?.email || 'A team member';
+      const invNum = savedInvoice?.invoice_number || 'New Invoice';
+      const vendorName = savedInvoice?.vendor_name || 'Unknown Vendor';
+      const totalAmt = savedInvoice?.total_amount || 0;
+
+      // 1. In-app notifications (realtime via Layout.jsx bell icon)
+      notifyManagers({
+        organization_id: orgId,
+        title: `New Invoice: ${invNum}`,
+        message: `${uploaderName} uploaded invoice ${invNum} from ${vendorName} ($${Number(totalAmt).toFixed(2)}). Please review.`,
+        type: 'invoice',
+        metadata: { invoice_id: savedInvoice?.id, invoice_number: invNum },
+        exclude_user_id: userProfile?.id,
+      }).then(({ managers }) => {
+        // 2. Email notifications to each manager
+        if (managers && managers.length > 0) {
+          managers.forEach(mgr => {
+            sendInvoiceUploadNotification({
+              to_email: mgr.email,
+              to_name: mgr.full_name,
+              uploader_name: uploaderName,
+              invoice_number: invNum,
+              vendor_name: vendorName,
+              total_amount: totalAmt,
+            }).catch(e => console.warn('Email to manager failed:', e));
+          });
+        }
+      }).catch(e => console.warn('Manager notification failed (non-fatal):', e));
+
       setEditorOpen(false);
       setEditingInvoice(null);
     } catch (err) {
@@ -435,7 +474,28 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       await syncInvoiceToProductsAndInventory(savedInvoice);
-      toast.success('Invoice approved & products/inventory updated');
+      toast.success('Invoice approved — items staged for 24h review before finalizing in inventory');
+
+      // Email the original uploader that their invoice was approved
+      if (savedInvoice?.created_by) {
+        try {
+          const { data: uploaderProfile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', savedInvoice.created_by)
+            .single();
+          if (uploaderProfile?.email) {
+            sendInvoiceStatusEmail({
+              to_email: uploaderProfile.email,
+              to_name: uploaderProfile.full_name,
+              invoice_number: savedInvoice.invoice_number,
+              status: 'approved',
+              reviewer_name: userProfile?.full_name || 'Manager',
+            }).catch(e => console.warn('Approval email failed:', e));
+          }
+        } catch { /* non-critical */ }
+      }
+
       setEditorOpen(false);
       setEditingInvoice(null);
     } catch (err) {
@@ -447,11 +507,34 @@ export default function Invoices() {
   const handleEditorReject = async () => {
     try {
       const data = { ...editingInvoice, status: 'rejected' };
+      let savedInvoice;
       if (editingInvoice.id) {
-        await updateMutation.mutateAsync({ id: editingInvoice.id, data });
+        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });
       } else {
-        await createMutation.mutateAsync(data);
+        savedInvoice = await createMutation.mutateAsync(data);
       }
+
+      // Email the original uploader that their invoice was rejected
+      const createdBy = savedInvoice?.created_by || editingInvoice?.created_by;
+      if (createdBy) {
+        try {
+          const { data: uploaderProfile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', createdBy)
+            .single();
+          if (uploaderProfile?.email) {
+            sendInvoiceStatusEmail({
+              to_email: uploaderProfile.email,
+              to_name: uploaderProfile.full_name,
+              invoice_number: savedInvoice?.invoice_number || editingInvoice?.invoice_number,
+              status: 'rejected',
+              reviewer_name: userProfile?.full_name || 'Manager',
+            }).catch(e => console.warn('Rejection email failed:', e));
+          }
+        } catch { /* non-critical */ }
+      }
+
       setEditorOpen(false);
       setEditingInvoice(null);
     } catch (err) {

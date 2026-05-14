@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { logAudit } from '@/lib/audit';
+import { sendInvitationEmail } from '@/lib/emailService';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -632,6 +633,22 @@ function InviteDialog({ open, onClose, orgId }) {
       if (token) {
         const link = `${window.location.origin}/signup/${token}`;
         setGeneratedLink(link);
+
+        // Send invitation email via EmailJS
+        const orgName = userProfile?.organization?.name || 'MEVS';
+        const roleDef = MEVS_ROLES[role];
+        sendInvitationEmail({
+          to_email: email,
+          to_name: email.split('@')[0],
+          role: roleDef?.label || role,
+          org_name: orgName,
+          invite_link: link,
+        }).then(res => {
+          if (res.success) {
+            toast.success(`Invitation email sent to ${email}`);
+          }
+        }).catch(e => console.warn('Invitation email failed (non-fatal):', e));
+
         toast.success(`Invitation generated for ${email}`);
       } else {
         toast.success(`Invitation sent to ${email}`);

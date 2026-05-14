@@ -18,7 +18,8 @@ import {
   MoreVertical,
   ShoppingCart,
   Download,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -367,6 +368,49 @@ export default function Inventory() {
           </div>
         )}
       </div>
+
+      {/* 24-Hour Pending Review Banner */}
+      {(() => {
+        const now = new Date();
+        const pendingItems = inventory.filter(item => 
+          item.pending_until && new Date(item.pending_until) > now
+        );
+        if (pendingItems.length === 0) return null;
+
+        // Calculate time remaining for the earliest pending item
+        const earliest = pendingItems.reduce((min, item) => {
+          const d = new Date(item.pending_until);
+          return d < min ? d : min;
+        }, new Date(pendingItems[0].pending_until));
+        const hoursLeft = Math.max(0, Math.ceil((earliest - now) / (1000 * 60 * 60)));
+
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                {pendingItems.length} item{pendingItems.length > 1 ? 's' : ''} pending review
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                Recently approved invoice items are staged for {hoursLeft}h. You can edit quantities and details during this window before they finalize.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {pendingItems.slice(0, 5).map(item => (
+                  <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                    {item.product_name} ({item.current_quantity} {item.current_unit || 'ea'})
+                    {item.pending_source_invoice ? ` • Inv: ${item.pending_source_invoice}` : ''}
+                  </span>
+                ))}
+                {pendingItems.length > 5 && (
+                  <span className="text-[10px] text-amber-500">+{pendingItems.length - 5} more</span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

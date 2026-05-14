@@ -7,7 +7,8 @@ export const queryClientInstance = new QueryClient({
 			refetchOnWindowFocus: false,
 			retry: 2,
 			retryDelay: (attemptIndex) => Math.min(500 * 2 ** attemptIndex, 3000),
-			staleTime: 30_000, // 30s — prevents redundant re-fetches on mount
+			staleTime: 5 * 60 * 1000,  // 5 min — realtime channels handle live updates
+			gcTime: 10 * 60 * 1000,    // 10 min — keep cache warm for back-navigation
 		},
 	},
 });
