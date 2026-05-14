@@ -671,7 +671,9 @@ export default function Invoices() {
                   >
                     <Save className="h-4 w-4 mr-1" /> Save
                   </Button>
-                  <Button
+                  {userProfile?.role !== 'ground_staff' && (
+                    <>
+                      <Button
                     variant="outline"
                     onClick={handleEditorReject}
                     className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
@@ -691,6 +693,8 @@ export default function Invoices() {
                   >
                     Validate
                   </Button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
