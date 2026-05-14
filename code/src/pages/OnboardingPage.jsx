@@ -345,37 +345,53 @@ export default function OnboardingPage() {
       return;
     }
 
-    const validRows = csvData.filter(row => {
-      const oName = row['Organization Name'] || row.orgName || row.organization_name;
-      const bName = row['Brand Name'] || row.brandName || row.brand_name;
-      const lName = row['Location Name'] || row.locationName || row.location_name;
-      return oName && bName && lName;
-    });
+    let currentOrg = '';
+    let currentBrand = '';
+    const processedRows = [];
 
-    if (validRows.length === 0) {
-      toast.error('No valid rows found. Each row needs: Organization Name, Brand Name, and Location Name.');
+    for (const row of csvData) {
+      let oName = (row['Organization Name'] || row.orgName || row.organization_name || '').trim();
+      let bName = (row['Brand Name'] || row.brandName || row.brand_name || '').trim();
+      let lName = (row['Location Name'] || row.locationName || row.location_name || '').trim();
+      let lAddr = (row['Location Address'] || row.locationAddress || row.address || '').trim();
+
+      // Update current tracking variables if explicit names are provided
+      if (oName) currentOrg = oName;
+      if (bName) currentBrand = bName;
+
+      // Carry over from previous rows if blank
+      if (!oName) oName = currentOrg;
+      if (!bName) bName = currentBrand;
+
+      if (oName && bName && lName) {
+        processedRows.push({
+          oName,
+          bName,
+          lName,
+          lAddr: lAddr || 'Address pending'
+        });
+      }
+    }
+
+    if (processedRows.length === 0) {
+      toast.error('No valid rows found. Please ensure your CSV has Organization Name, Brand Name, and Location Name.');
       return;
     }
 
-    const firstRow = validRows[0];
-    const finalOrgName = firstRow['Organization Name'] || firstRow.orgName || firstRow.organization_name;
+    const firstRow = processedRows[0];
+    const finalOrgName = firstRow.oName;
     const finalOrgSlug = finalOrgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
 
     // Group valid rows by brand for the primary organization
     const brandsMap = {};
-    validRows.forEach(row => {
-      const rowOrg = row['Organization Name'] || row.orgName || row.organization_name;
+    processedRows.forEach(row => {
       // We only process rows that match the first row's organization name
-      if (rowOrg !== finalOrgName) return;
+      if (row.oName !== finalOrgName) return;
 
-      const bName = row['Brand Name'] || row.brandName || row.brand_name;
-      const lName = row['Location Name'] || row.locationName || row.location_name;
-      const lAddr = row['Location Address'] || row.locationAddress || row.address || 'Address pending';
-
-      if (!brandsMap[bName]) {
-        brandsMap[bName] = { name: bName, locations: [] };
+      if (!brandsMap[row.bName]) {
+        brandsMap[row.bName] = { name: row.bName, locations: [] };
       }
-      brandsMap[bName].locations.push({ name: lName, address: lAddr });
+      brandsMap[row.bName].locations.push({ name: row.lName, address: row.lAddr });
     });
 
     const parsedBrands = Object.values(brandsMap);

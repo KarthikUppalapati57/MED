@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -90,6 +91,21 @@ export default function Inventory() {
     queryKey: ['wastage'],
     queryFn: () => api.entities.WastageLog.list('-created_at', 50),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('inventory-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['wastage'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),

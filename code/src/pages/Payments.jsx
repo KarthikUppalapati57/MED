@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -96,6 +97,21 @@ export default function Payments() {
     queryKey: ['payments'],
     queryFn: () => api.entities.Payment.list('-created_at'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('payments-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['payments'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const createPayment = useMutation({
     mutationFn: (data) => api.entities.Payment.create(data),

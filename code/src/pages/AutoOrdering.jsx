@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -63,6 +64,18 @@ export default function AutoOrdering() {
     queryKey: ['auto-orders'],
     queryFn: () => api.entities.AutoOrder.list('-created_at'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('auto-orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'auto_orders' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['auto-orders'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const { data: inventory = [] } = useAuthQuery({
     queryKey: ['inventory'],

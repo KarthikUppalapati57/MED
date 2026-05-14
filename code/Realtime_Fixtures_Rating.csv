@@ -1,0 +1,9 @@
+Module,Current Realtime Status,Needed Realtime Feature,Priority Level,Rating (1-5),Description of Fixes Needed
+Invoices,None,Live status updates on approvals/rejections and new uploads,High,4,Ground staff and managers need instant feedback when an invoice changes state (e.g. approved by manager). Needs Supabase realtime subscription on `invoices` table.
+Inventory,None,Live stock level synchronization,Critical,5,Multiple staff members might update or consume inventory simultaneously. Without realtime stock levels will go out of sync causing bad orders. Needs realtime subscription on `inventory_items` table.
+AutoOrdering / Orders,None,Order status and vendor delivery updates,High,4,When an order is accepted or fulfilled by a vendor the platform needs to update instantly so staff know stock is arriving. Needs realtime on `orders` table.
+Payments,None,Live payment confirmation,Critical,5,When a payment clears or fails through Stripe/external gateways the UI must reflect this instantly to prevent double-payments. Needs realtime on `payments` table.
+Products,None,Price and catalog sync,Medium,3,When a vendor changes a price the product catalog should update in the UI without a manual refresh. Needs realtime on `products` table.
+Platform Admin,Basic,Realtime for requests and organizations exists,Low,1,Currently uses `postgres_changes` for requests and orgs. Might need minor optimization but fundamentally works.
+Notifications,Basic,User-specific notifications exist,Low,1,Already uses realtime to fetch new notifications in Layout. No major fixes needed.
+Audit Logs,None,Live streaming of security events,Medium,3,Administrators should be able to watch audit logs stream in real-time during security investigations. Needs realtime on `audit_logs` table.

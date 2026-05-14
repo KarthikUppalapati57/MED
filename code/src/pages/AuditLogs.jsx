@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
@@ -18,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 export default function AuditLogs() {
   const [search, setSearch] = useState('');
 
+  const queryClient = useQueryClient();
+
   const { data: logs = [], isLoading, isError } = useAuthQuery({
     queryKey: ['audit_logs'],
     queryFn: async () => {
@@ -28,8 +32,19 @@ export default function AuditLogs() {
         throw err;
       }
     },
-    refetchInterval: 60000,
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('audit-logs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['audit_logs'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const filteredLogs = logs.filter(log => {
     const term = search.toLowerCase();

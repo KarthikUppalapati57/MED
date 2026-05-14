@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
 import {
   Search,
@@ -124,6 +125,18 @@ export default function Invoices() {
     queryKey: ['invoices'],
     queryFn: () => api.entities.Invoice.list('-created_at'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('invoices-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Sanitize invoice data before saving to Supabase
   const sanitizeInvoiceData = (data) => {

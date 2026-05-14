@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -125,6 +126,18 @@ export default function Products() {
     queryKey: ['products'],
     queryFn: () => api.entities.Product.list('-created_at'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('products-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Product.create(data),
