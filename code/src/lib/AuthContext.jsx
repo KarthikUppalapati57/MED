@@ -3,6 +3,10 @@ import { supabase } from '@/lib/supabaseClient';
 import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/lib/query-client';
 import { queryClientInstance } from '@/lib/query-client';
 
+// Canonical app URL — use VITE_APP_URL if set, otherwise fall back to current origin.
+// This prevents the password reset redirecting to Vercel's default login page.
+const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+
 const AuthContext = createContext(null);
 
 // ── Session cache helpers ────────────────────────────────────
@@ -206,11 +210,18 @@ export const AuthProvider = ({ children }) => {
         setActiveLocation(data.location);
         setCachedProfile(data);
 
-        // Sync Auth Metadata if it doesn't match the database role
-        // This fixes users who signed up with the wrong metadata role
-        if (sessionUser.user_metadata?.role !== data.role) {
+        // Sync Auth Metadata if it doesn't match the database profile
+        // This fixes: 1) wrong role in JWT, 2) missing org_id in JWT (RLS fix)
+        const metaRole = sessionUser.user_metadata?.role;
+        const metaOrgId = sessionUser.user_metadata?.organization_id;
+        if (metaRole !== data.role || metaOrgId !== data.organization_id) {
           supabase.auth.updateUser({
-            data: { role: data.role }
+            data: {
+              role: data.role,
+              organization_id: data.organization_id,
+              brand_id: data.brand_id,
+              location_id: data.location_id,
+            }
           }).catch(err => console.warn('Auth metadata sync failed:', err));
         }
 
@@ -273,7 +284,18 @@ export const AuthProvider = ({ children }) => {
         const currentUser = session?.user ?? null;
         
         try {
-          if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+          if (event === 'PASSWORD_RECOVERY') {
+            // Password recovery event: user clicked the reset link in email.
+            // We must redirect to /update-password BEFORE any other routing kicks in.
+            if (currentUser) {
+              setUser(currentUser);
+              setIsLoadingAuth(false);
+              // Navigate to update-password page
+              if (!window.location.pathname.includes('update-password')) {
+                window.location.replace(`${APP_URL}/update-password`);
+              }
+            }
+          } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
             if (currentUser) {
               // 0. Safety Check: If the user ID has changed, or we're starting fresh, clear the stale cache
               const currentCache = getCachedProfile();
@@ -478,7 +500,7 @@ export const AuthProvider = ({ children }) => {
         password,
         options: {
           data: metadata,
-          emailRedirectTo: `${window.location.origin}/login?verified=true`,
+          emailRedirectTo: `${APP_URL}/login?verified=true`,
         },
       });
       if (error) {
@@ -495,8 +517,11 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     setAuthError(null);
     try {
+      // Use APP_URL to ensure the redirect goes to the correct domain
+      // (not Vercel's default). The Supabase Dashboard must also list
+      // this URL under Authentication > URL Configuration > Redirect URLs.
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: `${APP_URL}/update-password`,
       });
       if (error) {
         setAuthError(error);

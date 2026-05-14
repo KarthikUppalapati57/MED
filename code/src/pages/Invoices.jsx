@@ -75,8 +75,9 @@ export default function Invoices() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
 
-  const { userProfile } = useAuth();
+  const { userProfile, role } = useAuth();
   const queryClient = useQueryClient();
+  const isHigherRole = ['org_owner', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
 
   // Resizing state
   const [sheetWidth, setSheetWidth] = useState(() => {
@@ -415,11 +416,17 @@ export default function Invoices() {
 
   const handleEditorSave = async () => {
     try {
+      // Ground staff: force status to pending_review so RLS allows the operation
+      const invoiceData = { ...editingInvoice };
+      if (role === 'ground_staff') {
+        invoiceData.status = 'pending_review';
+      }
+
       let savedInvoice;
-      if (editingInvoice.id) {
-        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data: editingInvoice });
+      if (invoiceData.id) {
+        savedInvoice = await updateMutation.mutateAsync({ id: invoiceData.id, data: invoiceData });
       } else {
-        savedInvoice = await createMutation.mutateAsync(editingInvoice);
+        savedInvoice = await createMutation.mutateAsync(invoiceData);
         setEditingInvoice(savedInvoice);
       }
       toast.success('Invoice saved for later');
@@ -684,12 +691,12 @@ export default function Invoices() {
                             }}>
                               <Eye className="h-4 w-4 mr-2" /> View/Edit
                             </DropdownMenuItem>
-                            {(invoice.status === 'validated' || invoice.status === 'pending_review') && (
+                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'pending_review') && (
                               <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
                                 <Check className="h-4 w-4 mr-2" /> Approve
                               </DropdownMenuItem>
                             )}
-                            {(invoice.status === 'validated' || invoice.status === 'approved') && (
+                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
                               <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-red-600">
                                 <X className="h-4 w-4 mr-2" /> Reject
                               </DropdownMenuItem>
@@ -701,9 +708,11 @@ export default function Invoices() {
                                 </a>
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-red-600">
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
+                            {isHigherRole && (
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

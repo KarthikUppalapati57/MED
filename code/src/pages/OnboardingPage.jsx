@@ -350,19 +350,21 @@ export default function OnboardingPage() {
     const processedRows = [];
 
     for (const row of csvData) {
-      let oName = (row['Organization Name'] || row.orgName || row.organization_name || '').trim();
-      let bName = (row['Brand Name'] || row.brandName || row.brand_name || '').trim();
-      let lName = (row['Location Name'] || row.locationName || row.location_name || '').trim();
-      let lAddr = (row['Location Address'] || row.locationAddress || row.address || '').trim();
+      // Flexibly match column headers (exact match or common variations)
+      let oName = (row['Organization Name'] || row['organization_name'] || row['orgName'] || row['Org Name'] || row['org'] || '').trim();
+      let bName = (row['Brand Name'] || row['brand_name'] || row['brandName'] || row['Brand'] || row['brand'] || '').trim();
+      let lName = (row['Location Name'] || row['location_name'] || row['locationName'] || row['Location'] || row['location'] || '').trim();
+      let lAddr = (row['Location Address'] || row['address'] || row['locationAddress'] || row['Address'] || '').trim();
 
-      // Update current tracking variables if explicit names are provided
+      // Update current tracking variables ONLY when an explicit name is given
       if (oName) currentOrg = oName;
       if (bName) currentBrand = bName;
 
-      // Carry over from previous rows if blank
+      // Carry forward from previous rows when cells are blank
       if (!oName) oName = currentOrg;
       if (!bName) bName = currentBrand;
 
+      // A row is valid if we have at least a location name (org/brand inherited is fine)
       if (oName && bName && lName) {
         processedRows.push({
           oName,
@@ -374,27 +376,40 @@ export default function OnboardingPage() {
     }
 
     if (processedRows.length === 0) {
-      toast.error('No valid rows found. Please ensure your CSV has Organization Name, Brand Name, and Location Name.');
+      toast.error('No valid rows found. Please ensure your CSV has Organization Name, Brand Name, and Location Name columns.');
       return;
     }
 
-    const firstRow = processedRows[0];
-    const finalOrgName = firstRow.oName;
+    // Use the first org name as the primary organization for onboarding.
+    // During onboarding we can only create ONE org — aggregate ALL rows
+    // (even if they list different org names) under this single org.
+    const finalOrgName = processedRows[0].oName;
     const finalOrgSlug = finalOrgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
 
-    // Group valid rows by brand for the primary organization
+    // Group ALL rows by brand name (regardless of org column value)
+    // This ensures brands/locations from rows with different org names aren't dropped
     const brandsMap = {};
     processedRows.forEach(row => {
-      // We only process rows that match the first row's organization name
-      if (row.oName !== finalOrgName) return;
-
       if (!brandsMap[row.bName]) {
         brandsMap[row.bName] = { name: row.bName, locations: [] };
       }
-      brandsMap[row.bName].locations.push({ name: row.lName, address: row.lAddr });
+      // Deduplicate locations with same name under the same brand
+      const existingLoc = brandsMap[row.bName].locations.find(
+        l => l.name.toLowerCase() === row.lName.toLowerCase()
+      );
+      if (!existingLoc) {
+        brandsMap[row.bName].locations.push({ name: row.lName, address: row.lAddr });
+      }
     });
 
     const parsedBrands = Object.values(brandsMap);
+
+    if (parsedBrands.length === 0) {
+      toast.error('Could not parse any brands from the CSV. Check your column headers.');
+      return;
+    }
+
+    toast.info(`Importing ${parsedBrands.length} brand(s) with ${parsedBrands.reduce((s, b) => s + b.locations.length, 0)} location(s)`);
     await performOnboarding(finalOrgName, finalOrgSlug, parsedBrands);
   };
 
