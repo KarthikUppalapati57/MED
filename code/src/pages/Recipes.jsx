@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -103,6 +104,22 @@ export default function Recipes() {
     queryKey: ['products'],
     queryFn: () => api.entities.Product.list(),
   });
+
+  // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  useEffect(() => {
+    const channel = supabase.channel('recipes-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Recipe.create(data),

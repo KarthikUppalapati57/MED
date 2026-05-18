@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -109,6 +110,26 @@ function PlatformDashboard() {
   });
 
   // Removed tenant invoices query to enforce data siloing
+
+  // -- Realtime subscription for platform dashboard --
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase.channel('platform-dash-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dash-orgs'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dash-profiles'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dash-recent-logs'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const activeOrgs = allOrgs.filter(o => o.subscription_status === 'active');
   const trialOrgs = allOrgs.filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial');
@@ -223,6 +244,29 @@ function OrgOwnerDashboard() {
     },
     enabled: !!organization?.id,
   });
+
+  // -- Realtime subscription for org dashboard --
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase.channel('org-dash-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['payments'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
   const totalUnpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
@@ -352,6 +396,26 @@ function BranchManagerDashboard() {
     enabled: !!brand?.id
   });
 
+  // -- Realtime subscription for branch dashboard --
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase.channel('branch-dash-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
   const totalUnpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
   const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
@@ -458,6 +522,26 @@ function LocationManagerDashboard() {
     enabled: !!location?.id
   });
 
+  // -- Realtime subscription for location dashboard --
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase.channel('location-dash-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
   const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
 
@@ -526,6 +610,20 @@ function GroundLevelDashboard() {
     },
     enabled: !!location?.id
   });
+
+  // -- Realtime subscription for ground-level dashboard --
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const channel = supabase.channel('ground-dash-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'pending_review');
   const myUploads = invoices.length;

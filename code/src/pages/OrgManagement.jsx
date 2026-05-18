@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
@@ -99,6 +99,28 @@ export default function OrgManagement() {
   });
 
   const isLoading = isLoadingOrgs || isLoadingBrands || isLoadingLocations;
+
+  // -- Realtime subscription for org management --
+  useEffect(() => {
+    const channel = supabase.channel('org-mgmt-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['my-organizations'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['my-brands'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['my-locations'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['org-profiles'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const toggleOrg = (orgId) => {
     setExpandedOrgs(prev => {

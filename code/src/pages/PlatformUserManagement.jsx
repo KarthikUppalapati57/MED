@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -35,6 +35,22 @@ export default function PlatformUserManagement() {
   
   // Confirmation State
   const [confirmDeleteAdmin, setConfirmDeleteAdmin] = useState(null);
+
+  // -- Realtime subscription for platform users --
+  useEffect(() => {
+    const channel = supabase.channel('platform-users-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-admin-invites'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // ── Platform Admins Query ──────────────────────────────────
   const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({

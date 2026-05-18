@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -96,6 +97,18 @@ export default function Vendors() {
     queryFn: () => api.entities.Vendor.list('-created_at'),
   });
 
+  // ── Realtime subscription ──────────────────────────────────
+  useEffect(() => {
+    const channel = supabase.channel('vendors-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Vendor.create(data),
     onSuccess: () => {

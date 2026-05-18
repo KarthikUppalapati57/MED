@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -24,6 +24,19 @@ export default function PlatformAuditLogs() {
   const [logModuleFilter, setLogModuleFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+
+  // -- Realtime subscription for platform audit logs --
+  useEffect(() => {
+    const channel = supabase.channel('platform-audit-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // ── Audit Logs Query ───────────────────────────────────────
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({

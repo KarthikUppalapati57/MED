@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
@@ -919,6 +919,26 @@ export default function UserManagement() {
   const activeOrgId = userProfile?.organization_id;
   const activeBrandId = userProfile?.brand_id;
   const activeLocationId = userProfile?.location_id;
+
+  // -- Realtime subscription for user management --
+  useEffect(() => {
+    const channel = supabase.channel('usermgmt-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // ── Fetch team members ─────────────────────────────────────
   const { data: members = [], isLoading } = useAuthQuery({
