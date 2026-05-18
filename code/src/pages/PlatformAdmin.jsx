@@ -103,19 +103,19 @@ export default function PlatformAdmin() {
     const channel = supabase
       .channel('platform-admin-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'demo_requests' }, () => {
-        queryClient.refetchQueries({ queryKey: ['demo-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, () => {
-        queryClient.refetchQueries({ queryKey: ['contact-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['contact-requests'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'access_requests' }, () => {
-        queryClient.refetchQueries({ queryKey: ['access-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['access-requests'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
-        queryClient.refetchQueries({ queryKey: ['organizations'] });
+        queryClient.invalidateQueries({ queryKey: ['organizations'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
-        queryClient.refetchQueries({ queryKey: ['pending-client-invites'] });
+        queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
       })
       .subscribe();
 
