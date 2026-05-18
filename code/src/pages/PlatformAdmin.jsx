@@ -123,7 +123,9 @@ export default function PlatformAdmin() {
     };
   }, [authChecked, userRole, queryClient]);
 
-  // ── Queries ────────────────────────────────────────────────
+  const jwtRole = user?.user_metadata?.role;
+  const isReadyAdmin = authChecked && userRole === 'platform_admin' && jwtRole === 'platform_admin';
+
   const { data: requests = [], isLoading: isLoadingAccess } = useAuthQuery({
     queryKey: ['access-requests'],
     queryFn: async () => {
@@ -135,7 +137,7 @@ export default function PlatformAdmin() {
       if (error) throw error;
       return data || [];
     },
-    enabled: authChecked && userRole === 'platform_admin',
+    enabled: isReadyAdmin,
   });
 
   const { data: demoRequests = [], isLoading: isLoadingDemo } = useAuthQuery({
