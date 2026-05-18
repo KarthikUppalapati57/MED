@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [mfaLevel, setMfaLevel] = useState({ current: 'aal1', next: 'aal1' });
   const [mfaFactors, setMfaFactors] = useState([]);
+  const [isMfaReady, setIsMfaReady] = useState(false);
   const inviteLock = React.useRef(false);
 
   const refreshMFAStatus = useCallback(async () => {
@@ -205,10 +206,29 @@ export const AuthProvider = ({ children }) => {
             
       if (data) {
         setUserProfile(data);
-        setActiveOrg(data.organization);
-        setActiveBrand(data.brand);
-        setActiveLocation(data.location);
-        setCachedProfile(data);
+        
+        // Preserve active context from cache on reload if valid, otherwise fall back to profile defaults
+        const currentCache = getCachedProfile();
+        if (currentCache && currentCache.id === sessionUser.id && (currentCache.organization || currentCache.brand || currentCache.location)) {
+          setActiveOrg(currentCache.organization);
+          setActiveBrand(currentCache.brand);
+          setActiveLocation(currentCache.location);
+          
+          setCachedProfile({
+            ...data,
+            organization: currentCache.organization,
+            brand: currentCache.brand,
+            location: currentCache.location,
+            organization_id: currentCache.organization?.id || null,
+            brand_id: currentCache.brand?.id || null,
+            location_id: currentCache.location?.id || null,
+          });
+        } else {
+          setActiveOrg(data.organization);
+          setActiveBrand(data.brand);
+          setActiveLocation(data.location);
+          setCachedProfile(data);
+        }
 
         // Sync Auth Metadata if it doesn't match the database profile
         // This fixes: 1) wrong role in JWT, 2) missing org_id in JWT (RLS fix)
@@ -273,6 +293,8 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (err) {
           console.warn('Deferred MFA refresh error (non-fatal):', err);
+        } finally {
+          if (isMounted) setIsMfaReady(true);
         }
       }, 1500);
     };
@@ -401,6 +423,7 @@ export const AuthProvider = ({ children }) => {
             setActiveLocation(null);
             setMfaLevel({ current: 'aal1', next: 'aal1' });
             setMfaFactors([]);
+            setIsMfaReady(false);
             clearCachedProfile();
             // Clear all cached query data to prevent data leaks after logout
             clearAllQueries();
@@ -566,6 +589,7 @@ export const AuthProvider = ({ children }) => {
         role,
         isAuthenticated,
         isLoadingAuth,
+        isMfaReady,
         authError,
         loginWithEmail,
         signUp,
@@ -578,23 +602,73 @@ export const AuthProvider = ({ children }) => {
         mfaFactors,
         refreshMFAStatus,
         switchContext: (type, entity) => {
+          let updatedOrg = activeOrg;
+          let updatedBrand = activeBrand;
+          let updatedLocation = activeLocation;
+
           if (type === 'organization') {
+            updatedOrg = entity;
+            updatedBrand = null;
+            updatedLocation = null;
             setActiveOrg(entity);
             setActiveBrand(null);
             setActiveLocation(null);
           } else if (type === 'brand') {
+            updatedBrand = entity;
+            updatedLocation = null;
             setActiveBrand(entity);
             setActiveLocation(null);
           } else if (type === 'location') {
+            updatedLocation = entity;
             setActiveLocation(entity);
           }
+
+          // Persist the updated context to cached profile in sessionStorage
+          const currentCache = getCachedProfile();
+          if (currentCache) {
+            currentCache.organization = updatedOrg;
+            currentCache.brand = updatedBrand;
+            currentCache.location = updatedLocation;
+            currentCache.organization_id = updatedOrg?.id || null;
+            currentCache.brand_id = updatedBrand?.id || null;
+            currentCache.location_id = updatedLocation?.id || null;
+            setCachedProfile(currentCache);
+          }
+
           // Invalidate only org-scoped queries — platform-level data is untouched
           invalidateOrgScopedQueries();
         },
         // Direct setters for ContextSwitcher / platform admin impersonation
-        setActiveOrg: (org) => { setActiveOrg(org); invalidateOrgScopedQueries(); },
-        setActiveBrand: (brand) => { setActiveBrand(brand); invalidateOrgScopedQueries(); },
-        setActiveLocation: (loc) => { setActiveLocation(loc); invalidateOrgScopedQueries(); },
+        setActiveOrg: (org) => {
+          setActiveOrg(org);
+          const currentCache = getCachedProfile();
+          if (currentCache) {
+            currentCache.organization = org;
+            currentCache.organization_id = org?.id || null;
+            setCachedProfile(currentCache);
+          }
+          invalidateOrgScopedQueries();
+        },
+        setActiveBrand: (brand) => {
+          setActiveBrand(brand);
+          const currentCache = getCachedProfile();
+          if (currentCache) {
+            currentCache.brand = brand;
+            currentCache.brand_id = brand?.id || null;
+            setCachedProfile(currentCache);
+          }
+          invalidateOrgScopedQueries();
+        },
+        setActiveLocation: (loc) => {
+          setActiveLocation(loc);
+          const currentCache = getCachedProfile();
+          if (currentCache) {
+            currentCache.location = loc;
+            currentCache.location_id = loc?.id || null;
+            setCachedProfile(currentCache);
+          }
+          invalidateOrgScopedQueries();
+        },
         unenrollMFA: async (factorId) => {
           const { error } = await supabase.auth.mfa.unenroll({ factorId });
           if (!error) await refreshMFAStatus();

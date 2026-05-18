@@ -22,7 +22,7 @@ import {
 import { 
   Shield, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, 
   ChevronDown, ChevronRight, Building2, Store, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, Sparkles, 
-  Receipt, History, CreditCard, RefreshCw, Fingerprint, Send
+  Receipt, History, RefreshCw, Fingerprint, Send
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";

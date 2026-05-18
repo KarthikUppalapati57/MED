@@ -458,12 +458,12 @@ function UpdatePasswordPage() {
 
 // ── Authenticated App ──────────────────────────────────────
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors } = useAuth();
+  const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   
   // MFA Interceptor
   const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1';
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
-  const needsMFASetup = user && verifiedFactors.length === 0;
+  const needsMFASetup = user && isMfaReady && verifiedFactors.length === 0;
 
   // Check if this device is trusted (MFA remembered for 30 days)
   const isDeviceTrusted = React.useMemo(() => {
