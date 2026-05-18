@@ -85,8 +85,7 @@ export default function PlatformAdmin() {
   const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
   const [generatedInviteLink, setGeneratedInviteLink] = useState("");
 
-  // Audit Logs State
-  const [logModuleFilter, setLogModuleFilter] = useState('All');
+
 
   const [accountingSubTab, setAccountingSubTab] = useState('revenue');
   
@@ -206,17 +205,7 @@ export default function PlatformAdmin() {
     enabled: authChecked && userRole === 'platform_admin',
   });
 
-  const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
-    queryKey: ['platform-audit-logs', logModuleFilter],
-    queryFn: async () => {
-      let q = supabase.from('audit_logs').select('*, profiles:user_id(email)');
-      if (logModuleFilter !== 'All') q = q.eq('table_name', logModuleFilter);
-      const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: authChecked && userRole === 'platform_admin',
-  });
+
 
   const { data: pendingClientInvites = [] } = useAuthQuery({
     queryKey: ['pending-client-invites'],
@@ -984,42 +973,7 @@ export default function PlatformAdmin() {
              </div>
           </TabsContent>
 
-          <TabsContent value="logs" className="mt-0 outline-none">
-             <Card className="border-0 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-6">
-                <div>
-                  <CardTitle className="text-base">Platform Activity Ledger</CardTitle>
-                  <p className="text-xs text-slate-400">Immutable audit trail of administrative actions</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold rounded-lg px-3 py-1">Filter: {logModuleFilter}</Badge>
-                  <Button variant="outline" size="sm" className="rounded-xl"><Download className="w-3.5 h-3.5" /></Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                 <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50/50">
-                        <TableHead className="text-[11px] font-bold">TIMESTAMP</TableHead>
-                        <TableHead className="text-[11px] font-bold">ADMIN</TableHead>
-                        <TableHead className="text-[11px] font-bold">ACTION</TableHead>
-                        <TableHead className="text-[11px] font-bold">TARGET</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {auditLogs.map(log => (
-                        <TableRow key={log.id}>
-                          <TableCell className="text-[10px] text-slate-500 font-medium font-mono">{new Date(log.created_at).toLocaleString()}</TableCell>
-                          <TableCell className="text-xs font-bold">{log.profiles?.email || 'System'}</TableCell>
-                          <TableCell><Badge variant="secondary" className="text-[9px] uppercase font-bold">{log.action}</Badge></TableCell>
-                          <TableCell className="text-[10px] text-slate-400 font-mono">{log.table_name}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                 </Table>
-              </CardContent>
-             </Card>
-          </TabsContent>
+
         </div>
       </Tabs>
 

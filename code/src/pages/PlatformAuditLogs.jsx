@@ -29,7 +29,7 @@ export default function PlatformAuditLogs() {
   useEffect(() => {
     const channel = supabase.channel('platform-audit-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
+        queryClient.invalidateQueries({ queryKey: ['platform-wide-audit-logs'] });
       })
       .subscribe();
 
@@ -40,7 +40,7 @@ export default function PlatformAuditLogs() {
 
   // ── Audit Logs Query ───────────────────────────────────────
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
-    queryKey: ['platform-audit-logs', logModuleFilter],
+    queryKey: ['platform-wide-audit-logs', logModuleFilter],
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
