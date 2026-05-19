@@ -105,6 +105,84 @@ export default function Recipes() {
     queryFn: () => api.entities.Product.list(),
   });
 
+  const productsMap = React.useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < products.length; i++) {
+      map.set(products[i].id, products[i]);
+    }
+    return map;
+  }, [products]);
+
+  const stats = React.useMemo(() => {
+    const totalRecipes = recipes.length;
+    const totalCostPerServing = recipes.reduce((sum, r) => sum + (r.cost_per_serving || 0), 0);
+    const avgCostPerServing = totalRecipes > 0 ? totalCostPerServing / totalRecipes : 0;
+    const activeCount = recipes.filter(r => r.status === 'active').length;
+    
+    // category counts
+    const categoryCounts = {};
+    for (let i = 0; i < recipes.length; i++) {
+      const cat = recipes[i].category || 'other';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    }
+    const categoriesCount = Object.keys(categoryCounts).length;
+    
+    return {
+      totalRecipes,
+      avgCostPerServing,
+      activeCount,
+      categoryCounts,
+      categoriesCount
+    };
+  }, [recipes]);
+
+  const menuAnalysis = React.useMemo(() => {
+    const byCategory = recipes.reduce((acc, r) => {
+      const cat = r.category || 'other';
+      if (!acc[cat]) {
+        acc[cat] = { count: 0, totalCost: 0, avgPlateCost: 0 };
+      }
+      acc[cat].count++;
+      acc[cat].totalCost += r.total_cost || 0;
+      acc[cat].avgPlateCost += r.cost_per_serving || 0;
+      return acc;
+    }, {});
+    
+    Object.values(byCategory).forEach(v => {
+      if (v.count > 0) v.avgPlateCost = v.avgPlateCost / v.count;
+    });
+    
+    const sortedCategories = Object.entries(byCategory).sort((a, b) => b[1].totalCost - a[1].totalCost);
+    const maxCost = sortedCategories.length > 0 ? sortedCategories[0][1].totalCost : 1;
+    
+    const expensiveRecipesCount = recipes.filter(r => (r.cost_per_serving || 0) > 5).length;
+    
+    const rankedRecipes = recipes.slice().sort((a, b) => (b.cost_per_serving || 0) - (a.cost_per_serving || 0)).slice(0, 8);
+    
+    return {
+      sortedCategories,
+      maxCost,
+      expensiveRecipesCount,
+      rankedRecipes
+    };
+  }, [recipes]);
+
+  const costs = React.useMemo(() => {
+    const ingredientCost = formData.ingredients.reduce((sum, i) => sum + (i.total_cost || 0), 0);
+    const packagingCost = formData.packaging_items.reduce((sum, p) => sum + (p.total_cost || 0), 0);
+    const laborCost = (formData.labor_time_minutes / 60) * formData.labor_rate_per_hour;
+    const totalCost = ingredientCost + packagingCost + laborCost;
+    const costPerServing = formData.yield_quantity > 0 ? totalCost / formData.yield_quantity : totalCost;
+
+    return {
+      ingredientCost,
+      packagingCost,
+      laborCost,
+      totalCost,
+      costPerServing
+    };
+  }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity]);
+
   // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const channel = supabase.channel('recipes-realtime')
@@ -222,7 +300,7 @@ export default function Recipes() {
     
     // Update product info from selection
     if (field === 'product_id') {
-      const product = products.find(p => p.id === value);
+      const product = productsMap.get(value);
       if (product) {
         newIngredients[index].product_name = product.name;
         newIngredients[index].unit_cost = product.latest_price || 0;
@@ -272,22 +350,6 @@ export default function Recipes() {
     });
   };
 
-  const calculateCosts = () => {
-    const ingredientCost = formData.ingredients.reduce((sum, i) => sum + (i.total_cost || 0), 0);
-    const packagingCost = formData.packaging_items.reduce((sum, p) => sum + (p.total_cost || 0), 0);
-    const laborCost = (formData.labor_time_minutes / 60) * formData.labor_rate_per_hour;
-    const totalCost = ingredientCost + packagingCost + laborCost;
-    const costPerServing = formData.yield_quantity > 0 ? totalCost / formData.yield_quantity : totalCost;
-
-    return {
-      ingredientCost,
-      packagingCost,
-      laborCost,
-      totalCost,
-      costPerServing
-    };
-  };
-
   const handleCalculateWithAI = async (recipe) => {
     setEditingRecipe(recipe);
     setCostDialogOpen(true);
@@ -328,7 +390,6 @@ export default function Recipes() {
       return;
     }
 
-    const costs = calculateCosts();
     const data = {
       ...formData,
       total_ingredient_cost: costs.ingredientCost,
@@ -345,13 +406,14 @@ export default function Recipes() {
     }
   };
 
-  const filteredRecipes = recipes.filter(r => {
-    const matchesSearch = !search || r.name?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  const costs = calculateCosts();
+  const filteredRecipes = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return recipes.filter(r => {
+      const matchesSearch = !search || r.name?.toLowerCase().includes(searchLower);
+      const matchesCategory = categoryFilter === 'all' || r.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [recipes, search, categoryFilter]);
 
   return (
     <div className="space-y-6">
@@ -372,14 +434,14 @@ export default function Recipes() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Recipes</p>
-            <p className="text-2xl font-bold text-slate-900">{recipes.length}</p>
+            <p className="text-2xl font-bold text-slate-900">{stats.totalRecipes}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Avg Cost/Serving</p>
             <p className="text-2xl font-bold text-slate-900">
-              ${(recipes.reduce((sum, r) => sum + (r.cost_per_serving || 0), 0) / (recipes.length || 1)).toFixed(2)}
+              ${stats.avgCostPerServing.toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -387,7 +449,7 @@ export default function Recipes() {
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Active</p>
             <p className="text-2xl font-bold text-slate-900">
-              {recipes.filter(r => r.status === 'active').length}
+              {stats.activeCount}
             </p>
           </CardContent>
         </Card>
@@ -395,7 +457,7 @@ export default function Recipes() {
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Categories</p>
             <p className="text-2xl font-bold text-slate-900">
-              {new Set(recipes.map(r => r.category)).size}
+              {stats.categoriesCount}
             </p>
           </CardContent>
         </Card>
@@ -596,8 +658,8 @@ export default function Recipes() {
                   <div className="p-4 bg-white/80 rounded-lg border border-amber-100">
                     <p className="text-sm font-medium text-amber-700">Modify</p>
                     <p className="text-xs text-slate-500 mt-1">
-                      {recipes.filter(r => (r.cost_per_serving || 0) > 5).length > 0
-                        ? `${recipes.filter(r => (r.cost_per_serving || 0) > 5).length} recipes have cost per serving >$5. Consider ingredient substitutions to reduce plate cost.`
+                      {menuAnalysis.expensiveRecipesCount > 0
+                        ? `${menuAnalysis.expensiveRecipesCount} recipes have cost per serving >$5. Consider ingredient substitutions to reduce plate cost.`
                         : 'All recipes are within healthy cost ranges. No modifications needed.'}
                     </p>
                   </div>
@@ -620,23 +682,13 @@ export default function Recipes() {
                 </CardHeader>
                 <CardContent>
                   {(() => {
-                    const byCategory = recipes.reduce((acc, r) => {
-                      const cat = r.category || 'other';
-                      if (!acc[cat]) acc[cat] = { count: 0, totalCost: 0, avgPlateCost: 0 };
-                      acc[cat].count++;
-                      acc[cat].totalCost += r.total_cost || 0;
-                      acc[cat].avgPlateCost += r.cost_per_serving || 0;
-                      return acc;
-                    }, {});
-                    Object.values(byCategory).forEach(v => { if (v.count > 0) v.avgPlateCost = v.avgPlateCost / v.count; });
-                    const sorted = Object.entries(byCategory).sort((a, b) => b[1].totalCost - a[1].totalCost);
-                    const maxCost = sorted.length > 0 ? sorted[0][1].totalCost : 1;
+                    const { sortedCategories, maxCost } = menuAnalysis;
 
-                    return sorted.length === 0 ? (
+                    return sortedCategories.length === 0 ? (
                       <p className="text-slate-400 text-center py-6">No recipe data</p>
                     ) : (
                       <div className="space-y-3">
-                        {sorted.map(([cat, data]) => (
+                        {sortedCategories.map(([cat, data]) => (
                           <div key={cat}>
                             <div className="flex justify-between text-sm mb-1">
                               <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
@@ -669,7 +721,7 @@ export default function Recipes() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recipes.slice().sort((a, b) => (b.cost_per_serving || 0) - (a.cost_per_serving || 0)).slice(0, 8).map(r => {
+                      {menuAnalysis.rankedRecipes.map(r => {
                         const plateCost = r.cost_per_serving || 0;
                         const margin = plateCost > 0 ? ((plateCost * 3.5 - plateCost) / (plateCost * 3.5) * 100) : 0;
                         return (
@@ -839,7 +891,7 @@ export default function Recipes() {
                   <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
                     <Badge variant="secondary">
-                      {recipes.filter(r => r.category === cat).length} recipes
+                      {stats.categoryCounts[cat] || 0} recipes
                     </Badge>
                   </div>
                 ))}
