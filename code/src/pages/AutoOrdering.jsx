@@ -50,6 +50,14 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const STATUS_COLORS = {
+  pending_approval: 'bg-orange-100 text-orange-700',
+  approved: 'bg-green-100 text-green-700',
+  sent: 'bg-blue-100 text-blue-700',
+  cancelled: 'bg-red-100 text-red-700',
+  received: 'bg-emerald-100 text-emerald-700',
+};
+
 export default function AutoOrdering() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
@@ -231,8 +239,8 @@ export default function AutoOrdering() {
     setChatMessage('');
   };
 
-  const pendingOrders = orders.filter(o => o.status === 'pending_approval');
-  const approvedOrders = orders.filter(o => o.status === 'approved');
+  const pendingOrders = React.useMemo(() => orders.filter(o => o.status === 'pending_approval'), [orders]);
+  const approvedOrders = React.useMemo(() => orders.filter(o => o.status === 'approved'), [orders]);
 
   return (
     <div className="space-y-6">
@@ -298,13 +306,6 @@ export default function AutoOrdering() {
                     </TableRow>
                   ) : (
                     orders.map(order => {
-                      const statusColors = {
-                        pending_approval: 'bg-orange-100 text-orange-700',
-                        approved: 'bg-green-100 text-green-700',
-                        sent: 'bg-blue-100 text-blue-700',
-                        cancelled: 'bg-red-100 text-red-700',
-                        received: 'bg-emerald-100 text-emerald-700',
-                      };
                       return (
                         <TableRow key={order.id}>
                           <TableCell className="font-medium font-mono">{order.order_number}</TableCell>
@@ -312,7 +313,7 @@ export default function AutoOrdering() {
                           <TableCell>{order.items?.length || 0} items</TableCell>
                           <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge className={statusColors[order.status] || 'bg-slate-100 text-slate-700'}>
+                            <Badge className={STATUS_COLORS[order.status] || 'bg-slate-100 text-slate-700'}>
                               {order.status?.replace(/_/g, ' ')}
                             </Badge>
                           </TableCell>
