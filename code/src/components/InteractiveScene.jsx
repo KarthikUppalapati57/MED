@@ -95,11 +95,15 @@ const InteractiveScene = () => {
         scrollY = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('scroll', onScroll);
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     // ANIMATION
     const animate = () => {
+      if (document.hidden) {
+        frameId = requestAnimationFrame(animate);
+        return;
+      }
       targetX += (mouseX - targetX) * 0.05;
       targetY += (mouseY - targetY) * 0.05;
 
@@ -145,6 +149,7 @@ const InteractiveScene = () => {
       if (mountRef.current) {
         mountRef.current.removeChild(renderer.domElement);
       }
+      renderer.dispose();
       geometry.dispose();
       wireframeMaterial.dispose();
       pointsMaterial.dispose();
