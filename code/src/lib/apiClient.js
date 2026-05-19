@@ -1,12 +1,15 @@
 import { supabase } from '@/lib/supabaseClient';
 
 const createEntityClient = (table) => ({
-  list: async (orderBy) => {
+  list: async (orderBy, options = {}) => {
     let query = supabase.from(table).select('*');
     if (orderBy) {
       const ascending = !orderBy.startsWith('-');
       const column = ascending ? orderBy : orderBy.slice(1);
       query = query.order(column, { ascending });
+    }
+    if (options.limit) {
+      query = query.limit(options.limit);
     }
     const { data, error } = await query;
     if (error) throw error;
