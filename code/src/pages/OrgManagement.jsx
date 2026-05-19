@@ -274,11 +274,73 @@ export default function OrgManagement() {
 
   const canManage = ['org_owner', 'platform_admin'].includes(userProfile?.role);
 
-  const getOrgBrands = (orgId) => brands.filter(b => b.organization_id === orgId);
-  const getBrandLocations = (brandId) => locations.filter(l => l.brand_id === brandId);
-  const getOrgStaffCount = (orgId) => profiles.filter(p => p.organization_id === orgId).length;
-  const getBrandStaffCount = (brandId) => profiles.filter(p => p.brand_id === brandId).length;
-  const getLocationStaffCount = (locationId) => profiles.filter(p => p.location_id === locationId).length;
+  // Precomputed Brand/Location/Staff lookup Maps for O(1) retrieval during hierarchy rendering
+  const orgBrandsMap = React.useMemo(() => {
+    const map = new Map();
+    brands.forEach(b => {
+      const orgId = b.organization_id;
+      if (orgId) {
+        if (!map.has(orgId)) {
+          map.set(orgId, []);
+        }
+        map.get(orgId).push(b);
+      }
+    });
+    return map;
+  }, [brands]);
+
+  const brandLocationsMap = React.useMemo(() => {
+    const map = new Map();
+    locations.forEach(l => {
+      const brandId = l.brand_id;
+      if (brandId) {
+        if (!map.has(brandId)) {
+          map.set(brandId, []);
+        }
+        map.get(brandId).push(l);
+      }
+    });
+    return map;
+  }, [locations]);
+
+  const staffByOrgMap = React.useMemo(() => {
+    const map = new Map();
+    profiles.forEach(p => {
+      const orgId = p.organization_id;
+      if (orgId) {
+        map.set(orgId, (map.get(orgId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [profiles]);
+
+  const staffByBrandMap = React.useMemo(() => {
+    const map = new Map();
+    profiles.forEach(p => {
+      const brandId = p.brand_id;
+      if (brandId) {
+        map.set(brandId, (map.get(brandId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [profiles]);
+
+  const staffByLocationMap = React.useMemo(() => {
+    const map = new Map();
+    profiles.forEach(p => {
+      const locationId = p.location_id;
+      if (locationId) {
+        map.set(locationId, (map.get(locationId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [profiles]);
+
+  const getOrgBrands = React.useCallback((orgId) => orgBrandsMap.get(orgId) || [], [orgBrandsMap]);
+  const getBrandLocations = React.useCallback((brandId) => brandLocationsMap.get(brandId) || [], [brandLocationsMap]);
+  const getOrgStaffCount = React.useCallback((orgId) => staffByOrgMap.get(orgId) || 0, [staffByOrgMap]);
+  const getBrandStaffCount = React.useCallback((brandId) => staffByBrandMap.get(brandId) || 0, [staffByBrandMap]);
+  const getLocationStaffCount = React.useCallback((locationId) => staffByLocationMap.get(locationId) || 0, [staffByLocationMap]);
 
   return (
     <div className="p-6 space-y-6">

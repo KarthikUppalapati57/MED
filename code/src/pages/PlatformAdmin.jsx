@@ -583,16 +583,62 @@ The MEVS Platform Team
     });
   };
 
-  const getOrgBrands = (orgId) => allBrands.filter(b => b.organization_id === orgId);
-  const getBrandLocations = (brandId) => allLocations.filter(l => l.brand_id === brandId);
+  // Precomputed Brand/Location lookup Maps for O(1) retrieval during organization hierarchy rendering
+  const orgBrandsMap = React.useMemo(() => {
+    const map = new Map();
+    allBrands.forEach(brand => {
+      const orgId = brand.organization_id;
+      if (orgId) {
+        if (!map.has(orgId)) {
+          map.set(orgId, []);
+        }
+        map.get(orgId).push(brand);
+      }
+    });
+    return map;
+  }, [allBrands]);
+
+  const brandLocationsMap = React.useMemo(() => {
+    const map = new Map();
+    allLocations.forEach(loc => {
+      const brandId = loc.brand_id;
+      if (brandId) {
+        if (!map.has(brandId)) {
+          map.set(brandId, []);
+        }
+        map.get(brandId).push(loc);
+      }
+    });
+    return map;
+  }, [allLocations]);
+
+  const getOrgBrands = React.useCallback((orgId) => orgBrandsMap.get(orgId) || [], [orgBrandsMap]);
+  const getBrandLocations = React.useCallback((brandId) => brandLocationsMap.get(brandId) || [], [brandLocationsMap]);
 
   // ── Computed Stats ─────────────────────────────────────────
-  const accessReqs = requests.filter(r => r.request_type !== 'demo');
-  const contactReqs = contactRequests;
-  const pendingAccessCount = accessReqs.filter(r => r.status === 'pending_approval' || r.status === 'under_review').length;
-  const pendingContactCount = contactReqs.filter(r => r.status === 'pending_approval').length;
-  const pendingOrgCount = orgs.filter(o => o.status === 'pending_approval' || o.status === 'under_review' || o.status === 'onboarding').length;
-  const pendingCount = pendingAccessCount + pendingContactCount + pendingOrgCount;
+  const {
+    accessReqs,
+    contactReqs,
+    pendingAccessCount,
+    pendingContactCount,
+    pendingOrgCount,
+    pendingCount
+  } = React.useMemo(() => {
+    const access = requests.filter(r => r.request_type !== 'demo');
+    const contact = contactRequests;
+    const pendingAccess = access.filter(r => r.status === 'pending_approval' || r.status === 'under_review').length;
+    const pendingContact = contact.filter(r => r.status === 'pending_approval').length;
+    const pendingOrg = orgs.filter(o => o.status === 'pending_approval' || o.status === 'under_review' || o.status === 'onboarding').length;
+    const pending = pendingAccess + pendingContact + pendingOrg;
+    return {
+      accessReqs: access,
+      contactReqs: contact,
+      pendingAccessCount: pendingAccess,
+      pendingContactCount: pendingContact,
+      pendingOrgCount: pendingOrg,
+      pendingCount: pending
+    };
+  }, [requests, contactRequests, orgs]);
 
   // ── Tab Renderers ──────────────────────────────────────────
   const renderRequestTable = (data, title, pCount, type) => (
