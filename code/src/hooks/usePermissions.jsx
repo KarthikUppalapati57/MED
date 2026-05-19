@@ -1,4 +1,5 @@
 import { useAuth } from '@/lib/AuthContext';
+import React, { useMemo } from 'react';
 
 /**
  * Custom hook for role-based permission checks.
@@ -13,26 +14,27 @@ import { useAuth } from '@/lib/AuthContext';
  *   org_owner:        Full org access, user management, org settings, accounting
  *   platform_admin:   Platform-wide management, all orgs, subscription/pricing
  */
+
+const ROLE_LEVEL = {
+  ground_staff:     0,
+  location_manager: 1,
+  manager:          2, // alias
+  branch_manager:   2,
+  org_owner:        3,
+  owner:            3, // alias
+  platform_admin:   4,
+  admin:            4, // alias
+};
+
 export function usePermissions() {
   const { role, userProfile } = useAuth();
 
-  const roleLevel = {
-    ground_staff:     0,
-    location_manager: 1,
-    manager:          2, // alias
-    branch_manager:   2,
-    org_owner:        3,
-    owner:            3, // alias
-    platform_admin:   4,
-    admin:            4, // alias
-  };
+  const currentLevel = ROLE_LEVEL[role] ?? 0;
 
-  const currentLevel = roleLevel[role] ?? 0;
-
-  return {
+  return useMemo(() => ({
     role,
     userProfile,
-    roleLevel,
+    roleLevel: ROLE_LEVEL,
 
     // Basic permissions
     canView: true, 
@@ -72,6 +74,6 @@ export function usePermissions() {
     isPlatformAdminOrAbove: currentLevel >= 4,
 
     // Check against a specific minimum role
-    hasMinRole: (minRole) => currentLevel >= (roleLevel[minRole] ?? 0),
-  };
+    hasMinRole: (minRole) => currentLevel >= (ROLE_LEVEL[minRole] ?? 0),
+  }), [role, userProfile, currentLevel]);
 }

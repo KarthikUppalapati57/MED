@@ -15,13 +15,13 @@ export const queryClientInstance = new QueryClient({
 
 // ── Query key prefixes that are platform-level (NOT org-scoped) ──
 // These should NOT be invalidated when the user switches org/brand/location context.
-const PLATFORM_QUERY_PREFIXES = [
+const PLATFORM_QUERY_PREFIXES = new Set([
 	'dash-orgs', 'dash-profiles', 'dash-plans', 'dash-recent-logs',
 	'platform-audit-logs', 'platform-admins', 'platform-admin-invites',
 	'access-requests', 'demo-requests', 'contact-requests',
 	'organizations', 'all-brands', 'all-locations', 'plans',
 	'pending-client-invites',
-];
+]);
 
 /**
  * Invalidate only org-scoped queries (invoices, inventory, products, etc.)
@@ -32,7 +32,7 @@ export function invalidateOrgScopedQueries() {
 	queryClientInstance.invalidateQueries({
 		predicate: (query) => {
 			const key = query.queryKey[0];
-			return typeof key === 'string' && !PLATFORM_QUERY_PREFIXES.includes(key);
+			return typeof key === 'string' && !PLATFORM_QUERY_PREFIXES.has(key);
 		},
 	});
 }

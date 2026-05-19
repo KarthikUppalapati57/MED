@@ -67,13 +67,15 @@ export const AuthProvider = ({ children }) => {
 
   const refreshMFAStatus = useCallback(async () => {
     try {
-      const { data: aal, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aalError) throw aalError;
-      setMfaLevel({ current: aal.currentLevel, next: aal.nextLevel });
-
-      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-      if (factorsError) throw factorsError;
-      setMfaFactors(factors.all || []);
+      const [aalRes, factorsRes] = await Promise.all([
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+        supabase.auth.mfa.listFactors(),
+      ]);
+      if (aalRes.error) throw aalRes.error;
+      if (factorsRes.error) throw factorsRes.error;
+      
+      setMfaLevel({ current: aalRes.data.currentLevel, next: aalRes.data.nextLevel });
+      setMfaFactors(factorsRes.data.all || []);
     } catch (err) {
       console.warn('MFA status check error:', err);
     }
@@ -280,16 +282,16 @@ export const AuthProvider = ({ children }) => {
       setTimeout(async () => {  // 1.5s delay avoids auth lock contention with session restoration
         if (!isMounted) return;
         try {
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const [aalRes, factorsRes] = await Promise.all([
+            supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+            supabase.auth.mfa.listFactors(),
+          ]);
           if (!isMounted) return;
-          if (aal) {
-            setMfaLevel({ current: aal.currentLevel, next: aal.nextLevel });
+          if (aalRes.data) {
+            setMfaLevel({ current: aalRes.data.currentLevel, next: aalRes.data.nextLevel });
           }
-          
-          const { data: factors } = await supabase.auth.mfa.listFactors();
-          if (!isMounted) return;
-          if (factors) {
-            setMfaFactors(factors.all || []);
+          if (factorsRes.data) {
+            setMfaFactors(factorsRes.data.all || []);
           }
         } catch (err) {
           console.warn('Deferred MFA refresh error (non-fatal):', err);
@@ -459,7 +461,7 @@ export const AuthProvider = ({ children }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loginWithEmail = async (email, password) => {
+  const loginWithEmail = useCallback(async (email, password) => {
     setAuthError(null);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -472,9 +474,9 @@ export const AuthProvider = ({ children }) => {
       setAuthError(err);
       return { data: null, error: err };
     }
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setIsLoadingAuth(true);
     // Clear state locally first to trigger immediate unmount of protected UIs
     setUser(null);
@@ -494,9 +496,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoadingAuth(false);
     }
-  };
+  }, []);
 
-  const signUp = async (email, password, metadata = {}) => {
+  const signUp = useCallback(async (email, password, metadata = {}) => {
     setAuthError(null);
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -516,9 +518,9 @@ export const AuthProvider = ({ children }) => {
       setAuthError(err);
       return { data: null, error: err };
     }
-  };
+  }, []);
 
-  const resetPassword = async (email) => {
+  const resetPassword = useCallback(async (email) => {
     setAuthError(null);
     try {
       // Use APP_URL to ensure the redirect goes to the correct domain
@@ -536,8 +538,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(err);
       return { data: null, error: err };
     }
-  };
-
+  }, []);
 
   // Robust role detection — NEVER default to 'ground_staff'
   // 1. Database profile role (most accurate)
@@ -548,7 +549,7 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user;
 
   // Permission helpers — new role hierarchy with backward-compatible aliases
-  const hasPermission = (action) => {
+  const hasPermission = useCallback((action) => {
     const permissions = {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
@@ -557,106 +558,141 @@ export const AuthProvider = ({ children }) => {
       platform_admin:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform', 'manage_subscriptions', 'manage_accounting'],
     };
     return (permissions[role] || []).includes(action);
-  };
+  }, [role]);
+
+  const switchContext = useCallback((type, entity) => {
+    let updatedOrg = activeOrg;
+    let updatedBrand = activeBrand;
+    let updatedLocation = activeLocation;
+
+    if (type === 'organization') {
+      updatedOrg = entity;
+      updatedBrand = null;
+      updatedLocation = null;
+      setActiveOrg(entity);
+      setActiveBrand(null);
+      setActiveLocation(null);
+    } else if (type === 'brand') {
+      updatedBrand = entity;
+      updatedLocation = null;
+      setActiveBrand(entity);
+      setActiveLocation(null);
+    } else if (type === 'location') {
+      updatedLocation = entity;
+      setActiveLocation(entity);
+    }
+
+    // Persist the updated context to cached profile in sessionStorage
+    const currentCache = getCachedProfile();
+    if (currentCache) {
+      currentCache.organization = updatedOrg;
+      currentCache.brand = updatedBrand;
+      currentCache.location = updatedLocation;
+      currentCache.organization_id = updatedOrg?.id || null;
+      currentCache.brand_id = updatedBrand?.id || null;
+      currentCache.location_id = updatedLocation?.id || null;
+      setCachedProfile(currentCache);
+    }
+
+    // Invalidate only org-scoped queries — platform-level data is untouched
+    invalidateOrgScopedQueries();
+  }, [activeOrg, activeBrand, activeLocation]);
+
+  const handleSetActiveOrg = useCallback((org) => {
+    setActiveOrg(org);
+    const currentCache = getCachedProfile();
+    if (currentCache) {
+      currentCache.organization = org;
+      currentCache.organization_id = org?.id || null;
+      setCachedProfile(currentCache);
+    }
+    invalidateOrgScopedQueries();
+  }, []);
+
+  const handleSetActiveBrand = useCallback((brand) => {
+    setActiveBrand(brand);
+    const currentCache = getCachedProfile();
+    if (currentCache) {
+      currentCache.brand = brand;
+      currentCache.brand_id = brand?.id || null;
+      setCachedProfile(currentCache);
+    }
+    invalidateOrgScopedQueries();
+  }, []);
+
+  const handleSetActiveLocation = useCallback((loc) => {
+    setActiveLocation(loc);
+    const currentCache = getCachedProfile();
+    if (currentCache) {
+      currentCache.location = loc;
+      currentCache.location_id = loc?.id || null;
+      setCachedProfile(currentCache);
+    }
+    invalidateOrgScopedQueries();
+  }, []);
+
+  const unenrollMFA = useCallback(async (factorId) => {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (!error) await refreshMFAStatus();
+    return { error };
+  }, [refreshMFAStatus]);
+
+  const contextValue = React.useMemo(() => ({
+    user,
+    userProfile,
+    organization: activeOrg,
+    brand: activeBrand,
+    location: activeLocation,
+    role,
+    isAuthenticated,
+    isLoadingAuth,
+    isMfaReady,
+    authError,
+    loginWithEmail,
+    signUp,
+    resetPassword,
+    logout,
+    hasPermission,
+    fetchProfile,
+    refreshProfile,
+    mfaLevel,
+    mfaFactors,
+    refreshMFAStatus,
+    switchContext,
+    setActiveOrg: handleSetActiveOrg,
+    setActiveBrand: handleSetActiveBrand,
+    setActiveLocation: handleSetActiveLocation,
+    unenrollMFA
+  }), [
+    user,
+    userProfile,
+    activeOrg,
+    activeBrand,
+    activeLocation,
+    role,
+    isAuthenticated,
+    isLoadingAuth,
+    isMfaReady,
+    authError,
+    loginWithEmail,
+    signUp,
+    resetPassword,
+    logout,
+    hasPermission,
+    fetchProfile,
+    refreshProfile,
+    mfaLevel,
+    mfaFactors,
+    refreshMFAStatus,
+    switchContext,
+    handleSetActiveOrg,
+    handleSetActiveBrand,
+    handleSetActiveLocation,
+    unenrollMFA
+  ]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userProfile,
-        organization: activeOrg,
-        brand: activeBrand,
-        location: activeLocation,
-        role,
-        isAuthenticated,
-        isLoadingAuth,
-        isMfaReady,
-        authError,
-        loginWithEmail,
-        signUp,
-        resetPassword,
-        logout,
-        hasPermission,
-        fetchProfile,
-        refreshProfile,
-        mfaLevel,
-        mfaFactors,
-        refreshMFAStatus,
-        switchContext: (type, entity) => {
-          let updatedOrg = activeOrg;
-          let updatedBrand = activeBrand;
-          let updatedLocation = activeLocation;
-
-          if (type === 'organization') {
-            updatedOrg = entity;
-            updatedBrand = null;
-            updatedLocation = null;
-            setActiveOrg(entity);
-            setActiveBrand(null);
-            setActiveLocation(null);
-          } else if (type === 'brand') {
-            updatedBrand = entity;
-            updatedLocation = null;
-            setActiveBrand(entity);
-            setActiveLocation(null);
-          } else if (type === 'location') {
-            updatedLocation = entity;
-            setActiveLocation(entity);
-          }
-
-          // Persist the updated context to cached profile in sessionStorage
-          const currentCache = getCachedProfile();
-          if (currentCache) {
-            currentCache.organization = updatedOrg;
-            currentCache.brand = updatedBrand;
-            currentCache.location = updatedLocation;
-            currentCache.organization_id = updatedOrg?.id || null;
-            currentCache.brand_id = updatedBrand?.id || null;
-            currentCache.location_id = updatedLocation?.id || null;
-            setCachedProfile(currentCache);
-          }
-
-          // Invalidate only org-scoped queries — platform-level data is untouched
-          invalidateOrgScopedQueries();
-        },
-        // Direct setters for ContextSwitcher / platform admin impersonation
-        setActiveOrg: (org) => {
-          setActiveOrg(org);
-          const currentCache = getCachedProfile();
-          if (currentCache) {
-            currentCache.organization = org;
-            currentCache.organization_id = org?.id || null;
-            setCachedProfile(currentCache);
-          }
-          invalidateOrgScopedQueries();
-        },
-        setActiveBrand: (brand) => {
-          setActiveBrand(brand);
-          const currentCache = getCachedProfile();
-          if (currentCache) {
-            currentCache.brand = brand;
-            currentCache.brand_id = brand?.id || null;
-            setCachedProfile(currentCache);
-          }
-          invalidateOrgScopedQueries();
-        },
-        setActiveLocation: (loc) => {
-          setActiveLocation(loc);
-          const currentCache = getCachedProfile();
-          if (currentCache) {
-            currentCache.location = loc;
-            currentCache.location_id = loc?.id || null;
-            setCachedProfile(currentCache);
-          }
-          invalidateOrgScopedQueries();
-        },
-        unenrollMFA: async (factorId) => {
-          const { error } = await supabase.auth.mfa.unenroll({ factorId });
-          if (!error) await refreshMFAStatus();
-          return { error };
-        }
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -84,10 +84,15 @@ export const CHART_OF_ACCOUNTS = {
   }
 };
 
+let cachedFlattened = null;
+let labelLookupMap = null;
+
 /**
  * Flattens the COA for use in select components
  */
 export const getFlattenedCOA = () => {
+  if (cachedFlattened) return cachedFlattened;
+  
   const flattened = [];
   Object.values(CHART_OF_ACCOUNTS).forEach(account => {
     // Add the main account
@@ -110,11 +115,18 @@ export const getFlattenedCOA = () => {
       });
     }
   });
+  
+  cachedFlattened = flattened;
   return flattened;
 };
 
 export const getCOALabel = (code) => {
-  const flattened = getFlattenedCOA();
-  const found = flattened.find(item => item.code === code);
-  return found ? `${found.code} - ${found.label}` : code;
+  if (!labelLookupMap) {
+    const flattened = getFlattenedCOA();
+    labelLookupMap = new Map();
+    flattened.forEach(item => {
+      labelLookupMap.set(item.code, `${item.code} - ${item.label}`);
+    });
+  }
+  return labelLookupMap.get(code) || code;
 };

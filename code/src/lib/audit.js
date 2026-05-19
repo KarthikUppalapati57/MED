@@ -69,15 +69,6 @@ export async function logAudit(entry) {
   }
 }
 
-/**
- * Build audit entries by diffing old and new data objects.
- * @param {string} entityType
- * @param {string} entityId
- * @param {object} oldData
- * @param {object} newData
- * @param {object} [meta]
- * @returns {Array}
- */
 export function diffForAudit(entityType, entityId, oldData, newData, meta = {}) {
   const entries = [];
   const allKeys = new Set([...Object.keys(oldData || {}), ...Object.keys(newData || {})]);
@@ -85,7 +76,13 @@ export function diffForAudit(entityType, entityId, oldData, newData, meta = {}) 
   for (const key of allKeys) {
     const oldVal = oldData?.[key];
     const newVal = newData?.[key];
-    if (oldVal !== newVal) {
+    
+    // Use structural stringification comparison for objects to avoid false positive diffs
+    const isDifferent = typeof oldVal === 'object' && oldVal !== null && newVal !== null
+      ? JSON.stringify(oldVal) !== JSON.stringify(newVal)
+      : oldVal !== newVal;
+
+    if (isDifferent) {
       entries.push({
         entityType,
         entityId,
@@ -101,9 +98,35 @@ export function diffForAudit(entityType, entityId, oldData, newData, meta = {}) 
 }
 
 /**
- * Log multiple audit entries in parallel.
+ * Log multiple audit entries in a single batch database insert query.
+ * Reduces network operations from N parallel queries to exactly 1 query.
  * @param {Array} entries
  */
 export async function logAuditBatch(entries) {
-  await Promise.allSettled(entries.map(logAudit));
+  if (!entries || entries.length === 0) return;
+  const rows = entries.map(entry => ({
+    entity_type:   entry.entityType || entry.action || 'unknown',
+    entity_id:     entry.entityId || entry.target_user_id || null,
+    action:        entry.action || 'audit',
+    module:        entry.module || null,
+    org_id:        entry.orgId || null,
+    field_changed: entry.fieldChanged || null,
+    old_value:     entry.oldValue != null ? String(entry.oldValue) : null,
+    new_value:     entry.newValue != null ? String(entry.newValue) : null,
+    user_email:    entry.userEmail || null,
+    user_id:       entry.userId || null,
+    details:       entry.details ? JSON.stringify(entry.details) : null,
+    created_at:    new Date().toISOString(),
+  }));
+
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('audit_logs').insert(rows);
+      if (error) throw error;
+    } else {
+      console.log('[audit] Batch:', rows);
+    }
+  } catch (err) {
+    console.warn('[audit] Failed to write batch audit log:', err.message || err);
+  }
 }
