@@ -77,6 +77,60 @@ This invitation will expire in 7 days.
 }
 
 /**
+ * Send an email confirming a demo booking request has been received.
+ */
+export async function sendDemoConfirmationEmail({ to_email, to_name }) {
+  return sendEmail({
+    to_email,
+    to_name,
+    subject: `Your MEVS System Demo Request is Received!`,
+    message: `
+Hi ${to_name || 'Valued Guest'},
+
+Thank you for your interest in the MEVS (Multi-tenant Enterprise Valuation & Stock-control) platform!
+
+We have successfully received your request for a live system walkthrough demo. Our administrative team is currently preparing a secure, personalized demo environment space for your company.
+
+An administrator will contact you shortly and send your personalized demo login link to this email address.
+
+If you have any questions or additional business requirements in the meantime, feel free to reply directly to this email.
+
+Best regards,
+The MEVS Onboarding Team
+    `.trim(),
+  });
+}
+
+/**
+ * Send the secure demo environment access link.
+ */
+export async function sendDemoAccessEmail({ to_email, to_name, invite_link }) {
+  return sendEmail({
+    to_email,
+    to_name,
+    subject: `Your MEVS Live Demo Environment is Ready!`,
+    message: `
+Hi ${to_name || 'Valued Guest'},
+
+We are thrilled to let you know that your private demo environment space is fully prepared!
+
+You can now explore our modern invoice scanning, automated inventory tracking, and real-time analytical reporting tools.
+
+Please click the secure link below to access your demo workspace and create your administrator credentials:
+
+👉 ${invite_link}
+
+Note: For security reasons, this personalized demo link is only active for 7 days.
+
+We look forward to hearing your feedback!
+
+Warmly,
+The MEVS Administrative Team
+    `.trim(),
+  });
+}
+
+/**
  * Notify managers that a ground staff member uploaded a new invoice.
  */
 export async function sendInvoiceUploadNotification({ to_email, to_name, uploader_name, invoice_number, vendor_name, total_amount }) {
