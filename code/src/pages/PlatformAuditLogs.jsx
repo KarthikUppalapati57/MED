@@ -60,31 +60,37 @@ export default function PlatformAuditLogs() {
   });
 
   // Filter logs by search
-  const filteredLogs = auditLogs.filter(log => {
-    if (!searchQuery) return true;
+  const filteredLogs = React.useMemo(() => {
+    if (!searchQuery) return auditLogs;
     const term = searchQuery.toLowerCase();
-    return (
-      log.action?.toLowerCase().includes(term) ||
-      log.table_name?.toLowerCase().includes(term) ||
-      log.profiles?.email?.toLowerCase().includes(term) ||
-      log.profiles?.full_name?.toLowerCase().includes(term) ||
-      log.record_id?.toLowerCase().includes(term)
-    );
-  });
+    return auditLogs.filter(log => {
+      return (
+        log.action?.toLowerCase().includes(term) ||
+        log.table_name?.toLowerCase().includes(term) ||
+        log.profiles?.email?.toLowerCase().includes(term) ||
+        log.profiles?.full_name?.toLowerCase().includes(term) ||
+        log.record_id?.toLowerCase().includes(term)
+      );
+    });
+  }, [auditLogs, searchQuery]);
 
   // Stats
-  const todayLogs = auditLogs.filter(l => {
-    if (!l.created_at) return false;
-    const today = new Date();
-    const logDate = new Date(l.created_at);
-    return logDate.toDateString() === today.toDateString();
-  });
+  const todayLogs = React.useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return auditLogs.filter(l => {
+      if (!l.created_at) return false;
+      const logDate = new Date(l.created_at);
+      return logDate.toDateString() === todayStr;
+    });
+  }, [auditLogs]);
 
-  const actionCounts = auditLogs.reduce((acc, l) => {
-    const action = l.action?.toUpperCase() || 'UNKNOWN';
-    acc[action] = (acc[action] || 0) + 1;
-    return acc;
-  }, {});
+  const actionCounts = React.useMemo(() => {
+    return auditLogs.reduce((acc, l) => {
+      const action = l.action?.toUpperCase() || 'UNKNOWN';
+      acc[action] = (acc[action] || 0) + 1;
+      return acc;
+    }, {});
+  }, [auditLogs]);
 
   const getActionColor = (action) => {
     switch (action?.toUpperCase()) {
