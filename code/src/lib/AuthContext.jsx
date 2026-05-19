@@ -279,6 +279,11 @@ export const AuthProvider = ({ children }) => {
     // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
     // to avoid the browser lock deadlock. Uses setTimeout(0) to yield the lock.
     const deferredMFARefresh = () => {
+      // Mark MFA ready quickly because we already extracted it synchronously from session
+      setTimeout(() => {
+        if (isMounted) setIsMfaReady(true);
+      }, 50);
+
       setTimeout(async () => {  // 1.5s delay avoids auth lock contention with session restoration
         if (!isMounted) return;
         try {
@@ -295,8 +300,6 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (err) {
           console.warn('Deferred MFA refresh error (non-fatal):', err);
-        } finally {
-          if (isMounted) setIsMfaReady(true);
         }
       }, 1500);
     };
@@ -445,6 +448,7 @@ export const AuthProvider = ({ children }) => {
         setIsLoadingAuth((current) => {
           if (current) {
             console.debug('[AuthContext] Safety timeout — completing auth init with cached profile');
+            setIsMfaReady(true); // Ensure MFA is also marked ready to prevent stuck screen
             return false;
           }
           return current;
