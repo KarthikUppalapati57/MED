@@ -358,12 +358,12 @@ export const AuthProvider = ({ children }) => {
               // 3. Kick off accurate MFA refresh outside the lock (will correct if needed)
               deferredMFARefresh();
               
-              // 4. Background work (non-blocking for invitations, but we await profile so role is accurate)
+              // 4. Accept pending invitation BEFORE loading profile to prevent race conditions on cold signups
               try {
-                processPendingInvitationRef.current(currentUser.email, currentUser.id).catch(err => {
-                  console.warn('Invitation processing error (non-fatal):', err);
-                });
-              } catch (inviteErr) {}
+                await processPendingInvitationRef.current(currentUser.email, currentUser.id);
+              } catch (inviteErr) {
+                console.warn('Invitation processing error (non-fatal):', inviteErr);
+              }
               
               try {
                 await loadProfile(currentUser);

@@ -380,6 +380,71 @@ function LoginPage() {
   );
 }
 
+// ── Pending Assignment Page for Invited Non-Owners ─────────
+function PendingAssignmentPage() {
+  const { userProfile, refreshProfile, logout } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+      toast.success("Assignment status refreshed!");
+    } catch (e) {
+      toast.error("Failed to refresh status");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white animate-fade-in">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100/80 text-center space-y-6 animate-in fade-in zoom-in duration-300">
+        <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-8 h-8 text-teal-600 animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-slate-900">Account Setup Pending</h2>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Welcome, <span className="font-semibold text-slate-700">{userProfile?.full_name || 'User'}</span>! 
+            Your account has been created successfully, but you are not yet assigned to an organization or branch.
+          </p>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            Please contact your organization administrator or platform administrator to complete your assignment.
+          </p>
+        </div>
+
+        <div className="pt-4 flex flex-col gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="w-full h-12 inline-flex items-center justify-center bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {refreshing ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Checking Status...
+              </>
+            ) : (
+              "Check Assignment Status"
+            )}
+          </button>
+          
+          <button
+            onClick={logout}
+            className="w-full h-12 inline-flex items-center justify-center border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Update Password Page ───────────────────────────────────
 function UpdatePasswordPage() {
   const { user } = useAuth();
@@ -494,9 +559,10 @@ const AuthenticatedApp = () => {
   // Setup is required for any non-platform-admin without an organization
   const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser;
   
-  // Within the setup flow, we distinguish between payment and organization creation
+  // Within the setup flow, we distinguish between payment, organization creation, and pending assignment
   const needsPaymentVerification = needsSetupFlow && isTenantOwner && !userProfile?.payment_verified;
-  const needsOnboarding = needsSetupFlow && (userProfile?.payment_verified || !isTenantOwner);
+  const needsOnboarding = needsSetupFlow && isTenantOwner && userProfile?.payment_verified;
+  const needsAssignment = needsSetupFlow && !isTenantOwner;
 
   if (isLoadingAuth) {
     return (
@@ -534,12 +600,19 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : (needsPaymentVerification || needsOnboarding) ? (
+      ) : (needsPaymentVerification || needsOnboarding || needsAssignment) ? (
         <>
-          {/* New users without an organization must complete payment verification THEN onboarding */}
+          {/* New users without an organization must complete payment verification THEN onboarding, or wait for assignment */}
           <Route path="/verify-payment" element={<PaymentVerification />} />
-          <Route path="/onboarding" element={userProfile?.payment_verified ? <OnboardingPage /> : <Navigate to="/verify-payment" replace />} />
-          <Route path="*" element={<Navigate to={userProfile?.payment_verified ? "/onboarding" : "/verify-payment"} replace />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
+          <Route path="*" element={
+            <Navigate to={
+              needsPaymentVerification ? "/verify-payment" :
+              needsOnboarding ? "/onboarding" :
+              "/pending-assignment"
+            } replace />
+          } />
         </>
       ) : (
         <>
@@ -547,6 +620,7 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/verify-payment" element={<Navigate to="/" replace />} />
           <Route path="/onboarding" element={<Navigate to="/" replace />} />
+          <Route path="/pending-assignment" element={<Navigate to="/" replace />} />
           <Route
             path="/"
             element={

@@ -69,7 +69,13 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[invite-user] Inviting ${email} as ${role} (resend: ${resend})`);
 
-    const targetRole = role || "ground_staff";
+    const rawRole = role || "ground_staff";
+    const roleMapping: Record<string, string> = {
+      owner: 'org_owner',
+      admin: 'platform_admin',
+      manager: 'branch_manager',
+    };
+    const targetRole = roleMapping[rawRole] || rawRole;
     const targetOrgId = org_id || callerProfile.organization_id;
 
     const frontendUrl = Deno.env.get("FRONTEND_URL") || Deno.env.get("SITE_URL") || "http://localhost:5173";
