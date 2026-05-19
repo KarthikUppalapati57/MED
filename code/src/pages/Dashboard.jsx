@@ -131,13 +131,14 @@ function PlatformDashboard() {
     };
   }, [queryClient]);
 
-  const activeOrgs = allOrgs.filter(o => o.subscription_status === 'active');
-  const trialOrgs = allOrgs.filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial');
-
-  // Compute MRR from plans
-  const planPriceMap = {};
-  allPlans.forEach(p => { planPriceMap[p.id] = p.price_monthly || 0; });
-  const mrr = allOrgs.reduce((sum, org) => sum + (planPriceMap[org.plan_id] || 0), 0);
+  const { activeOrgs, trialOrgs, mrr } = React.useMemo(() => {
+    const active = allOrgs.filter(o => o.subscription_status === 'active');
+    const trial = allOrgs.filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial');
+    const planPriceMap = {};
+    allPlans.forEach(p => { planPriceMap[p.id] = p.price_monthly || 0; });
+    const calculatedMrr = allOrgs.reduce((sum, org) => sum + (planPriceMap[org.plan_id] || 0), 0);
+    return { activeOrgs: active, trialOrgs: trial, mrr: calculatedMrr };
+  }, [allOrgs, allPlans]);
 
   return (
     <div className="space-y-6">
@@ -268,19 +269,30 @@ function OrgOwnerDashboard() {
     };
   }, [queryClient]);
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
-  const totalUnpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
-  const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-  const activeModules = organization?.enabled_modules?.length || 0;
+  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData } = React.useMemo(() => {
+    const pending = invoices.filter(i => i.status === 'pending_review').length;
+    const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
+    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+    const active = organization?.enabled_modules?.length || 0;
 
-  const spendByCategory = invoices.reduce((acc, inv) => {
-    inv.line_items?.forEach(item => {
-      const cat = item.category || 'Other';
-      acc[cat] = (acc[cat] || 0) + (item.extended_price || 0);
-    });
-    return acc;
-  }, {});
-  const pieData = Object.entries(spendByCategory).map(([name, value]) => ({ name, value }));
+    const spend = invoices.reduce((acc, inv) => {
+      inv.line_items?.forEach(item => {
+        const cat = item.category || 'Other';
+        acc[cat] = (acc[cat] || 0) + (item.extended_price || 0);
+      });
+      return acc;
+    }, {});
+    const pie = Object.entries(spend).map(([name, value]) => ({ name, value }));
+
+    return {
+      pendingInvoices: pending,
+      totalUnpaid: unpaid,
+      lowStockItems: lowStock,
+      activeModules: active,
+      spendByCategory: spend,
+      pieData: pie
+    };
+  }, [invoices, inventory, organization]);
 
   return (
     <div className="space-y-6">
@@ -416,14 +428,28 @@ function BranchManagerDashboard() {
     };
   }, [queryClient]);
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
-  const totalUnpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
-  const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-  const thisMonthSpend = invoices
-    .filter(i => new Date(i.invoice_date) >= new Date(new Date().setDate(1)))
-    .reduce((sum, i) => sum + (i.total_amount || 0), 0);
+  const { pendingInvoices, totalUnpaid, lowStockItems, thisMonthSpend, recentInvoices } = React.useMemo(() => {
+    const pending = invoices.filter(i => i.status === 'pending_review').length;
+    const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
+    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const thisMonth = invoices
+      .filter(i => new Date(i.invoice_date) >= startOfMonth)
+      .reduce((sum, i) => sum + (i.total_amount || 0), 0);
 
-  const recentInvoices = invoices.slice(0, 5);
+    const recent = invoices.slice(0, 5);
+
+    return {
+      pendingInvoices: pending,
+      totalUnpaid: unpaid,
+      lowStockItems: lowStock,
+      thisMonthSpend: thisMonth,
+      recentInvoices: recent
+    };
+  }, [invoices, inventory]);
 
   return (
     <div className="space-y-6">
@@ -542,10 +568,16 @@ function LocationManagerDashboard() {
     };
   }, [queryClient]);
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending_review').length;
-  const lowStockItems = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-
-  const recentInvoices = invoices.slice(0, 5);
+  const { pendingInvoices, lowStockItems, recentInvoices } = React.useMemo(() => {
+    const pending = invoices.filter(i => i.status === 'pending_review').length;
+    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+    const recent = invoices.slice(0, 5);
+    return {
+      pendingInvoices: pending,
+      lowStockItems: lowStock,
+      recentInvoices: recent
+    };
+  }, [invoices, inventory]);
 
   return (
     <div className="space-y-6">
@@ -625,8 +657,14 @@ function GroundLevelDashboard() {
     };
   }, [queryClient]);
 
-  const pendingInvoices = invoices.filter(i => i.status === 'pending_review');
-  const myUploads = invoices.length;
+  const { pendingInvoices, myUploads } = React.useMemo(() => {
+    const pending = invoices.filter(i => i.status === 'pending_review');
+    const uploads = invoices.length;
+    return {
+      pendingInvoices: pending,
+      myUploads: uploads
+    };
+  }, [invoices]);
 
   return (
     <div className="space-y-6">
