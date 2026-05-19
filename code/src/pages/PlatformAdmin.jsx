@@ -57,6 +57,7 @@ export default function PlatformAdmin() {
   // Selection/Processing State
   const [processingRequests, setProcessingRequests] = useState(new Set());
   const [selectedRequests, setSelectedRequests] = useState(new Set());
+  const [resendingDemos, setResendingDemos] = useState(new Set());
   
   // Organization Hierarchy State
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
@@ -433,6 +434,89 @@ The MEVS Platform Team
       toast.error(err.message || "Failed to decline request", { id: toastId });
     } finally {
       setProcessingRequests(prev => { const n = new Set(prev); n.delete(request.id); return n; });
+    }
+  };
+
+  // ── Resend email for an already-processed demo request ───────
+  const handleResendDemoEmail = async (request) => {
+    const toastId = toast.loading(`Resending email to ${request.full_name}...`);
+    setResendingDemos(prev => { const n = new Set(prev); n.add(request.id); return n; });
+
+    try {
+      if (request.status === 'accepted') {
+        // Find the invitation that was created for this demo request
+        const { data: invite } = await supabase
+          .from('invitations')
+          .select('token')
+          .eq('email', request.email)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const signupLink = invite?.token
+          ? `${window.location.origin}/signup/${invite.token}`
+          : `${window.location.origin}`;
+
+        const emailResult = await sendEmail({
+          to_email: request.email,
+          to_name: request.full_name,
+          subject: "Your MEVS Demo Request has been Approved!",
+          message: `
+Hi ${request.full_name},
+
+We are thrilled to inform you that your request for a MEVS system walkthrough and demo has been approved! 
+
+We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+
+Click the link below to create your account and access your environment:
+${signupLink}
+
+This secure registration link will remain active for 7 days. If you have any questions or require a guided walkthrough with our implementation engineers, please respond directly to this email.
+
+Welcome to the future of multi-tenant enterprise management!
+
+Best regards,
+The MEVS Platform Team
+          `.trim()
+        });
+
+        if (!emailResult.success) {
+          toast.error("Email service failed. Please check EmailJS configuration.", { id: toastId });
+        } else {
+          toast.success("Approval email resent successfully!", { id: toastId });
+        }
+      } else if (request.status === 'rejected') {
+        const emailResult = await sendEmail({
+          to_email: request.email,
+          to_name: request.full_name,
+          subject: "Update on your MEVS Demo Request",
+          message: `
+Hi ${request.full_name},
+
+Thank you for your interest in the MEVS platform and requesting a demo walkthrough.
+
+After reviewing your company profile and current requirements, we regret to inform you that we are unable to approve your demo request at this time. Our current onboarding pipeline is highly curated to ensure high service standards for matching enterprise profiles.
+
+We will keep your details on file and reach out if our capacity opens up or if there is a better alignment in the future.
+
+Thank you again for your time and interest in MEVS.
+
+Best regards,
+The MEVS Platform Team
+          `.trim()
+        });
+
+        if (!emailResult.success) {
+          toast.error("Email service failed. Please check EmailJS configuration.", { id: toastId });
+        } else {
+          toast.success("Rejection email resent successfully!", { id: toastId });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to resend demo email:", err);
+      toast.error(err.message || "Failed to resend email", { id: toastId });
+    } finally {
+      setResendingDemos(prev => { const n = new Set(prev); n.delete(request.id); return n; });
     }
   };
 
@@ -932,9 +1016,29 @@ The MEVS Platform Team
                                 </Button>
                               </>
                             ) : (
-                              <span className="text-xs text-slate-400 font-medium italic">
-                                Processed
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn(
+                                  "text-[9px] font-bold border-none capitalize",
+                                  r.status === 'accepted' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                                )}>
+                                  {r.status}
+                                </Badge>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-7 px-2.5 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 font-bold rounded-lg flex items-center gap-1"
+                                  disabled={resendingDemos.has(r.id)}
+                                  onClick={() => handleResendDemoEmail(r)}
+                                  title={r.status === 'accepted' ? 'Resend approval email with invite link' : 'Resend rejection notification'}
+                                >
+                                  {resendingDemos.has(r.id) ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Mail className="w-3 h-3" />
+                                  )}
+                                  Resend
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </TableCell>

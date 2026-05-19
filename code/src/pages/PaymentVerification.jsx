@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldCheck, Lock, CreditCard, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripe } from '@/lib/paymentService';
 import { toast } from 'sonner';
@@ -22,6 +22,77 @@ const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
 };
 
+/**
+ * Robustly set payment_verified = true on the user's profile.
+ * Handles race conditions where the profile row may not exist yet
+ * (e.g. the DB trigger hasn't fired) or RLS blocks the update.
+ *
+ * Strategy:
+ *  1. Try UPDATE first (profile already exists from DB trigger)
+ *  2. If UPDATE matches 0 rows, wait briefly and retry
+ *  3. If still 0 rows after retries, fall back to UPSERT to create the row
+ */
+async function markPaymentVerified(userId, userEmail) {
+  const MAX_RETRIES = 4;
+  const RETRY_DELAY = 800; // ms
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { data, error, count } = await supabase
+      .from('profiles')
+      .update({
+        payment_verified: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      console.warn(`[PaymentVerification] update attempt ${attempt + 1} error:`, error.message);
+      // If it's an RLS error or permission issue, wait and retry
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, RETRY_DELAY));
+        continue;
+      }
+      throw error;
+    }
+
+    // If data is returned, the update affected a row — success!
+    if (data?.id) {
+      console.log('[PaymentVerification] Profile updated successfully on attempt', attempt + 1);
+      return true;
+    }
+
+    // No row was matched — profile may not exist yet. Wait and retry.
+    console.warn(`[PaymentVerification] update matched 0 rows on attempt ${attempt + 1}, retrying...`);
+    if (attempt < MAX_RETRIES - 1) {
+      await new Promise(r => setTimeout(r, RETRY_DELAY));
+    }
+  }
+
+  // All UPDATE retries exhausted — fall back to UPSERT
+  console.warn('[PaymentVerification] UPDATE retries exhausted, falling back to UPSERT');
+  const { error: upsertError } = await supabase
+    .from('profiles')
+    .upsert(
+      {
+        id: userId,
+        email: userEmail,
+        payment_verified: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    );
+
+  if (upsertError) {
+    console.error('[PaymentVerification] UPSERT fallback failed:', upsertError.message);
+    throw upsertError;
+  }
+
+  console.log('[PaymentVerification] UPSERT fallback succeeded');
+  return true;
+}
+
 function VerificationForm({ onVerified }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -37,28 +108,44 @@ function VerificationForm({ onVerified }) {
     setError(null);
 
     try {
-      // In a real scenario, we would create a SetupIntent or a PaymentMethod
-      // For this workflow, we simulate successful verification
-      await new Promise(r => setTimeout(r, 2000));
+      // Step 1: Validate the card with Stripe by creating a PaymentMethod.
+      // This sends the card details to Stripe and confirms the card is valid
+      // without charging it.
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card input not found. Please refresh and try again.');
+      }
 
-      // Use update instead of upsert to avoid RLS INSERT violations
-      // The profile is already created by the database trigger during signup
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          payment_verified: true, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', user.id);
+      const { paymentMethod, error: stripeError } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+          email: user?.email,
+        },
+      });
 
-      if (updateError) throw updateError;
+      if (stripeError) {
+        // Stripe returned a validation error (invalid card, expired, etc.)
+        throw new Error(stripeError.message);
+      }
+
+      if (!paymentMethod?.id) {
+        throw new Error('Card validation failed. Please check your card details and try again.');
+      }
+
+      console.log('[PaymentVerification] Stripe PaymentMethod created:', paymentMethod.id);
+
+      // Step 2: Mark payment as verified in the database
+      await markPaymentVerified(user.id, user.email);
 
       toast.success('Payment details verified successfully!');
       // Signal parent that verification is done
       onVerified();
     } catch (err) {
-      setError(err.message || 'Verification failed. Please try again.');
-      toast.error('Verification failed');
+      console.error('[PaymentVerification] Verification failed:', err);
+      const message = err.message || 'Verification failed. Please try again.';
+      setError(message);
+      toast.error(message);
     } finally {
       setProcessing(false);
     }
@@ -78,14 +165,21 @@ function VerificationForm({ onVerified }) {
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-center gap-2 text-sm text-red-600 animate-in fade-in slide-in-from-top-1">
-          <AlertCircle className="w-4 h-4" />
-          {error}
+        <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-start gap-2 text-sm text-red-600 animate-in fade-in slide-in-from-top-1">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p>{error}</p>
+            {error.includes('failed') && (
+              <p className="text-xs text-red-400 mt-1">
+                If you're using a test card, try <code className="bg-red-100 px-1 rounded">4242 4242 4242 4242</code> with any future date and CVC.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      <Button 
-        type="submit" 
+      <Button
+        type="submit"
         disabled={!stripe || processing}
         className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
       >
@@ -104,7 +198,7 @@ export default function PaymentVerification() {
   const { userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [completed, setCompleted] = useState(false);
-  const retryCountRef = useRef(0);
+  const [pollFailed, setPollFailed] = useState(false);
 
   // ── After verification completes, poll refreshProfile until payment_verified is confirmed ──
   useEffect(() => {
@@ -112,15 +206,15 @@ export default function PaymentVerification() {
     let cancelled = false;
 
     const pollUntilReady = async () => {
-      const MAX_RETRIES = 12; // Increased retries
+      const MAX_RETRIES = 15;
       let success = false;
 
       for (let i = 0; i < MAX_RETRIES; i++) {
         if (cancelled) return;
-        
+
         try {
           const freshProfile = await refreshProfile();
-          // Check the return value directly to avoid stale closure issues with userProfile state
+          // Check the return value directly to avoid stale closure issues
           if (freshProfile?.payment_verified) {
             success = true;
             break;
@@ -128,15 +222,20 @@ export default function PaymentVerification() {
         } catch (e) {
           console.warn('Profile refresh attempt failed:', e);
         }
-        
-        // Wait before next retry (exponential-ish backoff or steady intervals)
-        await new Promise(r => setTimeout(r, 800 + (i * 100)));
+
+        // Wait before next retry (gradual backoff)
+        await new Promise(r => setTimeout(r, 600 + (i * 150)));
       }
 
-      if (!cancelled && !success) {
-        // If we still haven't confirmed, try one last navigation anyway
-        // But use navigate() to avoid a full app reload if possible
+      if (cancelled) return;
+
+      if (success) {
         navigate('/onboarding', { replace: true });
+      } else {
+        // Instead of silently force-navigating (which causes a redirect loop),
+        // show a clear error state with a retry button.
+        console.warn('[PaymentVerification] Polling exhausted — profile still not showing payment_verified');
+        setPollFailed(true);
       }
     };
 
@@ -159,6 +258,64 @@ export default function PaymentVerification() {
   // Guard: If already verified, move to onboarding
   if (userProfile?.payment_verified && !completed) {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  // ── Poll failure screen — profile update didn't propagate ──
+  if (pollFailed) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-8 h-8 text-amber-600" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-900">Almost There!</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Your card was verified by Stripe, but we're having trouble updating your account status.
+              This is usually a temporary issue.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Button
+              className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg"
+              onClick={async () => {
+                setPollFailed(false);
+                // Try the profile update one more time directly
+                try {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await markPaymentVerified(user.id, user.email);
+                    toast.success('Account updated! Redirecting...');
+                    // Re-trigger the polling effect
+                    setCompleted(false);
+                    setTimeout(() => setCompleted(true), 100);
+                  }
+                } catch (err) {
+                  console.error('Retry failed:', err);
+                  toast.error('Still having trouble. Please try logging out and back in.');
+                  setPollFailed(true);
+                }
+              }}
+            >
+              <RefreshCw className="w-5 h-5 mr-2" /> Try Again
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-10 rounded-xl"
+              onClick={() => {
+                // Force-navigate to onboarding as last resort
+                navigate('/onboarding', { replace: true });
+              }}
+            >
+              Continue to Setup →
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400">
+            If this keeps happening, try signing out and signing back in.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // ── Success screen while waiting for profile to update ──
