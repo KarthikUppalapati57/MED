@@ -168,14 +168,16 @@ export default function PlatformUserManagement() {
   };
 
   // Filter admins by search
-  const filteredAdmins = platformAdmins.filter(admin => {
-    if (!searchQuery) return true;
+  const filteredAdmins = React.useMemo(() => {
+    if (!searchQuery) return platformAdmins;
     const term = searchQuery.toLowerCase();
-    return (
-      admin.full_name?.toLowerCase().includes(term) ||
-      admin.email?.toLowerCase().includes(term)
-    );
-  });
+    return platformAdmins.filter(admin => {
+      return (
+        admin.full_name?.toLowerCase().includes(term) ||
+        admin.email?.toLowerCase().includes(term)
+      );
+    });
+  }, [platformAdmins, searchQuery]);
 
   // ── Guards ─────────────────────────────────────────────────
   if (!authChecked) {
