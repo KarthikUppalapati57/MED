@@ -113,11 +113,15 @@ const STATUS_CONFIG = {
 };
 
 // ─── Utilities ─────────────────────────────────────────────────────────────
+const avatarColorCache = new Map();
 function avatarColor(email = "") {
+  if (avatarColorCache.has(email)) return avatarColorCache.get(email);
   const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"];
   let h = 0;
   for (const c of email) h = (h * 31 + c.charCodeAt(0)) % colors.length;
-  return colors[h];
+  const res = colors[h];
+  avatarColorCache.set(email, res);
+  return res;
 }
 
 function formatLastActive(dateStr) {
@@ -1049,7 +1053,7 @@ export default function UserManagement() {
     return { total, active, invited, admins };
   }, [scopedMembers]);
 
-  const canEdit = (targetMember) => {
+  const canEdit = React.useCallback((targetMember) => {
     if (isPlatformAdmin) return true;
     const targetRole = targetMember.role || targetMember.capabilities?.role || 'ground_staff';
     const myLevel = roleLevel?.[userRole] ?? 0;
@@ -1065,7 +1069,7 @@ export default function UserManagement() {
     if (myLevel === 1 && targetLevel < 1) return true;
     
     return false;
-  };
+  }, [isPlatformAdmin, userRole, roleLevel]);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 animate-in fade-in duration-500">
