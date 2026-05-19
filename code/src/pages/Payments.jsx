@@ -79,6 +79,15 @@ const paymentStatusColors = {
   refunded: 'bg-purple-100 text-purple-700',
 };
 
+const invoiceStatusColors = {
+  approved: 'bg-green-100 text-green-700',
+  paid: 'bg-teal-100 text-teal-700',
+  rejected: 'bg-red-100 text-red-700',
+  pending_review: 'bg-orange-100 text-orange-700',
+  validated: 'bg-blue-100 text-blue-700',
+  flagged: 'bg-yellow-100 text-yellow-700',
+};
+
 export default function Payments() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -134,11 +143,21 @@ export default function Payments() {
   };
 
   // Stats
-  const approvedUnpaid = invoices.filter(i => i.status === 'approved' && i.payment_status !== 'paid');
-  const totalDue = approvedUnpaid.reduce((sum, i) => sum + (i.total_amount || 0), 0);
-  const totalPaid = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
-  const pendingPayments = payments.filter(p => p.status === 'pending').length;
-  const overdue = approvedUnpaid.filter(i => i.due_date && new Date(i.due_date) < new Date()).length;
+  const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue } = React.useMemo(() => {
+    const appUnpaid = invoices.filter(i => i.status === 'approved' && i.payment_status !== 'paid');
+    const dueSum = appUnpaid.reduce((sum, i) => sum + (i.total_amount || 0), 0);
+    const paidSum = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
+    const pending = payments.filter(p => p.status === 'pending').length;
+    const now = new Date();
+    const overdueCount = appUnpaid.filter(i => i.due_date && new Date(i.due_date) < now).length;
+    return {
+      approvedUnpaid: appUnpaid,
+      totalDue: dueSum,
+      totalPaid: paidSum,
+      pendingPayments: pending,
+      overdue: overdueCount,
+    };
+  }, [invoices, payments]);
 
   const handlePayNow = (invoice) => {
     setSelectedInvoice(invoice);
@@ -162,21 +181,27 @@ export default function Payments() {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = !search ||
-      inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || inv.payment_status === statusFilter || inv.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredInvoices = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return invoices.filter(inv => {
+      const matchesSearch = !search ||
+        inv.vendor_name?.toLowerCase().includes(searchLower) ||
+        inv.invoice_number?.toLowerCase().includes(searchLower);
+      const matchesStatus = statusFilter === 'all' || inv.payment_status === statusFilter || inv.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [invoices, search, statusFilter]);
 
-  const filteredPayments = payments.filter(p => {
-    const matchesSearch = !search ||
-      p.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
-      p.transaction_id?.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredPayments = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return payments.filter(p => {
+      const matchesSearch = !search ||
+        p.vendor_name?.toLowerCase().includes(searchLower) ||
+        p.invoice_number?.toLowerCase().includes(searchLower) ||
+        p.transaction_id?.toLowerCase().includes(searchLower);
+      return matchesSearch;
+    });
+  }, [payments, search]);
 
   return (
     <div className="space-y-6">
@@ -340,15 +365,6 @@ export default function Payments() {
                         const isOverdue = dueDate && dueDate < new Date() && invoice.payment_status !== 'paid';
                         const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && invoice.payment_status !== 'paid';
                         const canPay = invoice.status === 'approved' && invoice.payment_status !== 'paid';
-
-                        const invoiceStatusColors = {
-                          approved: 'bg-green-100 text-green-700',
-                          paid: 'bg-teal-100 text-teal-700',
-                          rejected: 'bg-red-100 text-red-700',
-                          pending_review: 'bg-orange-100 text-orange-700',
-                          validated: 'bg-blue-100 text-blue-700',
-                          flagged: 'bg-yellow-100 text-yellow-700',
-                        };
 
                         return (
                           <TableRow key={invoice.id}>
