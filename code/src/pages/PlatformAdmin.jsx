@@ -29,6 +29,8 @@ import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import InventoryAudit from '@/components/accounting/InventoryAudit';
+import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
+
 
 const TABS = [
   { id: 'requests', label: 'Requests', icon: ShieldAlert },
@@ -236,7 +238,7 @@ export default function PlatformAdmin() {
       return;
     }
     
-    const toastId = toast.loading("Generating secure onboarding link...");
+    const toastId = toast.loading("Generating secure onboarding link & sending email...");
     setInviting(true);
     try {
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -263,16 +265,175 @@ export default function PlatformAdmin() {
       if (insertErr) throw insertErr;
 
       const link = `${window.location.origin}/signup/${token}`;
+
+      // Send invitation email via EmailJS
+      const emailResult = await sendInvitationEmail({
+        to_email: inviteEmail,
+        to_name: inviteEmail.split('@')[0],
+        role: "Organization Owner",
+        org_name: "MEVS Platform",
+        invite_link: link
+      });
+
       setGeneratedInviteLink(link);
       setIsInviteLinkDialogOpen(true);
       setInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
-      toast.success("Onboarding link generated!", { id: toastId });
+
+      if (!emailResult.success) {
+        console.warn("Email sending failed or skipped:", emailResult.error);
+        toast.success("Onboarding link generated, but email notification skipped.", { id: toastId });
+      } else {
+        toast.success("Onboarding link generated and invitation email sent!", { id: toastId });
+      }
     } catch (e) {
       console.error('Invite generation failed:', e);
       toast.error(e.message || "Failed to generate invitation", { id: toastId });
     }
     setInviting(false);
+  };
+
+  const handleAcceptDemo = async (request) => {
+    const toastId = toast.loading(`Accepting request from ${request.full_name} and generating onboarding link...`);
+    setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
+    
+    try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // 1. Create invitation
+      const { error: inviteErr } = await supabase
+        .from("invitations")
+        .insert([{
+          email: request.email,
+          token,
+          role: "owner",
+          invited_by: user?.id,
+          expires_at: expiresAt.toISOString(),
+          organization_id: null,
+          brand_id: null,
+          location_id: null,
+          metadata: { 
+            modules: ALL_MODULE_KEYS.filter(k => k !== 'platform'),
+            access: { read: true, write: true, update: true },
+            demo_request_id: request.id
+          }
+        }]);
+
+      if (inviteErr) throw inviteErr;
+
+      const signupLink = `${window.location.origin}/signup/${token}`;
+
+      // 2. Update demo request status and demo_viewed
+      const { error: updateErr } = await supabase
+        .from("demo_requests")
+        .update({ 
+          status: 'accepted',
+          demo_viewed: true
+        })
+        .eq('id', request.id);
+
+      if (updateErr) throw updateErr;
+
+      // 3. Send email via EmailJS
+      const emailResult = await sendEmail({
+        to_email: request.email,
+        to_name: request.full_name,
+        subject: "Your MEVS Demo Request has been Approved!",
+        message: `
+Hi ${request.full_name},
+
+We are thrilled to inform you that your request for a MEVS system walkthrough and demo has been approved! 
+
+We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+
+Click the link below to create your account and access your environment:
+${signupLink}
+
+This secure registration link will remain active for 7 days. If you have any questions or require a guided walkthrough with our implementation engineers, please respond directly to this email.
+
+Welcome to the future of multi-tenant enterprise management!
+
+Best regards,
+The MEVS Platform Team
+        `.trim()
+      });
+
+      if (!emailResult.success) {
+        console.warn("Email sending failed or skipped:", emailResult.error);
+        toast.success("Demo request approved and invite link generated, but email notification skipped.", { id: toastId });
+      } else {
+        toast.success("Demo request accepted! Onboarding link sent to client.", { id: toastId });
+      }
+
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+
+      // Open the link dialog for the admin to see/copy too!
+      setGeneratedInviteLink(signupLink);
+      setIsInviteLinkDialogOpen(true);
+
+    } catch (err) {
+      console.error("Failed to accept demo request:", err);
+      toast.error(err.message || "Failed to process request", { id: toastId });
+    } finally {
+      setProcessingRequests(prev => { const n = new Set(prev); n.delete(request.id); return n; });
+    }
+  };
+
+  const handleRejectDemo = async (request) => {
+    const toastId = toast.loading(`Declining request from ${request.full_name}...`);
+    setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
+
+    try {
+      // 1. Update demo request status and demo_viewed
+      const { error: updateErr } = await supabase
+        .from("demo_requests")
+        .update({ 
+          status: 'rejected',
+          demo_viewed: true
+        })
+        .eq('id', request.id);
+
+      if (updateErr) throw updateErr;
+
+      // 2. Send email via EmailJS
+      const emailResult = await sendEmail({
+        to_email: request.email,
+        to_name: request.full_name,
+        subject: "Update on your MEVS Demo Request",
+        message: `
+Hi ${request.full_name},
+
+Thank you for your interest in the MEVS platform and requesting a demo walkthrough.
+
+After reviewing your company profile and current requirements, we regret to inform you that we are unable to approve your demo request at this time. Our current onboarding pipeline is highly curated to ensure high service standards for matching enterprise profiles.
+
+We will keep your details on file and reach out if our capacity opens up or if there is a better alignment in the future.
+
+Thank you again for your time and interest in MEVS.
+
+Best regards,
+The MEVS Platform Team
+        `.trim()
+      });
+
+      if (!emailResult.success) {
+        console.warn("Email sending failed or skipped:", emailResult.error);
+        toast.success("Demo request rejected, but email notification skipped.", { id: toastId });
+      } else {
+        toast.success("Request rejected and notification email sent.", { id: toastId });
+      }
+      queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
+
+    } catch (err) {
+      console.error("Failed to reject demo request:", err);
+      toast.error(err.message || "Failed to decline request", { id: toastId });
+    } finally {
+      setProcessingRequests(prev => { const n = new Set(prev); n.delete(request.id); return n; });
+    }
   };
 
   const handleDeleteInvite = async (id) => {
@@ -726,13 +887,56 @@ export default function PlatformAdmin() {
                         </TableCell>
                         <TableCell className="text-sm">{r.company_name}</TableCell>
                         <TableCell>
-                          <Badge variant={r.demo_viewed ? "secondary" : "default"} className="text-[9px]">
-                            {r.demo_viewed ? "Viewed" : "New"}
+                          <Badge 
+                            className={cn(
+                              "text-[10px] font-bold border-none capitalize",
+                              r.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                              r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                            )}
+                          >
+                            {r.status || 'new'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs text-slate-500">{new Date(r.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><History className="w-4 h-4" /></Button>
+                          <div className="flex items-center gap-2">
+                            {(r.status === 'new' || !r.status) ? (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-8 px-3 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 font-bold rounded-xl flex items-center"
+                                  disabled={processingRequests.has(r.id)}
+                                  onClick={() => handleAcceptDemo(r)}
+                                >
+                                  {processingRequests.has(r.id) ? (
+                                    <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3 h-3 mr-1.5" />
+                                  )}
+                                  Accept & Invite
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="h-8 px-3 text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 font-bold rounded-xl flex items-center"
+                                  disabled={processingRequests.has(r.id)}
+                                  onClick={() => handleRejectDemo(r)}
+                                >
+                                  {processingRequests.has(r.id) ? (
+                                    <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
+                                  ) : (
+                                    <X className="w-3 h-3 mr-1.5" />
+                                  )}
+                                  Reject
+                                </Button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-medium italic">
+                                Processed
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
