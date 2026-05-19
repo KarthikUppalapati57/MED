@@ -225,17 +225,24 @@ export default function Vendors() {
     }
   };
 
-  const filteredVendors = vendors.filter(v => {
-    const matchesSearch = !search || 
-      v.name?.toLowerCase().includes(search.toLowerCase()) ||
-      v.email?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredVendors = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return vendors.filter(v => {
+      const matchesSearch = !search || 
+        v.name?.toLowerCase().includes(searchLower) ||
+        v.email?.toLowerCase().includes(searchLower);
+      const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [vendors, search, statusFilter]);
 
   // Stats
-  const totalSpent = vendors.reduce((sum, v) => sum + (v.total_spent || 0), 0);
-  const activeVendors = vendors.filter(v => v.status === 'active').length;
+  const { totalSpent, activeVendors, totalOrders } = React.useMemo(() => {
+    const spent = vendors.reduce((sum, v) => sum + (v.total_spent || 0), 0);
+    const active = vendors.filter(v => v.status === 'active').length;
+    const orders = vendors.reduce((sum, v) => sum + (v.total_orders || 0), 0);
+    return { totalSpent: spent, activeVendors: active, totalOrders: orders };
+  }, [vendors]);
 
   return (
     <div className="space-y-6">
@@ -274,9 +281,7 @@ export default function Vendors() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Orders</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {vendors.reduce((sum, v) => sum + (v.total_orders || 0), 0)}
-            </p>
+            <p className="text-2xl font-bold text-slate-900">{totalOrders}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
