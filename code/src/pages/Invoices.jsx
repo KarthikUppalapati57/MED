@@ -290,23 +290,63 @@ export default function Invoices() {
       api.entities.Inventory.list(),
     ]);
 
+    // O(1) Precomputed Lookups
+    const productByProductIdMap = new Map();
+    const productByNameMap = new Map();
+    existingProducts.forEach(p => {
+      if (p.product_id) {
+        productByProductIdMap.set(p.product_id, p);
+      }
+      if (p.name) {
+        productByNameMap.set(p.name.toLowerCase(), p);
+      }
+    });
+
+    const inventoryByNameMap = new Map();
+    existingInventory.forEach(i => {
+      if (i.product_name) {
+        inventoryByNameMap.set(i.product_name.toLowerCase(), i);
+      }
+    });
+
+    // Aggregate line items by product name to sum quantities and prevent race conditions/duplicate creations
+    const aggregatedItems = [];
+    const aggregatedByName = new Map();
     for (const item of items) {
       const name = (item.description || item.product_name || '').trim();
       if (!name) continue;
+      const key = name.toLowerCase();
+      if (aggregatedByName.has(key)) {
+        const existing = aggregatedByName.get(key);
+        existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
+        existing.unit_price = item.unit_price || existing.unit_price || 0;
+      } else {
+        const itemCopy = { ...item, description: name };
+        aggregatedByName.set(key, itemCopy);
+        aggregatedItems.push(itemCopy);
+      }
+    }
+
+    const pendingUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const vendorName = invoice.vendor_name || '';
+
+    // Parallelize operations safely using Promise.allSettled
+    const syncOperations = aggregatedItems.map(async (item) => {
+      const name = item.description;
       const unitPrice = item.unit_price || 0;
       const unit = item.unit || 'ea';
       const qty = item.quantity || 0;
-      const vendorName = invoice.vendor_name || '';
       const itemProductId = item.product_id || '';
 
-      // Upsert product
-      const existingProduct = existingProducts.find(
-        p => (itemProductId && p.product_id === `PRD-${itemProductId}`) || 
-             (p.name?.toLowerCase() === name.toLowerCase())
-      );
+      // O(1) Product Lookup
+      let existingProduct = itemProductId ? productByProductIdMap.get(`PRD-${itemProductId}`) : null;
+      if (!existingProduct) {
+        existingProduct = productByNameMap.get(name.toLowerCase());
+      }
 
       let productId;
       if (existingProduct) {
+        productId = existingProduct.product_id;
         try {
           await api.entities.Product.update(existingProduct.id, {
             latest_price: unitPrice,
@@ -320,33 +360,32 @@ export default function Invoices() {
         } catch (e) {
           console.warn('Could not update product (likely ground_staff RLS):', e);
         }
-        productId = existingProduct.product_id;
       } else {
-        const genProductId = itemProductId ? `PRD-${itemProductId}` : `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        const newProd = await api.entities.Product.create({
-          name,
-          description: name,
-          product_id: genProductId,
-          latest_price: unitPrice,
-          report_by_unit: unit,
-          base_unit: unit,
-          is_inventoried: true,
-          accounting_category: 'food',
-          vendor_name: vendorName,
-          organization_id: invoice.organization_id,
-          location_id: invoice.location_id,
-          price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
-        });
-        productId = newProd.product_id;
-        existingProducts.push(newProd);
+        productId = itemProductId ? `PRD-${itemProductId}` : `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        try {
+          const newProd = await api.entities.Product.create({
+            name,
+            description: name,
+            product_id: productId,
+            latest_price: unitPrice,
+            report_by_unit: unit,
+            base_unit: unit,
+            is_inventoried: true,
+            accounting_category: 'food',
+            vendor_name: vendorName,
+            organization_id: invoice.organization_id,
+            location_id: invoice.location_id,
+            price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
+          });
+          productByNameMap.set(name.toLowerCase(), newProd);
+          productByProductIdMap.set(productId, newProd);
+        } catch (e) {
+          console.warn('Could not create product:', e);
+        }
       }
 
-      // Upsert inventory — stage with 24-hour pending review window
-      const pendingUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const existingInv = existingInventory.find(
-        i => i.product_name?.toLowerCase() === name.toLowerCase()
-      );
-
+      // O(1) Inventory Lookup
+      const existingInv = inventoryByNameMap.get(name.toLowerCase());
       if (existingInv) {
         const newQty = (existingInv.current_quantity || 0) + qty;
         try {
@@ -361,33 +400,32 @@ export default function Invoices() {
           console.warn('Could not update inventory (likely ground_staff RLS):', e);
         }
       } else {
-        await api.entities.Inventory.create({
-          product_id: productId,
-          product_name: name,
-          current_quantity: qty,
-          current_unit: unit,
-          unit_cost: unitPrice,
-          current_value: qty * unitPrice,
-          accounting_category: 'food',
-          par_level: 0,
-          reorder_point: 0,
-          previous_quantity: 0,
-          previous_value: 0,
-          location: invoice.location || '',
-          organization_id: invoice.organization_id,
-          location_id: invoice.location_id,
-          pending_until: pendingUntil,
-          pending_source_invoice: invoice.invoice_number || invoice.id,
-        });
-        existingInventory.push({
-          id: 'temp-' + Date.now(),
-          product_name: name,
-          current_quantity: qty,
-          unit_cost: unitPrice,
-          current_value: qty * unitPrice,
-        });
+        try {
+          await api.entities.Inventory.create({
+            product_id: productId,
+            product_name: name,
+            current_quantity: qty,
+            current_unit: unit,
+            unit_cost: unitPrice,
+            current_value: qty * unitPrice,
+            accounting_category: 'food',
+            par_level: 0,
+            reorder_point: 0,
+            previous_quantity: 0,
+            previous_value: 0,
+            location: invoice.location || '',
+            organization_id: invoice.organization_id,
+            location_id: invoice.location_id,
+            pending_until: pendingUntil,
+            pending_source_invoice: invoice.invoice_number || invoice.id,
+          });
+        } catch (e) {
+          console.warn('Could not create inventory:', e);
+        }
       }
-    }
+    });
+
+    await Promise.allSettled(syncOperations);
 
     queryClient.invalidateQueries({ queryKey: ['products'] });
     queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -550,13 +588,30 @@ export default function Invoices() {
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = !search || 
-      inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
-      inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredInvoices = React.useMemo(() => {
+    return invoices.filter(inv => {
+      const matchesSearch = !search || 
+        inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
+        inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [invoices, search, statusFilter]);
+
+  const stats = React.useMemo(() => {
+    let validatedCount = 0;
+    let approvedCount = 0;
+    let totalApprovedAmount = 0;
+    for (const inv of invoices) {
+      if (inv.status === 'validated') {
+        validatedCount++;
+      } else if (inv.status === 'approved') {
+        approvedCount++;
+        totalApprovedAmount += (inv.total_amount || 0);
+      }
+    }
+    return { validatedCount, approvedCount, totalApprovedAmount };
+  }, [invoices]);
 
   return (
     <div className="space-y-6">
@@ -578,7 +633,7 @@ export default function Invoices() {
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Validated</p>
             <p className="text-2xl font-bold text-blue-700">
-              {invoices.filter(i => i.status === 'validated').length}
+              {stats.validatedCount}
             </p>
           </CardContent>
         </Card>
@@ -586,7 +641,7 @@ export default function Invoices() {
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Approved</p>
             <p className="text-2xl font-bold text-green-700">
-              {invoices.filter(i => i.status === 'approved').length}
+              {stats.approvedCount}
             </p>
           </CardContent>
         </Card>
@@ -594,7 +649,7 @@ export default function Invoices() {
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Approved</p>
             <p className="text-2xl font-bold text-slate-900">
-              ${invoices.filter(i => i.status === 'approved').reduce((sum, i) => sum + (i.total_amount || 0), 0).toLocaleString()}
+              ${stats.totalApprovedAmount.toLocaleString()}
             </p>
           </CardContent>
         </Card>
