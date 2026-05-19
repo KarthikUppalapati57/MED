@@ -53,26 +53,42 @@ export default function PlatformUserManagement() {
   }, [queryClient]);
 
   // ── Platform Admins Query ──────────────────────────────────
-  const { data: platformAdmins = [], isLoading: isLoadingAdmins } = useAuthQuery({
+  const { data: platformAdmins = [], isLoading: isLoadingAdmins, error: adminQueryError } = useAuthQuery({
     queryKey: ['platform-admins'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, role, created_at, last_sign_in_at")
-        .eq("role", "platform_admin");
-      if (error) throw error;
-      return (data || []).map(p => ({
-        membership_id: p.id,
-        user_id: p.id,
-        email: p.email || "—",
-        full_name: p.full_name || "—",
-        role: p.role,
-        created_at: p.created_at,
-        last_sign_in_at: p.last_sign_in_at,
-      }));
+      console.log("[DEBUG PUM] platform-admins queryFn started");
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, email, full_name, role, created_at, updated_at")
+          .eq("role", "platform_admin");
+        console.log("[DEBUG PUM] platform-admins queryFn fetched:", { data, error });
+        if (error) {
+          console.error("[DEBUG PUM] DB error in platform-admins:", error);
+          throw error;
+        }
+        return (data || []).map(p => ({
+          membership_id: p.id,
+          user_id: p.id,
+          email: p.email || "—",
+          full_name: p.full_name || "—",
+          role: p.role,
+          created_at: p.created_at,
+          last_sign_in_at: p.updated_at,
+        }));
+      } catch (err) {
+        console.error("[DEBUG PUM] queryFn exception:", err);
+        throw err;
+      }
     },
     enabled: authChecked,
   });
+
+  useEffect(() => {
+    if (adminQueryError) {
+      console.error("[DEBUG PUM] platform-admins query error state:", adminQueryError);
+    }
+  }, [adminQueryError]);
 
   // ── Pending Invitations Query ──────────────────────────────
   const { data: pendingInvites = [], isLoading: isLoadingInvites } = useAuthQuery({
@@ -463,7 +479,7 @@ export default function PlatformUserManagement() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmDeleteAdmin(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleRemoveAdmin(confirmDeleteAdmin?.id)}>Remove Access</Button>
+            <Button variant="destructive" onClick={() => handleRemoveAdmin(confirmDeleteAdmin?.user_id)}>Remove Access</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

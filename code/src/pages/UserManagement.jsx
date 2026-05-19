@@ -948,7 +948,7 @@ export default function UserManagement() {
       try {
         let memQuery = supabase
           .from('memberships')
-          .select('*, profiles(id, email, full_name, phone, last_sign_in_at, location_id, brand_id)')
+          .select('*, profiles(id, email, full_name, updated_at, location_id, brand_id)')
           .eq('org_id', activeOrgId);
           
         const { data, error } = await memQuery;
@@ -1247,7 +1247,7 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell>
                           <span className="text-xs text-slate-400">
-                            {formatLastActive(member.profiles?.last_sign_in_at || member.last_sign_in_at)}
+                            {formatLastActive(member.profiles?.updated_at || member.updated_at)}
                           </span>
                         </TableCell>
                         <TableCell onClick={e => e.stopPropagation()} className="pr-8">
