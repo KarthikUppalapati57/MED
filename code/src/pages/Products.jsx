@@ -256,13 +256,29 @@ export default function Products() {
     a.click();
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = !search || 
-      p.name?.toLowerCase().includes(search.toLowerCase()) ||
-      p.product_id?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || p.accounting_category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return products.filter(p => {
+      const matchesSearch = !search || 
+        p.name?.toLowerCase().includes(searchLower) ||
+        p.product_id?.toLowerCase().includes(searchLower);
+      const matchesCategory = categoryFilter === 'all' || p.accounting_category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, search, categoryFilter]);
+
+  const { totalProducts, inventoriedCount, taxExemptCount, categoriesCount } = React.useMemo(() => {
+    const total = products.length;
+    const inventoried = products.filter(p => p.is_inventoried).length;
+    const taxExempt = products.filter(p => p.is_tax_exempt).length;
+    const categories = new Set(products.map(p => p.accounting_category)).size;
+    return {
+      totalProducts: total,
+      inventoriedCount: inventoried,
+      taxExemptCount: taxExempt,
+      categoriesCount: categories
+    };
+  }, [products]);
 
   return (
     <div className="space-y-6">
@@ -291,31 +307,25 @@ export default function Products() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Total Products</p>
-            <p className="text-2xl font-bold text-slate-900">{products.length}</p>
+            <p className="text-2xl font-bold text-slate-900">{totalProducts}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Inventoried</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {products.filter(p => p.is_inventoried).length}
-            </p>
+            <p className="text-2xl font-bold text-slate-900">{inventoriedCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Tax Exempt</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {products.filter(p => p.is_tax_exempt).length}
-            </p>
+            <p className="text-2xl font-bold text-slate-900">{taxExemptCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-slate-500">Categories</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {new Set(products.map(p => p.accounting_category)).size}
-            </p>
+            <p className="text-2xl font-bold text-slate-900">{categoriesCount}</p>
           </CardContent>
         </Card>
       </div>
