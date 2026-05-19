@@ -364,22 +364,25 @@ export const AuthProvider = ({ children }) => {
               deferredMFARefresh();
               
               // 4. Accept pending invitation BEFORE loading profile to prevent race conditions on cold signups
-              try {
-                await processPendingInvitationRef.current(currentUser.email, currentUser.id);
-              } catch (inviteErr) {
-                console.warn('Invitation processing error (non-fatal):', inviteErr);
-              }
-              
-              try {
-                await loadProfile(currentUser);
-              } catch (profileErr) {
-                console.warn('Profile loading error (non-fatal):', profileErr);
-              }
-              // 5. Removed pre-warming data caches here to prevent race conditions 
-              // where the Supabase client fetches anonymously and caches empty arrays.
-
-              // 6. Loading complete — user, auth state, and profile are ready for routing
-              if (isMounted) setIsLoadingAuth(false);
+              // Defer asynchronous operations using setTimeout(..., 0) to yield the thread immediately.
+              // This releases GoTrue's auth lock so that subsequent client operations do not deadlock.
+              setTimeout(async () => {
+                if (!isMounted) return;
+                try {
+                  await processPendingInvitationRef.current(currentUser.email, currentUser.id);
+                } catch (inviteErr) {
+                  console.warn('Invitation processing error (non-fatal):', inviteErr);
+                }
+                
+                try {
+                  await loadProfile(currentUser);
+                } catch (profileErr) {
+                  console.warn('Profile loading error (non-fatal):', profileErr);
+                }
+                
+                // Loading complete — user, auth state, and profile are ready for routing
+                if (isMounted) setIsLoadingAuth(false);
+              }, 0);
             } else {
               setUser(null);
               setUserProfile(null);
@@ -418,13 +421,41 @@ export const AuthProvider = ({ children }) => {
             if (currentUser) {
               const prevUser = user;
               setUser(currentUser);
+              
+              // Synchronously extract MFA state from token/session to ensure instant state updates
+              const factors = currentUser.factors || [];
+              setMfaFactors(factors);
+              const verifiedTotp = factors.filter(
+                f => f.status === 'verified' && f.factor_type === 'totp'
+              );
+              
+              let currentAAL = 'aal1';
+              try {
+                if (session?.access_token) {
+                  const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+                  currentAAL = payload.aal || 'aal1';
+                }
+              } catch (e) {
+                // Ignore decoding errors
+              }
+              
+              const nextLevel = verifiedTotp.length > 0 ? 'aal2' : 'aal1';
+              setMfaLevel({ current: currentAAL, next: nextLevel });
+              
               deferredMFARefresh();
               
               // Only trigger a full profile reload if the user ID changed
-              // or if we don't have a profile yet. This prevents the "flash"
-              // during background token refreshes.
+              // or if we don't have a profile yet. Defer execution using setTimeout(..., 0)
+              // to prevent auth lock deadlocks during token refreshes.
               if (!userProfile || prevUser?.id !== currentUser.id) {
-                await loadProfile(currentUser);
+                setTimeout(async () => {
+                  if (!isMounted) return;
+                  try {
+                    await loadProfile(currentUser);
+                  } catch (e) {
+                    console.warn('Deferred token refresh profile load error:', e);
+                  }
+                }, 0);
               }
             }
           }

@@ -68,13 +68,21 @@ export function MFAEnrollment({ onComplete, onCancel }) {
       if (verify.error) throw verify.error;
 
       toast.success('Authenticator app linked successfully!');
-      await refreshMFAStatus();
-      if (onComplete) onComplete();
+      
+      // Defer state synchronization and redirect slightly to let GoTrue client finish updating internal state and release its lock
+      setTimeout(async () => {
+        try {
+          await refreshMFAStatus();
+          if (onComplete) onComplete();
+        } catch (e) {
+          console.warn('Deferred MFA status check error:', e);
+          if (onComplete) onComplete();
+        }
+      }, 50);
     } catch (err) {
       setError(err.message || 'Invalid code. Please try again.');
       setCode('');
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only set loading to false on error, keep loading on success until unmount
     }
   };
 

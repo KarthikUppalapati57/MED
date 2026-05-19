@@ -43,26 +43,31 @@ export function MFAChallenge() {
 
       if (verifyError) throw verifyError;
 
-      // Successfully verified AAL2
-      await refreshMFAStatus();
+      // Defer state updates and user token storage to allow GoTrue client lock to release
+      setTimeout(async () => {
+        try {
+          await refreshMFAStatus();
 
-      // If "Remember this device" was checked, store a trust token
-      if (rememberDevice) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const trustToken = {
-            userId: user.id,
-            trustedAt: Date.now(),
-            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
-          };
-          localStorage.setItem('edgeops_mfa_trust', JSON.stringify(trustToken));
+          // If "Remember this device" was checked, store a trust token
+          if (rememberDevice) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const trustToken = {
+                userId: user.id,
+                trustedAt: Date.now(),
+                expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+              };
+              localStorage.setItem('edgeops_mfa_trust', JSON.stringify(trustToken));
+            }
+          }
+        } catch (e) {
+          console.warn('Deferred challenge verification actions failed:', e);
         }
-      }
+      }, 50);
     } catch (err) {
       setError(err.message || 'Verification failed. Please try again.');
       setCode('');
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only set loading to false on error, keep loading on success until unmount
     }
   };
 
