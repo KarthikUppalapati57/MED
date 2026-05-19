@@ -26,7 +26,7 @@ export default function AuditLogs() {
     queryKey: ['audit_logs'],
     queryFn: async () => {
       try {
-        return await api.entities.AuditLog.list('-created_at');
+        return await api.entities.AuditLog.list('-created_at', { limit: 500 });
       } catch (err) {
         console.error('Error fetching audit logs:', err);
         throw err;
@@ -46,14 +46,16 @@ export default function AuditLogs() {
     };
   }, [queryClient]);
 
-  const filteredLogs = logs.filter(log => {
+  const filteredLogs = React.useMemo(() => {
     const term = search.toLowerCase();
-    return (
-      log.action?.toLowerCase().includes(term) ||
-      log.table_name?.toLowerCase().includes(term) ||
-      log.user_id?.toLowerCase().includes(term)
-    );
-  });
+    return logs.filter(log => {
+      return (
+        log.action?.toLowerCase().includes(term) ||
+        log.table_name?.toLowerCase().includes(term) ||
+        log.user_id?.toLowerCase().includes(term)
+      );
+    });
+  }, [logs, search]);
 
   const getActionColor = (action) => {
     switch (action?.toUpperCase()) {
