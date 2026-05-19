@@ -1,6 +1,6 @@
-# EdgeOps: System Workflow & Connection Map
+# MECURSOR SaaS Platform: System Workflow & Connection Map
 
-This document outlines the end-to-end user journey, routing logic, and functional connections within the EdgeOps SaaS platform.
+This document outlines the end-to-end user journey, routing logic, and functional connections within the MECURSOR SaaS platform.
 
 ## 1. The User Journey
 The following flowchart illustrates how a user moves from physical discovery to active management within the platform.
@@ -56,6 +56,8 @@ The sidebar in `Layout.jsx` acts as the central command hub. Navigation visibili
 | **Financials** | `Payments` | Manager+ | Vendor payments and reconciliation. |
 | **Operations** | `Inventory` | Manager+ | Stock levels, location transfers, and waste logs. |
 | **Operations** | `Auto Ordering` | Manager+ | Par-level based ordering and vendor sync. |
+| **Operations** | `Products` | Manager+ | Catalog management and cost tracking. |
+| **Operations** | `Recipes` | Manager+ | Recipe creation, dynamic costing, and margin analysis. |
 | **Procurement** | `Vendors` | Manager+ | Vendor management and catalogs. |
 | **Management** | `OrgManagement` | Owner | Organization settings and hierarchy. |
 | **Management** | `UserManagement` | Owner | Team member invitations and role assignments. |

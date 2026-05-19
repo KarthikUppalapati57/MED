@@ -370,27 +370,8 @@ export const AuthProvider = ({ children }) => {
               } catch (profileErr) {
                 console.warn('Profile loading error (non-fatal):', profileErr);
               }
-              // 5. Pre-warm critical data caches so pages load instantly
-              // These fire in parallel while routing resolves, so by the time
-              // the user sees the page, data is already in the React Query cache.
-              try {
-                const { api } = await import('@/lib/apiClient');
-                queryClientInstance.prefetchQuery({
-                  queryKey: ['invoices'],
-                  queryFn: () => api.entities.Invoice.list('-created_at'),
-                  staleTime: 5 * 60 * 1000,
-                });
-                queryClientInstance.prefetchQuery({
-                  queryKey: ['inventory'],
-                  queryFn: () => api.entities.Inventory.list(),
-                  staleTime: 5 * 60 * 1000,
-                });
-                queryClientInstance.prefetchQuery({
-                  queryKey: ['products'],
-                  queryFn: () => api.entities.Product.list(),
-                  staleTime: 5 * 60 * 1000,
-                });
-              } catch { /* prefetch is best-effort */ }
+              // 5. Removed pre-warming data caches here to prevent race conditions 
+              // where the Supabase client fetches anonymously and caches empty arrays.
 
               // 6. Loading complete — user, auth state, and profile are ready for routing
               if (isMounted) setIsLoadingAuth(false);
