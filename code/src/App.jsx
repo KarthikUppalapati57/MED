@@ -556,8 +556,18 @@ const AuthenticatedApp = () => {
   
   const isUnassignedUser = !userProfile?.organization_id;
   
+  // ── CRITICAL FIX: Don't make setup flow decisions until MFA status is known ──
+  // isMfaReady takes ~1.5s to resolve after login. During that gap, needsMFASetup
+  // is false (because isMfaReady is false), which causes needsSetupFlow to be true,
+  // prematurely routing new users to /verify-payment BEFORE MFA setup is evaluated.
+  // Then when isMfaReady resolves, the user gets yanked to MFA setup, creating a loop.
+  //
+  // Fix: For unassigned users (new signups), require isMfaReady before entering setup flow.
+  // Already-assigned users (existing accounts) skip this gate — they already have MFA set up.
+  const mfaStatusKnown = isMfaReady || !isUnassignedUser;
+  
   // Setup is required for any non-platform-admin without an organization
-  const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser;
+  const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && mfaStatusKnown;
   
   // Within the setup flow, we distinguish between payment, organization creation, and pending assignment
   const needsPaymentVerification = needsSetupFlow && isTenantOwner && !userProfile?.payment_verified;
@@ -570,6 +580,20 @@ const AuthenticatedApp = () => {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
           <p className="text-sm text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // For new users (unassigned), wait for MFA status before rendering anything.
+  // This prevents the flash where the user briefly sees payment verification
+  // before being redirected to MFA setup.
+  if (user && isUnassignedUser && !isMfaReady && !isPlatformAdmin) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
+          <p className="text-sm text-slate-500">Setting up your account...</p>
         </div>
       </div>
     );
