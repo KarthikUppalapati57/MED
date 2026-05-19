@@ -23,10 +23,15 @@ import {
   Check,
   Building2,
   ShieldAlert,
+  ShieldCheck,
   UserPlus,
   Sparkles,
   Activity,
-  DollarSign
+  DollarSign,
+  History,
+  ArrowRightLeft,
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,13 +67,79 @@ const navigation = [
   { name: 'User Management', href: 'PlatformUserManagement', icon: Users, minRole: 'platform_admin' },
   { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
-  { name: 'Payments', href: 'Payments', icon: CreditCard, minRole: 'branch_manager' },
-  { name: 'Products', href: 'Products', icon: Package, minRole: 'ground_staff' },
-  { name: 'Inventory', href: 'Inventory', icon: Warehouse, minRole: 'location_manager' },
-  { name: 'Orders', href: 'AutoOrdering', icon: ShoppingCart, minRole: 'location_manager' },
-  { name: 'Recipes', href: 'Recipes', icon: ChefHat, minRole: 'location_manager' },
-  { name: 'Vendors', href: 'Vendors', icon: Store, minRole: 'branch_manager' },
-  { name: 'My Organization', href: 'OrgManagement', icon: Building2, minRole: 'org_owner' },
+  { 
+    name: 'Payments', 
+    icon: CreditCard, 
+    minRole: 'branch_manager',
+    subItems: [
+      { name: 'Invoices', href: 'Payments?tab=invoices', icon: FileText },
+      { name: 'Payment History', href: 'Payments?tab=history', icon: History },
+      { name: 'Reconciliation', href: 'Payments?tab=reconciliation', icon: ArrowRightLeft },
+      { name: 'Gateway Setup', href: 'Payments?tab=setup', icon: Settings }
+    ]
+  },
+  { 
+    name: 'Products', 
+    icon: Package, 
+    minRole: 'ground_staff',
+    subItems: [
+      { name: 'All Products', href: 'Products?tab=all-products', icon: Package },
+      { name: 'Product Review', href: 'Products?tab=new-review', icon: Check },
+      { name: 'Purchase Report', href: 'Products?tab=purchase-report', icon: FileText }
+    ]
+  },
+  { 
+    name: 'Inventory', 
+    icon: Warehouse, 
+    minRole: 'location_manager',
+    subItems: [
+      { name: 'Inventory List', href: 'Inventory?tab=inventory', icon: Warehouse },
+      { name: 'Summary', href: 'Inventory?tab=summary', icon: FileText },
+      { name: 'Wastage Log', href: 'Inventory?tab=wastage', icon: Trash2 },
+      { name: 'Stock Counts', href: 'Inventory?tab=counts', icon: Check },
+      { name: 'Count Sheets', href: 'Inventory?tab=count-sheets', icon: FileText }
+    ]
+  },
+  { 
+    name: 'Orders', 
+    icon: ShoppingCart, 
+    minRole: 'location_manager',
+    subItems: [
+      { name: 'All Orders', href: 'AutoOrdering?tab=all-orders', icon: ShoppingCart },
+      { name: 'Place Order', href: 'AutoOrdering?tab=place-order', icon: Plus },
+      { name: 'Invoice Approval', href: 'AutoOrdering?tab=invoice-approval', icon: FileText },
+      { name: 'Order Setup', href: 'AutoOrdering?tab=order-setup', icon: Settings }
+    ]
+  },
+  { 
+    name: 'Recipes', 
+    icon: ChefHat, 
+    minRole: 'location_manager',
+    subItems: [
+      { name: 'Recipes List', href: 'Recipes?tab=recipes', icon: ChefHat },
+      { name: 'Prepared Items', href: 'Recipes?tab=prepared-items', icon: Plus },
+      { name: 'Menu Analysis', href: 'Recipes?tab=menu-analysis', icon: Activity },
+      { name: 'Setup', href: 'Recipes?tab=setup', icon: Settings }
+    ]
+  },
+  { 
+    name: 'Vendors', 
+    icon: Store, 
+    minRole: 'branch_manager',
+    subItems: [
+      { name: 'Vendors List', href: 'Vendors?tab=vendors', icon: Store },
+      { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package }
+    ]
+  },
+  { 
+    name: 'My Organization', 
+    icon: Building2, 
+    minRole: 'org_owner',
+    subItems: [
+      { name: 'Hierarchy', href: 'OrgManagement?tab=hierarchy', icon: Building2 },
+      { name: 'Security & MFA', href: 'OrgManagement?tab=security', icon: ShieldCheck }
+    ]
+  },
   { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
   { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
 ];
@@ -192,6 +263,20 @@ export default function Layout({ children, currentPageName }) {
           --primary: 210 100% 35%;
           --primary-foreground: 0 0% 100%;
         }
+        /* Custom slim scrollbar for scrollable sidebar navigation */
+        .sidebar-nav::-webkit-scrollbar {
+          width: 4px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+          background: #334155; /* slate-700 */
+          border-radius: 4px;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+          background: #475569; /* slate-600 */
+        }
       `}</style>
 
       {/* Mobile sidebar backdrop */}
@@ -204,10 +289,10 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex h-16 items-center justify-between px-6 border-b border-slate-800">
+        <div className="flex h-16 items-center justify-between px-6 border-b border-slate-800 shrink-0">
           <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-teal-500 flex items-center justify-center">
               <Package className="h-5 w-5 text-white" />
@@ -222,7 +307,7 @@ export default function Layout({ children, currentPageName }) {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="flex-grow overflow-y-auto sidebar-nav p-4 space-y-1">
           {filteredNavigation.map((item) => {
             if (item.subItems) {
               const isActive = item.subItems.some(sub => {
@@ -307,7 +392,7 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         {/* User info at bottom of sidebar */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 shrink-0 bg-slate-900 mt-auto">
           <div className="flex items-center gap-3 px-3">
             <div className="h-8 w-8 rounded-full bg-teal-600 flex items-center justify-center shrink-0">
               <span className="text-white text-xs font-bold">

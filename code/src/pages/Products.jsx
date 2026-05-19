@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -69,6 +70,9 @@ const categoryColors = {
 };
 
 export default function Products() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'all-products';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const { isGroundStaff } = usePermissions();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -330,7 +334,7 @@ export default function Products() {
         </Card>
       </div>
 
-      <Tabs defaultValue="all-products" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="all-products">View All Products</TabsTrigger>
           <TabsTrigger value="new-review">New Item Review</TabsTrigger>

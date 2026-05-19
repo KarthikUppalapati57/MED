@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -68,6 +69,9 @@ import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'inventory';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -466,7 +470,7 @@ export default function Inventory() {
         </Card>
       </div>
 
-      <Tabs defaultValue="inventory" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="inventory">Inventory</TabsTrigger>
           <TabsTrigger value="summary">Inventory Summary</TabsTrigger>

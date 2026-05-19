@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
@@ -19,7 +20,9 @@ import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('hierarchy');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'hierarchy';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [showEnrolling, setShowEnrolling] = useState(false);
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
   const [expandedBrands, setExpandedBrands] = useState(new Set());

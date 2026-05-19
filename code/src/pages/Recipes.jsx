@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
@@ -71,6 +72,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 export default function Recipes() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'recipes';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -463,7 +467,7 @@ export default function Recipes() {
         </Card>
       </div>
 
-      <Tabs defaultValue="recipes" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="recipes">Recipes</TabsTrigger>
           <TabsTrigger value="prepared-items">Prepared Items</TabsTrigger>

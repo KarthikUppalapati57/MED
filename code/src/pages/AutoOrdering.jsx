@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -59,6 +60,9 @@ const STATUS_COLORS = {
 };
 
 export default function AutoOrdering() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'all-orders';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -264,7 +268,7 @@ export default function AutoOrdering() {
         </Button>
       </div>
 
-      <Tabs defaultValue="all-orders" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="all-orders">Orders</TabsTrigger>
           <TabsTrigger value="place-order">Place New Order</TabsTrigger>
