@@ -161,10 +161,13 @@ export default function Inventory() {
   });
 
   // Stats
-  const totalItems = inventory.length;
-  const totalValue = inventory.reduce((sum, i) => sum + (i.current_value || 0), 0);
-  const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-  const totalWastageValue = wastageLogs.reduce((sum, w) => sum + (w.value || 0), 0);
+  const { totalItems, totalValue, lowStock, totalWastageValue } = React.useMemo(() => {
+    const items = inventory.length;
+    const value = inventory.reduce((sum, i) => sum + (i.current_value || 0), 0);
+    const low = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
+    const wastage = wastageLogs.reduce((sum, w) => sum + (w.value || 0), 0);
+    return { totalItems: items, totalValue: value, lowStock: low, totalWastageValue: wastage };
+  }, [inventory, wastageLogs]);
 
   // Group by category
   const byCategory = inventory.reduce((acc, item) => {
@@ -342,12 +345,15 @@ export default function Inventory() {
     URL.revokeObjectURL(url);
   };
 
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = !search || 
-      item.product_name?.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || item.accounting_category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredInventory = React.useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return inventory.filter(item => {
+      const matchesSearch = !search || 
+        item.product_name?.toLowerCase().includes(searchLower);
+      const matchesCategory = categoryFilter === 'all' || item.accounting_category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [inventory, search, categoryFilter]);
 
   return (
     <div className="space-y-6">
