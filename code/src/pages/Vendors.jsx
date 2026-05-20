@@ -297,10 +297,7 @@ export default function Vendors() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="vendors">Vendors</TabsTrigger>
-          <TabsTrigger value="vendor-items">Vendor Items</TabsTrigger>
-        </TabsList>
+
 
         <TabsContent value="vendors" className="space-y-4">
 

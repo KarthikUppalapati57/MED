@@ -361,16 +361,7 @@ export default function OrgManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-slate-100/50 p-1">
-          <TabsTrigger value="hierarchy" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Building2 className="w-4 h-4 mr-2" />
-            Hierarchy
-          </TabsTrigger>
-          <TabsTrigger value="security" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <ShieldCheck className="w-4 h-4 mr-2" />
-            Security & MFA
-          </TabsTrigger>
-        </TabsList>
+
 
         <TabsContent value="hierarchy" className="space-y-6 mt-6">
           {/* Hierarchy Tree (Original Content) */}

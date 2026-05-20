@@ -302,6 +302,7 @@ function PageAccessChips({ pagePerms = {}, maxVisible = 3 }) {
 // ─── UserDetailDrawer ───────────────────────────────────────────────────────
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
+  const { role: currentUserRole, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("permissions");
   const [form, setForm] = useState({
     role: member.role || member.capabilities?.role || 'ground_staff',
@@ -451,7 +452,9 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">System Role</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(MEVS_ROLES).map(([r, def]) => {
+                  {Object.entries(MEVS_ROLES)
+                    .filter(([r]) => r !== 'platform_admin' || (currentUserRole === 'platform_admin' || userProfile?.role === 'platform_admin'))
+                    .map(([r, def]) => {
                     const isSelected = form.role === r;
                     const Icon = def.icon;
                     return (
@@ -576,7 +579,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
 // ─── InviteDialog ──────────────────────────────────────────────────────────
 function InviteDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
-  const { user: currentUser, userProfile } = useAuth();
+  const { user: currentUser, role: currentUserRole, userProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('ground_staff');
   const [permissions, setPermissions] = useState({});
@@ -728,7 +731,9 @@ function InviteDialog({ open, onClose, orgId }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-slate-100">
-                {Object.entries(MEVS_ROLES).map(([r, def]) => (
+                {Object.entries(MEVS_ROLES)
+                  .filter(([r]) => r !== 'platform_admin' || (currentUserRole === 'platform_admin' || userProfile?.role === 'platform_admin'))
+                  .map(([r, def]) => (
                   <SelectItem key={r} value={r} className="rounded-xl font-bold py-2.5">
                     <div className="flex items-center gap-2">
                       <def.icon className="w-4 h-4 text-slate-400" />

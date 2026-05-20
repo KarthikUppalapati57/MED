@@ -468,13 +468,7 @@ export default function Recipes() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="recipes">Recipes</TabsTrigger>
-          <TabsTrigger value="prepared-items">Prepared Items</TabsTrigger>
-          <TabsTrigger value="menu-analysis">Menu Analysis</TabsTrigger>
-          <TabsTrigger value="recipe-viewer">Recipe Viewer</TabsTrigger>
-          <TabsTrigger value="setup">Setup</TabsTrigger>
-        </TabsList>
+
 
         <TabsContent value="recipes" className="space-y-4">
 

@@ -335,11 +335,7 @@ export default function Products() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="all-products">View All Products</TabsTrigger>
-          <TabsTrigger value="new-review">New Item Review</TabsTrigger>
-          <TabsTrigger value="purchase-report">Purchase Report</TabsTrigger>
-        </TabsList>
+
 
         <TabsContent value="all-products" className="space-y-4">
       {/* Filters */}

@@ -310,24 +310,7 @@ export default function Payments() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
-          <TabsTrigger value="invoices" className="gap-2">
-            <DollarSign className="h-4 w-4" />
-            Invoices
-          </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
-            <History className="h-4 w-4" />
-            Payment History
-          </TabsTrigger>
-          <TabsTrigger value="reconciliation" className="gap-2">
-            <ArrowRightLeft className="h-4 w-4" />
-            Reconciliation
-          </TabsTrigger>
-          <TabsTrigger value="setup" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Setup
-          </TabsTrigger>
-        </TabsList>
+
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="mt-4">

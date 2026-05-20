@@ -269,12 +269,7 @@ export default function AutoOrdering() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="all-orders">Orders</TabsTrigger>
-          <TabsTrigger value="place-order">Place New Order</TabsTrigger>
-          <TabsTrigger value="invoice-approval">Invoice Approval</TabsTrigger>
-          <TabsTrigger value="order-setup">Order Setup</TabsTrigger>
-        </TabsList>
+
 
         {/* ── All Orders Tab ──────────────────────────────── */}
         <TabsContent value="all-orders">

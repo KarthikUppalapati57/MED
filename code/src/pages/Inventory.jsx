@@ -471,14 +471,7 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="summary">Inventory Summary</TabsTrigger>
-          <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
-          <TabsTrigger value="counts">Inventory Counts</TabsTrigger>
-          <TabsTrigger value="waste-summary">Waste Summary</TabsTrigger>
-          <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
-        </TabsList>
+
 
         <TabsContent value="inventory" className="space-y-4">
           {/* Filters */}
