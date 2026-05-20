@@ -1,0 +1,119 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { stripe } from '../_shared/stripe.ts';
+import { getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
+import { corsHeaders } from '../_shared/cors.ts';
+
+// Webhook handling logic
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const signature = req.headers.get('stripe-signature');
+    if (!signature) {
+      return new Response('No signature', { status: 400, headers: corsHeaders });
+    }
+
+    const body = await req.text();
+    const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+
+    if (!endpointSecret) {
+      throw new Error('STRIPE_WEBHOOK_SECRET is not set');
+    }
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+    } catch (err: any) {
+      console.error(`Webhook signature verification failed: ${err.message}`);
+      return new Response(`Webhook Error: ${err.message}`, { status: 400, headers: corsHeaders });
+    }
+
+    const supabase = getSupabaseServiceRoleClient();
+    console.log(`Processing event type: ${event.type}`);
+
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const orgId = session.client_reference_id; // Passed when creating the session
+        if (orgId && session.customer && session.subscription) {
+          // Link customer and subscription to the org
+          await supabase
+            .from('organizations')
+            .update({
+              stripe_customer_id: session.customer as string,
+              stripe_subscription_id: session.subscription as string,
+              subscription_status: 'active'
+            })
+            .eq('id', orgId);
+        }
+        break;
+      }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object;
+        const customerId = subscription.customer as string;
+        
+        // Find org by customer ID and update status
+        await supabase
+          .from('organizations')
+          .update({
+            stripe_subscription_id: subscription.id,
+            subscription_status: subscription.status,
+            plan_id: subscription.items.data[0]?.price.id
+          })
+          .eq('stripe_customer_id', customerId);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object;
+        const customerId = subscription.customer as string;
+        
+        await supabase
+          .from('organizations')
+          .update({
+            subscription_status: 'canceled',
+            plan_id: null
+          })
+          .eq('stripe_customer_id', customerId);
+        break;
+      }
+      
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+           // Optionally record the payment in your payments table
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const customerId = invoice.customer as string;
+        
+        await supabase
+          .from('organizations')
+          .update({ subscription_status: 'past_due' })
+          .eq('stripe_customer_id', customerId);
+        break;
+      }
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    return new Response(JSON.stringify({ received: true }), { 
+      status: 200, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (err: any) {
+    console.error(`Webhook error: ${err.message}`);
+    return new Response(`Internal Server Error: ${err.message}`, { 
+      status: 500,
+      headers: corsHeaders 
+    });
+  }
+});
