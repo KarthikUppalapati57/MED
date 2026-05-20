@@ -49,6 +49,66 @@ function clearCachedProfile() {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
 }
 
+// ── Dashboard data prefetch ──────────────────────────────────
+// Fires common dashboard queries while auth is still finalizing,
+// so the React Query cache is pre-warmed by the time Dashboard mounts.
+async function prefetchDashboardData(role) {
+  try {
+    const staleTime = 5 * 60 * 1000;
+    if (role === 'platform_admin') {
+      queryClientInstance.prefetchQuery({
+        queryKey: ['dash-orgs'],
+        queryFn: async () => {
+          const { data } = await supabase.from('organizations')
+            .select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
+          return data || [];
+        },
+        staleTime,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['dash-profiles'],
+        queryFn: async () => {
+          const { data } = await supabase.from('profiles').select('id, role, organization_id');
+          return data || [];
+        },
+        staleTime,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['dash-plans'],
+        queryFn: async () => {
+          const { data } = await supabase.from('plans').select('*');
+          return data || [];
+        },
+        staleTime,
+      });
+    } else if (role === 'org_owner') {
+      const { api } = await import('@/lib/apiClient');
+      queryClientInstance.prefetchQuery({
+        queryKey: ['invoices'],
+        queryFn: () => api.entities.Invoice.list('-created_at'),
+        staleTime,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['payments'],
+        queryFn: () => api.entities.Payment.list('-created_at'),
+        staleTime,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['inventory'],
+        queryFn: () => api.entities.Inventory.list(),
+        staleTime,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['products'],
+        queryFn: () => api.entities.Product.list(),
+        staleTime,
+      });
+    }
+  } catch (err) {
+    console.debug('[Prefetch] Dashboard prefetch error (non-fatal):', err);
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   // Hydrate from cache so role is correct on first render after reload
   const cachedProfile = React.useMemo(() => getCachedProfile(), []);
@@ -279,12 +339,10 @@ export const AuthProvider = ({ children }) => {
     // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
     // to avoid the browser lock deadlock. Uses setTimeout(0) to yield the lock.
     const deferredMFARefresh = () => {
-      // Mark MFA ready quickly because we already extracted it synchronously from session
-      setTimeout(() => {
-        if (isMounted) setIsMfaReady(true);
-      }, 50);
+      // Set MFA ready immediately — JWT was already decoded synchronously above
+      if (isMounted) setIsMfaReady(true);
 
-      setTimeout(async () => {  // 1.5s delay avoids auth lock contention with session restoration
+      setTimeout(async () => {  // 500ms background MFA correction (reduced from 1.5s)
         if (!isMounted) return;
         try {
           const [aalRes, factorsRes] = await Promise.all([
@@ -301,7 +359,7 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           console.warn('Deferred MFA refresh error (non-fatal):', err);
         }
-      }, 1500);
+      }, 500);
     };
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
@@ -363,23 +421,33 @@ export const AuthProvider = ({ children }) => {
               // 3. Kick off accurate MFA refresh outside the lock (will correct if needed)
               deferredMFARefresh();
               
-              // 4. Accept pending invitation BEFORE loading profile to prevent race conditions on cold signups
-              // Defer asynchronous operations using setTimeout(..., 0) to yield the thread immediately.
-              // This releases GoTrue's auth lock so that subsequent client operations do not deadlock.
+              // 4. Load profile & process invitation in PARALLEL — defer via setTimeout(0)
+              // to release GoTrue's auth lock and prevent deadlocks.
               setTimeout(async () => {
                 if (!isMounted) return;
-                try {
-                  await processPendingInvitationRef.current(currentUser.email, currentUser.id);
-                } catch (inviteErr) {
-                  console.warn('Invitation processing error (non-fatal):', inviteErr);
+
+                // Fire dashboard data prefetch immediately — queries load in the
+                // background while invitation + profile resolve. By the time the
+                // Dashboard component mounts, React Query cache is pre-warmed.
+                const cachedRole = currentUser.user_metadata?.role || getCachedProfile()?.role;
+                prefetchDashboardData(cachedRole);
+
+                // Run invitation check and profile load in PARALLEL.
+                // For existing users (99% of logins), invitation check returns
+                // null instantly, so both resolve in ~one network round-trip.
+                const [inviteResult] = await Promise.allSettled([
+                  processPendingInvitationRef.current(currentUser.email, currentUser.id),
+                  loadProfile(currentUser),
+                ]);
+
+                // If an invitation was just accepted, the profile loaded in parallel
+                // may be stale — reload to pick up the new org/role assignment.
+                if (inviteResult.status === 'fulfilled' && inviteResult.value === true) {
+                  try { await loadProfile(currentUser); } catch (e) {
+                    console.warn('Post-invitation profile reload error:', e);
+                  }
                 }
-                
-                try {
-                  await loadProfile(currentUser);
-                } catch (profileErr) {
-                  console.warn('Profile loading error (non-fatal):', profileErr);
-                }
-                
+
                 // Loading complete — user, auth state, and profile are ready for routing
                 if (isMounted) setIsLoadingAuth(false);
               }, 0);
@@ -471,7 +539,7 @@ export const AuthProvider = ({ children }) => {
     );
 
     // Safety net: if INITIAL_SESSION + profile loading hasn't completed
-    // within the timeout, force loading to complete so the UI isn't stuck.
+    // within 3s, force loading to complete so the UI isn't stuck.
     // The cached profile (sessionStorage) makes the UI usable immediately
     // even when this safety net fires — the fresh profile will arrive shortly after.
     const safetyTimeout = setTimeout(() => {
@@ -485,7 +553,7 @@ export const AuthProvider = ({ children }) => {
           return current;
         });
       }
-    }, 5000);
+    }, 3000);
 
     return () => {
       isMounted = false;
