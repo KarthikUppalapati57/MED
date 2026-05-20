@@ -24,6 +24,8 @@ import {
   Settings,
   FileText,
   Mail,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,6 +111,33 @@ export default function Payments() {
     queryKey: ['payments'],
     queryFn: () => api.entities.Payment.list('-created_at'),
   });
+
+  const { data: orgPlans = [] } = useAuthQuery({
+    queryKey: ['plans'],
+    queryFn: async () => {
+      const { data } = await supabase.from('plans').select('*').eq('is_active', true);
+      return data || [];
+    }
+  });
+
+  const [portalLoading, setPortalLoading] = useState(false);
+  const handleManageBilling = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-portal-session', {
+        body: { returnUrl: window.location.href }
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to open billing portal. Please contact support.');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   useEffect(() => {
     const channel = supabase.channel('payments-realtime')
@@ -311,6 +340,15 @@ export default function Payments() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="border-b border-slate-200">
+          <TabsList className="h-auto p-0 bg-transparent gap-6 justify-start w-full overflow-x-auto">
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Vendor Invoices</TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Payment History</TabsTrigger>
+            <TabsTrigger value="reconciliation" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Reconciliation</TabsTrigger>
+            <TabsTrigger value="setup" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Payment Setup</TabsTrigger>
+            <TabsTrigger value="subscription" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Platform Subscription</TabsTrigger>
+          </TabsList>
+        </div>
 
 
         {/* Invoices Tab */}
@@ -668,6 +706,57 @@ export default function Payments() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Subscription Tab */}
+        <TabsContent value="subscription" className="mt-4">
+          <Card className="border-0 shadow-sm max-w-2xl mx-auto overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-8 text-white relative">
+              <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex items-center gap-4">
+                <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                  <Sparkles className="w-8 h-8 text-teal-400" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Platform Subscription</h2>
+                  <p className="text-slate-400 mt-1">Manage your MEVS workspace plan and billing</p>
+                </div>
+              </div>
+            </div>
+            <CardContent className="p-8">
+              <div className="space-y-6">
+                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="space-y-2 text-center md:text-left">
+                    <h3 className="font-bold text-slate-900 text-lg">Billing Portal</h3>
+                    <p className="text-sm text-slate-500 max-w-sm">
+                      Update your payment methods, view past invoices, or change your subscription plan securely via Stripe.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleManageBilling} 
+                    disabled={portalLoading}
+                    className="bg-teal-600 hover:bg-teal-700 text-white min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
+                  >
+                    {portalLoading ? (
+                      <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Loading Portal...</>
+                    ) : (
+                      <>Manage Billing <ExternalLink className="w-5 h-5 ml-2" /></>
+                    )}
+                  </Button>
+                </div>
+                
+                <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 text-sm text-teal-800">
+                  <p className="font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-teal-600" /> 
+                    Secure Payment Processing
+                  </p>
+                  <p className="mt-1 text-teal-700/80">
+                    We use Stripe to manage all platform billing. Your credit card details are never stored on our servers.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

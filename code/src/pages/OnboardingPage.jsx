@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2, Sparkles, Check } from 'lucide-react';
 import Papa from 'papaparse';
 
 export default function OnboardingPage() {
@@ -22,6 +22,17 @@ export default function OnboardingPage() {
   const [onboardingMode, setOnboardingMode] = useState(null); // 'manual' or 'csv'
   const [csvFile, setCsvFile] = useState(null);
   const [csvData, setCsvData] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      const { data } = await supabase.from('plans').select('*').eq('is_active', true).order('price_monthly', { ascending: true });
+      if (data) setPlans(data);
+    };
+    fetchPlans();
+  }, []);
 
   // Organization (single)
   const [orgName, setOrgName] = useState('');
@@ -317,9 +328,13 @@ export default function OnboardingPage() {
 
       const totalBrands = finalBrands.filter(b => b.name.trim()).length;
       const totalLocations = finalBrands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
-      toast.success(`Onboarding complete! Created ${totalBrands} brand(s) and ${totalLocations} location(s).`);
+      toast.success(`Organization created! Proceed to select a plan.`);
       
-      setCompleted(true);
+      // Refresh profile to get the organization_id in context
+      await refreshProfile();
+      
+      // Move to plan selection step
+      setStep(4);
     } catch (error) {
       console.error('Onboarding failed:', error);
       const message = error.message?.includes('organizations_slug_key')
@@ -411,6 +426,42 @@ export default function OnboardingPage() {
 
     toast.info(`Importing ${parsedBrands.length} brand(s) with ${parsedBrands.reduce((s, b) => s + b.locations.length, 0)} location(s)`);
     await performOnboarding(finalOrgName, finalOrgSlug, parsedBrands);
+  };
+
+  const handleSubscribe = async () => {
+    if (!selectedPlan) {
+      toast.error('Please select a plan to continue');
+      return;
+    }
+    
+    // If it's a free plan or no Stripe Price ID, we can just complete onboarding
+    if (!selectedPlan.stripe_price_id) {
+      toast.success('Free plan selected!');
+      setCompleted(true);
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { 
+          priceId: selectedPlan.stripe_price_id,
+          successUrl: `${window.location.origin}/`,
+          cancelUrl: `${window.location.origin}/onboarding`
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      toast.error(err.message || 'Failed to start checkout process');
+      setCheckoutLoading(false);
+    }
   };
 
   // Render initial selection screen
@@ -546,7 +597,7 @@ export default function OnboardingPage() {
         </div>
         {/* Progress Bar */}
         <div className="flex items-center justify-between mb-8 px-2">
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-2">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
@@ -555,10 +606,10 @@ export default function OnboardingPage() {
                   {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
                 </div>
                 <span className={`text-xs font-medium ${step >= i ? 'text-teal-700' : 'text-slate-400'}`}>
-                  {i === 1 ? 'Organization' : i === 2 ? 'Brands' : 'Locations'}
+                  {i === 1 ? 'Organization' : i === 2 ? 'Brands' : i === 3 ? 'Locations' : 'Plan'}
                 </span>
               </div>
-              {i < 3 && (
+              {i < 4 && (
                 <div className={`flex-1 h-0.5 mx-4 transition-all duration-500 ${step > i ? 'bg-teal-600' : 'bg-slate-200'}`} />
               )}
             </React.Fragment>
@@ -571,11 +622,13 @@ export default function OnboardingPage() {
               {step === 1 && <><Building2 className="w-6 h-6 text-teal-600" /> Let's start with your company</>}
               {step === 2 && <><Store className="w-6 h-6 text-teal-600" /> Define your brands</>}
               {step === 3 && <><MapPin className="w-6 h-6 text-teal-600" /> Add locations</>}
+              {step === 4 && <><Sparkles className="w-6 h-6 text-teal-600" /> Select a Plan</>}
             </CardTitle>
             <CardDescription className="text-slate-500 text-base">
               {step === 1 && "What's the name of your overall business entity?"}
               {step === 2 && "Add all your restaurant brands. You need at least one."}
               {step === 3 && "Add locations for each brand. Each brand needs at least one."}
+              {step === 4 && "Choose the subscription tier that best fits your needs."}
             </CardDescription>
           </CardHeader>
 
@@ -707,10 +760,59 @@ export default function OnboardingPage() {
                 ))}
               </div>
             )}
+
+            {/* ── Step 4: Plans ── */}
+            {step === 4 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {plans.length === 0 ? (
+                    <div className="col-span-2 text-center py-8 text-slate-500">
+                      Loading plans...
+                    </div>
+                  ) : (
+                    plans.map((plan) => (
+                      <div 
+                        key={plan.id}
+                        onClick={() => setSelectedPlan(plan)}
+                        className={`cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
+                          selectedPlan?.id === plan.id 
+                            ? 'border-teal-600 bg-teal-50/30 shadow-md ring-1 ring-teal-600' 
+                            : 'border-slate-200 hover:border-teal-300 bg-white hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
+                            <p className="text-sm text-slate-500 line-clamp-2">{plan.description}</p>
+                          </div>
+                          {selectedPlan?.id === plan.id && (
+                            <div className="bg-teal-600 text-white p-1 rounded-full shrink-0 animate-in zoom-in-50">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="mb-4">
+                          <span className="text-3xl font-extrabold text-slate-900">${plan.price_monthly}</span>
+                          <span className="text-sm font-medium text-slate-500">/mo</span>
+                        </div>
+                        <ul className="space-y-2 text-sm text-slate-600">
+                          {plan.features?.slice(0, 4).map((feat, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <Check className="w-4 h-4 text-teal-500 shrink-0" />
+                              <span className="truncate">{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
 
           <CardFooter className="flex justify-between pt-6 border-t border-slate-100">
-            {step > 1 ? (
+            {step > 1 && step < 4 ? (
               <Button variant="ghost" onClick={prevStep} disabled={loading}>
                 Back
               </Button>
@@ -729,16 +831,28 @@ export default function OnboardingPage() {
               >
                 Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
-            ) : (
+            ) : step === 3 ? (
               <Button 
                 onClick={handleManualSubmit} 
                 className="bg-teal-600 hover:bg-teal-700 text-white min-w-[140px]"
                 disabled={loading || !hasValidLocations}
               >
                 {loading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Setting up...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                 ) : (
-                  <>Complete Setup <CheckCircle2 className="w-4 h-4 ml-2" /> </>
+                  <>Next Step <ArrowRight className="w-4 h-4 ml-2" /> </>
+                )}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSubscribe} 
+                className="bg-teal-600 hover:bg-teal-700 text-white min-w-[140px]"
+                disabled={checkoutLoading || !selectedPlan}
+              >
+                {checkoutLoading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Preparing Checkout...</>
+                ) : (
+                  <>Complete & Subscribe <CheckCircle2 className="w-4 h-4 ml-2" /> </>
                 )}
               </Button>
             )}
