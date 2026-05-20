@@ -496,7 +496,7 @@ export default function Layout({ children, currentPageName }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem onClick={() => navigate('/Profile')} className="cursor-pointer">
                   <User className="h-4 w-4 mr-2" />
                   Profile
                 </DropdownMenuItem>

@@ -12,6 +12,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 export default function InvoiceEditor({ invoice, onChange }) {
 
@@ -132,6 +140,22 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 onChange={(e) => handleFieldChange('payment_terms', e.target.value)}
                 placeholder="e.g. Net 30"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Status</Label>
+              <Select
+                value={invoice.payment_status || 'unpaid'}
+                onValueChange={(val) => handleFieldChange('payment_status', val)}
+              >
+                <SelectTrigger className="w-full bg-white border-slate-200">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid">Unpaid</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="auto_pay">Auto-Pay</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Subtotal</Label>

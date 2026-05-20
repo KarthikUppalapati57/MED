@@ -147,7 +147,7 @@ export default function Payments() {
 
   // Stats
   const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue } = React.useMemo(() => {
-    const appUnpaid = invoices.filter(i => i.status === 'approved' && i.payment_status !== 'paid');
+    const appUnpaid = invoices.filter(i => i.status === 'approved' && !['paid', 'auto_pay'].includes(i.payment_status));
     const dueSum = appUnpaid.reduce((sum, i) => sum + (i.total_amount || 0), 0);
     const paidSum = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
     const pending = payments.filter(p => p.status === 'pending').length;
@@ -299,6 +299,7 @@ export default function Payments() {
                   <SelectItem value="all">All Invoices</SelectItem>
                   <SelectItem value="approved">Approved (Unpaid)</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="auto_pay">Auto-Pay</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="pending_review">Pending Review</SelectItem>
                 </SelectContent>
@@ -348,9 +349,9 @@ export default function Payments() {
                     ) : (
                       filteredInvoices.map((invoice) => {
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-                        const isOverdue = dueDate && dueDate < new Date() && invoice.payment_status !== 'paid';
-                        const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && invoice.payment_status !== 'paid';
-                        const canPay = invoice.status === 'approved' && invoice.payment_status !== 'paid';
+                        const isOverdue = dueDate && dueDate < new Date() && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canPay = invoice.status === 'approved' && !['paid', 'auto_pay'].includes(invoice.payment_status);
 
                         return (
                           <TableRow key={invoice.id}>
@@ -377,6 +378,8 @@ export default function Payments() {
                                 <Badge className="bg-red-100 text-red-700">Overdue</Badge>
                               ) : invoice.payment_status === 'paid' ? (
                                 <Badge className="bg-teal-100 text-teal-700">Paid</Badge>
+                              ) : invoice.payment_status === 'auto_pay' ? (
+                                <Badge className="bg-purple-100 text-purple-700 border-purple-200">Auto-Pay</Badge>
                               ) : isDueSoon ? (
                                 <Badge className="bg-orange-100 text-orange-700">Due Soon</Badge>
                               ) : (
