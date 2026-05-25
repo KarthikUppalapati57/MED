@@ -309,26 +309,25 @@ export const AuthProvider = ({ children }) => {
           setCachedProfile(data);
         }
 
-        // Sync Auth Metadata if it doesn't match the database profile
-        // This fixes: 1) wrong role in JWT, 2) missing org_id in JWT (RLS fix)
-        const metaRole = sessionUser.user_metadata?.role;
-        const metaOrgId = sessionUser.user_metadata?.organization_id;
+        // Note: We used to sync JWT metadata here if it drifted from the profile.
+        // Since we migrated to secure app_metadata, the client can no longer self-heal
+        // these claims. The backend RPCs (like admin_update_user_role) handle this.
+        const metaRole = sessionUser.app_metadata?.role;
+        const metaOrgId = sessionUser.app_metadata?.organization_id;
+        const metaBrandId = sessionUser.app_metadata?.brand_id;
+        const metaLocationId = sessionUser.app_metadata?.location_id;
         if (metaRole !== data.role || metaOrgId !== data.organization_id) {
-          supabase.auth.updateUser({
-            data: {
-              role: data.role,
-              organization_id: data.organization_id,
-              brand_id: data.brand_id,
-              location_id: data.location_id,
-            }
-          }).catch(err => console.warn('Auth metadata sync failed:', err));
+          console.warn('JWT app_metadata has drifted from database profile. Requires backend re-sync or re-login.');
         }
 
         return data;
       } else {
         // If profile is missing but user is authenticated, create a skeleton profile
         // This prevents the application from getting stuck in an inconsistent state
-        const role = sessionUser.user_metadata?.role || 'org_owner';
+        const role = sessionUser.app_metadata?.role || 'org_owner';
+        
+        // Ensure new users start with base layout unless overridden
+        const access_level = sessionUser.app_metadata?.access_level || 'organization';
         const { data: newProfile, error } = await supabase
           .from('profiles')
           .insert([{
@@ -446,8 +445,10 @@ export const AuthProvider = ({ children }) => {
                 // Fire dashboard data prefetch immediately — queries load in the
                 // background while invitation + profile resolve. By the time the
                 // Dashboard component mounts, React Query cache is pre-warmed.
-                const cachedRole = currentUser.user_metadata?.role || getCachedProfile()?.role;
-                prefetchDashboardData(cachedRole);
+                const cachedRole = currentUser.app_metadata?.role || getCachedProfile()?.role;
+                if (cachedRole !== 'platform_admin' && !organization_id) {
+                  prefetchDashboardData(cachedRole);
+                }
 
                 // Run invitation check and profile load in PARALLEL.
                 // For existing users (99% of logins), invitation check returns
@@ -665,7 +666,7 @@ export const AuthProvider = ({ children }) => {
   // 2. Cached session storage role (persists through refresh)
   // 3. User metadata role (from auth token)
   // 4. Null (keeps queries disabled until profile loads)
-  const role = userProfile?.role || cachedProfile?.role || user?.user_metadata?.role || null;
+  const role = userProfile?.role || cachedProfile?.role || user?.app_metadata?.role || null;
   const isAuthenticated = !!user;
 
   // Permission helpers — new role hierarchy with backward-compatible aliases

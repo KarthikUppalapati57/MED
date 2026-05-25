@@ -132,7 +132,7 @@ BEGIN
 
   -- 5. Sync auth JWT metadata so RLS policies work immediately
   UPDATE auth.users
-  SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+  SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object(
     'role', 'org_owner',
     'organization_id', v_org_id::text
   )
@@ -211,7 +211,7 @@ BEGIN
 
   -- Sync auth JWT metadata
   UPDATE auth.users
-  SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+  SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object(
     'role', v_invite.role,
     'organization_id', v_invite.organization_id::text
   )
@@ -303,7 +303,7 @@ BEGIN
 
   -- Sync auth JWT metadata with the new role
   UPDATE auth.users
-  SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+  SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object(
     'role', COALESCE(new_role, (SELECT role FROM public.profiles WHERE id = target_user_id))
   )
   WHERE id = target_user_id;

@@ -126,7 +126,7 @@ export default function PlatformAdmin() {
     };
   }, [authChecked, userRole, queryClient]);
 
-  const jwtRole = user?.user_metadata?.role;
+  const jwtRole = user?.app_metadata?.role;
   const isReadyAdmin = authChecked && userRole === 'platform_admin' && jwtRole === 'platform_admin';
 
   const { data: requests = [], isLoading: isLoadingAccess } = useAuthQuery({

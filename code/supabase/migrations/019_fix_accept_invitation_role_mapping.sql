@@ -62,7 +62,7 @@ BEGIN
 
   -- Sync auth JWT metadata
   UPDATE auth.users
-  SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object(
+  SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object(
     'role', v_mapped_role,
     'organization_id', v_invite.organization_id::text
   )

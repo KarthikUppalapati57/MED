@@ -13,11 +13,11 @@ DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 -- 2. HIGH-PERFORMANCE JWT HELPERS
 -- These do ZERO table queries, so they NEVER hang.
 CREATE OR REPLACE FUNCTION public.get_auth_role() RETURNS TEXT AS $$
-  SELECT COALESCE(auth.jwt() -> 'user_metadata' ->> 'role', 'ground_staff');
+  SELECT COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', 'ground_staff');
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 CREATE OR REPLACE FUNCTION public.get_auth_org() RETURNS UUID AS $$
-  SELECT (auth.jwt() -> 'user_metadata' ->> 'organization_id')::uuid;
+  SELECT (auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid;
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- 3. ENSURE ALL CORE TABLES HAVE FULL COLUMNS (Merging 001-007)
@@ -152,8 +152,8 @@ BEGIN
         
         -- Sync JWT Metadata
         UPDATE auth.users 
-        SET raw_user_meta_data = 
-            COALESCE(raw_user_meta_data, '{}'::jsonb) || 
+        SET raw_app_meta_data = 
+            COALESCE(raw_app_meta_data, '{}'::jsonb) || 
             jsonb_build_object('role', 'platform_admin')
         WHERE id = target_uid;
     END IF;
