@@ -16,6 +16,7 @@ import MFASetupPage from './pages/MFASetupPage';
 import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 // Initialize global error monitoring
 initGlobalErrorHandlers();
@@ -735,15 +736,17 @@ const AuthenticatedApp = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-          <Toaster />
-          <SonnerToaster position="top-right" richColors />
-        </QueryClientProvider>
-      </AuthProvider>
+      <ThemeProvider defaultTheme="system" storageKey="edgeops-theme">
+        <AuthProvider>
+          <QueryClientProvider client={queryClientInstance}>
+            <Router>
+              <AuthenticatedApp />
+            </Router>
+            <Toaster />
+            <SonnerToaster position="top-right" richColors />
+          </QueryClientProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

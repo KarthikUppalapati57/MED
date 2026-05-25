@@ -48,6 +48,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabaseClient';
 import { isPageInEnabledModules } from '@/lib/moduleConfig';
 import ContextSwitcher from '@/components/ContextSwitcher';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -308,19 +309,19 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex h-16 items-center justify-between px-6 border-b border-slate-800 shrink-0">
+        <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0">
           <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-teal-500 flex items-center justify-center">
-              <Package className="h-5 w-5 text-white" />
+            <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center">
+              <Package className="h-5 w-5 text-background" />
             </div>
-            <span className="text-lg font-semibold text-white">EdgeOps</span>
+            <span className="text-lg font-semibold text-foreground">EdgeOps</span>
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-white"
+            className="lg:hidden text-muted-foreground hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -346,8 +347,8 @@ export default function Layout({ children, currentPageName }) {
                     className={cn(
                       "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                       isActive
-                        ? "bg-slate-800 text-white"
-                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                        ? "bg-secondary text-foreground"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -373,8 +374,8 @@ export default function Layout({ children, currentPageName }) {
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
                               isSubActive
-                                ? "bg-teal-500/10 text-teal-400 shadow-sm"
-                                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                ? "bg-accent text-accent-foreground shadow-sm border border-border"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                             )}
                           >
                             <sub.icon className="h-4 w-4" />
@@ -397,8 +398,8 @@ export default function Layout({ children, currentPageName }) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                   isActive
-                    ? "bg-teal-500/10 text-teal-400 shadow-sm"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    ? "bg-accent text-accent-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -409,15 +410,15 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         {/* User info at bottom of sidebar */}
-        <div className="p-4 border-t border-slate-800 shrink-0 bg-slate-900 mt-auto">
+        <div className="p-4 border-t border-border shrink-0 bg-secondary/30 mt-auto">
           <div className="flex items-center gap-3 px-3">
-            <div className="h-8 w-8 rounded-full bg-teal-600 flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+              <span className="text-primary-foreground text-xs font-bold">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{displayName}</p>
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
               <Badge className={cn("text-[10px] px-1.5 py-0", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
                 {(displayRole || '').replace('_', ' ')}
               </Badge>
@@ -429,10 +430,10 @@ export default function Layout({ children, currentPageName }) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top header */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
+        <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-slate-600 hover:text-slate-900"
+            className="lg:hidden p-2 text-muted-foreground hover:text-foreground"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -442,10 +443,11 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative text-foreground">
                   <Bell className="h-5 w-5 text-slate-600" />
                   {notifications.length > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs animate-pulse">
