@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { getModuleForPage } from '@/lib/moduleConfig';
+import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
 import AccessDenied from '@/components/AccessDenied';
 
 /**
@@ -45,13 +45,13 @@ export default function ProtectedModule({ pageName, children }) {
     return <AccessDenied reason="role" requiredRole={moduleInfo.minRole} />;
   }
 
-  // Check 2: Module enabled for the user's organization
-  // If enabled_modules is empty/null, all modules are allowed (unrestricted org)
+  // Check 2: Module enabled for the user's organization (FAIL-CLOSED)
+  // Core modules (dashboard, admin) always pass. Operational modules require
+  // explicit inclusion in org.enabled_modules. If enabled_modules is empty/null,
+  // only core modules are accessible — this is secure-by-default.
   const enabledModules = organization?.enabled_modules;
-  if (enabledModules && enabledModules.length > 0) {
-    if (!enabledModules.includes(moduleInfo.key)) {
-      return <AccessDenied reason="module" moduleName={moduleInfo.label} />;
-    }
+  if (!isPageInEnabledModules(pageName, enabledModules)) {
+    return <AccessDenied reason="module" moduleName={moduleInfo.label} />;
   }
 
   // All checks passed — render the page

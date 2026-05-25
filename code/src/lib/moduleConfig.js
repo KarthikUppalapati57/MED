@@ -26,15 +26,26 @@ export const MODULE_DEFINITIONS = {
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
+// Core modules that are ALWAYS accessible regardless of subscription plan.
+// These are non-revenue operational essentials.
+const CORE_MODULE_KEYS = ['dashboard', 'admin'];
+
 /**
  * Returns the Set of page names that are enabled for the given module list.
- * If enabledModules is null/empty, returns null (meaning "all pages allowed").
+ * FAIL-CLOSED: If enabledModules is null/empty, only core module pages are returned.
  */
 export function getEnabledPages(enabledModules) {
-  if (!enabledModules || enabledModules.length === 0) return null;
+  const modulesList = (enabledModules && enabledModules.length > 0)
+    ? enabledModules
+    : CORE_MODULE_KEYS;
   const pages = new Set();
-  enabledModules.forEach(moduleKey => {
+  modulesList.forEach(moduleKey => {
     const mod = MODULE_DEFINITIONS[moduleKey];
+    if (mod) mod.pages.forEach(p => pages.add(p));
+  });
+  // Always include core module pages even if not explicitly listed
+  CORE_MODULE_KEYS.forEach(key => {
+    const mod = MODULE_DEFINITIONS[key];
     if (mod) mod.pages.forEach(p => pages.add(p));
   });
   return pages;
@@ -42,12 +53,21 @@ export function getEnabledPages(enabledModules) {
 
 /**
  * Checks if a specific page is enabled given the org's enabled module list.
- * Returns true if enabledModules is empty (no restrictions) or if the page is found.
+ * 
+ * FAIL-CLOSED (secure-by-default):
+ *   - Ungated pages (not in any module, e.g. Onboarding) → allowed
+ *   - Core modules (dashboard, admin) → always allowed
+ *   - Operational modules → ONLY allowed if explicitly in enabledModules
  */
 export function isPageInEnabledModules(pageName, enabledModules) {
-  const pages = getEnabledPages(enabledModules);
-  if (pages === null) return true;
-  return pages.has(pageName);
+  const moduleInfo = getModuleForPage(pageName);
+  // Ungated pages (not assigned to any module) are always allowed
+  if (!moduleInfo) return true;
+  // Core modules are always allowed
+  if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
+  // Operational modules: require explicit inclusion
+  const modulesList = enabledModules || [];
+  return modulesList.includes(moduleInfo.key);
 }
 
 /**

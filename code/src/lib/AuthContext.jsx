@@ -272,16 +272,33 @@ export const AuthProvider = ({ children }) => {
         // Preserve active context from cache on reload if valid, otherwise fall back to profile defaults
         const currentCache = getCachedProfile();
         if (currentCache && currentCache.id === sessionUser.id && (currentCache.organization || currentCache.brand || currentCache.location)) {
-          setActiveOrg(currentCache.organization);
+          // CRITICAL: Merge fresh DB-fetched org properties (enabled_modules, plan_id,
+          // subscription_plan, subscription_status) into the cached org object.
+          // Without this, stale sessionStorage overrides Platform Admin module changes.
+          const freshOrg = currentCache.organization
+            ? {
+                ...currentCache.organization,
+                ...(data.organization && currentCache.organization?.id === data.organization.id
+                  ? {
+                      enabled_modules: data.organization.enabled_modules,
+                      plan_id: data.organization.plan_id,
+                      subscription_plan: data.organization.subscription_plan,
+                      subscription_status: data.organization.subscription_status,
+                    }
+                  : {}),
+              }
+            : data.organization;
+          
+          setActiveOrg(freshOrg);
           setActiveBrand(currentCache.brand);
           setActiveLocation(currentCache.location);
           
           setCachedProfile({
             ...data,
-            organization: currentCache.organization,
+            organization: freshOrg,
             brand: currentCache.brand,
             location: currentCache.location,
-            organization_id: currentCache.organization?.id || null,
+            organization_id: freshOrg?.id || null,
             brand_id: currentCache.brand?.id || null,
             location_id: currentCache.location?.id || null,
           });

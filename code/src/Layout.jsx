@@ -157,14 +157,16 @@ const roleBadgeColors = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState({});
+  // Accordion: only one menu can be expanded at a time (null = none)
+  const [expandedMenu, setExpandedMenu] = useState(null);
   const { user, userProfile, logout, role, organization } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
 
-  const toggleMenu = (name) => setExpandedMenus(prev => ({...prev, [name]: !prev[name]}));
+  // Accordion toggle: clicking an open menu closes it; clicking a different menu opens it and closes the previous
+  const toggleMenu = (name) => setExpandedMenu(prev => prev === name ? null : name);
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications', user?.id],
@@ -237,7 +239,8 @@ export default function Layout({ children, currentPageName }) {
     navigate('/');
   };
 
-  // Filter navigation based on user role AND enabled modules
+  // Filter navigation based on user role AND enabled modules (FAIL-CLOSED)
+  const enabledModules = organization?.enabled_modules;
   const filteredNavigation = navigation.filter(item => {
     // Role check
     if (!hasMinRole(item.minRole)) return false;
@@ -245,13 +248,29 @@ export default function Layout({ children, currentPageName }) {
     if (isPlatformAdmin) {
       return item.minRole === 'platform_admin' || item.name === 'Dashboard';
     }
-    // Module check: if org has enabled_modules, only show nav items for enabled modules
-    const enabledModules = organization?.enabled_modules;
-    if (enabledModules && enabledModules.length > 0) {
-      return isPageInEnabledModules(item.href, enabledModules);
+    // Module check (fail-closed): isPageInEnabledModules handles the null/empty case
+    // For parent menus with subItems (no href), derive page name from the first sub-item
+    const pageName = item.href || (item.subItems?.[0]?.href?.split('?')[0]);
+    if (pageName) {
+      return isPageInEnabledModules(pageName, enabledModules);
     }
-    return true; // No module restrictions = show all
+    return true;
   });
+
+  // Auto-expand the correct accordion on initial load based on active path
+  useEffect(() => {
+    const activeParent = filteredNavigation.find(item =>
+      item.subItems?.some(sub => {
+        const [base, query] = sub.href.split('?');
+        if (currentPageName !== base) return false;
+        if (query) return location.search.includes(query.split('=')[1] || query);
+        return true;
+      })
+    );
+    if (activeParent) setExpandedMenu(activeParent.name);
+  // Only run on page/path changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPageName, location.search]);
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = role || 'loading';
@@ -316,13 +335,11 @@ export default function Layout({ children, currentPageName }) {
                 if (query) return location.search.includes(query.split('=')[1] || query);
                 return true;
               });
-              const isExpanded = expandedMenus[item.name] ?? isActive;
+              const isExpanded = expandedMenu === item.name || (expandedMenu === null && isActive);
               return (
                 <div 
                   key={item.name} 
                   className="space-y-1"
-                  onMouseEnter={() => setExpandedMenus(prev => ({...prev, [item.name]: true}))}
-                  onMouseLeave={() => setExpandedMenus(prev => ({...prev, [item.name]: false}))}
                 >
                   <button
                     onClick={() => toggleMenu(item.name)}

@@ -453,7 +453,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">System Role</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(MEVS_ROLES)
-                    .filter(([r]) => r !== 'platform_admin' || (currentUserRole === 'platform_admin' || userProfile?.role === 'platform_admin'))
+                    .filter(([r]) => r !== 'platform_admin')
                     .map(([r, def]) => {
                     const isSelected = form.role === r;
                     const Icon = def.icon;
@@ -732,7 +732,7 @@ function InviteDialog({ open, onClose, orgId }) {
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-slate-100">
                 {Object.entries(MEVS_ROLES)
-                  .filter(([r]) => r !== 'platform_admin' || (currentUserRole === 'platform_admin' || userProfile?.role === 'platform_admin'))
+                  .filter(([r]) => r !== 'platform_admin')
                   .map(([r, def]) => (
                   <SelectItem key={r} value={r} className="rounded-xl font-bold py-2.5">
                     <div className="flex items-center gap-2">

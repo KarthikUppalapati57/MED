@@ -30,6 +30,7 @@ export default function Profile() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Password change states
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -75,6 +76,10 @@ export default function Profile() {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    if (!currentPassword) {
+      toast.error('Please enter your current password.');
+      return;
+    }
     if (!password) {
       toast.error('Please enter a new password.');
       return;
@@ -90,9 +95,22 @@ export default function Profile() {
 
     setIsSavingPassword(true);
     try {
+      // Step 1: Verify current password before allowing the change
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (verifyError) {
+        toast.error('Current password is incorrect.');
+        setIsSavingPassword(false);
+        return;
+      }
+
+      // Step 2: Update to the new password
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
 
+      setCurrentPassword('');
       setPassword('');
       setConfirmPassword('');
       toast.success('Password updated successfully!');
@@ -230,6 +248,22 @@ export default function Profile() {
             </CardHeader>
             <CardContent className="p-6">
               <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="currentPassword" className="text-slate-700 font-semibold text-sm">Current Password</Label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="currentPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="pl-9 pr-10 h-10 rounded-lg border-slate-200 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
                   <Label htmlFor="newPassword" className="text-slate-700 font-semibold text-sm">New Password</Label>
                   <div className="relative">
