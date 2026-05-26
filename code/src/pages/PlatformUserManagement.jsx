@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -52,7 +52,7 @@ export default function PlatformUserManagement() {
     };
   }, [queryClient]);
 
-  // ── Platform Admins Query ──────────────────────────────────
+  // â”€â”€ Platform Admins Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: platformAdmins = [], isLoading: isLoadingAdmins, error: adminQueryError } = useAuthQuery({
     queryKey: ['platform-admins'],
     queryFn: async () => {
@@ -70,8 +70,8 @@ export default function PlatformUserManagement() {
         return (data || []).map(p => ({
           membership_id: p.id,
           user_id: p.id,
-          email: p.email || "—",
-          full_name: p.full_name || "—",
+          email: p.email || "â€”",
+          full_name: p.full_name || "â€”",
           role: p.role,
           created_at: p.created_at,
           last_sign_in_at: p.updated_at,
@@ -90,7 +90,7 @@ export default function PlatformUserManagement() {
     }
   }, [adminQueryError]);
 
-  // ── Pending Invitations Query ──────────────────────────────
+  // â”€â”€ Pending Invitations Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: pendingInvites = [], isLoading: isLoadingInvites } = useAuthQuery({
     queryKey: ['platform-admin-invites'],
     queryFn: async () => {
@@ -106,7 +106,7 @@ export default function PlatformUserManagement() {
     enabled: authChecked,
   });
 
-  // ── Invite Platform Admin ──────────────────────────────────
+  // â”€â”€ Invite Platform Admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleInvitePlatformAdmin = async () => {
     if (!platformInviteEmail) return;
     setPlatformInviting(true);
@@ -179,11 +179,11 @@ export default function PlatformUserManagement() {
     });
   }, [platformAdmins, searchQuery]);
 
-  // ── Guards ─────────────────────────────────────────────────
+  // â”€â”€ Guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -191,11 +191,11 @@ export default function PlatformUserManagement() {
   if (!user || userRole !== 'platform_admin') {
     return (
       <div className="flex flex-col items-center justify-center h-96 text-center px-4">
-        <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-4">
-          <Shield className="w-8 h-8 text-red-500" />
+        <div className="w-16 h-16 bg-resend-red/10 rounded-2xl flex items-center justify-center mb-4">
+          <Shield className="w-8 h-8 text-resend-red" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h2>
-        <p className="text-slate-500 max-w-md">Platform User Management is restricted to platform administrators only.</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+        <p className="text-muted-foreground max-w-md">Platform User Management is restricted to platform administrators only.</p>
       </div>
     );
   }
@@ -205,15 +205,15 @@ export default function PlatformUserManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-            <Users className="w-5 h-5 text-indigo-600" />
+          <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
+            <Users className="w-5 h-5 text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Platform User Management</h1>
-            <p className="text-sm text-slate-500">Manage platform administrators and their access</p>
+            <h1 className="text-2xl font-bold text-foreground">Platform User Management</h1>
+            <p className="text-sm text-muted-foreground">Manage platform administrators and their access</p>
           </div>
         </div>
-        <Button onClick={() => setShowPlatformInviteModal(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => setShowPlatformInviteModal(true)} className="bg-resend-blue hover:bg-blue-700">
           <UserPlus className="w-4 h-4 mr-2" /> Invite Admin
         </Button>
       </div>
@@ -224,12 +224,12 @@ export default function PlatformUserManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold text-slate-500 uppercase">Total Admins</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Total Admins</p>
                 <p className="text-2xl font-bold mt-1">{platformAdmins.length}</p>
-                <p className="text-[10px] text-blue-500 mt-0.5">Active administrators</p>
+                <p className="text-[10px] text-resend-blue mt-0.5">Active administrators</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <UserCheck className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-lg bg-resend-blue/10 flex items-center justify-center">
+                <UserCheck className="h-5 w-5 text-resend-blue" />
               </div>
             </div>
           </CardContent>
@@ -238,12 +238,12 @@ export default function PlatformUserManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold text-slate-500 uppercase">Pending Invites</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Pending Invites</p>
                 <p className="text-2xl font-bold mt-1">{pendingInvites.length}</p>
-                <p className="text-[10px] text-amber-500 mt-0.5">Awaiting signup</p>
+                <p className="text-[10px] text-resend-yellow mt-0.5">Awaiting signup</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-amber-600" />
+              <div className="h-10 w-10 rounded-lg bg-resend-yellow/10 flex items-center justify-center">
+                <Clock className="h-5 w-5 text-resend-yellow" />
               </div>
             </div>
           </CardContent>
@@ -252,12 +252,12 @@ export default function PlatformUserManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold text-slate-500 uppercase">Platform Role</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Platform Role</p>
                 <p className="text-2xl font-bold mt-1">Admin</p>
-                <p className="text-[10px] text-indigo-500 mt-0.5">Full platform access</p>
+                <p className="text-[10px] text-indigo-400 mt-0.5">Full platform access</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <Shield className="h-5 w-5 text-indigo-600" />
+              <div className="h-10 w-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-indigo-400" />
               </div>
             </div>
           </CardContent>
@@ -269,10 +269,10 @@ export default function PlatformUserManagement() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle className="text-base">Platform Administrators</CardTitle>
-            <p className="text-xs text-slate-400">Users with full administrative access to the platform.</p>
+            <p className="text-xs text-muted-foreground">Users with full administrative access to the platform.</p>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search admins..."
               className="pl-9 w-56 h-8"
@@ -284,7 +284,7 @@ export default function PlatformUserManagement() {
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50">
+              <TableRow className="bg-secondary">
                 <TableHead className="text-[11px]">NAME</TableHead>
                 <TableHead className="text-[11px]">EMAIL</TableHead>
                 <TableHead className="text-[11px]">ROLE</TableHead>
@@ -294,31 +294,31 @@ export default function PlatformUserManagement() {
             </TableHeader>
             <TableBody>
               {isLoadingAdmins ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
               ) : filteredAdmins.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-sm text-slate-400">No platform admins found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">No platform admins found</TableCell></TableRow>
               ) : filteredAdmins.map(admin => (
                 <TableRow key={admin.membership_id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-xs font-bold text-indigo-400">
                         {admin.full_name?.substring(0, 2).toUpperCase() || '??'}
                       </div>
                       <span className="font-medium text-sm">{admin.full_name}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-slate-500">{admin.email}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{admin.email}</TableCell>
                   <TableCell>
-                    <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none text-[10px]">Platform Admin</Badge>
+                    <Badge className="bg-purple-500/50/10 text-purple-400 hover:bg-purple-500/50/10 border-none text-[10px]">Platform Admin</Badge>
                   </TableCell>
-                  <TableCell className="text-xs text-slate-400">
-                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  <TableCell className="text-xs text-muted-foreground">
+                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                   </TableCell>
                   <TableCell>
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50" 
+                      className="h-7 w-7 p-0 text-resend-red hover:text-resend-red hover:bg-resend-red/5" 
                       disabled={admin.user_id === user?.id} 
                       onClick={() => setConfirmDeleteAdmin(admin)}
                     >
@@ -337,15 +337,15 @@ export default function PlatformUserManagement() {
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="h-4 w-4 text-amber-500" />
+              <Mail className="h-4 w-4 text-resend-yellow" />
               Pending Admin Invitations
             </CardTitle>
-            <p className="text-xs text-slate-400">{pendingInvites.length} invitation{pendingInvites.length !== 1 ? 's' : ''} awaiting acceptance</p>
+            <p className="text-xs text-muted-foreground">{pendingInvites.length} invitation{pendingInvites.length !== 1 ? 's' : ''} awaiting acceptance</p>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
+                <TableRow className="bg-secondary">
                   <TableHead className="text-[11px]">EMAIL</TableHead>
                   <TableHead className="text-[11px]">INVITED</TableHead>
                   <TableHead className="text-[11px]">EXPIRES</TableHead>
@@ -355,20 +355,20 @@ export default function PlatformUserManagement() {
               </TableHeader>
               <TableBody>
                 {isLoadingInvites ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-6"><Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" /></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-6"><Loader2 className="w-4 h-4 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
                 ) : pendingInvites.map(invite => {
                   const isExpired = new Date(invite.expires_at) < new Date();
                   return (
                     <TableRow key={invite.id}>
                       <TableCell className="text-sm font-medium">{invite.email}</TableCell>
-                      <TableCell className="text-xs text-slate-400">
-                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                       </TableCell>
-                      <TableCell className="text-xs text-slate-400">
-                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                       </TableCell>
                       <TableCell>
-                        <Badge className={isExpired ? 'bg-red-100 text-red-700 text-[10px]' : 'bg-amber-100 text-amber-700 text-[10px]'}>
+                        <Badge className={isExpired ? 'bg-resend-red/10 text-resend-red text-[10px]' : 'bg-resend-yellow/10 text-resend-yellow text-[10px]'}>
                           {isExpired ? 'Expired' : 'Pending'}
                         </Badge>
                       </TableCell>
@@ -376,7 +376,7 @@ export default function PlatformUserManagement() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-xs h-7 px-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          className="text-xs h-7 px-2 text-resend-red hover:text-resend-red hover:bg-resend-red/5"
                           onClick={async () => {
                             if (!window.confirm(`Delete invitation for ${invite.email}?`)) return;
                             
@@ -415,16 +415,16 @@ export default function PlatformUserManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Email Address</Label>
+              <Label className="text-sm font-semibold text-foreground">Email Address</Label>
               <Input type="email" placeholder="admin@company.com" value={platformInviteEmail} onChange={e => setPlatformInviteEmail(e.target.value)} className="mt-1" />
             </div>
-            <p className="text-xs text-amber-600 font-medium">
+            <p className="text-xs text-resend-yellow font-medium">
               Warning: This user will have unrestricted access to all organizations, users, and platform settings.
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPlatformInviteModal(false)}>Cancel</Button>
-            <Button onClick={handleInvitePlatformAdmin} disabled={platformInviting || !platformInviteEmail} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleInvitePlatformAdmin} disabled={platformInviting || !platformInviteEmail} className="bg-resend-blue hover:bg-blue-700">
               {platformInviting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Invite Admin
             </Button>
@@ -434,7 +434,7 @@ export default function PlatformUserManagement() {
 
       {/* Generated Invite Link Dialog */}
       <Dialog open={isInviteLinkDialogOpen} onOpenChange={setIsInviteLinkDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-white">
+        <DialogContent className="sm:max-w-md bg-card">
           <DialogHeader>
             <DialogTitle>Invitation Link Generated</DialogTitle>
             <DialogDescription>
@@ -448,12 +448,12 @@ export default function PlatformUserManagement() {
                 id="invite-link-pum"
                 readOnly
                 value={generatedInviteLink}
-                className="font-mono text-[10px] bg-slate-50 text-slate-800 border-slate-200"
+                className="font-mono text-[10px] bg-secondary text-foreground border-border"
               />
             </div>
             <Button
               size="sm"
-              className="px-3 bg-teal-600 hover:bg-teal-700 text-white"
+              className="px-3 bg-primary hover:bg-primary text-white"
               onClick={() => {
                 navigator.clipboard.writeText(generatedInviteLink);
                 toast.success('Link copied to clipboard');
@@ -488,3 +488,4 @@ export default function PlatformUserManagement() {
     </div>
   );
 }
+

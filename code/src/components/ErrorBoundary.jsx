@@ -1,8 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { captureError } from '@/lib/errorMonitor';
 
 /**
- * React Error Boundary — catches render errors in children.
+ * React Error Boundary â€” catches render errors in children.
  * Shows a user-friendly fallback UI with recovery options.
  */
 export default class ErrorBoundary extends React.Component {
@@ -51,9 +51,9 @@ export default class ErrorBoundary extends React.Component {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-red-50">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100 text-center">
-            <div className="h-14 w-14 rounded-xl bg-red-100 flex items-center justify-center mx-auto">
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-full max-w-md bg-card rounded-2xl shadow-lg p-8 space-y-6 border border-border text-center">
+            <div className="h-14 w-14 rounded-xl bg-resend-red/10 flex items-center justify-center mx-auto">
               <svg
                 width="28"
                 height="28"
@@ -69,17 +69,17 @@ export default class ErrorBoundary extends React.Component {
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold text-foreground">
                 Something went wrong
               </h2>
-              <p className="text-sm text-slate-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 An unexpected error occurred. Our team has been notified.
               </p>
             </div>
 
             {this.state.error && (
-              <div className="bg-red-50 rounded-lg p-3 text-left">
-                <p className="text-xs font-mono text-red-700 break-all">
+              <div className="bg-resend-red/5 rounded-lg p-3 text-left">
+                <p className="text-xs font-mono text-resend-red break-all">
                   {this.state.error.stack || this.state.error.message}
                 </p>
               </div>
@@ -88,13 +88,13 @@ export default class ErrorBoundary extends React.Component {
             <div className="flex gap-3 justify-center">
               <button
                 onClick={this.handleReset}
-                className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-colors"
               >
                 Try Again
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Reload Page
               </button>
@@ -107,3 +107,4 @@ export default class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+

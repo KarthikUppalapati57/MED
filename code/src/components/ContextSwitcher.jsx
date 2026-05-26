@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -17,13 +17,13 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * ContextSwitcher — Cascading org/brand/location selector for the Layout header.
+ * ContextSwitcher â€” Cascading org/brand/location selector for the Layout header.
  *
  * Behavior per role:
- *   Platform Admin → Dropdown of ALL organizations → brands → locations
- *   Org Owner      → Dropdown of their org's brands → locations
- *   Branch Manager  → Dropdown of their assigned branches → locations
- *   Ground Level    → Static text showing assigned location (no dropdown)
+ *   Platform Admin â†’ Dropdown of ALL organizations â†’ brands â†’ locations
+ *   Org Owner      â†’ Dropdown of their org's brands â†’ locations
+ *   Branch Manager  â†’ Dropdown of their assigned branches â†’ locations
+ *   Ground Level    â†’ Static text showing assigned location (no dropdown)
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile } = useAuth();
@@ -86,8 +86,8 @@ export default function ContextSwitcher() {
   if (!isPlatformAdmin && !isOrgOwner && !isBranchManager) {
     if (location?.name) {
       return (
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <MapPin className="h-4 w-4 text-emerald-500" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="h-4 w-4 text-resend-green" />
           <span className="font-medium">{location.name}</span>
         </div>
       );
@@ -102,17 +102,17 @@ export default function ContextSwitcher() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[200px]">
-              <Building2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+              <Building2 className="h-3.5 w-3.5 text-resend-blue shrink-0" />
               <span className="truncate">{organization?.name || 'All Organizations'}</span>
-              <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+              <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
-            <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase">Select Organization</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => switchContext('organization', null)}
-              className={cn("gap-2 text-sm", !organization && "bg-blue-50 text-blue-700")}
+              className={cn("gap-2 text-sm", !organization && "bg-resend-blue/5 text-resend-blue")}
             >
               <Globe className="h-3.5 w-3.5" />
               All Organizations
@@ -122,14 +122,14 @@ export default function ContextSwitcher() {
               <DropdownMenuItem
                 key={org.id}
                 onClick={() => switchContext('organization', org)}
-                className={cn("gap-2 text-sm", organization?.id === org.id && "bg-blue-50 text-blue-700")}
+                className={cn("gap-2 text-sm", organization?.id === org.id && "bg-resend-blue/5 text-resend-blue")}
               >
                 <Building2 className="h-3.5 w-3.5" />
                 {org.name}
               </DropdownMenuItem>
             ))}
             {allOrgs.length === 0 && (
-              <div className="p-2 text-center text-xs text-slate-400">No organizations</div>
+              <div className="p-2 text-center text-xs text-muted-foreground">No organizations</div>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -138,21 +138,21 @@ export default function ContextSwitcher() {
       {/* Brand Selector (Platform Admin with org selected, or Org Owner) */}
       {(isPlatformAdmin ? !!organization : (isOrgOwner || isBranchManager)) && orgBrands.length > 0 && (
         <>
-          <span className="text-slate-300 text-xs">›</span>
+          <span className="text-muted-foreground text-xs">â€º</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
-                <Store className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                <Store className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                 <span className="truncate">{brand?.name || 'All Brands'}</span>
-                <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 max-h-72 overflow-y-auto">
-              <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase">Select Brand</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Brand</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => switchContext('brand', null)}
-                className={cn("gap-2 text-sm", !brand && "bg-violet-50 text-violet-700")}
+                className={cn("gap-2 text-sm", !brand && "bg-purple-500/5 text-purple-400")}
               >
                 All Brands
               </DropdownMenuItem>
@@ -161,7 +161,7 @@ export default function ContextSwitcher() {
                 <DropdownMenuItem
                   key={b.id}
                   onClick={() => switchContext('brand', b)}
-                  className={cn("gap-2 text-sm", brand?.id === b.id && "bg-violet-50 text-violet-700")}
+                  className={cn("gap-2 text-sm", brand?.id === b.id && "bg-purple-500/5 text-purple-400")}
                 >
                   <Store className="h-3.5 w-3.5" />
                   {b.name}
@@ -175,21 +175,21 @@ export default function ContextSwitcher() {
       {/* Location Selector */}
       {(isPlatformAdmin ? !!organization : (isOrgOwner || isBranchManager)) && brandLocations.length > 0 && (
         <>
-          <span className="text-slate-300 text-xs">›</span>
+          <span className="text-muted-foreground text-xs">â€º</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
-                <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <MapPin className="h-3.5 w-3.5 text-resend-green shrink-0" />
                 <span className="truncate">{location?.name || 'All Locations'}</span>
-                <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 max-h-72 overflow-y-auto">
-              <DropdownMenuLabel className="text-[10px] text-slate-400 uppercase">Select Location</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Location</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => switchContext('location', null)}
-                className={cn("gap-2 text-sm", !location && "bg-emerald-50 text-emerald-700")}
+                className={cn("gap-2 text-sm", !location && "bg-resend-green/5 text-resend-green")}
               >
                 All Locations
               </DropdownMenuItem>
@@ -198,12 +198,12 @@ export default function ContextSwitcher() {
                 <DropdownMenuItem
                   key={loc.id}
                   onClick={() => switchContext('location', loc)}
-                  className={cn("gap-2 text-sm", location?.id === loc.id && "bg-emerald-50 text-emerald-700")}
+                  className={cn("gap-2 text-sm", location?.id === loc.id && "bg-resend-green/5 text-resend-green")}
                 >
                   <MapPin className="h-3.5 w-3.5" />
                   <div>
                     <span>{loc.name}</span>
-                    {loc.address && <span className="block text-[10px] text-slate-400 truncate max-w-[160px]">{loc.address}</span>}
+                    {loc.address && <span className="block text-[10px] text-muted-foreground truncate max-w-[160px]">{loc.address}</span>}
                   </div>
                 </DropdownMenuItem>
               ))}
@@ -214,10 +214,11 @@ export default function ContextSwitcher() {
 
       {/* Viewing-as badge for platform admin impersonation */}
       {isPlatformAdmin && organization && (
-        <Badge className="ml-1 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-medium">
+        <Badge className="ml-1 bg-resend-blue/5 text-resend-blue border border-resend-blue/20 text-[10px] font-medium">
           Viewing: {organization.name}
         </Badge>
       )}
     </div>
   );
 }
+

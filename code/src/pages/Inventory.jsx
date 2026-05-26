@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -328,7 +328,7 @@ export default function Inventory() {
       total_amount: orderItems.reduce((s, i) => s + i.total_price, 0),
       chat_history: [],
     });
-    toast.success(`Order created for ${selectedIds.size} item(s) — check Auto Ordering`);
+    toast.success(`Order created for ${selectedIds.size} item(s) â€” check Auto Ordering`);
     setSelectedIds(new Set());
   };
 
@@ -364,15 +364,15 @@ export default function Inventory() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
-          <p className="text-slate-500 mt-1">Track and manage stock levels</p>
+          <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
+          <p className="text-muted-foreground mt-1">Track and manage stock levels</p>
         </div>
         {!isGroundStaff && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" /> Export
             </Button>
-            <Button onClick={() => setAddDialogOpen(true)} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => setAddDialogOpen(true)} className="bg-primary hover:bg-primary">
               <Plus className="h-4 w-4 mr-2" /> Add Item
             </Button>
           </div>
@@ -395,26 +395,26 @@ export default function Inventory() {
         const hoursLeft = Math.max(0, Math.ceil((earliest - now) / (1000 * 60 * 60)));
 
         return (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-              <Clock className="h-5 w-5 text-amber-600" />
+          <div className="bg-resend-yellow/5 border border-resend-yellow/20 rounded-xl p-4 flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-resend-yellow/10 flex items-center justify-center shrink-0">
+              <Clock className="h-5 w-5 text-resend-yellow" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-amber-800">
                 {pendingItems.length} item{pendingItems.length > 1 ? 's' : ''} pending review
               </p>
-              <p className="text-xs text-amber-600 mt-0.5">
+              <p className="text-xs text-resend-yellow mt-0.5">
                 Recently approved invoice items are staged for {hoursLeft}h. You can edit quantities and details during this window before they finalize.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {pendingItems.slice(0, 5).map(item => (
-                  <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 font-medium">
+                  <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-resend-yellow/10 text-resend-yellow border border-resend-yellow/20 font-medium">
                     {item.product_name} ({item.current_quantity} {item.current_unit || 'ea'})
-                    {item.pending_source_invoice ? ` • Inv: ${item.pending_source_invoice}` : ''}
+                    {item.pending_source_invoice ? ` â€¢ Inv: ${item.pending_source_invoice}` : ''}
                   </span>
                 ))}
                 {pendingItems.length > 5 && (
-                  <span className="text-[10px] text-amber-500">+{pendingItems.length - 5} more</span>
+                  <span className="text-[10px] text-resend-yellow">+{pendingItems.length - 5} more</span>
                 )}
               </div>
             </div>
@@ -428,10 +428,10 @@ export default function Inventory() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Items</p>
-                <p className="text-2xl font-bold text-slate-900">{totalItems}</p>
+                <p className="text-sm text-muted-foreground">Total Items</p>
+                <p className="text-2xl font-bold text-foreground">{totalItems}</p>
               </div>
-              <Warehouse className="h-8 w-8 text-teal-500" />
+              <Warehouse className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -439,10 +439,10 @@ export default function Inventory() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Value</p>
-                <p className="text-2xl font-bold text-slate-900">${totalValue.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Total Value</p>
+                <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString()}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <TrendingUp className="h-8 w-8 text-resend-green" />
             </div>
           </CardContent>
         </Card>
@@ -450,10 +450,10 @@ export default function Inventory() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Low Stock</p>
-                <p className="text-2xl font-bold text-red-600">{lowStock}</p>
+                <p className="text-sm text-muted-foreground">Low Stock</p>
+                <p className="text-2xl font-bold text-resend-red">{lowStock}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-500" />
+              <AlertTriangle className="h-8 w-8 text-resend-red" />
             </div>
           </CardContent>
         </Card>
@@ -461,10 +461,10 @@ export default function Inventory() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Wastage (MTD)</p>
-                <p className="text-2xl font-bold text-orange-600">${totalWastageValue.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Wastage (MTD)</p>
+                <p className="text-2xl font-bold text-resend-orange">${totalWastageValue.toLocaleString()}</p>
               </div>
-              <TrendingDown className="h-8 w-8 text-orange-500" />
+              <TrendingDown className="h-8 w-8 text-resend-orange" />
             </div>
           </CardContent>
         </Card>
@@ -479,7 +479,7 @@ export default function Inventory() {
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search inventory..."
                     value={search}
@@ -506,7 +506,7 @@ export default function Inventory() {
 
           {/* Bulk Action Bar */}
           {selectedIds.size > 0 && (
-            <div className="flex items-center gap-3 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <span className="text-sm font-medium text-teal-800">{selectedIds.size} item(s) selected</span>
               <div className="flex gap-2 ml-auto">
                 <Button size="sm" variant="outline" onClick={handleBulkOrder}>
@@ -515,7 +515,7 @@ export default function Inventory() {
                 <Button size="sm" variant="outline" onClick={handleExport}>
                   <Download className="h-4 w-4 mr-1" /> Export
                 </Button>
-                <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-red-600 border-red-300 hover:bg-red-50">
+                <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-resend-red border-red-300 hover:bg-resend-red/5">
                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
@@ -555,13 +555,13 @@ export default function Inventory() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>
@@ -571,7 +571,7 @@ export default function Inventory() {
                         const isLow = item.current_quantity <= (item.reorder_point || 5);
                         
                         return (
-                          <TableRow key={item.id} className={cn(isLow && "bg-red-50", selectedIds.has(item.id) && "bg-teal-50")}>
+                          <TableRow key={item.id} className={cn(isLow && "bg-resend-red/5", selectedIds.has(item.id) && "bg-primary/5")}>
                              <TableCell>
                                {!isGroundStaff && (
                                  <Checkbox
@@ -588,7 +588,7 @@ export default function Inventory() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{item.product_name}</span>
-                                {isLow && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                                {isLow && <AlertTriangle className="h-4 w-4 text-resend-red" />}
                               </div>
                             </TableCell>
                             <TableCell>{item.current_unit}</TableCell>
@@ -598,15 +598,15 @@ export default function Inventory() {
                              <TableCell className="font-semibold">${(item.current_value || 0).toFixed(2)}</TableCell>
                              <TableCell>
                                <div className="flex flex-col gap-0.5">
-                                 <span className="text-xs text-slate-500">Par: <span className="font-medium text-slate-700">{item.par_level ?? '—'}</span></span>
-                                 <span className="text-xs text-slate-500">Reorder: <span className={cn("font-medium", isLow ? "text-red-600" : "text-slate-700")}>{item.reorder_point ?? '—'}</span></span>
+                                 <span className="text-xs text-muted-foreground">Par: <span className="font-medium text-foreground">{item.par_level ?? 'â€”'}</span></span>
+                                 <span className="text-xs text-muted-foreground">Reorder: <span className={cn("font-medium", isLow ? "text-resend-red" : "text-foreground")}>{item.reorder_point ?? 'â€”'}</span></span>
                                </div>
                              </TableCell>
                               <TableCell>
                                <span className={cn(
                                 "font-medium",
-                                change > 0 && "text-green-600",
-                                change < 0 && "text-red-600"
+                                change > 0 && "text-resend-green",
+                                change < 0 && "text-resend-red"
                               )}>
                                 {change > 0 ? '+' : ''}{change.toFixed(2)}
                               </span>
@@ -629,7 +629,7 @@ export default function Inventory() {
                                     <DropdownMenuItem onClick={() => handleLogWastage(item)}>
                                       <Trash2 className="h-4 w-4 mr-2" /> Log Wastage
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600">
+                                    <DropdownMenuItem onClick={() => handleDelete(item)} className="text-resend-red">
                                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
@@ -655,10 +655,10 @@ export default function Inventory() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(byCategory).map(([category, data]) => (
-                  <div key={category} className="p-4 bg-slate-50 rounded-lg">
-                    <p className="font-medium text-slate-900 font-mono text-xs mb-2">{getCOALabel(category)}</p>
+                  <div key={category} className="p-4 bg-secondary rounded-lg">
+                    <p className="font-medium text-foreground font-mono text-xs mb-2">{getCOALabel(category)}</p>
                     <div className="mt-2 flex justify-between text-sm">
-                      <span className="text-slate-500">{data.items} items</span>
+                      <span className="text-muted-foreground">{data.items} items</span>
                       <span className="font-semibold">${data.value.toLocaleString()}</span>
                     </div>
                   </div>
@@ -688,7 +688,7 @@ export default function Inventory() {
                 <TableBody>
                   {wastageLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No wastage logged
                       </TableCell>
                     </TableRow>
@@ -698,11 +698,11 @@ export default function Inventory() {
                         <TableCell>{format(new Date(log.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-medium">{log.product_name}</TableCell>
                         <TableCell>{log.quantity} {log.unit}</TableCell>
-                        <TableCell className="text-red-600 font-semibold">${log.value?.toFixed(2)}</TableCell>
+                        <TableCell className="text-resend-red font-semibold">${log.value?.toFixed(2)}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">{log.reason}</Badge>
                         </TableCell>
-                        <TableCell className="text-slate-500">{log.notes}</TableCell>
+                        <TableCell className="text-muted-foreground">{log.notes}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -712,12 +712,12 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {/* ── Inventory Counts Tab ────────────────────────────── */}
+        {/* â”€â”€ Inventory Counts Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="counts">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Inventory Counts</CardTitle>
-              <Button className="bg-teal-600 hover:bg-teal-700" size="sm">
+              <Button className="bg-primary hover:bg-primary" size="sm">
                 <Plus className="h-4 w-4 mr-2" /> New Count
               </Button>
             </CardHeader>
@@ -745,7 +745,7 @@ export default function Inventory() {
                       <TableRow>
                         <TableCell className="font-medium">{format(new Date(), 'MMM d, yyyy')}</TableCell>
                         <TableCell><Badge variant="secondary">All</Badge></TableCell>
-                        <TableCell><Badge className="bg-emerald-100 text-emerald-700">Current</Badge></TableCell>
+                        <TableCell><Badge className="bg-resend-green/10 text-resend-green">Current</Badge></TableCell>
                         <TableCell>${foodValue.toLocaleString()}</TableCell>
                         <TableCell>${bevValue.toLocaleString()}</TableCell>
                         <TableCell>${otherValue.toLocaleString()}</TableCell>
@@ -759,7 +759,7 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {/* ── Waste Summary Tab ───────────────────────────────── */}
+        {/* â”€â”€ Waste Summary Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="waste-summary">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Waste Reasons */}
@@ -779,18 +779,18 @@ export default function Inventory() {
                   const sorted = Object.entries(byReason).sort((a, b) => b[1].value - a[1].value);
                   const maxValue = sorted.length > 0 ? sorted[0][1].value : 1;
                   return sorted.length === 0 ? (
-                    <p className="text-slate-400 text-center py-8">No waste data available</p>
+                    <p className="text-muted-foreground text-center py-8">No waste data available</p>
                   ) : (
                     <div className="space-y-4">
                       {sorted.map(([reason, data]) => (
                         <div key={reason}>
                           <div className="flex justify-between text-sm mb-1">
                             <span className="font-medium capitalize">{reason.replace(/_/g, ' ')}</span>
-                            <span className="text-slate-500">{data.count} entries · ${data.value.toFixed(2)}</span>
+                            <span className="text-muted-foreground">{data.count} entries Â· ${data.value.toFixed(2)}</span>
                           </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-orange-500 rounded-full transition-all"
+                              className="h-full bg-resend-orange/50 rounded-full transition-all"
                               style={{ width: `${(data.value / maxValue) * 100}%` }}
                             />
                           </div>
@@ -826,7 +826,7 @@ export default function Inventory() {
                         <TableRow key={log.id}>
                           <TableCell className="font-medium">{log.product_name}</TableCell>
                           <TableCell>{log.quantity} {log.unit}</TableCell>
-                          <TableCell className="text-red-600 font-semibold">${log.value?.toFixed(2)}</TableCell>
+                          <TableCell className="text-resend-red font-semibold">${log.value?.toFixed(2)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="capitalize">{log.reason?.replace(/_/g, ' ')}</Badge>
                           </TableCell>
@@ -834,7 +834,7 @@ export default function Inventory() {
                       ))}
                     {wastageLogs.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-slate-400">No waste data</TableCell>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No waste data</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -849,25 +849,25 @@ export default function Inventory() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <div className="p-4 bg-red-50 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-red-600">${totalWastageValue.toFixed(2)}</p>
-                    <p className="text-xs text-red-500 mt-1 font-medium">Total Waste Value</p>
+                  <div className="p-4 bg-resend-red/5 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-resend-red">${totalWastageValue.toFixed(2)}</p>
+                    <p className="text-xs text-resend-red mt-1 font-medium">Total Waste Value</p>
                   </div>
-                  <div className="p-4 bg-orange-50 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-orange-600">{wastageLogs.length}</p>
-                    <p className="text-xs text-orange-500 mt-1 font-medium">Waste Entries</p>
+                  <div className="p-4 bg-resend-orange/5 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-resend-orange">{wastageLogs.length}</p>
+                    <p className="text-xs text-resend-orange mt-1 font-medium">Waste Entries</p>
                   </div>
-                  <div className="p-4 bg-amber-50 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-amber-600">
+                  <div className="p-4 bg-resend-yellow/5 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-resend-yellow">
                       {wastageLogs.length > 0 ? `$${(totalWastageValue / wastageLogs.length).toFixed(2)}` : '$0.00'}
                     </p>
-                    <p className="text-xs text-amber-500 mt-1 font-medium">Avg Waste per Entry</p>
+                    <p className="text-xs text-resend-yellow mt-1 font-medium">Avg Waste per Entry</p>
                   </div>
-                  <div className="p-4 bg-slate-50 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-slate-700">
+                  <div className="p-4 bg-secondary rounded-lg text-center">
+                    <p className="text-2xl font-bold text-foreground">
                       {totalValue > 0 ? `${((totalWastageValue / totalValue) * 100).toFixed(1)}%` : '0%'}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1 font-medium">Waste as % of Inventory</p>
+                    <p className="text-xs text-muted-foreground mt-1 font-medium">Waste as % of Inventory</p>
                   </div>
                 </div>
               </CardContent>
@@ -875,14 +875,14 @@ export default function Inventory() {
           </div>
         </TabsContent>
 
-        {/* ── Count Sheets Tab ────────────────────────────────── */}
+        {/* â”€â”€ Count Sheets Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="count-sheets">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Items Added Today (new inventory received) */}
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Today's Received Items</CardTitle>
-                <p className="text-xs text-slate-400">{format(new Date(), 'EEEE, MMM d, yyyy')}</p>
+                <p className="text-xs text-muted-foreground">{format(new Date(), 'EEEE, MMM d, yyyy')}</p>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -903,7 +903,7 @@ export default function Inventory() {
                       );
                       return todayItems.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                             No items received today
                           </TableCell>
                         </TableRow>
@@ -928,7 +928,7 @@ export default function Inventory() {
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Previous Inventory Snapshot</CardTitle>
-                <p className="text-xs text-slate-400">Last recorded counts before today's changes</p>
+                <p className="text-xs text-muted-foreground">Last recorded counts before today's changes</p>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -938,13 +938,13 @@ export default function Inventory() {
                       <TableHead>Prev Count</TableHead>
                       <TableHead>Prev Value</TableHead>
                       <TableHead>Current Count</TableHead>
-                      <TableHead>Δ Change</TableHead>
+                      <TableHead>Î” Change</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {inventory.filter(i => i.previous_quantity != null && i.previous_quantity !== i.current_quantity).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           No count changes recorded
                         </TableCell>
                       </TableRow>
@@ -960,7 +960,7 @@ export default function Inventory() {
                               <TableCell>${(item.previous_value || 0).toFixed(2)}</TableCell>
                               <TableCell className="font-semibold">{item.current_quantity}</TableCell>
                               <TableCell>
-                                <span className={cn("font-medium", delta > 0 && "text-green-600", delta < 0 && "text-red-600")}>
+                                <span className={cn("font-medium", delta > 0 && "text-resend-green", delta < 0 && "text-resend-red")}>
                                   {delta > 0 ? '+' : ''}{delta}
                                 </span>
                               </TableCell>
@@ -1036,7 +1036,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveEdit} className="bg-teal-600 hover:bg-teal-700">Save</Button>
+            <Button onClick={saveEdit} className="bg-primary hover:bg-primary">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1098,7 +1098,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveAdd} className="bg-teal-600 hover:bg-teal-700">Add Item</Button>
+            <Button onClick={saveAdd} className="bg-primary hover:bg-primary">Add Item</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1110,7 +1110,7 @@ export default function Inventory() {
             <DialogTitle>Convert Unit</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Convert {selectedItem?.product_name} from {selectedItem?.current_unit}
             </p>
             <div className="space-y-2">
@@ -1138,7 +1138,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConvertDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveConvert} className="bg-teal-600 hover:bg-teal-700">Convert</Button>
+            <Button onClick={saveConvert} className="bg-primary hover:bg-primary">Convert</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1150,7 +1150,7 @@ export default function Inventory() {
             <DialogTitle>Log Wastage</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Log wastage for {selectedItem?.product_name}
             </p>
             <div className="grid grid-cols-2 gap-4">
@@ -1197,7 +1197,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWastageDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveWastage} className="bg-red-600 hover:bg-red-700">Log Wastage</Button>
+            <Button onClick={saveWastage} className="bg-resend-red hover:bg-resend-red">Log Wastage</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

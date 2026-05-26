@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -59,10 +59,10 @@ export default function AuditLogs() {
 
   const getActionColor = (action) => {
     switch (action?.toUpperCase()) {
-      case 'INSERT': return 'bg-green-100 text-green-700';
-      case 'UPDATE': return 'bg-blue-100 text-blue-700';
-      case 'DELETE': return 'bg-red-100 text-red-700';
-      default: return 'bg-slate-100 text-slate-700';
+      case 'INSERT': return 'bg-resend-green/10 text-resend-green';
+      case 'UPDATE': return 'bg-resend-blue/10 text-resend-blue';
+      case 'DELETE': return 'bg-resend-red/10 text-resend-red';
+      default: return 'bg-secondary text-foreground';
     }
   };
 
@@ -70,18 +70,18 @@ export default function AuditLogs() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-teal-600" />
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <ShieldAlert className="h-6 w-6 text-primary" />
             Audit Logs
           </h1>
-          <p className="text-slate-500 mt-1">Track organization-wide activity and security events</p>
+          <p className="text-muted-foreground mt-1">Track organization-wide activity and security events</p>
         </div>
       </div>
 
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by action, table, or user ID..."
               value={search}
@@ -110,27 +110,27 @@ export default function AuditLogs() {
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-12">
                       <div className="flex flex-col items-center gap-2">
-                        <div className="w-8 h-8 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
-                        <p className="text-sm text-slate-500">Loading audit history...</p>
+                        <div className="w-8 h-8 border-4 border-border border-t-teal-600 rounded-full animate-spin"></div>
+                        <p className="text-sm text-muted-foreground">Loading audit history...</p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : isError ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-12 text-red-500">
+                    <TableCell colSpan={5} className="text-center py-12 text-resend-red">
                       Failed to load audit logs. Verify permissions.
                     </TableCell>
                   </TableRow>
                 ) : filteredLogs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No matching audit records found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap text-slate-600">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy HH:mm:ss') : 'N/A'}
                       </TableCell>
                       <TableCell>
@@ -140,21 +140,21 @@ export default function AuditLogs() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
-                          <Database className="h-3 w-3 text-slate-400" />
-                          <span className="font-medium text-slate-700">{log.table_name}</span>
+                          <Database className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium text-foreground">{log.table_name}</span>
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[150px]">
+                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate max-w-[150px]">
                           {log.record_id}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-slate-600 font-mono text-xs">
-                          <User className="h-3 w-3 text-slate-400" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono text-xs">
+                          <User className="h-3 w-3 text-muted-foreground" />
                           <span className="truncate max-w-[120px]">{log.user_id}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-xs text-slate-500 max-w-sm truncate">
+                        <div className="text-xs text-muted-foreground max-w-sm truncate">
                           {log.action === 'UPDATE' && 'Modified record values'}
                           {log.action === 'INSERT' && 'Created new record'}
                           {log.action === 'DELETE' && 'Removed record'}
@@ -171,3 +171,4 @@ export default function AuditLogs() {
     </div>
   );
 }
+

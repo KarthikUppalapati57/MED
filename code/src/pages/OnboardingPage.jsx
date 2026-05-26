@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -15,7 +15,7 @@ export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
-  // ── All hooks MUST be called before any conditional returns (React rules of hooks) ──
+  // â”€â”€ All hooks MUST be called before any conditional returns (React rules of hooks) â”€â”€
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -39,14 +39,14 @@ export default function OnboardingPage() {
   const [orgSlug, setOrgSlug] = useState('');
   const [orgSlugManual, setOrgSlugManual] = useState(false);
 
-  // Brands — array of { name, locations: [{ name, address }] }
+  // Brands â€” array of { name, locations: [{ name, address }] }
   const [brands, setBrands] = useState([
     { name: '', locations: [{ name: '', address: '' }] }
   ]);
 
   const retryCountRef = useRef(0);
 
-  // ── After onboarding completes, poll refreshProfile until org_id is confirmed, then redirect ──
+  // â”€â”€ After onboarding completes, poll refreshProfile until org_id is confirmed, then redirect â”€â”€
   useEffect(() => {
     if (!completed) return;
     let cancelled = false;
@@ -81,7 +81,7 @@ export default function OnboardingPage() {
     return () => { cancelled = true; };
   }, [completed, refreshProfile, navigate]);
 
-  // ── If profile org_id becomes available (from polling above), navigate cleanly ──
+  // â”€â”€ If profile org_id becomes available (from polling above), navigate cleanly â”€â”€
   useEffect(() => {
     if (completed && userProfile?.organization_id) {
       navigate('/', { replace: true });
@@ -98,17 +98,17 @@ export default function OnboardingPage() {
     return <Navigate to="/verify-payment" replace />;
   }
 
-  // ── Success screen while waiting for profile to update ──
+  // â”€â”€ Success screen while waiting for profile to update â”€â”€
   if (completed) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
-            <CheckCircle2 className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <CheckCircle2 className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Onboarding Complete!</h2>
-          <p className="text-slate-500">Setting up your workspace. Redirecting shortly…</p>
-          <Loader2 className="w-6 h-6 text-teal-600 animate-spin mx-auto" />
+          <h2 className="text-2xl font-bold text-foreground">Onboarding Complete!</h2>
+          <p className="text-muted-foreground">Setting up your workspace. Redirecting shortlyâ€¦</p>
+          <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
         </div>
       </div>
     );
@@ -396,7 +396,7 @@ export default function OnboardingPage() {
     }
 
     // Use the first org name as the primary organization for onboarding.
-    // During onboarding we can only create ONE org — aggregate ALL rows
+    // During onboarding we can only create ONE org â€” aggregate ALL rows
     // (even if they list different org names) under this single org.
     const finalOrgName = processedRows[0].oName;
     const finalOrgSlug = finalOrgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
@@ -467,45 +467,45 @@ export default function OnboardingPage() {
   // Render initial selection screen
   if (!onboardingMode) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
         <div className="w-full max-w-2xl">
-          <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50">
+          <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
             <CardHeader className="text-center pb-8 border-b">
-              <CardTitle className="text-3xl font-bold text-slate-900">Welcome to EdgeOps</CardTitle>
-              <CardDescription className="text-slate-500 text-lg mt-2">
+              <CardTitle className="text-3xl font-bold text-foreground">Welcome to EdgeOps</CardTitle>
+              <CardDescription className="text-muted-foreground text-lg mt-2">
                 How would you like to set up your primary organization?
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
               <div 
                 onClick={() => setOnboardingMode('manual')}
-                className="group cursor-pointer rounded-xl border-2 border-slate-100 p-6 hover:border-teal-600 hover:bg-teal-50/50 transition-all text-center flex flex-col items-center gap-4"
+                className="group cursor-pointer rounded-xl border-2 border-border p-6 hover:border-primary hover:bg-primary/5/50 transition-all text-center flex flex-col items-center gap-4"
               >
-                <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Building2 className="w-8 h-8 text-teal-600" />
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Building2 className="w-8 h-8 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-1">Manual Setup</h3>
-                  <p className="text-sm text-slate-500">I want to type in my organization, brand, and location details directly.</p>
+                  <h3 className="font-bold text-foreground mb-1">Manual Setup</h3>
+                  <p className="text-sm text-muted-foreground">I want to type in my organization, brand, and location details directly.</p>
                 </div>
               </div>
               
               <div 
                 onClick={() => setOnboardingMode('csv')}
-                className="group cursor-pointer rounded-xl border-2 border-slate-100 p-6 hover:border-teal-600 hover:bg-teal-50/50 transition-all text-center flex flex-col items-center gap-4"
+                className="group cursor-pointer rounded-xl border-2 border-border p-6 hover:border-primary hover:bg-primary/5/50 transition-all text-center flex flex-col items-center gap-4"
               >
-                <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <FileSpreadsheet className="w-8 h-8 text-indigo-600" />
+                <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet className="w-8 h-8 text-indigo-400" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 mb-1">Bulk Import</h3>
-                  <p className="text-sm text-slate-500">I have a CSV/Excel file with my organization data ready to upload.</p>
+                  <h3 className="font-bold text-foreground mb-1">Bulk Import</h3>
+                  <p className="text-sm text-muted-foreground">I have a CSV/Excel file with my organization data ready to upload.</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <p className="text-center mt-8 text-slate-400 text-sm">
-            Logged in as <span className="text-teal-600 font-medium">{user?.email}</span>
+          <p className="text-center mt-8 text-muted-foreground text-sm">
+            Logged in as <span className="text-primary font-medium">{user?.email}</span>
           </p>
         </div>
       </div>
@@ -515,27 +515,27 @@ export default function OnboardingPage() {
   // Render CSV Mode
   if (onboardingMode === 'csv') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
         <div className="w-full max-w-2xl">
-          <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50">
+          <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
             <CardHeader className="space-y-1 pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                  <FileSpreadsheet className="w-6 h-6 text-indigo-600" /> Bulk Import
+                <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  <FileSpreadsheet className="w-6 h-6 text-indigo-400" /> Bulk Import
                 </CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)}>Change Method</Button>
               </div>
-              <CardDescription className="text-slate-500 text-base">
+              <CardDescription className="text-muted-foreground text-base">
                 Upload a CSV file containing your organization details. We will set up the first valid row as your primary organization. 
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
-              <div className="p-4 bg-indigo-50 text-indigo-700 text-sm rounded-lg border border-indigo-100">
+              <div className="p-4 bg-indigo-50 text-indigo-400 text-sm rounded-lg border border-indigo-100">
                 <p className="font-semibold mb-1">Required CSV Columns:</p>
-                <code className="bg-white px-2 py-1 object-cover rounded text-xs select-all text-slate-600">Organization Name, Brand Name, Location Name, Location Address</code>
+                <code className="bg-card px-2 py-1 object-cover rounded text-xs select-all text-muted-foreground">Organization Name, Brand Name, Location Name, Location Address</code>
               </div>
               
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-8 hover:border-indigo-500 hover:bg-slate-50 transition-colors">
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 hover:border-indigo-500 hover:bg-secondary transition-colors">
                 <input 
                   type="file" 
                   id="csv-upload" 
@@ -544,24 +544,24 @@ export default function OnboardingPage() {
                   onChange={handleCsvUpload} 
                 />
                 <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 bg-white shadow-sm rounded-full flex items-center justify-center text-indigo-600">
+                  <div className="w-12 h-12 bg-card shadow-sm rounded-full flex items-center justify-center text-indigo-400">
                     <Upload className="w-6 h-6" />
                   </div>
                   <div className="text-center">
-                    <span className="text-indigo-600 font-semibold hover:underline">Click to browse</span> or drag and drop
-                    <p className="text-xs text-slate-400 mt-1">.CSV files only</p>
+                    <span className="text-indigo-400 font-semibold hover:underline">Click to browse</span> or drag and drop
+                    <p className="text-xs text-muted-foreground mt-1">.CSV files only</p>
                   </div>
                 </label>
               </div>
 
               {csvFile && (
-                <div className="p-3 bg-white border rounded-lg flex items-center justify-between shadow-sm">
-                  <span className="text-sm font-medium text-slate-700 truncate">{csvFile.name}</span>
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{csvData.length} Valid Rows</span>
+                <div className="p-3 bg-card border rounded-lg flex items-center justify-between shadow-sm">
+                  <span className="text-sm font-medium text-foreground truncate">{csvFile.name}</span>
+                  <span className="text-xs font-bold text-resend-green bg-resend-green/5 px-2 py-1 rounded-full">{csvData.length} Valid Rows</span>
                 </div>
               )}
             </CardContent>
-            <CardFooter className="flex justify-between pt-6 border-t border-slate-100">
+            <CardFooter className="flex justify-between pt-6 border-t border-border">
               <Button variant="outline" onClick={downloadTemplate}>
                 Download Template
               </Button>
@@ -578,8 +578,8 @@ export default function OnboardingPage() {
               </Button>
             </CardFooter>
           </Card>
-          <p className="text-center mt-8 text-slate-400 text-sm">
-            Logged in as <span className="text-indigo-600 font-medium">{user?.email}</span>
+          <p className="text-center mt-8 text-muted-foreground text-sm">
+            Logged in as <span className="text-indigo-400 font-medium">{user?.email}</span>
           </p>
         </div>
       </div>
@@ -588,11 +588,11 @@ export default function OnboardingPage() {
 
   // Render Manual Mode
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+    <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
       <div className="w-full max-w-2xl">
         <div className="flex justify-between mb-2">
-          <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)} className="text-slate-500 hover:text-slate-800">
-            ← Back to options
+          <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)} className="text-muted-foreground hover:text-foreground">
+            â† Back to options
           </Button>
         </div>
         {/* Progress Bar */}
@@ -601,30 +601,30 @@ export default function OnboardingPage() {
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-2">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  step >= i ? 'bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-200' : 'bg-white border-slate-200 text-slate-400'
+                  step >= i ? 'bg-primary border-primary text-white shadow-lg shadow-primary/10' : 'bg-card border-border text-muted-foreground'
                 }`}>
                   {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
                 </div>
-                <span className={`text-xs font-medium ${step >= i ? 'text-teal-700' : 'text-slate-400'}`}>
+                <span className={`text-xs font-medium ${step >= i ? 'text-primary' : 'text-muted-foreground'}`}>
                   {i === 1 ? 'Organization' : i === 2 ? 'Brands' : i === 3 ? 'Locations' : 'Plan'}
                 </span>
               </div>
               {i < 4 && (
-                <div className={`flex-1 h-0.5 mx-4 transition-all duration-500 ${step > i ? 'bg-teal-600' : 'bg-slate-200'}`} />
+                <div className={`flex-1 h-0.5 mx-4 transition-all duration-500 ${step > i ? 'bg-primary' : 'bg-secondary'}`} />
               )}
             </React.Fragment>
           ))}
         </div>
 
-        <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50">
+        <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
           <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              {step === 1 && <><Building2 className="w-6 h-6 text-teal-600" /> Let's start with your company</>}
-              {step === 2 && <><Store className="w-6 h-6 text-teal-600" /> Define your brands</>}
-              {step === 3 && <><MapPin className="w-6 h-6 text-teal-600" /> Add locations</>}
-              {step === 4 && <><Sparkles className="w-6 h-6 text-teal-600" /> Select a Plan</>}
+            <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
+              {step === 1 && <><Building2 className="w-6 h-6 text-primary" /> Let's start with your company</>}
+              {step === 2 && <><Store className="w-6 h-6 text-primary" /> Define your brands</>}
+              {step === 3 && <><MapPin className="w-6 h-6 text-primary" /> Add locations</>}
+              {step === 4 && <><Sparkles className="w-6 h-6 text-primary" /> Select a Plan</>}
             </CardTitle>
-            <CardDescription className="text-slate-500 text-base">
+            <CardDescription className="text-muted-foreground text-base">
               {step === 1 && "What's the name of your overall business entity?"}
               {step === 2 && "Add all your restaurant brands. You need at least one."}
               {step === 3 && "Add locations for each brand. Each brand needs at least one."}
@@ -633,7 +633,7 @@ export default function OnboardingPage() {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* ── Step 1: Organization ── */}
+            {/* â”€â”€ Step 1: Organization â”€â”€ */}
             {step === 1 && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="space-y-2">
@@ -649,7 +649,7 @@ export default function OnboardingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="orgSlug">Slug (URL identifier)</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-sm">edgeops.io/</span>
+                    <span className="text-muted-foreground text-sm">edgeops.io/</span>
                     <Input 
                       id="orgSlug" 
                       placeholder="acme-hospitality" 
@@ -658,21 +658,21 @@ export default function OnboardingPage() {
                         setOrgSlug(e.target.value);
                         setOrgSlugManual(true);
                       }}
-                      className="h-10 text-sm italic text-teal-700 font-medium"
+                      className="h-10 text-sm italic text-primary font-medium"
                     />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* ── Step 2: Brands ── */}
+            {/* â”€â”€ Step 2: Brands â”€â”€ */}
             {step === 2 && (
               <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {brands.map((brand, idx) => (
                   <div key={idx} className="flex items-center gap-2 group">
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full">
                           Brand {idx + 1}
                         </span>
                       </div>
@@ -687,7 +687,7 @@ export default function OnboardingPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 mt-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/5 mt-5 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => removeBrand(idx)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -698,47 +698,47 @@ export default function OnboardingPage() {
                 <Button 
                   variant="outline" 
                   onClick={addBrand}
-                  className="w-full border-dashed border-2 border-teal-200 text-teal-600 hover:bg-teal-50 hover:border-teal-400 transition-colors"
+                  className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-teal-400 transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-2" /> Add Another Brand
                 </Button>
               </div>
             )}
 
-            {/* ── Step 3: Locations (grouped by brand) ── */}
+            {/* â”€â”€ Step 3: Locations (grouped by brand) â”€â”€ */}
             {step === 3 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {brands.filter(b => b.name.trim()).map((brand, brandIdx) => (
                   <div key={brandIdx} className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <Store className="w-4 h-4 text-teal-500" />
-                      <h3 className="text-sm font-bold text-slate-700">{brand.name}</h3>
-                      <span className="text-xs text-slate-400">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
+                      <Store className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-bold text-foreground">{brand.name}</h3>
+                      <span className="text-xs text-muted-foreground">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
                     </div>
 
                     <div className="pl-4 border-l-2 border-teal-100 space-y-3">
                       {brand.locations.map((loc, locIdx) => (
-                        <div key={locIdx} className="group bg-slate-50 rounded-lg p-3 border border-slate-100 hover:border-teal-200 transition-colors">
+                        <div key={locIdx} className="group bg-secondary rounded-lg p-3 border border-border hover:border-primary/20 transition-colors">
                           <div className="flex items-start gap-2">
                             <div className="flex-1 space-y-2">
                               <Input 
                                 placeholder={locIdx === 0 ? "e.g. Downtown Branch" : "e.g. Airport Location"} 
                                 value={loc.name} 
                                 onChange={(e) => updateLocation(brandIdx, locIdx, 'name', e.target.value)}
-                                className="h-10 bg-white"
+                                className="h-10 bg-card"
                               />
                               <Input 
                                 placeholder="123 Street, City, State, ZIP" 
                                 value={loc.address} 
                                 onChange={(e) => updateLocation(brandIdx, locIdx, 'address', e.target.value)}
-                                className="h-9 bg-white text-sm text-slate-500"
+                                className="h-9 bg-card text-sm text-muted-foreground"
                               />
                             </div>
                             {brand.locations.length > 1 && (
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => removeLocation(brandIdx, locIdx)}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -751,7 +751,7 @@ export default function OnboardingPage() {
                         variant="ghost" 
                         size="sm"
                         onClick={() => addLocation(brandIdx)}
-                        className="text-teal-600 hover:text-teal-700 hover:bg-teal-50 text-xs w-full border border-dashed border-teal-200"
+                        className="text-primary hover:text-primary hover:bg-primary/5 text-xs w-full border border-dashed border-primary/20"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" /> Add Location to {brand.name}
                       </Button>
@@ -761,12 +761,12 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ── Step 4: Plans ── */}
+            {/* â”€â”€ Step 4: Plans â”€â”€ */}
             {step === 4 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {plans.length === 0 ? (
-                    <div className="col-span-2 text-center py-8 text-slate-500">
+                    <div className="col-span-2 text-center py-8 text-muted-foreground">
                       Loading plans...
                     </div>
                   ) : (
@@ -776,29 +776,29 @@ export default function OnboardingPage() {
                         onClick={() => setSelectedPlan(plan)}
                         className={`cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
                           selectedPlan?.id === plan.id 
-                            ? 'border-teal-600 bg-teal-50/30 shadow-md ring-1 ring-teal-600' 
-                            : 'border-slate-200 hover:border-teal-300 bg-white hover:shadow-sm'
+                            ? 'border-primary bg-primary/5/30 shadow-md ring-1 ring-ring' 
+                            : 'border-border hover:border-teal-300 bg-card hover:shadow-sm'
                         }`}
                       >
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
-                            <p className="text-sm text-slate-500 line-clamp-2">{plan.description}</p>
+                            <h3 className="font-bold text-lg text-foreground">{plan.name}</h3>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{plan.description}</p>
                           </div>
                           {selectedPlan?.id === plan.id && (
-                            <div className="bg-teal-600 text-white p-1 rounded-full shrink-0 animate-in zoom-in-50">
+                            <div className="bg-primary text-white p-1 rounded-full shrink-0 animate-in zoom-in-50">
                               <Check className="w-3 h-3" />
                             </div>
                           )}
                         </div>
                         <div className="mb-4">
-                          <span className="text-3xl font-extrabold text-slate-900">${plan.price_monthly}</span>
-                          <span className="text-sm font-medium text-slate-500">/mo</span>
+                          <span className="text-3xl font-extrabold text-foreground">${plan.price_monthly}</span>
+                          <span className="text-sm font-medium text-muted-foreground">/mo</span>
                         </div>
-                        <ul className="space-y-2 text-sm text-slate-600">
+                        <ul className="space-y-2 text-sm text-muted-foreground">
                           {plan.features?.slice(0, 4).map((feat, idx) => (
                             <li key={idx} className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-teal-500 shrink-0" />
+                              <Check className="w-4 h-4 text-primary shrink-0" />
                               <span className="truncate">{feat}</span>
                             </li>
                           ))}
@@ -811,7 +811,7 @@ export default function OnboardingPage() {
             )}
           </CardContent>
 
-          <CardFooter className="flex justify-between pt-6 border-t border-slate-100">
+          <CardFooter className="flex justify-between pt-6 border-t border-border">
             {step > 1 && step < 4 ? (
               <Button variant="ghost" onClick={prevStep} disabled={loading}>
                 Back
@@ -823,7 +823,7 @@ export default function OnboardingPage() {
             {step < 3 ? (
               <Button 
                 onClick={nextStep} 
-                className="bg-teal-600 hover:bg-teal-700 text-white min-w-[120px]"
+                className="bg-primary hover:bg-primary text-white min-w-[120px]"
                 disabled={
                   (step === 1 && !orgName) || 
                   (step === 2 && !hasValidBrands)
@@ -834,7 +834,7 @@ export default function OnboardingPage() {
             ) : step === 3 ? (
               <Button 
                 onClick={handleManualSubmit} 
-                className="bg-teal-600 hover:bg-teal-700 text-white min-w-[140px]"
+                className="bg-primary hover:bg-primary text-white min-w-[140px]"
                 disabled={loading || !hasValidLocations}
               >
                 {loading ? (
@@ -846,7 +846,7 @@ export default function OnboardingPage() {
             ) : (
               <Button 
                 onClick={handleSubscribe} 
-                className="bg-teal-600 hover:bg-teal-700 text-white min-w-[140px]"
+                className="bg-primary hover:bg-primary text-white min-w-[140px]"
                 disabled={checkoutLoading || !selectedPlan}
               >
                 {checkoutLoading ? (
@@ -859,10 +859,11 @@ export default function OnboardingPage() {
           </CardFooter>
         </Card>
 
-        <p className="text-center mt-8 text-slate-400 text-sm">
-          Logged in as <span className="text-teal-600 font-medium">{user?.email}</span>
+        <p className="text-center mt-8 text-muted-foreground text-sm">
+          Logged in as <span className="text-primary font-medium">{user?.email}</span>
         </p>
       </div>
     </div>
   );
 }
+

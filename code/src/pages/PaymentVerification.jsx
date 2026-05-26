@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -57,20 +57,20 @@ async function markPaymentVerified(userId, userEmail) {
       throw error;
     }
 
-    // If data is returned, the update affected a row — success!
+    // If data is returned, the update affected a row â€” success!
     if (data?.id) {
       console.log('[PaymentVerification] Profile updated successfully on attempt', attempt + 1);
       return true;
     }
 
-    // No row was matched — profile may not exist yet. Wait and retry.
+    // No row was matched â€” profile may not exist yet. Wait and retry.
     console.warn(`[PaymentVerification] update matched 0 rows on attempt ${attempt + 1}, retrying...`);
     if (attempt < MAX_RETRIES - 1) {
       await new Promise(r => setTimeout(r, RETRY_DELAY));
     }
   }
 
-  // All UPDATE retries exhausted — fall back to UPSERT
+  // All UPDATE retries exhausted â€” fall back to UPSERT
   console.warn('[PaymentVerification] UPDATE retries exhausted, falling back to UPSERT');
   const { error: upsertError } = await supabase
     .from('profiles')
@@ -154,24 +154,24 @@ function VerificationForm({ onVerified }) {
   return (
     <form onSubmit={handleVerify} className="space-y-6">
       <div className="space-y-4">
-        <label className="text-sm font-medium text-slate-700">Card Details</label>
-        <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 shadow-inner">
+        <label className="text-sm font-medium text-foreground">Card Details</label>
+        <div className="p-4 border border-border rounded-xl bg-secondary shadow-inner">
           <CardElement options={CARD_ELEMENT_OPTIONS} />
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Lock className="w-3 h-3" />
           Your payment information is encrypted and secured by Stripe.
         </div>
       </div>
 
       {error && (
-        <div className="p-3 rounded-lg bg-red-50 border border-red-100 flex items-start gap-2 text-sm text-red-600 animate-in fade-in slide-in-from-top-1">
+        <div className="p-3 rounded-lg bg-resend-red/5 border border-resend-red/10 flex items-start gap-2 text-sm text-resend-red animate-in fade-in slide-in-from-top-1">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <div>
             <p>{error}</p>
             {error.includes('failed') && (
               <p className="text-xs text-red-400 mt-1">
-                If you're using a test card, try <code className="bg-red-100 px-1 rounded">4242 4242 4242 4242</code> with any future date and CVC.
+                If you're using a test card, try <code className="bg-resend-red/10 px-1 rounded">4242 4242 4242 4242</code> with any future date and CVC.
               </p>
             )}
           </div>
@@ -181,7 +181,7 @@ function VerificationForm({ onVerified }) {
       <Button
         type="submit"
         disabled={!stripe || processing}
-        className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        className="w-full h-12 bg-primary hover:bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
       >
         {processing ? (
           <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying...</>
@@ -200,7 +200,7 @@ export default function PaymentVerification() {
   const [completed, setCompleted] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
 
-  // ── After verification completes, poll refreshProfile until payment_verified is confirmed ──
+  // â”€â”€ After verification completes, poll refreshProfile until payment_verified is confirmed â”€â”€
   useEffect(() => {
     if (!completed) return;
     let cancelled = false;
@@ -234,7 +234,7 @@ export default function PaymentVerification() {
       } else {
         // Instead of silently force-navigating (which causes a redirect loop),
         // show a clear error state with a retry button.
-        console.warn('[PaymentVerification] Polling exhausted — profile still not showing payment_verified');
+        console.warn('[PaymentVerification] Polling exhausted â€” profile still not showing payment_verified');
         setPollFailed(true);
       }
     };
@@ -243,7 +243,7 @@ export default function PaymentVerification() {
     return () => { cancelled = true; };
   }, [completed, refreshProfile, navigate]);
 
-  // ── Once profile state confirms payment_verified, navigate cleanly ──
+  // â”€â”€ Once profile state confirms payment_verified, navigate cleanly â”€â”€
   useEffect(() => {
     if (completed && userProfile?.payment_verified) {
       navigate('/onboarding', { replace: true });
@@ -260,24 +260,24 @@ export default function PaymentVerification() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // ── Poll failure screen — profile update didn't propagate ──
+  // â”€â”€ Poll failure screen â€” profile update didn't propagate â”€â”€
   if (pollFailed) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
         <div className="w-full max-w-md text-center space-y-6">
-          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle className="w-8 h-8 text-amber-600" />
+          <div className="w-16 h-16 bg-resend-yellow/10 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-8 h-8 text-resend-yellow" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-slate-900">Almost There!</h2>
-            <p className="text-slate-500 text-sm leading-relaxed">
+            <h2 className="text-2xl font-bold text-foreground">Almost There!</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
               Your card was verified by Stripe, but we're having trouble updating your account status.
               This is usually a temporary issue.
             </p>
           </div>
           <div className="flex flex-col gap-3">
             <Button
-              className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg"
+              className="w-full h-12 bg-primary hover:bg-primary text-white font-bold rounded-xl shadow-lg"
               onClick={async () => {
                 setPollFailed(false);
                 // Try the profile update one more time directly
@@ -307,10 +307,10 @@ export default function PaymentVerification() {
                 navigate('/onboarding', { replace: true });
               }}
             >
-              Continue to Setup →
+              Continue to Setup â†’
             </Button>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             If this keeps happening, try signing out and signing back in.
           </p>
         </div>
@@ -318,37 +318,37 @@ export default function PaymentVerification() {
     );
   }
 
-  // ── Success screen while waiting for profile to update ──
+  // â”€â”€ Success screen while waiting for profile to update â”€â”€
   if (completed) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
-            <ShieldCheck className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <ShieldCheck className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900">Payment Verified!</h2>
-          <p className="text-slate-500">Redirecting to organization setup…</p>
-          <Loader2 className="w-6 h-6 text-teal-600 animate-spin mx-auto" />
+          <h2 className="text-2xl font-bold text-foreground">Payment Verified!</h2>
+          <p className="text-muted-foreground">Redirecting to organization setupâ€¦</p>
+          <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+    <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
       <div className="w-full max-w-lg">
         <div className="mb-8 text-center space-y-2">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mx-auto mb-4 border border-slate-100">
-            <CreditCard className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-card rounded-2xl shadow-xl flex items-center justify-center mx-auto mb-4 border border-border">
+            <CreditCard className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Confirm Your Account</h1>
-          <p className="text-slate-500 font-medium">To keep your account secure, please provide a valid payment method.</p>
+          <h1 className="text-3xl font-black text-foreground tracking-tight">Confirm Your Account</h1>
+          <p className="text-muted-foreground font-medium">To keep your account secure, please provide a valid payment method.</p>
         </div>
 
-        <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50">
+        <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold text-slate-900">Payment Verification</CardTitle>
-            <CardDescription className="text-slate-500">
+            <CardTitle className="text-xl font-bold text-foreground">Payment Verification</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Your card will not be charged at this time. We use this to verify your identity and prevent platform abuse.
             </CardDescription>
           </CardHeader>
@@ -358,18 +358,18 @@ export default function PaymentVerification() {
                 <VerificationForm onVerified={() => setCompleted(true)} />
               </Elements>
             ) : (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">Stripe Configuration Missing</p>
-                <p className="text-xs text-slate-400 mt-1">Please check your environment variables.</p>
+              <div className="p-8 text-center bg-secondary rounded-2xl border border-dashed border-border">
+                <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">Stripe Configuration Missing</p>
+                <p className="text-xs text-muted-foreground mt-1">Please check your environment variables.</p>
               </div>
             )}
           </CardContent>
-          <CardFooter className="bg-slate-50/50 border-t border-slate-100 rounded-b-xl flex flex-col gap-3 py-6">
+          <CardFooter className="bg-secondary/50 border-t border-border rounded-b-xl flex flex-col gap-3 py-6">
             <div className="flex items-center gap-4 justify-center grayscale opacity-50">
-              <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">Powered by Stripe</span>
+              <span className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">Powered by Stripe</span>
             </div>
-            <p className="text-[10px] text-center text-slate-400">
+            <p className="text-[10px] text-center text-muted-foreground">
               By continuing, you agree to our Terms of Service and Privacy Policy. Your card will be stored for future billing.
             </p>
           </CardFooter>
@@ -378,3 +378,4 @@ export default function PaymentVerification() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -49,7 +49,7 @@ export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
 
-  // Tab State — persisted in URL search params so it survives navigation
+  // Tab State â€” persisted in URL search params so it survives navigation
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'requests';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
@@ -98,7 +98,7 @@ export default function PlatformAdmin() {
 
   const authChecked = !!user;
 
-  // ── Real-Time Subscriptions ────────────────────────────────
+  // â”€â”€ Real-Time Subscriptions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   React.useEffect(() => {
     if (!authChecked || userRole !== 'platform_admin') return;
 
@@ -227,7 +227,7 @@ export default function PlatformAdmin() {
     enabled: authChecked && userRole === 'platform_admin',
   });
 
-  // ── Mutators & Handlers ─────────────────────────────────────
+  // â”€â”€ Mutators & Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleInviteClient = async () => {
     if (!inviteEmail) { toast.error("Email is required"); return; }
     if (inviteSelectedModules.length === 0) { toast.error("Select at least one module"); return; }
@@ -437,7 +437,7 @@ The MEVS Platform Team
     }
   };
 
-  // ── Resend email for an already-processed demo request ───────
+  // â”€â”€ Resend email for an already-processed demo request â”€â”€â”€â”€â”€â”€â”€
   const handleResendDemoEmail = async (request) => {
     const toastId = toast.loading(`Resending email to ${request.full_name}...`);
     setResendingDemos(prev => { const n = new Set(prev); n.add(request.id); return n; });
@@ -615,7 +615,7 @@ The MEVS Platform Team
   const getOrgBrands = React.useCallback((orgId) => orgBrandsMap.get(orgId) || [], [orgBrandsMap]);
   const getBrandLocations = React.useCallback((brandId) => brandLocationsMap.get(brandId) || [], [brandLocationsMap]);
 
-  // ── Computed Stats ─────────────────────────────────────────
+  // â”€â”€ Computed Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const {
     accessReqs,
     contactReqs,
@@ -640,23 +640,23 @@ The MEVS Platform Team
     };
   }, [requests, contactRequests, orgs]);
 
-  // ── Tab Renderers ──────────────────────────────────────────
+  // â”€â”€ Tab Renderers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderRequestTable = (data, title, pCount, type) => (
     <Card className="border-0 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base">{title}</CardTitle>
-          <p className="text-xs text-slate-400">{data.length} total · {pCount} pending</p>
+          <p className="text-xs text-muted-foreground">{data.length} total Â· {pCount} pending</p>
         </div>
         <div className="flex gap-2">
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="Search..." className="pl-9 w-48 h-8 rounded-xl border-slate-100" /></div>
-          <Button variant="outline" size="sm" className="rounded-xl border-slate-100"><Download className="w-4 h-4 mr-1" />Export</Button>
+          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-9 w-48 h-8 rounded-xl border-border" /></div>
+          <Button variant="outline" size="sm" className="rounded-xl border-border"><Download className="w-4 h-4 mr-1" />Export</Button>
         </div>
       </CardHeader>
       <CardContent className="p-0">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50/50">
+            <TableRow className="bg-secondary/50">
               <TableHead className="text-[11px] font-bold">APPLICANT</TableHead>
               <TableHead className="text-[11px] font-bold">COMPANY</TableHead>
               <TableHead className="text-[11px] font-bold">PLAN/TYPE</TableHead>
@@ -667,31 +667,31 @@ The MEVS Platform Team
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-12 text-slate-400">No requests found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No requests found</TableCell></TableRow>
             ) : data.map(r => (
-              <TableRow key={r.id} className="hover:bg-slate-50/50 transition-colors">
+              <TableRow key={r.id} className="hover:bg-secondary/50 transition-colors">
                 <TableCell>
-                  <p className="text-sm font-semibold text-slate-900">{r.full_name || r.name}</p>
-                  <p className="text-[10px] text-slate-500">{r.email}</p>
+                  <p className="text-sm font-semibold text-foreground">{r.full_name || r.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{r.email}</p>
                 </TableCell>
-                <TableCell className="text-sm text-slate-600">{r.company_name || '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{r.company_name || 'â€”'}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px] capitalize bg-white">{r.plan || r.request_type || '—'}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize bg-card">{r.plan || r.request_type || 'â€”'}</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge className={cn(
                     "text-[10px] font-bold border-none",
-                    r.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 
-                    r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                    r.status === 'approved' ? 'bg-resend-green/10 text-resend-green' : 
+                    r.status === 'rejected' ? 'bg-resend-red/10 text-resend-red' : 'bg-resend-yellow/10 text-resend-yellow'
                   )}>
                     {r.status || 'pending'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-[10px] text-slate-500">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-emerald-600"><CheckCircle2 className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"><X className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-green"><CheckCircle2 className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-red"><X className="w-4 h-4" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -708,28 +708,28 @@ The MEVS Platform Team
         <div className="bg-slate-900 px-6 py-8 text-white relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+              <div className="p-3 bg-card/10 backdrop-blur-md rounded-2xl border border-white/10">
                 <UserPlus className="w-8 h-8 text-white" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold">Invite New Client</h2>
-                <p className="text-slate-400 text-sm">Generate secure onboarding links for Organization Owners</p>
+                <p className="text-muted-foreground text-sm">Generate secure onboarding links for Organization Owners</p>
               </div>
             </div>
           </div>
-          <div className="absolute -right-12 -top-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl" />
-          <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute -right-12 -top-12 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-resend-blue/50/10 rounded-full blur-3xl" />
         </div>
         <CardContent className="p-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label className="text-sm font-bold text-slate-700">Client Email Address</Label>
+                <Label className="text-sm font-bold text-foreground">Client Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
                     placeholder="owner@new-organization.com" 
-                    className="pl-10 h-12 rounded-xl border-slate-200"
+                    className="pl-10 h-12 rounded-xl border-border"
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                   />
@@ -737,7 +737,7 @@ The MEVS Platform Team
               </div>
 
               <div className="space-y-3">
-                <Label className="text-sm font-bold text-slate-700">Granular Access Permissions</Label>
+                <Label className="text-sm font-bold text-foreground">Granular Access Permissions</Label>
                 <div className="grid grid-cols-3 gap-3">
                   {ACCESS_LEVELS.map(level => (
                     <button
@@ -747,34 +747,34 @@ The MEVS Platform Team
                         "flex flex-col items-center p-4 rounded-2xl border transition-all",
                         inviteAccessLevels[level.id] 
                           ? `bg-${level.color}-50 border-${level.color}-600 ring-2 ring-${level.color}-100` 
-                          : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                          : "bg-card border-border text-muted-foreground hover:border-border"
                       )}
                     >
                       <div className={cn(
                         "w-10 h-10 rounded-xl flex items-center justify-center mb-2",
                         inviteAccessLevels[level.id] 
                           ? `bg-${level.color}-600 text-white` 
-                          : "bg-slate-100"
+                          : "bg-secondary"
                       )}>
                         <Fingerprint className="w-5 h-5" />
                       </div>
-                      <span className={cn("text-xs font-bold", inviteAccessLevels[level.id] ? "text-slate-900" : "text-slate-500")}>
+                      <span className={cn("text-xs font-bold", inviteAccessLevels[level.id] ? "text-foreground" : "text-muted-foreground")}>
                         {level.label}
                       </span>
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-400 italic">Determines if the client can read, create (write), or modify (update) records.</p>
+                <p className="text-[10px] text-muted-foreground italic">Determines if the client can read, create (write), or modify (update) records.</p>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-bold text-slate-700">Enable Platform Modules</Label>
+                <Label className="text-sm font-bold text-foreground">Enable Platform Modules</Label>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-6 text-[10px] text-teal-600 font-bold"
+                  className="h-6 text-[10px] text-primary font-bold"
                   onClick={() => {
                     const clientModules = ALL_MODULE_KEYS.filter(k => k !== 'platform');
                     setInviteSelectedModules(prev => prev.length === clientModules.length ? [] : [...clientModules]);
@@ -796,8 +796,8 @@ The MEVS Platform Team
                       className={cn(
                         "flex items-center gap-2 p-3 rounded-xl border text-left transition-all",
                         isSelected 
-                          ? "bg-slate-50 border-slate-900 shadow-sm" 
-                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+                          ? "bg-secondary border-slate-900 shadow-sm" 
+                          : "bg-card border-border text-muted-foreground hover:border-border"
                       )}
                     >
                       <Checkbox checked={isSelected} className="pointer-events-none" />
@@ -809,7 +809,7 @@ The MEVS Platform Team
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-100 flex justify-end">
+          <div className="pt-6 border-t border-border flex justify-end">
             <Button 
               className="bg-slate-900 hover:bg-slate-800 text-white h-12 px-8 rounded-xl shadow-lg"
               disabled={inviting || !inviteEmail || inviteSelectedModules.length === 0}
@@ -825,12 +825,12 @@ The MEVS Platform Team
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Pending Client Invitations</CardTitle>
-          <p className="text-xs text-slate-400">Recently generated links that haven't been accepted yet</p>
+          <p className="text-xs text-muted-foreground">Recently generated links that haven't been accepted yet</p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50/50">
+              <TableRow className="bg-secondary/50">
                 <TableHead className="text-[11px] font-bold">CLIENT EMAIL</TableHead>
                 <TableHead className="text-[11px] font-bold">MODULES</TableHead>
                 <TableHead className="text-[11px] font-bold">ACCESS</TableHead>
@@ -841,14 +841,14 @@ The MEVS Platform Team
             </TableHeader>
             <TableBody>
               {pendingClientInvites.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-12 text-slate-400">No pending invitations</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No pending invitations</TableCell></TableRow>
               ) : pendingClientInvites.map(invite => (
-                <TableRow key={invite.id} className="hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="font-semibold text-sm text-slate-900">{invite.email}</TableCell>
+                <TableRow key={invite.id} className="hover:bg-secondary/50 transition-colors">
+                  <TableCell className="font-semibold text-sm text-foreground">{invite.email}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {invite.metadata?.modules?.map(m => (
-                        <Badge key={m} variant="secondary" className="text-[9px] px-1.5 py-0 bg-slate-100 text-slate-600">
+                        <Badge key={m} variant="secondary" className="text-[9px] px-1.5 py-0 bg-secondary text-muted-foreground">
                           {MODULE_DEFINITIONS[m]?.label || m}
                         </Badge>
                       ))}
@@ -857,11 +857,11 @@ The MEVS Platform Team
                   <TableCell>
                     <div className="flex gap-1">
                       {Object.entries(invite.metadata?.access || {}).filter(([_, v]) => v).map(([k]) => (
-                        <Badge key={k} className="bg-blue-50 text-blue-700 text-[9px] uppercase font-bold border-none">{k}</Badge>
+                        <Badge key={k} className="bg-resend-blue/5 text-resend-blue text-[9px] uppercase font-bold border-none">{k}</Badge>
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell className="text-[10px] text-slate-500">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-[10px] text-muted-foreground">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <Badge className="bg-pink-100 text-pink-700 text-[9px] font-bold border-none">Delivered</Badge>
                   </TableCell>
@@ -870,7 +870,7 @@ The MEVS Platform Team
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
                         title="Copy Invite Link"
                         onClick={() => {
                           const link = `${window.location.origin}/signup/${invite.token}`;
@@ -883,7 +883,7 @@ The MEVS Platform Team
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-teal-600 hover:bg-teal-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5"
                         title="Resend Invite"
                         onClick={async () => {
                           toast.loading("Resending invite...", { id: 'resend-invite' });
@@ -908,7 +908,7 @@ The MEVS Platform Team
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
                         title="Delete Invite"
                         onClick={() => setConfirmDeleteInvite(invite.id)}
                       >
@@ -926,7 +926,7 @@ The MEVS Platform Team
   );
 
   return (
-    <div className="p-6 space-y-8 min-h-screen bg-slate-50/30">
+    <div className="p-6 space-y-8 min-h-screen bg-secondary/30">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-200">
@@ -934,14 +934,14 @@ The MEVS Platform Team
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Platform Admin Console</h1>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Platform Admin Console</h1>
               {pendingCount > 0 && (
-                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-bold px-3 py-1">
+                <Badge className="bg-resend-yellow/10 text-resend-yellow hover:bg-resend-yellow/10 border-none font-bold px-3 py-1">
                   {pendingCount} Action Required
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-slate-500 mt-1">Global infrastructure & organization governance · v2.1.0</p>
+            <p className="text-sm text-muted-foreground mt-1">Global infrastructure & organization governance Â· v2.1.0</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -952,7 +952,7 @@ The MEVS Platform Team
             <UserPlus className="w-4 h-4 mr-2" />
             Quick Invite
           </Button>
-          <Button variant="outline" className="rounded-xl border-slate-200 h-10 px-6">
+          <Button variant="outline" className="rounded-xl border-border h-10 px-6">
             System Status
           </Button>
         </div>
@@ -969,8 +969,8 @@ The MEVS Platform Team
             <CardContent className="p-6 relative">
               <div className="flex items-center justify-between relative z-10">
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-3xl font-bold text-foreground mt-2">{stat.value}</p>
                   <p className={cn("text-[10px] font-medium mt-1", `text-${stat.color}-500`)}>{stat.sub}</p>
                 </div>
                 <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110", `bg-${stat.color}-50 text-${stat.color}-600`)}>
@@ -994,13 +994,13 @@ The MEVS Platform Team
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div>
                   <CardTitle className="text-base">Demo Inquiries</CardTitle>
-                  <p className="text-xs text-slate-400">Prospective clients interested in system walkthroughs</p>
+                  <p className="text-xs text-muted-foreground">Prospective clients interested in system walkthroughs</p>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50/50">
+                    <TableRow className="bg-secondary/50">
                       <TableHead className="text-[11px] font-bold">APPLICANT</TableHead>
                       <TableHead className="text-[11px] font-bold">COMPANY</TableHead>
                       <TableHead className="text-[11px] font-bold">STATUS</TableHead>
@@ -1013,21 +1013,21 @@ The MEVS Platform Team
                       <TableRow key={r.id}>
                         <TableCell>
                           <p className="font-bold text-sm">{r.full_name}</p>
-                          <p className="text-[10px] text-slate-500">{r.email}</p>
+                          <p className="text-[10px] text-muted-foreground">{r.email}</p>
                         </TableCell>
                         <TableCell className="text-sm">{r.company_name}</TableCell>
                         <TableCell>
                           <Badge 
                             className={cn(
                               "text-[10px] font-bold border-none capitalize",
-                              r.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
-                              r.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                              r.status === 'accepted' ? 'bg-resend-green/10 text-resend-green' :
+                              r.status === 'rejected' ? 'bg-resend-red/10 text-resend-red' : 'bg-resend-yellow/10 text-resend-yellow'
                             )}
                           >
                             {r.status || 'new'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {(r.status === 'new' || !r.status) ? (
@@ -1035,7 +1035,7 @@ The MEVS Platform Team
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
-                                  className="h-8 px-3 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 font-bold rounded-xl flex items-center"
+                                  className="h-8 px-3 text-xs bg-resend-green/5 hover:bg-resend-green/10 text-resend-green border-resend-green/20 font-bold rounded-xl flex items-center"
                                   disabled={processingRequests.has(r.id)}
                                   onClick={() => handleAcceptDemo(r)}
                                 >
@@ -1065,14 +1065,14 @@ The MEVS Platform Team
                               <div className="flex items-center gap-2">
                                 <Badge className={cn(
                                   "text-[9px] font-bold border-none capitalize",
-                                  r.status === 'accepted' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                                  r.status === 'accepted' ? 'bg-resend-green/5 text-resend-green' : 'bg-resend-red/5 text-resend-red'
                                 )}>
                                   {r.status}
                                 </Badge>
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
-                                  className="h-7 px-2.5 text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 font-bold rounded-lg flex items-center gap-1"
+                                  className="h-7 px-2.5 text-[10px] bg-resend-blue/5 hover:bg-resend-blue/10 text-resend-blue border-resend-blue/20 font-bold rounded-lg flex items-center gap-1"
                                   disabled={resendingDemos.has(r.id)}
                                   onClick={() => handleResendDemoEmail(r)}
                                   title={r.status === 'accepted' ? 'Resend approval email with invite link' : 'Resend rejection notification'}
@@ -1109,12 +1109,12 @@ The MEVS Platform Team
               <CardHeader className="flex flex-row items-center justify-between pb-6">
                 <div>
                   <CardTitle className="text-base">Organization Hierarchy</CardTitle>
-                  <p className="text-xs text-slate-400">Global tenant distribution and structural breakdown</p>
+                  <p className="text-xs text-muted-foreground">Global tenant distribution and structural breakdown</p>
                 </div>
                 <div className="flex items-center gap-4">
-                   <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                   <div className="flex items-center space-x-2 bg-secondary px-3 py-1.5 rounded-lg border border-border">
                     <Checkbox id="showArchived" checked={showArchivedOrgs} onCheckedChange={setShowArchivedOrgs} />
-                    <Label htmlFor="showArchived" className="text-[10px] font-bold text-slate-500 cursor-pointer">Show Archived</Label>
+                    <Label htmlFor="showArchived" className="text-[10px] font-bold text-muted-foreground cursor-pointer">Show Archived</Label>
                   </div>
                 </div>
               </CardHeader>
@@ -1129,23 +1129,23 @@ The MEVS Platform Team
                        <div key={org.id} className="group">
                          <div 
                           className={cn(
-                            "flex items-center gap-4 p-4 px-6 cursor-pointer hover:bg-slate-50/80 transition-all",
-                            isExp && "bg-slate-50/50 shadow-inner"
+                            "flex items-center gap-4 p-4 px-6 cursor-pointer hover:bg-secondary/80 transition-all",
+                            isExp && "bg-secondary/50 shadow-inner"
                           )}
                           onClick={() => toggleOrg(org.id)}
                          >
                             <div className="w-6 h-6 flex items-center justify-center shrink-0 transition-transform">
-                              {isExp ? <ChevronDown className="w-4 h-4 text-slate-900" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                              {isExp ? <ChevronDown className="w-4 h-4 text-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                             </div>
-                            <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center shadow-sm">
-                              <Building2 className="w-5 h-5 text-slate-600" />
+                            <div className="w-10 h-10 bg-card rounded-xl border border-border flex items-center justify-center shadow-sm">
+                              <Building2 className="w-5 h-5 text-muted-foreground" />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <p className="font-bold text-slate-900">{org.name}</p>
-                                <Badge className="bg-emerald-50 text-emerald-700 text-[9px] font-bold border-none">{org.status || 'Active'}</Badge>
+                                <p className="font-bold text-foreground">{org.name}</p>
+                                <Badge className="bg-resend-green/5 text-resend-green text-[9px] font-bold border-none">{org.status || 'Active'}</Badge>
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{org.admin_email} · {brands.length} Brands</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{org.admin_email} Â· {brands.length} Brands</p>
                             </div>
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg" onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
@@ -1154,7 +1154,7 @@ The MEVS Platform Team
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                className="h-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                className="h-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setConfirmDeleteOrg({ id: org.id, name: org.name });
@@ -1165,16 +1165,16 @@ The MEVS Platform Team
                             </div>
                          </div>
                          {isExp && (
-                           <div className="bg-white/50 px-12 pb-2">
+                           <div className="bg-card/50 px-12 pb-2">
                              {brands.length === 0 ? (
-                               <p className="p-4 text-[10px] text-slate-400 italic">No brands registered under this organization.</p>
+                               <p className="p-4 text-[10px] text-muted-foreground italic">No brands registered under this organization.</p>
                              ) : brands.map(brand => (
-                               <div key={brand.id} className="py-3 border-l-2 border-slate-100 pl-6 flex items-center justify-between">
+                               <div key={brand.id} className="py-3 border-l-2 border-border pl-6 flex items-center justify-between">
                                  <div className="flex items-center gap-3">
                                    <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center"><Store className="w-4 h-4 text-violet-600" /></div>
                                    <div>
-                                      <p className="text-xs font-bold text-slate-800">{brand.name}</p>
-                                      <p className="text-[9px] text-slate-400">{getBrandLocations(brand.id).length} Locations</p>
+                                      <p className="text-xs font-bold text-foreground">{brand.name}</p>
+                                      <p className="text-[9px] text-muted-foreground">{getBrandLocations(brand.id).length} Locations</p>
                                    </div>
                                  </div>
                                  <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold">+ Location</Button>
@@ -1196,32 +1196,32 @@ The MEVS Platform Team
                  <Card key={plan.id} className="border-0 shadow-sm relative group overflow-hidden">
                    <CardHeader className="pb-2">
                      <div className="flex justify-between items-start">
-                        <Badge className="bg-blue-50 text-blue-700 text-[10px] font-bold mb-2">{plan.is_active ? 'Production' : 'Draft'}</Badge>
+                        <Badge className="bg-resend-blue/5 text-resend-blue text-[10px] font-bold mb-2">{plan.is_active ? 'Production' : 'Draft'}</Badge>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"><Plus className="w-4 h-4" /></Button>
                      </div>
-                     <CardTitle className="text-xl font-black text-slate-900">{plan.name}</CardTitle>
-                     <p className="text-4xl font-black text-slate-900 mt-2">${plan.price_monthly}<span className="text-sm text-slate-400 font-normal">/mo</span></p>
+                     <CardTitle className="text-xl font-black text-foreground">{plan.name}</CardTitle>
+                     <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
                    </CardHeader>
                    <CardContent>
-                      <p className="text-xs text-slate-500 mb-6">{plan.description || 'Global service level agreement'}</p>
+                      <p className="text-xs text-muted-foreground mb-6">{plan.description || 'Global service level agreement'}</p>
                       <div className="space-y-2">
                         {(Array.isArray(plan.features) ? plan.features : []).map(f => (
                           <div key={f} className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /></div>
-                            <span className="text-[11px] font-medium text-slate-600">{MODULE_DEFINITIONS[f]?.label || f}</span>
+                            <div className="w-4 h-4 rounded-full bg-resend-green/5 flex items-center justify-center"><CheckCircle2 className="w-2.5 h-2.5 text-resend-green" /></div>
+                            <span className="text-[11px] font-medium text-muted-foreground">{MODULE_DEFINITIONS[f]?.label || f}</span>
                           </div>
                         ))}
                       </div>
-                      <Button variant="outline" className="w-full mt-8 rounded-xl border-slate-200 font-bold text-xs h-10">Configure Plan</Button>
+                      <Button variant="outline" className="w-full mt-8 rounded-xl border-border font-bold text-xs h-10">Configure Plan</Button>
                    </CardContent>
-                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl" />
+                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-resend-blue/50/5 rounded-full blur-2xl" />
                  </Card>
                ))}
                <button 
                 onClick={() => setShowPlanDialog(true)}
-                className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:bg-slate-50 transition-all"
+                className="border-2 border-dashed border-border rounded-3xl p-8 flex flex-col items-center justify-center text-muted-foreground hover:border-border hover:bg-secondary transition-all"
                >
-                 <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-4"><Plus className="w-6 h-6" /></div>
+                 <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center mb-4"><Plus className="w-6 h-6" /></div>
                  <p className="font-bold">Create New Plan</p>
                  <p className="text-[10px] mt-1">Standardize service tiers</p>
                </button>
@@ -1236,7 +1236,7 @@ The MEVS Platform Team
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-slate-50/50">
+                      <TableRow className="bg-secondary/50">
                         <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
                         <TableHead className="text-[11px] font-bold">CURRENT PLAN</TableHead>
                         <TableHead className="text-[11px] font-bold">STATUS</TableHead>
@@ -1250,9 +1250,9 @@ The MEVS Platform Team
                         return (
                           <TableRow key={org.id}>
                             <TableCell className="font-bold text-sm">{org.name}</TableCell>
-                            <TableCell className="text-sm text-slate-600 font-medium">{plan?.name || 'Standard'}</TableCell>
-                            <TableCell><Badge className="bg-green-50 text-green-700 text-[10px] font-bold border-none">{org.subscription_status || 'active'}</Badge></TableCell>
-                            <TableCell className="text-xs text-slate-500">May 15, 2026</TableCell>
+                            <TableCell className="text-sm text-muted-foreground font-medium">{plan?.name || 'Standard'}</TableCell>
+                            <TableCell><Badge className="bg-resend-green/5 text-resend-green text-[10px] font-bold border-none">{org.subscription_status || 'active'}</Badge></TableCell>
+                            <TableCell className="text-xs text-muted-foreground">May 15, 2026</TableCell>
                             <TableCell>
                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><RefreshCw className="w-4 h-4" /></Button>
                             </TableCell>
@@ -1267,12 +1267,12 @@ The MEVS Platform Team
 
           <TabsContent value="accounting" className="mt-0 outline-none">
              <div className="space-y-6">
-               <div className="flex gap-4 border-b border-slate-100 pb-4">
+               <div className="flex gap-4 border-b border-border pb-4">
                  <button 
                   onClick={() => setAccountingSubTab('revenue')}
                   className={cn(
                     "text-xs font-bold px-4 py-2 rounded-lg transition-all",
-                    accountingSubTab === 'revenue' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                    accountingSubTab === 'revenue' ? "bg-slate-900 text-white shadow-sm" : "text-muted-foreground hover:text-muted-foreground"
                   )}
                  >
                    Revenue Overview
@@ -1281,7 +1281,7 @@ The MEVS Platform Team
                   onClick={() => setAccountingSubTab('audit')}
                   className={cn(
                     "text-xs font-bold px-4 py-2 rounded-lg transition-all",
-                    accountingSubTab === 'audit' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                    accountingSubTab === 'audit' ? "bg-slate-900 text-white shadow-sm" : "text-muted-foreground hover:text-muted-foreground"
                   )}
                  >
                    Inventory Auditing
@@ -1299,13 +1299,13 @@ The MEVS Platform Team
                             return (
                               <div key={plan.id} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                   <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-bold text-slate-400">{plan.name[0]}</div>
+                                   <div className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center font-bold text-muted-foreground">{plan.name[0]}</div>
                                    <div>
                                       <p className="font-bold text-sm">{plan.name}</p>
-                                      <p className="text-[10px] text-slate-400">{count} Organizations</p>
+                                      <p className="text-[10px] text-muted-foreground">{count} Organizations</p>
                                    </div>
                                 </div>
-                                <p className="font-black text-slate-900">${(count * plan.price_monthly).toLocaleString()}</p>
+                                <p className="font-black text-foreground">${(count * plan.price_monthly).toLocaleString()}</p>
                               </div>
                             )
                           })}
@@ -1315,9 +1315,9 @@ The MEVS Platform Team
                    <Card className="border-0 shadow-sm">
                      <CardHeader><CardTitle className="text-base">Platform Invoicing</CardTitle></CardHeader>
                      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mb-4"><Receipt className="w-8 h-8 text-slate-300" /></div>
-                        <p className="font-bold text-slate-900">No pending invoices</p>
-                        <p className="text-xs text-slate-400 mt-1">All organization payments are up to date.</p>
+                        <div className="w-16 h-16 bg-secondary rounded-3xl flex items-center justify-center mb-4"><Receipt className="w-8 h-8 text-muted-foreground" /></div>
+                        <p className="font-bold text-foreground">No pending invoices</p>
+                        <p className="text-xs text-muted-foreground mt-1">All organization payments are up to date.</p>
                      </CardContent>
                    </Card>
                  </div>
@@ -1350,10 +1350,10 @@ The MEVS Platform Team
                   onClick={() => setSelectedModules(prev => checked ? prev.filter(k => k !== key) : [...prev, key])}
                   className={cn(
                     "flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                    checked ? "bg-slate-900 border-slate-900 text-white shadow-lg" : "bg-white border-slate-100 hover:border-slate-200"
+                    checked ? "bg-slate-900 border-slate-900 text-white shadow-lg" : "bg-card border-border hover:border-border"
                   )}
                  >
-                    <Checkbox checked={checked} className={cn("border-slate-300", checked && "border-white bg-white text-slate-900")} />
+                    <Checkbox checked={checked} className={cn("border-border", checked && "border-white bg-card text-foreground")} />
                     <span className="text-xs font-bold">{mod?.label || key}</span>
                  </div>
                )
@@ -1373,14 +1373,14 @@ The MEVS Platform Team
 
       <Dialog open={isInviteLinkDialogOpen} onOpenChange={setIsInviteLinkDialogOpen}>
         <DialogContent className="rounded-3xl border-none shadow-2xl p-10 text-center">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+          <div className="w-20 h-20 bg-resend-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-resend-green" />
           </div>
           <DialogTitle className="text-3xl font-black mb-2">Link Generated!</DialogTitle>
-          <p className="text-slate-500 mb-8">Share this onboarding link with the client to begin their registration.</p>
+          <p className="text-muted-foreground mb-8">Share this onboarding link with the client to begin their registration.</p>
           <div className="relative mb-8">
-            <Input readOnly value={generatedInviteLink} className="bg-slate-50 h-12 pr-12 rounded-xl border-slate-100 font-mono text-xs" />
-            <Button variant="ghost" size="sm" className="absolute right-1 top-1 h-10 w-10 p-0 hover:bg-white" onClick={() => { navigator.clipboard.writeText(generatedInviteLink); toast.success("Copied to clipboard"); }}>
+            <Input readOnly value={generatedInviteLink} className="bg-secondary h-12 pr-12 rounded-xl border-border font-mono text-xs" />
+            <Button variant="ghost" size="sm" className="absolute right-1 top-1 h-10 w-10 p-0 hover:bg-card" onClick={() => { navigator.clipboard.writeText(generatedInviteLink); toast.success("Copied to clipboard"); }}>
               <Copy className="w-4 h-4" />
             </Button>
           </div>
@@ -1419,3 +1419,4 @@ The MEVS Platform Team
     </div>
   );
 }
+

@@ -146,14 +146,14 @@ const navigation = [
 ];
 
 const roleBadgeColors = {
-  ground_staff: 'bg-slate-100 text-slate-700',
-  location_manager: 'bg-blue-100 text-blue-700',
-  manager: 'bg-blue-100 text-blue-700',           // alias
-  branch_manager: 'bg-cyan-100 text-cyan-700',
-  org_owner: 'bg-purple-100 text-purple-700',
-  owner: 'bg-purple-100 text-purple-700',          // alias
-  admin: 'bg-purple-100 text-purple-700',          // alias
-  platform_admin: 'bg-indigo-100 text-indigo-700',
+  ground_staff: 'bg-secondary text-muted-foreground',
+  location_manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
+  manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
+  branch_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
+  org_owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
+  owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
+  admin: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
+  platform_admin: 'bg-indigo-500/10 text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300',
 };
 
 export default function Layout({ children, currentPageName }) {
@@ -277,56 +277,37 @@ export default function Layout({ children, currentPageName }) {
   const displayRole = role || 'loading';
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <style>{`
-        :root {
-          --primary: 210 100% 35%;
-          --primary-foreground: 0 0% 100%;
-        }
-        /* Custom slim scrollbar for scrollable sidebar navigation */
-        .sidebar-nav::-webkit-scrollbar {
-          width: 4px;
-        }
-        .sidebar-nav::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .sidebar-nav::-webkit-scrollbar-thumb {
-          background: #334155; /* slate-700 */
-          border-radius: 4px;
-        }
-        .sidebar-nav::-webkit-scrollbar-thumb:hover {
-          background: #475569; /* slate-600 */
-        }
-      `}</style>
-
+    <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* ═══ Sidebar ═══ */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
+        {/* Brand */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0">
-          <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center">
-              <Package className="h-5 w-5 text-background" />
+          <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2.5 group">
+            <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
+              <Package className="h-4.5 w-4.5 text-background" />
             </div>
-            <span className="text-lg font-semibold text-foreground">EdgeOps</span>
+            <span className="text-lg font-semibold text-foreground tracking-tight">EdgeOps</span>
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-muted-foreground hover:text-foreground"
+            className="lg:hidden text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-grow overflow-y-auto sidebar-nav p-4 space-y-1">
           {filteredNavigation.map((item) => {
             if (item.subItems) {
@@ -340,7 +321,7 @@ export default function Layout({ children, currentPageName }) {
               return (
                 <div 
                   key={item.name} 
-                  className="space-y-1"
+                  className="space-y-0.5"
                 >
                   <button
                     onClick={() => toggleMenu(item.name)}
@@ -348,17 +329,17 @@ export default function Layout({ children, currentPageName }) {
                       "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                       isActive
                         ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <item.icon className="h-5 w-5" />
+                      <item.icon className="h-[18px] w-[18px]" />
                       {item.name}
                     </div>
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded ? "rotate-180" : "")} />
+                    <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded ? "rotate-180" : "")} />
                   </button>
                   {isExpanded && (
-                    <div className="pl-10 pr-2 space-y-1 mt-1">
+                    <div className="pl-10 pr-2 space-y-0.5 mt-0.5">
                       {item.subItems.map(sub => {
                         const isSubActive = (() => {
                           const [base, query] = sub.href.split('?');
@@ -375,7 +356,7 @@ export default function Layout({ children, currentPageName }) {
                               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
                               isSubActive
                                 ? "bg-accent text-accent-foreground shadow-sm border border-border"
-                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                             )}
                           >
                             <sub.icon className="h-4 w-4" />
@@ -399,10 +380,10 @@ export default function Layout({ children, currentPageName }) {
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                   isActive
                     ? "bg-accent text-accent-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
                 )}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-[18px] w-[18px]" />
                 {item.name}
               </Link>
             );
@@ -410,7 +391,7 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         {/* User info at bottom of sidebar */}
-        <div className="p-4 border-t border-border shrink-0 bg-secondary/30 mt-auto">
+        <div className="p-4 border-t border-border shrink-0 mt-auto">
           <div className="flex items-center gap-3 px-3">
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
               <span className="text-primary-foreground text-xs font-bold">
@@ -419,7 +400,7 @@ export default function Layout({ children, currentPageName }) {
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-              <Badge className={cn("text-[10px] px-1.5 py-0", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
+              <Badge className={cn("text-[10px] px-1.5 py-0 border-0", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
                 {(displayRole || '').replace('_', ' ')}
               </Badge>
             </div>
@@ -427,13 +408,13 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* ═══ Main content ═══ */}
       <div className="lg:pl-64">
-        {/* Top header */}
-        <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 lg:px-6">
+        {/* Top header — glass effect */}
+        <header className="sticky top-0 z-30 h-16 glass-header border-b border-border flex items-center justify-between px-4 lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-muted-foreground hover:text-foreground"
+            className="lg:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -442,15 +423,15 @@ export default function Layout({ children, currentPageName }) {
             {!isPlatformAdmin && <ContextSwitcher />}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <ThemeToggle />
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-foreground">
-                  <Bell className="h-5 w-5 text-slate-600" />
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
+                  <Bell className="h-5 w-5" />
                   {notifications.length > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-red-500 text-white text-xs animate-pulse">
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-resend-red text-white text-xs border-0 animate-pulse">
                       {notifications.length > 9 ? '9+' : notifications.length}
                     </Badge>
                   )}
@@ -458,11 +439,11 @@ export default function Layout({ children, currentPageName }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 <div className="flex items-center justify-between p-2">
-                  <span className="font-medium text-sm text-slate-900">Notifications</span>
+                  <span className="font-medium text-sm text-foreground">Notifications</span>
                   {notifications.length > 0 && (
                     <button
                       onClick={markAllAsRead}
-                      className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                      className="text-xs text-primary hover:opacity-80 font-medium transition-opacity"
                     >
                       Mark all read
                     </button>
@@ -470,7 +451,7 @@ export default function Layout({ children, currentPageName }) {
                 </div>
                 <DropdownMenuSeparator />
                 {notifications.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-slate-500">
+                  <div className="p-4 text-center text-sm text-muted-foreground">
                     No new notifications
                   </div>
                 ) : (
@@ -484,12 +465,12 @@ export default function Layout({ children, currentPageName }) {
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm">{notif.title}</p>
                           {notif.priority === 'high' && (
-                            <Badge className="bg-red-100 text-red-700 text-[10px] px-1">urgent</Badge>
+                            <Badge className="bg-resend-red/10 text-resend-red text-[10px] px-1 border-0">urgent</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{notif.message}</p>
                       </div>
-                      <Check className="h-3.5 w-3.5 text-slate-400 shrink-0 ml-2" />
+                      <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
                     </DropdownMenuItem>
                   ))
                 )}
@@ -499,19 +480,19 @@ export default function Layout({ children, currentPageName }) {
             {/* User menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
-                    <User className="h-4 w-4 text-teal-600" />
+                <Button variant="ghost" className="flex items-center gap-2 hover:bg-secondary/70">
+                  <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center border border-border">
+                    <User className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="hidden md:block text-left">
-                    <span className="block text-sm font-medium text-slate-700">
+                    <span className="block text-sm font-medium text-foreground">
                       {displayName}
                     </span>
-                    <span className="block text-[10px] text-slate-400 capitalize">
+                    <span className="block text-[10px] text-muted-foreground capitalize">
                       {(displayRole || '').replace('_', ' ')}
                     </span>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -528,7 +509,7 @@ export default function Layout({ children, currentPageName }) {
                   <span className="capitalize">{(displayRole || '').replace('_', ' ')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout
                 </DropdownMenuItem>

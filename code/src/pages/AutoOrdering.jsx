@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -52,11 +52,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLORS = {
-  pending_approval: 'bg-orange-100 text-orange-700',
-  approved: 'bg-green-100 text-green-700',
-  sent: 'bg-blue-100 text-blue-700',
-  cancelled: 'bg-red-100 text-red-700',
-  received: 'bg-emerald-100 text-emerald-700',
+  pending_approval: 'bg-resend-orange/10 text-resend-orange',
+  approved: 'bg-resend-green/10 text-resend-green',
+  sent: 'bg-resend-blue/10 text-resend-blue',
+  cancelled: 'bg-resend-red/10 text-resend-red',
+  received: 'bg-resend-green/10 text-resend-green',
 };
 
 export default function AutoOrdering() {
@@ -251,13 +251,13 @@ export default function AutoOrdering() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Orders</h1>
-          <p className="text-slate-500 mt-1">Manage purchase orders and vendor communications</p>
+          <h1 className="text-2xl font-bold text-foreground">Orders</h1>
+          <p className="text-muted-foreground mt-1">Manage purchase orders and vendor communications</p>
         </div>
         <Button 
           onClick={generateOrder} 
           disabled={generating}
-          className="bg-teal-600 hover:bg-teal-700"
+          className="bg-primary hover:bg-primary"
         >
           {generating ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -271,7 +271,7 @@ export default function AutoOrdering() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
 
 
-        {/* ── All Orders Tab ──────────────────────────────── */}
+        {/* â”€â”€ All Orders Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="all-orders">
           <Card className="border-0 shadow-sm">
             <CardHeader>
@@ -293,13 +293,13 @@ export default function AutoOrdering() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         Loading orders...
                       </TableCell>
                     </TableRow>
                   ) : orders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No orders yet. Generate one from the "Place New Order" tab.
                       </TableCell>
                     </TableRow>
@@ -312,12 +312,12 @@ export default function AutoOrdering() {
                           <TableCell>{order.items?.length || 0} items</TableCell>
                           <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge className={STATUS_COLORS[order.status] || 'bg-slate-100 text-slate-700'}>
+                            <Badge className={STATUS_COLORS[order.status] || 'bg-secondary text-foreground'}>
                               {order.status?.replace(/_/g, ' ')}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-500">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
+                          <TableCell className="text-sm text-muted-foreground">
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'â€”'}
                           </TableCell>
                           <TableCell>
                             {order.status === 'pending_approval' && (
@@ -325,13 +325,13 @@ export default function AutoOrdering() {
                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(order)}>
                                   <Check className="h-3 w-3 mr-1" /> Approve
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => handleReject(order)}>
+                                <Button size="sm" variant="outline" className="h-7 text-xs text-resend-red" onClick={() => handleReject(order)}>
                                   <X className="h-3 w-3 mr-1" /> Reject
                                 </Button>
                               </div>
                             )}
                             {order.status === 'approved' && (
-                              <Button size="sm" className="h-7 text-xs bg-teal-600" onClick={() => { setSelectedOrder(order); setSendDialogOpen(true); }}>
+                              <Button size="sm" className="h-7 text-xs bg-primary" onClick={() => { setSelectedOrder(order); setSendDialogOpen(true); }}>
                                 <Send className="h-3 w-3 mr-1" /> Send
                               </Button>
                             )}
@@ -346,30 +346,30 @@ export default function AutoOrdering() {
           </Card>
         </TabsContent>
 
-        {/* ── Place New Order Tab (existing content) ────────── */}
+        {/* â”€â”€ Place New Order Tab (existing content) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="place-order" className="space-y-6">
 
       {/* External Suggestions */}
       {suggestions.length > 0 && (
-        <Card className="border-0 shadow-sm bg-gradient-to-r from-teal-50 to-cyan-50">
+        <Card className="border-0 shadow-sm bg-gradient-to-r from-background to-cyan-50">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-teal-600" />
+              <Sparkles className="h-5 w-5 text-primary" />
               AI Suggestions
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {suggestions.map((s, idx) => (
-                <div key={s.id || `suggestion-${idx}`} className="flex items-start gap-3 p-3 bg-white/50 rounded-lg">
-                  <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                    {s.type === 'weather' ? <Cloud className="h-4 w-4 text-teal-600" /> :
-                     s.type === 'holiday' ? <Calendar className="h-4 w-4 text-teal-600" /> :
-                     <AlertCircle className="h-4 w-4 text-teal-600" />}
+                <div key={s.id || `suggestion-${idx}`} className="flex items-start gap-3 p-3 bg-card/50 rounded-lg">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    {s.type === 'weather' ? <Cloud className="h-4 w-4 text-primary" /> :
+                     s.type === 'holiday' ? <Calendar className="h-4 w-4 text-primary" /> :
+                     <AlertCircle className="h-4 w-4 text-primary" />}
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">{s.description}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{s.impact}</p>
+                    <p className="font-medium text-foreground">{s.description}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{s.impact}</p>
                   </div>
                 </div>
               ))}
@@ -388,21 +388,21 @@ export default function AutoOrdering() {
         </CardHeader>
         <CardContent>
           {pendingOrders.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
+            <div className="text-center py-8 text-muted-foreground">
               No orders pending approval. Generate one based on inventory levels.
             </div>
           ) : (
             <div className="space-y-4">
               {pendingOrders.map((order) => (
                 <div key={order.id} className="border rounded-lg overflow-hidden">
-                  <div className="p-4 bg-slate-50 flex items-center justify-between">
+                  <div className="p-4 bg-secondary flex items-center justify-between">
                     <div>
                       <p className="font-semibold">{order.order_number}</p>
-                      <p className="text-sm text-slate-500">{order.vendor_name}</p>
+                      <p className="text-sm text-muted-foreground">{order.vendor_name}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-lg">${order.total_amount?.toFixed(2)}</span>
-                      <Badge className="bg-orange-100 text-orange-700">Pending</Badge>
+                      <Badge className="bg-resend-orange/10 text-resend-orange">Pending</Badge>
                     </div>
                   </div>
                   
@@ -456,7 +456,7 @@ export default function AutoOrdering() {
                     </TableBody>
                   </Table>
 
-                  <div className="p-4 bg-slate-50 flex items-center justify-between">
+                  <div className="p-4 bg-secondary flex items-center justify-between">
                     <Button
                       variant="outline"
                       size="sm"
@@ -476,7 +476,7 @@ export default function AutoOrdering() {
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-resend-green hover:bg-green-700"
                         onClick={() => handleApprove(order)}
                       >
                         <Check className="h-4 w-4 mr-2" />
@@ -511,7 +511,7 @@ export default function AutoOrdering() {
             <TableBody>
               {approvedOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No approved orders
                   </TableCell>
                 </TableRow>
@@ -523,7 +523,7 @@ export default function AutoOrdering() {
                     <TableCell>{order.items?.length} items</TableCell>
                     <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge className="bg-green-100 text-green-700">Approved</Badge>
+                      <Badge className="bg-resend-green/10 text-resend-green">Approved</Badge>
                     </TableCell>
                     <TableCell>
                       <Button
@@ -532,7 +532,7 @@ export default function AutoOrdering() {
                           setSelectedOrder(order);
                           setSendDialogOpen(true);
                         }}
-                        className="bg-teal-600 hover:bg-teal-700"
+                        className="bg-primary hover:bg-primary"
                       >
                         <Send className="h-4 w-4 mr-2" />
                         Send
@@ -547,14 +547,14 @@ export default function AutoOrdering() {
       </Card>
         </TabsContent>
 
-        {/* ── Invoice Approval Tab ──────────────────────────── */}
+        {/* â”€â”€ Invoice Approval Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="invoice-approval">
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <FileText className="h-5 w-5" /> Invoice Approval Queue
               </CardTitle>
-              <p className="text-xs text-slate-400">Match received invoices against purchase orders for approval</p>
+              <p className="text-xs text-muted-foreground">Match received invoices against purchase orders for approval</p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -572,7 +572,7 @@ export default function AutoOrdering() {
                 <TableBody>
                   {orders.filter(o => o.status === 'sent' || o.status === 'received').length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No invoices pending approval. Invoices will appear here once orders are sent and invoices received.
                       </TableCell>
                     </TableRow>
@@ -584,8 +584,8 @@ export default function AutoOrdering() {
                         <TableCell className="font-mono text-sm">{order.order_number}</TableCell>
                         <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
                         <TableCell>${order.total_amount?.toFixed(2)}</TableCell>
-                        <TableCell><Badge className="bg-green-100 text-green-700">$0.00</Badge></TableCell>
-                        <TableCell><Badge className="bg-amber-100 text-amber-700">Pending Review</Badge></TableCell>
+                        <TableCell><Badge className="bg-resend-green/10 text-resend-green">$0.00</Badge></TableCell>
+                        <TableCell><Badge className="bg-resend-yellow/10 text-resend-yellow">Pending Review</Badge></TableCell>
                       </TableRow>
                     ))
                   )}
@@ -595,7 +595,7 @@ export default function AutoOrdering() {
           </Card>
         </TabsContent>
 
-        {/* ── Order Setup Tab ───────────────────────────────── */}
+        {/* â”€â”€ Order Setup Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="order-setup">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">
@@ -605,24 +605,24 @@ export default function AutoOrdering() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Require Manager Approval</p>
-                    <p className="text-sm text-slate-500">Orders above threshold need manager sign-off</p>
+                    <p className="text-sm text-muted-foreground">Orders above threshold need manager sign-off</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Approval Threshold</p>
-                    <p className="text-sm text-slate-500">Orders above this amount need approval</p>
+                    <p className="text-sm text-muted-foreground">Orders above this amount need approval</p>
                   </div>
                   <Input className="w-28" type="number" step="100" defaultValue="500" />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Auto-Approve Below Threshold</p>
-                    <p className="text-sm text-slate-500">Automatically approve small orders</p>
+                    <p className="text-sm text-muted-foreground">Automatically approve small orders</p>
                   </div>
                   <Switch />
                 </div>
@@ -636,24 +636,24 @@ export default function AutoOrdering() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Send Order Confirmation</p>
-                    <p className="text-sm text-slate-500">Email order details to manager after approval</p>
+                    <p className="text-sm text-muted-foreground">Email order details to manager after approval</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Default Send Method</p>
-                    <p className="text-sm text-slate-500">Default channel for vendor orders</p>
+                    <p className="text-sm text-muted-foreground">Default channel for vendor orders</p>
                   </div>
-                  <Badge className="bg-teal-100 text-teal-700">Email</Badge>
+                  <Badge className="bg-primary/10 text-primary">Email</Badge>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Recurring Orders</p>
-                    <p className="text-sm text-slate-500">Set up automatic recurring order schedules</p>
+                    <p className="text-sm text-muted-foreground">Set up automatic recurring order schedules</p>
                   </div>
                   <Badge variant="secondary">Not Configured</Badge>
                 </div>
@@ -677,15 +677,15 @@ export default function AutoOrdering() {
                 className={cn(
                   "p-3 rounded-lg max-w-[80%]",
                   msg.role === 'user' 
-                    ? "bg-teal-100 ml-auto" 
-                    : "bg-slate-100"
+                    ? "bg-primary/10 ml-auto" 
+                    : "bg-secondary"
                 )}
               >
                 <p className="text-sm">{msg.message}</p>
               </div>
             ))}
             {(selectedOrder?.chat_history || []).length === 0 && (
-              <p className="text-center text-slate-400 py-8">
+              <p className="text-center text-muted-foreground py-8">
                 Ask me to adjust quantities, add items, or make changes to the order
               </p>
             )}
@@ -698,7 +698,7 @@ export default function AutoOrdering() {
               placeholder="Ask to adjust the order..."
               onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
             />
-            <Button onClick={handleChatSubmit} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleChatSubmit} className="bg-primary hover:bg-primary">
               <Send className="h-4 w-4" />
             </Button>
           </div>
@@ -713,7 +713,7 @@ export default function AutoOrdering() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Choose how to send this order to the vendor
             </p>
             
@@ -722,20 +722,20 @@ export default function AutoOrdering() {
                 onClick={() => setSendMethod('email')}
                 className={cn(
                   "p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-all",
-                  sendMethod === 'email' ? "border-teal-500 bg-teal-50" : "border-slate-200"
+                  sendMethod === 'email' ? "border-primary bg-primary/5" : "border-border"
                 )}
               >
-                <Mail className="h-8 w-8 text-teal-600" />
+                <Mail className="h-8 w-8 text-primary" />
                 <span className="font-medium">Email</span>
               </button>
               <button
                 onClick={() => setSendMethod('whatsapp')}
                 className={cn(
                   "p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-all",
-                  sendMethod === 'whatsapp' ? "border-teal-500 bg-teal-50" : "border-slate-200"
+                  sendMethod === 'whatsapp' ? "border-primary bg-primary/5" : "border-border"
                 )}
               >
-                <MessageSquare className="h-8 w-8 text-green-600" />
+                <MessageSquare className="h-8 w-8 text-resend-green" />
                 <span className="font-medium">WhatsApp</span>
               </button>
             </div>
@@ -743,7 +743,7 @@ export default function AutoOrdering() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSendDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSendOrder} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleSendOrder} className="bg-primary hover:bg-primary">
               Send Order
             </Button>
           </DialogFooter>

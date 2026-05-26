@@ -59,7 +59,13 @@ module.exports = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+  			/* Resend Accent Palette */
+  			'resend-orange': 'hsl(var(--resend-orange))',
+  			'resend-yellow': 'hsl(var(--resend-yellow))',
+  			'resend-blue': 'hsl(var(--resend-blue))',
+  			'resend-green': 'hsl(var(--resend-green))',
+  			'resend-red': 'hsl(var(--resend-red))'
   		},
   		keyframes: {
   			'accordion-down': {

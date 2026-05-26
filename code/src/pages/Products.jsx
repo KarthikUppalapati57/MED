@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -60,13 +60,13 @@ import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
 const categoryColors = {
-  food: 'bg-green-100 text-green-700',
-  beverage: 'bg-blue-100 text-blue-700',
-  supplies: 'bg-purple-100 text-purple-700',
-  equipment: 'bg-orange-100 text-orange-700',
-  packaging: 'bg-yellow-100 text-yellow-700',
-  cleaning: 'bg-cyan-100 text-cyan-700',
-  other: 'bg-slate-100 text-slate-700',
+  food: 'bg-resend-green/10 text-resend-green',
+  beverage: 'bg-resend-blue/10 text-resend-blue',
+  supplies: 'bg-purple-500/50/10 text-purple-400',
+  equipment: 'bg-resend-orange/10 text-resend-orange',
+  packaging: 'bg-resend-yellow/10 text-resend-yellow',
+  cleaning: 'bg-cyan-500/10 text-cyan-400',
+  other: 'bg-secondary text-foreground',
 };
 
 export default function Products() {
@@ -289,8 +289,8 @@ export default function Products() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Products</h1>
-          <p className="text-slate-500 mt-1">Manage your product catalog</p>
+          <h1 className="text-2xl font-bold text-foreground">Products</h1>
+          <p className="text-muted-foreground mt-1">Manage your product catalog</p>
         </div>
         {!isGroundStaff && (
           <div className="flex gap-2">
@@ -298,7 +298,7 @@ export default function Products() {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
               <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
@@ -310,26 +310,26 @@ export default function Products() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Total Products</p>
-            <p className="text-2xl font-bold text-slate-900">{totalProducts}</p>
+            <p className="text-sm text-muted-foreground">Total Products</p>
+            <p className="text-2xl font-bold text-foreground">{totalProducts}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Inventoried</p>
-            <p className="text-2xl font-bold text-slate-900">{inventoriedCount}</p>
+            <p className="text-sm text-muted-foreground">Inventoried</p>
+            <p className="text-2xl font-bold text-foreground">{inventoriedCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Tax Exempt</p>
-            <p className="text-2xl font-bold text-slate-900">{taxExemptCount}</p>
+            <p className="text-sm text-muted-foreground">Tax Exempt</p>
+            <p className="text-2xl font-bold text-foreground">{taxExemptCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Categories</p>
-            <p className="text-2xl font-bold text-slate-900">{categoriesCount}</p>
+            <p className="text-sm text-muted-foreground">Categories</p>
+            <p className="text-2xl font-bold text-foreground">{categoriesCount}</p>
           </CardContent>
         </Card>
       </div>
@@ -343,7 +343,7 @@ export default function Products() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search products..."
                 value={search}
@@ -370,13 +370,13 @@ export default function Products() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
           <span className="text-sm font-medium text-teal-800">{selectedIds.size} item(s) selected</span>
           <div className="flex gap-2 ml-auto">
             <Button size="sm" variant="outline" onClick={handleBulkExport}>
               <Download className="h-4 w-4 mr-1" /> Export
             </Button>
-            <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-red-600 border-red-300 hover:bg-red-50">
+            <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-resend-red border-red-300 hover:bg-resend-red/5">
               <Trash2 className="h-4 w-4 mr-1" /> Delete
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
@@ -412,19 +412,19 @@ export default function Products() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No products found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredProducts.map((product) => (
-                    <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-teal-50" : ""}>
+                    <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-primary/5" : ""}>
                       <TableCell>
                         {!isGroundStaff && (
                           <Checkbox
@@ -436,20 +436,20 @@ export default function Products() {
                       <TableCell className="font-mono text-sm">{product.product_id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <Package className="h-4 w-4 text-slate-500" />
+                          <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center">
+                            <Package className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <span className="font-medium">{product.description || product.name}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         {product.is_inventoried ? (
-                          <Badge className="bg-green-100 text-green-700">Yes</Badge>
+                          <Badge className="bg-resend-green/10 text-resend-green">Yes</Badge>
                         ) : (
                           <Badge variant="secondary">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{product.vendor_name || '—'}</TableCell>
+                      <TableCell>{product.vendor_name || 'â€”'}</TableCell>
                       <TableCell className="font-semibold">
                         ${product.latest_price?.toFixed(2) || '0.00'}
                       </TableCell>
@@ -467,7 +467,7 @@ export default function Products() {
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => deleteMutation.mutate(product.id)}
-                                className="text-red-600"
+                                className="text-resend-red"
                               >
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete
                               </DropdownMenuItem>
@@ -485,12 +485,12 @@ export default function Products() {
       </Card>
         </TabsContent>
 
-        {/* ── New Item Review Tab ──────────────────────────────── */}
+        {/* â”€â”€ New Item Review Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="new-review">
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="text-base">New Item Review</CardTitle>
-              <p className="text-xs text-slate-400">Recently added products pending review and approval</p>
+              <p className="text-xs text-muted-foreground">Recently added products pending review and approval</p>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -518,25 +518,25 @@ export default function Products() {
                     });
                     return newProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No new products added in the last 7 days
                         </TableCell>
                       </TableRow>
                     ) : (
                       newProducts.map(p => (
                         <TableRow key={p.id}>
-                          <TableCell className="text-sm text-slate-500">
-                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          <TableCell className="text-sm text-muted-foreground">
+                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                           </TableCell>
                           <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell>{p.vendor_name || '—'}</TableCell>
+                          <TableCell>{p.vendor_name || 'â€”'}</TableCell>
                           <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
-                          <TableCell>{p.category || '—'}</TableCell>
+                          <TableCell>{p.category || 'â€”'}</TableCell>
                           <TableCell>
-                            {p.is_inventoried ? <Badge className="bg-green-100 text-green-700">Yes</Badge> : <Badge variant="secondary">No</Badge>}
+                            {p.is_inventoried ? <Badge className="bg-resend-green/10 text-resend-green">Yes</Badge> : <Badge variant="secondary">No</Badge>}
                           </TableCell>
                           <TableCell>
-                            {p.is_tax_exempt ? <Badge className="bg-amber-100 text-amber-700">Exempt</Badge> : <Badge variant="secondary">No</Badge>}
+                            {p.is_tax_exempt ? <Badge className="bg-resend-yellow/10 text-resend-yellow">Exempt</Badge> : <Badge variant="secondary">No</Badge>}
                           </TableCell>
                           <TableCell>{p.report_by_unit || 'ea'}</TableCell>
                           <TableCell>
@@ -556,13 +556,13 @@ export default function Products() {
           </Card>
         </TabsContent>
 
-        {/* ── Purchase Report Tab ──────────────────────────────── */}
+        {/* â”€â”€ Purchase Report Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="purchase-report">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">Purchase Report</CardTitle>
-                <p className="text-xs text-slate-400">Aggregated purchase data by product</p>
+                <p className="text-xs text-muted-foreground">Aggregated purchase data by product</p>
               </div>
               {!isGroundStaff && (
                 <Button variant="outline" size="sm" onClick={exportToCSV}>
@@ -586,7 +586,7 @@ export default function Products() {
                 <TableBody>
                   {products.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No purchase data available
                       </TableCell>
                     </TableRow>
@@ -595,7 +595,7 @@ export default function Products() {
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
                         <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
-                        <TableCell>{p.category || '—'}</TableCell>
+                        <TableCell>{p.category || 'â€”'}</TableCell>
                         <TableCell>{p.report_by_unit || 'ea'}</TableCell>
                         <TableCell className="font-medium">{p.item_count || 1}</TableCell>
                         <TableCell className="font-semibold">${(p.latest_price || 0).toFixed(2)}</TableCell>
@@ -685,10 +685,10 @@ export default function Products() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
               <div>
                 <p className="font-medium">Inventoried</p>
-                <p className="text-sm text-slate-500">Track this product in inventory</p>
+                <p className="text-sm text-muted-foreground">Track this product in inventory</p>
               </div>
               <Switch
                 checked={formData.is_inventoried}
@@ -696,10 +696,10 @@ export default function Products() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
               <div>
                 <p className="font-medium">Tax Exempt</p>
-                <p className="text-sm text-slate-500">Product is exempt from tax</p>
+                <p className="text-sm text-muted-foreground">Product is exempt from tax</p>
               </div>
               <Switch
                 checked={formData.is_tax_exempt}
@@ -707,10 +707,10 @@ export default function Products() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
               <div>
                 <p className="font-medium">Location Specific</p>
-                <p className="text-sm text-slate-500">Different settings per location</p>
+                <p className="text-sm text-muted-foreground">Different settings per location</p>
               </div>
               <Switch
                 checked={formData.location_specific}
@@ -721,7 +721,7 @@ export default function Products() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleSubmit} className="bg-primary hover:bg-primary">
               {editingProduct ? 'Update' : 'Create'} Product
             </Button>
           </DialogFooter>

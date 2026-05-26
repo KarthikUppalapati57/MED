@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -67,28 +67,28 @@ const paymentMethodIcons = {
 };
 
 const paymentMethodColors = {
-  stripe: 'bg-purple-100 text-purple-700',
-  paypal: 'bg-blue-100 text-blue-700',
-  bank_transfer: 'bg-green-100 text-green-700',
-  cheque: 'bg-orange-100 text-orange-700',
-  cash: 'bg-emerald-100 text-emerald-700',
-  manual: 'bg-slate-100 text-slate-700',
+  stripe: 'bg-purple-500/50/10 text-purple-400',
+  paypal: 'bg-resend-blue/10 text-resend-blue',
+  bank_transfer: 'bg-resend-green/10 text-resend-green',
+  cheque: 'bg-resend-orange/10 text-resend-orange',
+  cash: 'bg-resend-green/10 text-resend-green',
+  manual: 'bg-secondary text-foreground',
 };
 
 const paymentStatusColors = {
-  completed: 'bg-green-100 text-green-700',
-  pending: 'bg-yellow-100 text-yellow-700',
-  failed: 'bg-red-100 text-red-700',
-  refunded: 'bg-purple-100 text-purple-700',
+  completed: 'bg-resend-green/10 text-resend-green',
+  pending: 'bg-resend-yellow/10 text-resend-yellow',
+  failed: 'bg-resend-red/10 text-resend-red',
+  refunded: 'bg-purple-500/50/10 text-purple-400',
 };
 
 const invoiceStatusColors = {
-  approved: 'bg-green-100 text-green-700',
-  paid: 'bg-teal-100 text-teal-700',
-  rejected: 'bg-red-100 text-red-700',
-  pending_review: 'bg-orange-100 text-orange-700',
-  validated: 'bg-blue-100 text-blue-700',
-  flagged: 'bg-yellow-100 text-yellow-700',
+  approved: 'bg-resend-green/10 text-resend-green',
+  paid: 'bg-primary/10 text-primary',
+  rejected: 'bg-resend-red/10 text-resend-red',
+  pending_review: 'bg-resend-orange/10 text-resend-orange',
+  validated: 'bg-resend-blue/10 text-resend-blue',
+  flagged: 'bg-resend-yellow/10 text-resend-yellow',
 };
 
 export default function Payments() {
@@ -239,8 +239,8 @@ export default function Payments() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Payments</h1>
-        <p className="text-slate-500 mt-1">Process and track invoice payments</p>
+        <h1 className="text-2xl font-bold text-foreground">Payments</h1>
+        <p className="text-muted-foreground mt-1">Process and track invoice payments</p>
       </div>
 
       {/* Stats */}
@@ -249,13 +249,13 @@ export default function Payments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Due</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">
+                <p className="text-sm text-muted-foreground">Total Due</p>
+                <p className="text-2xl font-bold text-foreground mt-1">
                   ${totalDue.toLocaleString()}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-teal-100 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-teal-600" />
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-primary" />
               </div>
             </div>
           </CardContent>
@@ -265,13 +265,13 @@ export default function Payments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
+                <p className="text-sm text-muted-foreground">Total Paid</p>
+                <p className="text-2xl font-bold text-resend-green mt-1">
                   ${totalPaid.toLocaleString()}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 rounded-xl bg-resend-green/10 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-resend-green" />
               </div>
             </div>
           </CardContent>
@@ -281,11 +281,11 @@ export default function Payments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Overdue</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{overdue}</p>
+                <p className="text-sm text-muted-foreground">Overdue</p>
+                <p className="text-2xl font-bold text-resend-red mt-1">{overdue}</p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-red-100 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+              <div className="h-12 w-12 rounded-xl bg-resend-red/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-resend-red" />
               </div>
             </div>
           </CardContent>
@@ -295,11 +295,11 @@ export default function Payments() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600 mt-1">{pendingPayments}</p>
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold text-resend-yellow mt-1">{pendingPayments}</p>
               </div>
-              <div className="h-12 w-12 rounded-xl bg-yellow-100 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-yellow-600" />
+              <div className="h-12 w-12 rounded-xl bg-resend-yellow/10 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-resend-yellow" />
               </div>
             </div>
           </CardContent>
@@ -311,7 +311,7 @@ export default function Payments() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by vendor, invoice, or transaction..."
                 value={search}
@@ -340,13 +340,13 @@ export default function Payments() {
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="border-b border-slate-200">
+        <div className="border-b border-border">
           <TabsList className="h-auto p-0 bg-transparent gap-6 justify-start w-full overflow-x-auto">
-            <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Vendor Invoices</TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Payment History</TabsTrigger>
-            <TabsTrigger value="reconciliation" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Reconciliation</TabsTrigger>
-            <TabsTrigger value="setup" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Payment Setup</TabsTrigger>
-            <TabsTrigger value="subscription" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-teal-600 rounded-none px-1 py-3">Platform Subscription</TabsTrigger>
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Vendor Invoices</TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payment History</TabsTrigger>
+            <TabsTrigger value="reconciliation" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Reconciliation</TabsTrigger>
+            <TabsTrigger value="setup" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payment Setup</TabsTrigger>
+            <TabsTrigger value="subscription" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Platform Subscription</TabsTrigger>
           </TabsList>
         </div>
 
@@ -374,13 +374,13 @@ export default function Payments() {
                   <TableBody>
                     {invoicesLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No invoices found
                         </TableCell>
                       </TableRow>
@@ -397,29 +397,29 @@ export default function Payments() {
                             <TableCell>{invoice.invoice_number}</TableCell>
                             <TableCell>
                               <span className={cn(
-                                isOverdue && 'text-red-600 font-medium',
-                                isDueSoon && 'text-orange-600 font-medium'
+                                isOverdue && 'text-resend-red font-medium',
+                                isDueSoon && 'text-resend-orange font-medium'
                               )}>
-                                {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
+                                {dueDate ? format(dueDate, 'MMM d, yyyy') : 'â€”'}
                               </span>
                             </TableCell>
                             <TableCell className="font-semibold">
                               ${invoice.total_amount?.toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              <Badge className={invoiceStatusColors[invoice.status] || 'bg-slate-100 text-slate-700'}>
+                              <Badge className={invoiceStatusColors[invoice.status] || 'bg-secondary text-foreground'}>
                                 {invoice.status?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               {isOverdue ? (
-                                <Badge className="bg-red-100 text-red-700">Overdue</Badge>
+                                <Badge className="bg-resend-red/10 text-resend-red">Overdue</Badge>
                               ) : invoice.payment_status === 'paid' ? (
-                                <Badge className="bg-teal-100 text-teal-700">Paid</Badge>
+                                <Badge className="bg-primary/10 text-primary">Paid</Badge>
                               ) : invoice.payment_status === 'auto_pay' ? (
-                                <Badge className="bg-purple-100 text-purple-700 border-purple-200">Auto-Pay</Badge>
+                                <Badge className="bg-purple-500/50/10 text-purple-400 border-purple-200">Auto-Pay</Badge>
                               ) : isDueSoon ? (
-                                <Badge className="bg-orange-100 text-orange-700">Due Soon</Badge>
+                                <Badge className="bg-resend-orange/10 text-resend-orange">Due Soon</Badge>
                               ) : (
                                 <Badge variant="secondary">{invoice.payment_status || 'Unpaid'}</Badge>
                               )}
@@ -431,7 +431,7 @@ export default function Payments() {
                                     <Button
                                       size="sm"
                                       onClick={() => handleApprove(invoice)}
-                                      className="bg-green-600 hover:bg-green-700 h-8 px-2"
+                                      className="bg-resend-green hover:bg-green-700 h-8 px-2"
                                     >
                                       <Check className="h-3 w-3 mr-1" /> Approve
                                     </Button>
@@ -439,7 +439,7 @@ export default function Payments() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => handleReject(invoice)}
-                                      className="border-red-300 text-red-600 hover:bg-red-50 h-8 px-2"
+                                      className="border-red-300 text-resend-red hover:bg-resend-red/5 h-8 px-2"
                                     >
                                       <X className="h-3 w-3 mr-1" /> Reject
                                     </Button>
@@ -449,7 +449,7 @@ export default function Payments() {
                                   <Button
                                     size="sm"
                                     onClick={() => handlePayNow(invoice)}
-                                    className="bg-teal-600 hover:bg-teal-700 h-8 px-3"
+                                    className="bg-primary hover:bg-primary h-8 px-3"
                                   >
                                     <CreditCard className="h-3 w-3 mr-1" /> Pay Now
                                   </Button>
@@ -472,7 +472,7 @@ export default function Payments() {
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5 text-teal-600" />
+                <History className="h-5 w-5 text-primary" />
                 Payment History
               </CardTitle>
             </CardHeader>
@@ -494,13 +494,13 @@ export default function Payments() {
                   <TableBody>
                     {paymentsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredPayments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No payments recorded yet
                         </TableCell>
                       </TableRow>
@@ -510,24 +510,24 @@ export default function Payments() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell>
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
                             </TableCell>
                             <TableCell className="font-medium">{p.vendor_name}</TableCell>
                             <TableCell>{p.invoice_number}</TableCell>
                             <TableCell>
-                              <Badge className={paymentMethodColors[p.payment_method] || 'bg-slate-100 text-slate-700'}>
+                              <Badge className={paymentMethodColors[p.payment_method] || 'bg-secondary text-foreground'}>
                                 <MethodIcon className="h-3 w-3 mr-1" />
                                 {p.payment_method?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-mono text-xs text-slate-500">
+                            <TableCell className="font-mono text-xs text-muted-foreground">
                               {p.transaction_id?.slice(0, 20)}...
                             </TableCell>
                             <TableCell className="font-semibold">
                               ${p.amount?.toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              <Badge className={paymentStatusColors[p.status] || 'bg-slate-100 text-slate-700'}>
+                              <Badge className={paymentStatusColors[p.status] || 'bg-secondary text-foreground'}>
                                 {p.status}
                               </Badge>
                             </TableCell>
@@ -536,7 +536,7 @@ export default function Payments() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleConfirmBankTransfer(p)}
-                                  className="bg-green-600 hover:bg-green-700 h-8 px-2"
+                                  className="bg-resend-green hover:bg-green-700 h-8 px-2"
                                 >
                                   <ArrowRightLeft className="h-3 w-3 mr-1" /> Confirm
                                 </Button>
@@ -560,10 +560,10 @@ export default function Payments() {
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-teal-600" />
+                  <FileText className="h-5 w-5 text-primary" />
                   Open Invoices Awaiting Reconciliation
                 </CardTitle>
-                <p className="text-xs text-slate-400">Invoices that have been paid but not yet reconciled with bank statements</p>
+                <p className="text-xs text-muted-foreground">Invoices that have been paid but not yet reconciled with bank statements</p>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -581,7 +581,7 @@ export default function Payments() {
                   <TableBody>
                     {payments.filter(p => p.status === 'completed').length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-slate-400">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No payments pending reconciliation
                         </TableCell>
                       </TableRow>
@@ -594,16 +594,16 @@ export default function Payments() {
                             <TableCell>{p.invoice_number}</TableCell>
                             <TableCell className="font-semibold">${p.amount?.toLocaleString()}</TableCell>
                             <TableCell>
-                              <Badge className={paymentMethodColors[p.payment_method] || 'bg-slate-100 text-slate-700'}>
+                              <Badge className={paymentMethodColors[p.payment_method] || 'bg-secondary text-foreground'}>
                                 <MethodIcon className="h-3 w-3 mr-1" />
                                 {p.payment_method?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-sm text-slate-500">
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
+                            <TableCell className="text-sm text-muted-foreground">
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
                             </TableCell>
                             <TableCell>
-                              <Badge className="bg-green-100 text-green-700">Paid</Badge>
+                              <Badge className="bg-resend-green/10 text-resend-green">Paid</Badge>
                             </TableCell>
                             <TableCell>
                               <Button size="sm" variant="outline" className="h-7 text-xs">
@@ -623,16 +623,16 @@ export default function Payments() {
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-blue-600" />
+                  <Mail className="h-5 w-5 text-resend-blue" />
                   Email Awaiting
                 </CardTitle>
-                <p className="text-xs text-slate-400">Invoices received via email that need to be matched and processed</p>
+                <p className="text-xs text-muted-foreground">Invoices received via email that need to be matched and processed</p>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8">
-                  <Mail className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">No email invoices pending</p>
-                  <p className="text-sm text-slate-400 mt-1">Email invoices will appear here when the email integration is configured</p>
+                  <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No email invoices pending</p>
+                  <p className="text-sm text-muted-foreground mt-1">Email invoices will appear here when the email integration is configured</p>
                 </div>
               </CardContent>
             </Card>
@@ -649,26 +649,26 @@ export default function Payments() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Auto-Pay Approved Invoices</p>
-                    <p className="text-sm text-slate-500">Automatically process payment for approved invoices</p>
+                    <p className="text-sm text-muted-foreground">Automatically process payment for approved invoices</p>
                   </div>
                   <Switch />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Default Payment Method</p>
-                    <p className="text-sm text-slate-500">Method used for automatic payments</p>
+                    <p className="text-sm text-muted-foreground">Method used for automatic payments</p>
                   </div>
-                  <Badge className="bg-purple-100 text-purple-700">
+                  <Badge className="bg-purple-500/50/10 text-purple-400">
                     <CreditCard className="h-3 w-3 mr-1" /> Stripe
                   </Badge>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Payment Approval Threshold</p>
-                    <p className="text-sm text-slate-500">Auto-pay limit without manual approval</p>
+                    <p className="text-sm text-muted-foreground">Auto-pay limit without manual approval</p>
                   </div>
                   <Input className="w-28" type="number" step="100" defaultValue="1000" />
                 </div>
@@ -682,24 +682,24 @@ export default function Payments() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Payment Confirmation Email</p>
-                    <p className="text-sm text-slate-500">Send email when payment is processed</p>
+                    <p className="text-sm text-muted-foreground">Send email when payment is processed</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Overdue Invoice Alerts</p>
-                    <p className="text-sm text-slate-500">Get notified when invoices become overdue</p>
+                    <p className="text-sm text-muted-foreground">Get notified when invoices become overdue</p>
                   </div>
                   <Switch defaultChecked />
                 </div>
-                <div className="p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Weekly Payment Summary</p>
-                    <p className="text-sm text-slate-500">Receive a weekly digest of all payment activity</p>
+                    <p className="text-sm text-muted-foreground">Receive a weekly digest of all payment activity</p>
                   </div>
                   <Switch />
                 </div>
@@ -712,30 +712,30 @@ export default function Payments() {
         <TabsContent value="subscription" className="mt-4">
           <Card className="border-0 shadow-sm max-w-2xl mx-auto overflow-hidden">
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-8 text-white relative">
-              <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
               <div className="relative z-10 flex items-center gap-4">
-                <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                <div className="p-4 bg-card/10 backdrop-blur-md rounded-2xl border border-white/10">
                   <Sparkles className="w-8 h-8 text-teal-400" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">Platform Subscription</h2>
-                  <p className="text-slate-400 mt-1">Manage your MEVS workspace plan and billing</p>
+                  <p className="text-muted-foreground mt-1">Manage your MEVS workspace plan and billing</p>
                 </div>
               </div>
             </div>
             <CardContent className="p-8">
               <div className="space-y-6">
-                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="p-6 bg-secondary rounded-2xl border border-border flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="space-y-2 text-center md:text-left">
-                    <h3 className="font-bold text-slate-900 text-lg">Billing Portal</h3>
-                    <p className="text-sm text-slate-500 max-w-sm">
+                    <h3 className="font-bold text-foreground text-lg">Billing Portal</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
                       Update your payment methods, view past invoices, or change your subscription plan securely via Stripe.
                     </p>
                   </div>
                   <Button 
                     onClick={handleManageBilling} 
                     disabled={portalLoading}
-                    className="bg-teal-600 hover:bg-teal-700 text-white min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
+                    className="bg-primary hover:bg-primary text-white min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
                   >
                     {portalLoading ? (
                       <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Loading Portal...</>
@@ -745,12 +745,12 @@ export default function Payments() {
                   </Button>
                 </div>
                 
-                <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 text-sm text-teal-800">
+                <div className="bg-primary/5 border border-teal-100 rounded-xl p-4 text-sm text-teal-800">
                   <p className="font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-teal-600" /> 
+                    <CheckCircle2 className="w-4 h-4 text-primary" /> 
                     Secure Payment Processing
                   </p>
-                  <p className="mt-1 text-teal-700/80">
+                  <p className="mt-1 text-primary/80">
                     We use Stripe to manage all platform billing. Your credit card details are never stored on our servers.
                   </p>
                 </div>

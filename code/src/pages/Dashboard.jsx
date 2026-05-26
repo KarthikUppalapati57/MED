@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
@@ -40,27 +40,27 @@ import {
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444'];
 
-// ── Stat Card Component ──────────────────────────────────────
+// â”€â”€ Stat Card Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkText, subtext }) {
   return (
     <Card className="border-0 shadow-sm">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="text-3xl font-bold text-slate-900 mt-1">{value}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
           </div>
           <div className={`h-12 w-12 rounded-xl ${iconBg} flex items-center justify-center`}>
             <Icon className={`h-6 w-6 ${iconColor}`} />
           </div>
         </div>
         {linkTo && (
-          <Link to={createPageUrl(linkTo)} className="text-sm text-teal-600 hover:text-teal-700 mt-3 inline-flex items-center gap-1">
+          <Link to={createPageUrl(linkTo)} className="text-sm text-primary hover:opacity-80 mt-3 inline-flex items-center gap-1">
             {linkText} <ArrowRight className="h-4 w-4" />
           </Link>
         )}
         {subtext && (
-          <div className="text-sm text-slate-500 mt-3 flex items-center gap-1">
+          <div className="text-sm text-muted-foreground mt-3 flex items-center gap-1">
             {subtext}
           </div>
         )}
@@ -69,9 +69,9 @@ function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkTex
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Platform Admin Dashboard — Global platform-wide metrics
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Platform Admin Dashboard â€” Global platform-wide metrics
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function PlatformDashboard() {
   const { data: allOrgs = [] } = useAuthQuery({
     queryKey: ['dash-orgs'],
@@ -144,17 +144,17 @@ function PlatformDashboard() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-indigo-500" />
-          <h1 className="text-2xl font-bold text-slate-900">Platform Overview</h1>
+          <Shield className="h-6 w-6 text-indigo-400" />
+          <h1 className="text-2xl font-bold text-foreground">Platform Overview</h1>
         </div>
-        <p className="text-slate-500 mt-1">Global platform metrics across all organizations</p>
+        <p className="text-muted-foreground mt-1">Global platform metrics across all organizations</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-blue-100" iconColor="text-blue-600" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" />
-        <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-100" iconColor="text-purple-600" linkTo="PlatformUserManagement" linkText="View users" />
-        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-emerald-100" iconColor="text-emerald-600" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" />
-        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-amber-500 font-medium">{trialOrgs.length}</span> trials</>} />
+        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" />
+        <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="PlatformUserManagement" linkText="View users" />
+        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-resend-green/10" iconColor="text-resend-green" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" />
+        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-primary/10" iconColor="text-primary" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-resend-yellow font-medium">{trialOrgs.length}</span> trials</>} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -166,16 +166,16 @@ function PlatformDashboard() {
           <CardContent>
             <div className="space-y-3">
               {[
-                { label: 'Active', count: activeOrgs.length, color: 'bg-emerald-500' },
-                { label: 'Trial', count: trialOrgs.length, color: 'bg-amber-500' },
+                { label: 'Active', count: activeOrgs.length, color: 'bg-resend-green' },
+                { label: 'Trial', count: trialOrgs.length, color: 'bg-resend-yellow' },
                 { label: 'Total', count: allOrgs.length, color: 'bg-blue-500' },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                    <span className="text-sm text-slate-600">{item.label}</span>
+                    <span className="text-sm text-muted-foreground">{item.label}</span>
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">{item.count}</span>
+                  <span className="text-sm font-semibold text-foreground">{item.count}</span>
                 </div>
               ))}
             </div>
@@ -187,25 +187,25 @@ function PlatformDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
             <Link to={createPageUrl('PlatformAuditLogs')}>
-              <Button variant="ghost" size="sm" className="text-teal-600">View All</Button>
+              <Button variant="ghost" size="sm" className="text-primary">View All</Button>
             </Link>
           </CardHeader>
           <CardContent>
             {recentLogs.length > 0 ? (
               <div className="space-y-2">
                 {recentLogs.map(log => (
-                  <div key={log.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
+                  <div key={log.id} className="flex items-center justify-between p-2 bg-secondary rounded-lg text-sm">
                     <div className="flex items-center gap-2">
-                      <Activity className="h-3.5 w-3.5 text-slate-400" />
-                      <span className="font-medium text-slate-700 capitalize">{log.action}</span>
+                      <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="font-medium text-foreground capitalize">{log.action}</span>
                       <Badge variant="secondary" className="text-[10px]">{log.table_name}</Badge>
                     </div>
-                    <span className="text-[10px] text-slate-400">{log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}</span>
+                    <span className="text-[10px] text-muted-foreground">{log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-6 text-center text-slate-400 text-sm">No recent activity</div>
+              <div className="py-6 text-center text-muted-foreground text-sm">No recent activity</div>
             )}
           </CardContent>
         </Card>
@@ -214,9 +214,9 @@ function PlatformDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Org Owner Dashboard — Org-level metrics
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Org Owner Dashboard â€” Org-level metrics
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function OrgOwnerDashboard() {
   const { organization } = useAuth();
 
@@ -297,15 +297,15 @@ function OrgOwnerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">{organization?.name || 'Organization'} Dashboard</h1>
-        <p className="text-slate-500 mt-1">Overview of your organization's operations</p>
+        <h1 className="text-2xl font-bold text-foreground">{organization?.name || 'Organization'} Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Overview of your organization's operations</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-100" iconColor="text-purple-600" linkTo="UserManagement" linkText="Manage users" />
-        <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="OrgManagement" linkText="View plan" />
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-orange-100" iconColor="text-orange-600" linkTo="Invoices" linkText="View all" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-red-100" iconColor="text-red-600" linkTo="Payments" linkText="View payments" />
+        <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="UserManagement" linkText="Manage users" />
+        <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="OrgManagement" linkText="View plan" />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" />
+        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -327,13 +327,13 @@ function OrgOwnerDashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-slate-400">No data yet</div>
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground">No data yet</div>
             )}
             <div className="flex flex-wrap gap-3 mt-4 justify-center">
               {pieData.slice(0, 4).map((item, idx) => (
                 <div key={item.name} className="flex items-center gap-1.5 text-xs">
                   <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
-                  <span className="text-slate-600">{item.name}</span>
+                  <span className="text-muted-foreground">{item.name}</span>
                 </div>
               ))}
             </div>
@@ -355,11 +355,11 @@ function OrgOwnerDashboard() {
                 { label: 'Low Stock Alerts', value: lowStockItems, icon: AlertTriangle },
                 { label: 'Team Members', value: orgUsers.length, icon: Users },
               ].map(item => (
-                <div key={item.label} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                  <item.icon className="h-5 w-5 text-slate-400" />
+                <div key={item.label} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
+                  <item.icon className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-slate-500">{item.label}</p>
-                    <p className="text-lg font-bold text-slate-900">{item.value}</p>
+                    <p className="text-xs text-muted-foreground">{item.label}</p>
+                    <p className="text-lg font-bold text-foreground">{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -371,9 +371,9 @@ function OrgOwnerDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Branch Manager Dashboard — Branch-level metrics
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Branch Manager Dashboard â€” Branch-level metrics
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function BranchManagerDashboard() {
   const { brand, location } = useAuth();
 
@@ -454,17 +454,17 @@ function BranchManagerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-foreground">
           {brand?.name || location?.name || 'Branch'} Dashboard
         </h1>
-        <p className="text-slate-500 mt-1">Branch-level operations overview</p>
+        <p className="text-muted-foreground mt-1">Branch-level operations overview</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-orange-100" iconColor="text-orange-600" linkTo="Invoices" linkText="View all" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-red-100" iconColor="text-red-600" linkTo="Payments" linkText="View payments" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-yellow-100" iconColor="text-yellow-600" linkTo="Inventory" linkText="View inventory" />
-        <StatCard label="This Month Spend" value={`$${thisMonthSpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-teal-100" iconColor="text-teal-600" subtext={<><TrendingUp className="h-4 w-4 text-green-500" /><span>{products.length} products tracked</span></>} />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" />
+        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" />
+        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" />
+        <StatCard label="This Month Spend" value={`$${thisMonthSpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-primary/10" iconColor="text-primary" subtext={<><TrendingUp className="h-4 w-4 text-resend-green" /><span>{products.length} products tracked</span></>} />
       </div>
 
       {/* Recent Invoices */}
@@ -472,29 +472,29 @@ function BranchManagerDashboard() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base font-semibold">Recent Invoices</CardTitle>
           <Link to={createPageUrl('Invoices')}>
-            <Button variant="ghost" size="sm" className="text-teal-600">View All</Button>
+            <Button variant="ghost" size="sm" className="text-primary">View All</Button>
           </Link>
         </CardHeader>
         <CardContent>
           {recentInvoices.length > 0 ? (
             <div className="space-y-3">
               {recentInvoices.map(invoice => (
-                <div key={invoice.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div key={invoice.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center border">
-                      <FileText className="h-5 w-5 text-slate-400" />
+                      <FileText className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{invoice.vendor_name}</p>
-                      <p className="text-sm text-slate-500">#{invoice.invoice_number}</p>
+                      <p className="font-medium text-foreground">{invoice.vendor_name}</p>
+                      <p className="text-sm text-muted-foreground">#{invoice.invoice_number}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-slate-900">${invoice.total_amount?.toLocaleString()}</p>
+                    <p className="font-semibold text-foreground">${invoice.total_amount?.toLocaleString()}</p>
                     <Badge variant="secondary" className={`text-xs ${
-                      invoice.status === 'pending_review' ? 'bg-orange-100 text-orange-700' :
-                      invoice.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-slate-100 text-slate-600'
+                      invoice.status === 'pending_review' ? 'bg-resend-orange/10 text-resend-orange' :
+                      invoice.status === 'approved' ? 'bg-resend-green/10 text-resend-green' :
+                      'bg-secondary text-muted-foreground'
                     }`}>
                       {invoice.status?.replace('_', ' ')}
                     </Badge>
@@ -503,7 +503,7 @@ function BranchManagerDashboard() {
               ))}
             </div>
           ) : (
-            <div className="py-8 text-center text-slate-400">No invoices yet</div>
+            <div className="py-8 text-center text-muted-foreground">No invoices yet</div>
           )}
         </CardContent>
       </Card>
@@ -511,9 +511,9 @@ function BranchManagerDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Location Manager Dashboard — Location-level metrics
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Location Manager Dashboard â€” Location-level metrics
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function LocationManagerDashboard() {
   const { location } = useAuth();
 
@@ -582,16 +582,16 @@ function LocationManagerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-foreground">
           {location?.name || 'Location'} Dashboard
         </h1>
-        <p className="text-slate-500 mt-1">Location operations overview</p>
+        <p className="text-muted-foreground mt-1">Location operations overview</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-orange-100" iconColor="text-orange-600" linkTo="Invoices" linkText="View invoices" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-yellow-100" iconColor="text-yellow-600" linkTo="Inventory" linkText="View inventory" />
-        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="Products" linkText="View products" />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" />
+        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" />
+        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
       </div>
 
       {/* Quick Actions */}
@@ -602,7 +602,7 @@ function LocationManagerDashboard() {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Link to={createPageUrl('Invoices')}>
-              <Button className="gap-2 bg-teal-600 hover:bg-teal-700">
+              <Button className="gap-2 bg-primary hover:opacity-90">
                 <Upload className="h-4 w-4" />
                 Upload Invoice
               </Button>
@@ -626,9 +626,9 @@ function LocationManagerDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Ground Level Dashboard — Minimal view
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Ground Level Dashboard â€” Minimal view
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function GroundLevelDashboard() {
   const { location } = useAuth();
 
@@ -669,16 +669,16 @@ function GroundLevelDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">My Dashboard</h1>
-        <p className="text-slate-500 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">My Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
           {location?.name ? `Assigned to: ${location.name}` : 'Quick overview of your tasks'}
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices.length} icon={Clock} iconBg="bg-orange-100" iconColor="text-orange-600" linkTo="Invoices" linkText="View invoices" />
-        <StatCard label="My Uploads" value={myUploads} icon={Upload} iconBg="bg-blue-100" iconColor="text-blue-600" linkTo="Invoices" linkText="Upload invoice" />
-        <StatCard label="Products" value="—" icon={Eye} iconBg="bg-teal-100" iconColor="text-teal-600" linkTo="Products" linkText="View products" />
+        <StatCard label="Pending Invoices" value={pendingInvoices.length} icon={Clock} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" />
+        <StatCard label="My Uploads" value={myUploads} icon={Upload} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="Invoices" linkText="Upload invoice" />
+        <StatCard label="Products" value="â€”" icon={Eye} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
       </div>
 
       {/* Quick Actions */}
@@ -689,7 +689,7 @@ function GroundLevelDashboard() {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Link to={createPageUrl('Invoices')}>
-              <Button className="gap-2 bg-teal-600 hover:bg-teal-700">
+              <Button className="gap-2 bg-primary hover:opacity-90">
                 <Upload className="h-4 w-4" />
                 Upload Invoice
               </Button>
@@ -719,15 +719,15 @@ function GroundLevelDashboard() {
           <CardContent>
             <div className="space-y-3">
               {pendingInvoices.slice(0, 5).map(invoice => (
-                <div key={invoice.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div key={invoice.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-orange-500" />
+                    <FileText className="h-5 w-5 text-resend-orange" />
                     <div>
-                      <p className="font-medium text-slate-900">{invoice.vendor_name}</p>
-                      <p className="text-sm text-slate-500">#{invoice.invoice_number}</p>
+                      <p className="font-medium text-foreground">{invoice.vendor_name}</p>
+                      <p className="text-sm text-muted-foreground">#{invoice.invoice_number}</p>
                     </div>
                   </div>
-                  <Badge className="bg-orange-100 text-orange-700">Pending</Badge>
+                  <Badge className="bg-resend-orange/10 text-resend-orange">Pending</Badge>
                 </div>
               ))}
             </div>
@@ -738,9 +738,9 @@ function GroundLevelDashboard() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Main Dashboard — Routes to the correct role-specific view
-// ═══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Main Dashboard â€” Routes to the correct role-specific view
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 export default function Dashboard() {
   const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 

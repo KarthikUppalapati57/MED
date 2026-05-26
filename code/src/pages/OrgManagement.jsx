@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -350,12 +350,12 @@ export default function OrgManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-teal-600" />
+          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Organization Management</h1>
-            <p className="text-sm text-slate-500">Manage your brands and locations hierarchy</p>
+            <h1 className="text-2xl font-bold text-foreground">Organization Management</h1>
+            <p className="text-sm text-muted-foreground">Manage your brands and locations hierarchy</p>
           </div>
         </div>
       </div>
@@ -367,14 +367,14 @@ export default function OrgManagement() {
           {/* Hierarchy Tree (Original Content) */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
           ) : orgs.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-500">No organizations yet</p>
-                <p className="text-xs text-slate-400 mt-1">Complete onboarding to create your first organization</p>
+                <p className="text-muted-foreground">No organizations yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Complete onboarding to create your first organization</p>
               </CardContent>
             </Card>
           ) : (
@@ -385,25 +385,25 @@ export default function OrgManagement() {
                 const staffCount = getOrgStaffCount(org.id);
 
                 return (
-                  <Card key={org.id} className="overflow-hidden border-slate-200 shadow-sm">
+                  <Card key={org.id} className="overflow-hidden border-border shadow-sm">
                     {/* Organization Row */}
                     <div
-                      className="flex items-center gap-3 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-3 p-4 cursor-pointer hover:bg-secondary transition-colors"
                       onClick={() => toggleOrg(org.id)}
                     >
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                        {isExpanded ? <ChevronDown className="w-4 h-4 text-blue-600" /> : <ChevronRight className="w-4 h-4 text-blue-600" />}
+                      <div className="w-8 h-8 bg-resend-blue/10 rounded-lg flex items-center justify-center shrink-0">
+                        {isExpanded ? <ChevronDown className="w-4 h-4 text-resend-blue" /> : <ChevronRight className="w-4 h-4 text-resend-blue" />}
                       </div>
-                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-resend-blue/5 rounded-xl flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5 text-resend-blue" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{org.name}</p>
-                          <Badge className="bg-emerald-100 text-emerald-700 border-none text-[9px]">{org.status || 'active'}</Badge>
+                          <p className="text-sm font-semibold text-foreground truncate">{org.name}</p>
+                          <Badge className="bg-resend-green/10 text-resend-green border-none text-[9px]">{org.status || 'active'}</Badge>
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} · {staffCount} staff · Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} Â· {staffCount} staff Â· Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : 'â€”'}
                         </p>
                       </div>
                       {canManage && (
@@ -419,9 +419,9 @@ export default function OrgManagement() {
 
                     {/* Expanded: Brands list */}
                     {isExpanded && (
-                      <div className="border-t border-slate-100 bg-slate-50/50">
+                      <div className="border-t border-border bg-secondary/50">
                         {orgBrands.length === 0 ? (
-                          <div className="p-4 pl-20 text-xs text-slate-400 italic">No brands yet — add your first brand</div>
+                          <div className="p-4 pl-20 text-xs text-muted-foreground italic">No brands yet â€” add your first brand</div>
                         ) : (
                           orgBrands.map(brand => {
                             const brandLocations = getBrandLocations(brand.id);
@@ -432,7 +432,7 @@ export default function OrgManagement() {
                               <div key={brand.id}>
                                 {/* Brand Row */}
                                 <div
-                                  className="flex items-center gap-3 py-3 px-4 pl-12 cursor-pointer hover:bg-slate-100/50 transition-colors border-t border-slate-100 first:border-t-0"
+                                  className="flex items-center gap-3 py-3 px-4 pl-12 cursor-pointer hover:bg-secondary/50 transition-colors border-t border-border first:border-t-0"
                                   onClick={() => toggleBrand(brand.id)}
                                 >
                                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
@@ -442,9 +442,9 @@ export default function OrgManagement() {
                                     <Store className="w-4 h-4 text-violet-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-800 truncate">{brand.name}</p>
-                                    <p className="text-[10px] text-slate-400">
-                                      {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} · {brandStaff} staff
+                                    <p className="text-sm font-medium text-foreground truncate">{brand.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} Â· {brandStaff} staff
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
@@ -454,11 +454,11 @@ export default function OrgManagement() {
                                           onClick={() => { setAddLocationDialog({ orgId: org.id, brandId: brand.id }); setNewLocationName(''); setNewLocationAddress(''); }}>
                                           <Plus className="w-3 h-3 mr-1" /> Location
                                         </Button>
-                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
                                           onClick={() => { setEditBrand(brand); setEditBrandName(brand.name); }}>
                                           <Pencil className="w-3 h-3" />
                                         </Button>
-                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
                                           onClick={() => handleDeleteBrand(brand)}>
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
@@ -469,28 +469,28 @@ export default function OrgManagement() {
 
                                 {/* Expanded: Locations list */}
                                 {isBrandExpanded && (
-                                  <div className="bg-white/50">
+                                  <div className="bg-card/50">
                                     {brandLocations.length === 0 ? (
-                                      <div className="p-3 pl-28 text-[10px] text-slate-400 italic">No locations yet</div>
+                                      <div className="p-3 pl-28 text-[10px] text-muted-foreground italic">No locations yet</div>
                                     ) : (
                                       brandLocations.map(loc => {
                                         const locStaff = getLocationStaffCount(loc.id);
                                         return (
-                                          <div key={loc.id} className="flex items-center gap-3 py-2.5 px-4 pl-24 border-t border-slate-50 hover:bg-emerald-50/30 transition-colors">
-                                            <div className="w-7 h-7 bg-emerald-50 rounded-md flex items-center justify-center shrink-0">
-                                              <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                                          <div key={loc.id} className="flex items-center gap-3 py-2.5 px-4 pl-24 border-t border-slate-50 hover:bg-resend-green/5/30 transition-colors">
+                                            <div className="w-7 h-7 bg-resend-green/5 rounded-md flex items-center justify-center shrink-0">
+                                              <MapPin className="w-3.5 h-3.5 text-resend-green" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                              <p className="text-xs font-medium text-slate-700 truncate">{loc.name}</p>
-                                              <p className="text-[10px] text-slate-400 truncate">{loc.address || 'No address'} · {locStaff} staff</p>
+                                              <p className="text-xs font-medium text-foreground truncate">{loc.name}</p>
+                                              <p className="text-[10px] text-muted-foreground truncate">{loc.address || 'No address'} Â· {locStaff} staff</p>
                                             </div>
                                             {canManage && (
                                               <div className="flex items-center gap-1 shrink-0">
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
                                                   onClick={() => { setEditLocation(loc); setEditLocationName(loc.name); setEditLocationAddress(loc.address || ''); }}>
                                                   <Pencil className="w-2.5 h-2.5" />
                                                 </Button>
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
                                                   onClick={() => handleDeleteLocation(loc)}>
                                                   <Trash2 className="w-2.5 h-2.5" />
                                                 </Button>
@@ -516,16 +516,16 @@ export default function OrgManagement() {
         </TabsContent>
 
         <TabsContent value="security" className="mt-6">
-          <Card className="border-slate-200">
+          <Card className="border-border">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-8">
                 <div className="flex-1 space-y-6">
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                      <KeyRound className="w-5 h-5 text-teal-600" />
+                    <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
+                      <KeyRound className="w-5 h-5 text-primary" />
                       Two-Factor Authentication
                     </h3>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       Add an extra layer of security to your account by requiring a code from Microsoft Authenticator or a similar app.
                     </p>
                   </div>
@@ -533,23 +533,23 @@ export default function OrgManagement() {
                   {mfaFactors.length > 0 ? (
                     <div className="space-y-4">
                       {mfaFactors.map(factor => (
-                        <div key={factor.id} className="flex items-center justify-between p-4 bg-teal-50/50 rounded-xl border border-teal-100">
+                        <div key={factor.id} className="flex items-center justify-between p-4 bg-primary/5/50 rounded-xl border border-teal-100">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
-                              <Smartphone className="w-5 h-5 text-teal-600" />
+                            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Smartphone className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-900 uppercase">{factor.friendly_name || 'Authenticator App'}</p>
+                              <p className="text-sm font-semibold text-foreground uppercase">{factor.friendly_name || 'Authenticator App'}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <Badge variant="secondary" className="bg-teal-100 text-teal-700 text-[10px] h-4">Verified</Badge>
-                                <span className="text-[10px] text-slate-400 italic">Added {new Date(factor.created_at).toLocaleDateString()}</span>
+                                <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] h-4">Verified</Badge>
+                                <span className="text-[10px] text-muted-foreground italic">Added {new Date(factor.created_at).toLocaleDateString()}</span>
                               </div>
                             </div>
                           </div>
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
+                            className="text-resend-red hover:text-resend-red hover:bg-resend-red/5 text-xs"
                             onClick={() => {
                               if (window.confirm('Are you sure you want to disable MFA? This will make your account less secure.')) {
                                 unenrollMFA(factor.id);
@@ -562,17 +562,17 @@ export default function OrgManagement() {
                       ))}
                     </div>
                   ) : (
-                    <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center space-y-4">
-                      <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                    <div className="p-8 border-2 border-dashed border-border rounded-2xl text-center space-y-4">
+                      <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center mx-auto text-muted-foreground">
                         <ShieldAlert className="w-6 h-6" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-slate-900 font-medium">Protect your account</p>
-                        <p className="text-xs text-slate-400 max-w-[240px] mx-auto">
+                        <p className="text-foreground font-medium">Protect your account</p>
+                        <p className="text-xs text-muted-foreground max-w-[240px] mx-auto">
                           You haven't set up Multi-Factor Authentication yet. We highly recommend enabling it.
                         </p>
                       </div>
-                      <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setShowEnrolling(true)}>
+                      <Button className="bg-primary hover:bg-primary text-white" onClick={() => setShowEnrolling(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Enable MFA
                       </Button>
@@ -580,7 +580,7 @@ export default function OrgManagement() {
                   )}
 
                   {showEnrolling && (
-                    <Card className="border-teal-100 shadow-md bg-white">
+                    <Card className="border-teal-100 shadow-md bg-card">
                       <CardContent className="p-0">
                         <MFAEnrollment 
                           onComplete={() => setShowEnrolling(false)} 
@@ -591,20 +591,20 @@ export default function OrgManagement() {
                   )}
                 </div>
 
-                <div className="w-full md:w-72 bg-slate-50/80 rounded-2xl p-6 space-y-4 self-start">
-                  <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">How it works</h4>
+                <div className="w-full md:w-72 bg-secondary/80 rounded-2xl p-6 space-y-4 self-start">
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">How it works</h4>
                   <ul className="space-y-4">
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 bg-white shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-teal-600 border border-slate-100">1</div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">Download <b>Microsoft Authenticator</b> or Google Authenticator from your app store.</p>
+                      <div className="w-5 h-5 bg-card shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-primary border border-border">1</div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">Download <b>Microsoft Authenticator</b> or Google Authenticator from your app store.</p>
                     </li>
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 bg-white shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-teal-600 border border-slate-100">2</div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">Scan the secure QR code that will be generated for your account.</p>
+                      <div className="w-5 h-5 bg-card shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-primary border border-border">2</div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">Scan the secure QR code that will be generated for your account.</p>
                     </li>
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 bg-white shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-teal-600 border border-slate-100">3</div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">Confirm your setup with the first 6-digit code shown in your app.</p>
+                      <div className="w-5 h-5 bg-card shadow-sm rounded-md flex items-center justify-center shrink-0 text-[10px] font-bold text-primary border border-border">3</div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">Confirm your setup with the first 6-digit code shown in your app.</p>
                     </li>
                   </ul>
                 </div>
@@ -622,10 +622,10 @@ export default function OrgManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Brand Name</Label>
+              <Label className="text-sm font-semibold text-foreground">Brand Name</Label>
               <Input placeholder="e.g. Acme Burgers" value={newBrandName} onChange={e => setNewBrandName(e.target.value)} className="mt-1" />
             </div>
-            <p className="text-xs text-slate-400">A brand represents a restaurant concept within your organization. You can add multiple locations under each brand.</p>
+            <p className="text-xs text-muted-foreground">A brand represents a restaurant concept within your organization. You can add multiple locations under each brand.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddBrandDialog(null)}>Cancel</Button>
@@ -645,11 +645,11 @@ export default function OrgManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Location Name</Label>
+              <Label className="text-sm font-semibold text-foreground">Location Name</Label>
               <Input placeholder="e.g. Downtown Branch" value={newLocationName} onChange={e => setNewLocationName(e.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Address</Label>
+              <Label className="text-sm font-semibold text-foreground">Address</Label>
               <Input placeholder="123 Street, City, State, ZIP" value={newLocationAddress} onChange={e => setNewLocationAddress(e.target.value)} className="mt-1" />
             </div>
           </div>
@@ -671,13 +671,13 @@ export default function OrgManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Brand Name</Label>
+              <Label className="text-sm font-semibold text-foreground">Brand Name</Label>
               <Input value={editBrandName} onChange={e => setEditBrandName(e.target.value)} className="mt-1" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditBrand(null)}>Cancel</Button>
-            <Button onClick={handleSaveEditBrand} disabled={saving || !editBrandName.trim()} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSaveEditBrand} disabled={saving || !editBrandName.trim()} className="bg-resend-blue hover:bg-blue-700">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save Changes
             </Button>
@@ -693,17 +693,17 @@ export default function OrgManagement() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Location Name</Label>
+              <Label className="text-sm font-semibold text-foreground">Location Name</Label>
               <Input value={editLocationName} onChange={e => setEditLocationName(e.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-sm font-semibold text-slate-700">Address</Label>
+              <Label className="text-sm font-semibold text-foreground">Address</Label>
               <Input value={editLocationAddress} onChange={e => setEditLocationAddress(e.target.value)} className="mt-1" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditLocation(null)}>Cancel</Button>
-            <Button onClick={handleSaveEditLocation} disabled={saving || !editLocationName.trim()} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSaveEditLocation} disabled={saving || !editLocationName.trim()} className="bg-resend-blue hover:bg-blue-700">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save Changes
             </Button>
@@ -713,3 +713,4 @@ export default function OrgManagement() {
     </div>
   );
 }
+

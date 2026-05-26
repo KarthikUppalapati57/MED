@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -57,13 +57,13 @@ import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 
 const statusColors = {
-  pending_review: 'bg-yellow-100 text-yellow-700',
-  validated: 'bg-blue-100 text-blue-700',
-  approved: 'bg-green-100 text-green-700',
-  rejected: 'bg-red-100 text-red-700',
-  paid: 'bg-emerald-100 text-emerald-700',
-  flagged: 'bg-orange-100 text-orange-700',
-  duplicate: 'bg-slate-100 text-slate-600',
+  pending_review: 'bg-resend-yellow/10 text-resend-yellow',
+  validated: 'bg-resend-blue/10 text-resend-blue',
+  approved: 'bg-resend-green/10 text-resend-green',
+  rejected: 'bg-resend-red/10 text-resend-red',
+  paid: 'bg-resend-green/10 text-resend-green',
+  flagged: 'bg-resend-orange/10 text-resend-orange',
+  duplicate: 'bg-secondary text-muted-foreground',
 };
 
 export default function Invoices() {
@@ -469,7 +469,7 @@ export default function Invoices() {
       }
       toast.success('Invoice saved for later');
 
-      // ── Notify managers (in-app + email) ──────────────────────
+      // â”€â”€ Notify managers (in-app + email) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const orgId = savedInvoice?.organization_id || userProfile?.organization_id;
       const uploaderName = userProfile?.full_name || userProfile?.email || 'A team member';
       const invNum = savedInvoice?.invoice_number || 'New Invoice';
@@ -519,7 +519,7 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       await syncInvoiceToProductsAndInventory(savedInvoice);
-      toast.success('Invoice approved — items staged for 24h review before finalizing in inventory');
+      toast.success('Invoice approved â€” items staged for 24h review before finalizing in inventory');
 
       // Email the original uploader that their invoice was approved
       if (savedInvoice?.created_by) {
@@ -618,10 +618,10 @@ export default function Invoices() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Invoices</h1>
-          <p className="text-slate-500 mt-1">Manage and process vendor invoices</p>
+          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
+          <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
         </div>
-        <Button onClick={() => setUploadOpen(true)} className="bg-teal-600 hover:bg-teal-700">
+        <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
           <Upload className="h-4 w-4 mr-2" />
           Upload Invoice
         </Button>
@@ -631,24 +631,24 @@ export default function Invoices() {
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Validated</p>
-            <p className="text-2xl font-bold text-blue-700">
+            <p className="text-sm text-muted-foreground">Validated</p>
+            <p className="text-2xl font-bold text-resend-blue">
               {stats.validatedCount}
             </p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Approved</p>
-            <p className="text-2xl font-bold text-green-700">
+            <p className="text-sm text-muted-foreground">Approved</p>
+            <p className="text-2xl font-bold text-resend-green">
               {stats.approvedCount}
             </p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Total Approved</p>
-            <p className="text-2xl font-bold text-slate-900">
+            <p className="text-sm text-muted-foreground">Total Approved</p>
+            <p className="text-2xl font-bold text-foreground">
               ${stats.totalApprovedAmount.toLocaleString()}
             </p>
           </CardContent>
@@ -660,7 +660,7 @@ export default function Invoices() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search invoices..."
                 value={search}
@@ -702,19 +702,19 @@ export default function Invoices() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredInvoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No invoices found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-slate-50">
+                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
                       <TableCell className="font-medium">{invoice.vendor_name}</TableCell>
                       <TableCell>{invoice.invoice_number}</TableCell>
                       <TableCell>
@@ -752,7 +752,7 @@ export default function Invoices() {
                               </DropdownMenuItem>
                             )}
                             {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-red-600">
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
                                 <X className="h-4 w-4 mr-2" /> Reject
                               </DropdownMenuItem>
                             )}
@@ -764,7 +764,7 @@ export default function Invoices() {
                               </DropdownMenuItem>
                             )}
                             {isHigherRole && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-red-600">
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-resend-red">
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete
                               </DropdownMenuItem>
                             )}
@@ -797,8 +797,8 @@ export default function Invoices() {
           <div
             onMouseDown={startResizing}
             className={cn(
-              "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-teal-500/30 active:bg-teal-500/50 z-50 flex items-center justify-center",
-              isResizing && "bg-teal-500/40"
+              "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
+              isResizing && "bg-primary/40"
             )}
           >
              <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
@@ -827,7 +827,7 @@ export default function Invoices() {
                   <Button
                     variant="outline"
                     onClick={handleEditorSave}
-                    className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+                    className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5"
                   >
                     <Save className="h-4 w-4 mr-1" /> Save
                   </Button>
@@ -836,20 +836,20 @@ export default function Invoices() {
                       <Button
                     variant="outline"
                     onClick={handleEditorReject}
-                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                    className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5"
                   >
                     <X className="h-4 w-4 mr-1" /> Reject
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleEditorApprove}
-                    className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+                    className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5"
                   >
                     <Check className="h-4 w-4 mr-1" /> Approve
                   </Button>
                   <Button
                     onClick={handleAcceptInvoice}
-                    className="flex-1 bg-teal-600 hover:bg-teal-700"
+                    className="flex-1 bg-primary hover:bg-primary"
                   >
                     Validate
                   </Button>

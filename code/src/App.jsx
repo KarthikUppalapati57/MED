@@ -100,14 +100,15 @@ function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      <div className="absolute inset-0 glow-teal opacity-40 pointer-events-none" />
+      <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-teal-500 flex items-center justify-center mx-auto mb-3">
-            <svg width="24" height="24" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Create Your Account</h1>
-          <p className="text-slate-500 mt-1 text-sm">
+          <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
             {inviteInfo
               ? `You've been invited as ${
                   inviteInfo.role === 'owner' || inviteInfo.role === 'org_owner' ? 'organization owner' :
@@ -121,11 +122,11 @@ function SignupPage() {
 
         {success ? (
           <div className="text-center py-6 animate-in fade-in zoom-in duration-300">
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <svg width="24" height="24" fill="none" stroke="#16a34a" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+            <div className="h-12 w-12 rounded-full bg-resend-green/10 flex items-center justify-center mx-auto mb-3">
+              <svg width="24" height="24" fill="none" stroke="hsl(var(--resend-green))" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
             </div>
-            <p className="text-green-700 font-medium">Account created successfully!</p>
-            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+            <p className="text-resend-green font-medium">Account created successfully!</p>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               {!!user 
                 ? "Starting secure account setup..." 
                 : "Please check your email to confirm your account before setting up authentication."}
@@ -134,69 +135,69 @@ function SignupPage() {
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Full Name</label>
+              <label className="block text-sm font-medium text-foreground">Full Name</label>
               <input
                 type="text"
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
                 required
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Email</label>
+              <label className="block text-sm font-medium text-foreground">Email</label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
                 required
                 readOnly={!!inviteInfo?.email}
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <label className="block text-sm font-medium text-foreground">Password</label>
               <input
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
                 required
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-slate-700">Confirm Password</label>
+              <label className="block text-sm font-medium text-foreground">Confirm Password</label>
               <input
                 type="password"
                 value={form.confirm}
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
                 required
               />
             </div>
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>
+              <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">{error}</p>
             )}
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                  <div className="w-4 h-4 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin mr-2" />
                   Creating account...
                 </>
               ) : 'Create Account'}
             </button>
 
-            <div className="text-center pt-2 border-t">
-              <p className="text-sm text-slate-500">
+            <div className="text-center pt-2 border-t border-border">
+              <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <button
                   type="button"
                   onClick={() => navigate('/')}
-                  className="text-teal-600 hover:text-teal-700 font-medium"
+                  className="text-foreground hover:opacity-80 font-medium transition-opacity"
                 >
                   Sign In
                 </button>
@@ -273,23 +274,24 @@ function LoginPage() {
 
   if (isResetMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        <div className="absolute inset-0 glow-blue opacity-30 pointer-events-none" />
+        <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-slate-900">Reset Password</h1>
-            <p className="text-slate-500 mt-1 text-sm">
+            <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
               Enter your email and we'll send you a reset link.
             </p>
           </div>
           {resetSent ? (
             <div className="text-center space-y-4">
-              <div className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+              <div className="text-sm text-resend-green bg-resend-green/10 p-3 rounded-lg border border-resend-green/20">
                 Reset link sent! Please check your email.
               </div>
               <button
                 type="button"
                 onClick={() => { setIsResetMode(false); setResetSent(false); }}
-                className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+                className="text-foreground hover:opacity-80 text-sm font-medium transition-opacity"
               >
                 Back to sign in
               </button>
@@ -297,33 +299,33 @@ function LoginPage() {
           ) : (
             <form className="space-y-4" onSubmit={handleReset}>
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-slate-700">Email</label>
+                <label className="block text-sm font-medium text-foreground">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
                   placeholder="you@restaurant.com"
                   required
                 />
               </div>
               {displayError && (
-                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">
                   {displayError}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </button>
-              <div className="text-center pt-2 border-t mt-4">
+              <div className="text-center pt-2 border-t border-border mt-4">
                 <button
                   type="button"
                   onClick={() => setIsResetMode(false)}
-                  className="text-sm text-slate-500 hover:text-slate-700"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Back to sign in
                 </button>
@@ -336,39 +338,40 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 space-y-6 border border-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      <div className="absolute inset-0 glow-orange opacity-30 pointer-events-none" />
+      <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-teal-500 flex items-center justify-center mx-auto mb-3">
-            <svg width="24" height="24" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-foreground">
             Welcome to EdgeOps
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 text-sm">
             Sign in with your credentials
           </p>
         </div>
 
         <form className="space-y-4" onSubmit={handleLogin}>
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-slate-700">Email</label>
+            <label className="block text-sm font-medium text-foreground">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
               placeholder="you@restaurant.com"
               required
             />
           </div>
           <div className="space-y-1">
             <div className="flex justify-between items-center">
-              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <label className="block text-sm font-medium text-foreground">Password</label>
               <button 
                 type="button" 
                 onClick={() => setIsResetMode(true)}
-                className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
               >
                 Forgot password?
               </button>
@@ -377,20 +380,20 @@ function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
               placeholder="••••••••"
               required
             />
           </div>
           {displayError && (
-            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">
               {displayError}
             </p>
           )}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
@@ -418,21 +421,22 @@ function PendingAssignmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white animate-fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-100/80 text-center space-y-6 animate-in fade-in zoom-in duration-300">
-        <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto">
-          <svg className="w-8 h-8 text-teal-600 animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 animate-fade-in relative overflow-hidden">
+      <div className="absolute inset-0 glow-yellow opacity-30 pointer-events-none" />
+      <div className="w-full max-w-md bg-card rounded-xl shadow-xl p-8 border border-border text-center space-y-6 animate-in fade-in zoom-in duration-300 relative z-10">
+        <div className="w-16 h-16 bg-resend-orange/10 rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-8 h-8 text-resend-orange animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
         
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-slate-900">Account Setup Pending</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            Welcome, <span className="font-semibold text-slate-700">{userProfile?.full_name || 'User'}</span>! 
+          <h2 className="text-2xl font-bold text-foreground">Account Setup Pending</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Welcome, <span className="font-semibold text-foreground">{userProfile?.full_name || 'User'}</span>! 
             Your account has been created successfully, but you are not yet assigned to an organization or branch.
           </p>
-          <p className="text-slate-400 text-xs leading-relaxed">
+          <p className="text-muted-foreground/70 text-xs leading-relaxed">
             Please contact your organization administrator or platform administrator to complete your assignment.
           </p>
         </div>
@@ -441,7 +445,7 @@ function PendingAssignmentPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="w-full h-12 inline-flex items-center justify-center bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 inline-flex items-center justify-center bg-primary hover:opacity-90 text-primary-foreground font-bold rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {refreshing ? (
               <>
@@ -455,7 +459,7 @@ function PendingAssignmentPage() {
           
           <button
             onClick={logout}
-            className="w-full h-12 inline-flex items-center justify-center border border-slate-200 text-slate-600 font-semibold rounded-xl hover:bg-slate-50 transition-all"
+            className="w-full h-12 inline-flex items-center justify-center border border-border text-muted-foreground font-semibold rounded-lg hover:bg-secondary transition-all"
           >
             Sign Out
           </button>
@@ -503,33 +507,34 @@ function UpdatePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50 p-4">
-      <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 space-y-6 border border-slate-100 ring-1 ring-slate-200/50 animate-in fade-in zoom-in duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      <div className="absolute inset-0 glow-blue opacity-30 pointer-events-none" />
+      <div className="w-full max-w-md bg-card backdrop-blur-xl rounded-xl shadow-xl p-8 space-y-6 border border-border animate-in fade-in zoom-in duration-300 relative z-10">
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-xl bg-teal-500 flex items-center justify-center mx-auto mb-3 shadow-md shadow-teal-200">
-            <svg width="24" height="24" fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Update Password</h1>
-          <p className="text-slate-500 text-sm">Enter your new secure password below.</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Update Password</h1>
+          <p className="text-muted-foreground text-sm">Enter your new secure password below.</p>
         </div>
         <form className="space-y-4" onSubmit={handleUpdate}>
           <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-slate-700">New Password</label>
+            <label className="block text-sm font-semibold text-foreground">New Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 pl-3 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                className="w-full rounded-lg border border-border bg-secondary pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all placeholder:text-muted-foreground"
                 placeholder="••••••••"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPassword ? (
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
@@ -540,25 +545,25 @@ function UpdatePasswordPage() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-slate-700">Confirm Password</label>
+            <label className="block text-sm font-semibold text-foreground">Confirm Password</label>
             <input
               type={showPassword ? 'text' : 'password'}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all placeholder:text-muted-foreground"
               placeholder="••••••••"
               required
             />
           </div>
-          {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">{error}</p>}
+          {error && <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 transition-colors shadow-md shadow-teal-600/10"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin animate-spin-fast" />
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Updating...
               </>
             ) : 'Update Password'}
@@ -624,10 +629,10 @@ const AuthenticatedApp = () => {
 
   if (isLoadingAuth) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500">Loading...</p>
+          <div className="w-10 h-10 border-4 border-border border-t-foreground rounded-full animate-spin"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -638,10 +643,10 @@ const AuthenticatedApp = () => {
   // before being redirected to MFA setup.
   if (user && isUnassignedUser && !isMfaReady && !isPlatformAdmin) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-slate-500">Setting up your account...</p>
+          <div className="w-10 h-10 border-4 border-border border-t-foreground rounded-full animate-spin"></div>
+          <p className="text-sm text-muted-foreground">Setting up your account...</p>
         </div>
       </div>
     );
@@ -713,8 +718,8 @@ const AuthenticatedApp = () => {
                     <React.Suspense fallback={
                       <div className="flex-1 flex items-center justify-center p-12 min-h-[60vh]">
                         <div className="flex flex-col items-center gap-3">
-                          <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
-                          <p className="text-xs text-slate-400 font-medium">Loading {path.replace(/([A-Z])/g, ' $1').trim()}...</p>
+                          <Loader2 className="w-8 h-8 text-foreground animate-spin" />
+                          <p className="text-xs text-muted-foreground font-medium">Loading {path.replace(/([A-Z])/g, ' $1').trim()}...</p>
                         </div>
                       </div>
                     }>

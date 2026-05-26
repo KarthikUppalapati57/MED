@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,19 +9,19 @@ export default function MFASetupPage() {
   const { logout, user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-teal-50 via-slate-50 to-white">
+    <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
       <div className="w-full max-w-2xl animate-in fade-in zoom-in duration-500">
         <div className="text-center mb-8 space-y-2">
-          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-teal-200 ring-4 ring-white">
+          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-primary/10 ring-4 ring-white">
             <ShieldAlert className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Secure Your Account</h1>
-          <p className="text-slate-500 max-w-sm mx-auto">
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Secure Your Account</h1>
+          <p className="text-muted-foreground max-w-sm mx-auto">
             To protect our community and your data, we require multi-factor authentication (MFA) for all accounts.
           </p>
         </div>
 
-        <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl ring-1 ring-slate-200/50 overflow-hidden">
+        <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50 overflow-hidden">
           <CardContent className="p-0">
             <div className="grid md:grid-cols-5 h-full">
               {/* Left Side: Context */}
@@ -33,28 +33,28 @@ export default function MFASetupPage() {
                   </h3>
                   <ul className="space-y-4">
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 rounded-full bg-teal-500/20 flex items-center justify-center shrink-0 border border-teal-500/30 text-[10px] font-bold">1</div>
-                      <p className="text-xs text-slate-300 leading-relaxed">Install <b>Microsoft Authenticator</b> on your phone.</p>
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30 text-[10px] font-bold">1</div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">Install <b>Microsoft Authenticator</b> on your phone.</p>
                     </li>
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 rounded-full bg-teal-500/20 flex items-center justify-center shrink-0 border border-teal-500/30 text-[10px] font-bold">2</div>
-                      <p className="text-xs text-slate-300 leading-relaxed">Scan the QR code shown on the right.</p>
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30 text-[10px] font-bold">2</div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">Scan the QR code shown on the right.</p>
                     </li>
                     <li className="flex gap-3">
-                      <div className="w-5 h-5 rounded-full bg-teal-500/20 flex items-center justify-center shrink-0 border border-teal-500/30 text-[10px] font-bold">3</div>
-                      <p className="text-xs text-slate-300 leading-relaxed">Enter the 6-digit code to verify and link your account.</p>
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30 text-[10px] font-bold">3</div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">Enter the 6-digit code to verify and link your account.</p>
                     </li>
                   </ul>
                 </div>
 
                 <div className="pt-8 border-t border-slate-800">
-                  <p className="text-[10px] text-slate-500 leading-relaxed font-medium uppercase tracking-widest mb-2">Logged in as</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed font-medium uppercase tracking-widest mb-2">Logged in as</p>
                   <p className="text-sm font-semibold text-teal-400 truncate">{user?.email}</p>
                 </div>
 
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 p-0 h-auto py-2 text-xs"
+                  className="w-full justify-start text-muted-foreground hover:text-white hover:bg-slate-800 p-0 h-auto py-2 text-xs"
                   onClick={logout}
                 >
                   <LogOut className="w-4 h-4 mr-2" />
@@ -76,10 +76,11 @@ export default function MFASetupPage() {
           </CardContent>
         </Card>
         
-        <p className="text-center mt-8 text-slate-400 text-[11px] font-medium uppercase tracking-widest">
+        <p className="text-center mt-8 text-muted-foreground text-[11px] font-medium uppercase tracking-widest">
           EdgeOps Security Protocol &copy; 2026
         </p>
       </div>
     </div>
   );
 }
+

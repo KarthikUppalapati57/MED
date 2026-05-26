@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -61,9 +61,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 const statusColors = {
-  active: 'bg-green-100 text-green-700',
-  inactive: 'bg-slate-100 text-slate-700',
-  blacklisted: 'bg-red-100 text-red-700',
+  active: 'bg-resend-green/10 text-resend-green',
+  inactive: 'bg-secondary text-foreground',
+  blacklisted: 'bg-resend-red/10 text-resend-red',
 };
 
 export default function Vendors() {
@@ -101,7 +101,7 @@ export default function Vendors() {
     queryFn: () => api.entities.Vendor.list('-created_at'),
   });
 
-  // ── Realtime subscription ──────────────────────────────────
+  // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const channel = supabase.channel('vendors-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
@@ -253,15 +253,15 @@ export default function Vendors() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Vendors</h1>
-          <p className="text-slate-500 mt-1">Manage your vendor relationships</p>
+          <h1 className="text-2xl font-bold text-foreground">Vendors</h1>
+          <p className="text-muted-foreground mt-1">Manage your vendor relationships</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchSuggestions}>
             <Sparkles className="h-4 w-4 mr-2" />
             Suggestions
           </Button>
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
             <Plus className="h-4 w-4 mr-2" />
             Add Vendor
           </Button>
@@ -272,26 +272,26 @@ export default function Vendors() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Total Vendors</p>
-            <p className="text-2xl font-bold text-slate-900">{vendors.length}</p>
+            <p className="text-sm text-muted-foreground">Total Vendors</p>
+            <p className="text-2xl font-bold text-foreground">{vendors.length}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Active</p>
-            <p className="text-2xl font-bold text-green-600">{activeVendors}</p>
+            <p className="text-sm text-muted-foreground">Active</p>
+            <p className="text-2xl font-bold text-resend-green">{activeVendors}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Total Orders</p>
-            <p className="text-2xl font-bold text-slate-900">{totalOrders}</p>
+            <p className="text-sm text-muted-foreground">Total Orders</p>
+            <p className="text-2xl font-bold text-foreground">{totalOrders}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Total Spent</p>
-            <p className="text-2xl font-bold text-slate-900">${totalSpent.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Total Spent</p>
+            <p className="text-2xl font-bold text-foreground">${totalSpent.toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>
@@ -309,7 +309,7 @@ export default function Vendors() {
             size="sm"
             variant={periodFilter === period ? 'default' : 'outline'}
             onClick={() => setPeriodFilter(period)}
-            className={periodFilter === period ? 'bg-teal-600 hover:bg-teal-700' : ''}
+            className={periodFilter === period ? 'bg-primary hover:bg-primary' : ''}
           >
             {period === 'all' ? 'All Time' : period === 'this_period' ? 'This Period' : period === 'last_period' ? 'Last Period' : 'This Year'}
           </Button>
@@ -321,7 +321,7 @@ export default function Vendors() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search vendors..."
                 value={search}
@@ -363,13 +363,13 @@ export default function Vendors() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No vendors found
                     </TableCell>
                   </TableRow>
@@ -378,31 +378,31 @@ export default function Vendors() {
                     <TableRow key={vendor.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-teal-100 flex items-center justify-center">
-                            <Store className="h-5 w-5 text-teal-600" />
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Store className="h-5 w-5 text-primary" />
                           </div>
                           <div>
                             <p className="font-medium">{vendor.name}</p>
-                            <p className="text-sm text-slate-500">{vendor.contact_name}</p>
+                            <p className="text-sm text-muted-foreground">{vendor.contact_name}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
                           {vendor.email && (
-                            <div className="flex items-center gap-1 text-slate-500">
+                            <div className="flex items-center gap-1 text-muted-foreground">
                               <Mail className="h-3 w-3" /> {vendor.email}
                             </div>
                           )}
                           {vendor.phone && (
-                            <div className="flex items-center gap-1 text-slate-500 mt-1">
+                            <div className="flex items-center gap-1 text-muted-foreground mt-1">
                               <Phone className="h-3 w-3" /> {vendor.phone}
                             </div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-slate-500">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3" />
                           {vendor.city}, {vendor.state}
                         </div>
@@ -434,7 +434,7 @@ export default function Vendors() {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => deleteMutation.mutate(vendor.id)}
-                              className="text-red-600"
+                              className="text-resend-red"
                             >
                               <Trash2 className="h-4 w-4 mr-2" /> Delete
                             </DropdownMenuItem>
@@ -451,13 +451,13 @@ export default function Vendors() {
       </Card>
         </TabsContent>
 
-        {/* ── Vendor Items Tab ────────────────────────────────── */}
+        {/* â”€â”€ Vendor Items Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="vendor-items">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">Vendor Items Catalog</CardTitle>
-                <p className="text-xs text-slate-400">Master list of all vendor catalog items across all vendors</p>
+                <p className="text-xs text-muted-foreground">Master list of all vendor catalog items across all vendors</p>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -477,7 +477,7 @@ export default function Vendors() {
                 <TableBody>
                   {vendors.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No vendor items available. Items will appear here once vendors have associated products.
                       </TableCell>
                     </TableRow>
@@ -487,16 +487,16 @@ export default function Vendors() {
                         ? (vendor.items || []).map((item, idx) => (
                             <TableRow key={`${vendor.id}-${idx}`}>
                               <TableCell className="font-medium">{vendor.name}</TableCell>
-                              <TableCell>{item.vendor_item_name || item.name || '—'}</TableCell>
-                              <TableCell>{item.product_name || '—'}</TableCell>
-                              <TableCell><Badge variant="secondary">{item.category || '—'}</Badge></TableCell>
-                              <TableCell className="font-mono text-sm">{item.item_code || '—'}</TableCell>
-                              <TableCell className="text-sm text-slate-500">
-                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '—'}
+                              <TableCell>{item.vendor_item_name || item.name || 'â€”'}</TableCell>
+                              <TableCell>{item.product_name || 'â€”'}</TableCell>
+                              <TableCell><Badge variant="secondary">{item.category || 'â€”'}</Badge></TableCell>
+                              <TableCell className="font-mono text-sm">{item.item_code || 'â€”'}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : 'â€”'}
                               </TableCell>
                               <TableCell className="font-semibold">${(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
                               <TableCell>
-                                <Badge className={item.on_order_guide ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}>
+                                <Badge className={item.on_order_guide ? 'bg-resend-green/10 text-resend-green' : 'bg-secondary text-muted-foreground'}>
                                   {item.on_order_guide ? 'Active' : 'Inactive'}
                                 </Badge>
                               </TableCell>
@@ -504,7 +504,7 @@ export default function Vendors() {
                           ))
                         : [<TableRow key={`${vendor.id}-empty`}>
                             <TableCell className="font-medium">{vendor.name}</TableCell>
-                            <TableCell colSpan={7} className="text-slate-400 italic">No items cataloged</TableCell>
+                            <TableCell colSpan={7} className="text-muted-foreground italic">No items cataloged</TableCell>
                           </TableRow>]
                     )
                   )}
@@ -643,7 +643,7 @@ export default function Vendors() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={handleSubmit} className="bg-primary hover:bg-primary">
               {editingVendor ? 'Update' : 'Create'} Vendor
             </Button>
           </DialogFooter>
@@ -655,34 +655,34 @@ export default function Vendors() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-teal-500" />
+              <Sparkles className="h-5 w-5 text-primary" />
               Vendor Suggestions
             </DialogTitle>
           </DialogHeader>
 
           {loadingSuggestions ? (
             <div className="py-8 text-center">
-              <Loader2 className="h-10 w-10 animate-spin text-teal-500 mx-auto" />
-              <p className="mt-4 text-slate-500">Finding vendor suggestions...</p>
+              <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+              <p className="mt-4 text-muted-foreground">Finding vendor suggestions...</p>
             </div>
           ) : (
             <div className="space-y-4 py-4">
               {suggestions.length === 0 ? (
-                <p className="text-center text-slate-500 py-4">No suggestions available</p>
+                <p className="text-center text-muted-foreground py-4">No suggestions available</p>
               ) : (
                 suggestions.map((s, idx) => (
                   <div key={s.name || idx} className="p-4 border rounded-lg">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-semibold">{s.name}</p>
-                        <p className="text-sm text-slate-500">{s.specialty}</p>
+                        <p className="text-sm text-muted-foreground">{s.specialty}</p>
                       </div>
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                         <span className="font-medium">{s.estimated_rating?.toFixed(1)}</span>
                       </div>
                     </div>
-                    <p className="text-sm text-slate-600 mt-2">{s.reason}</p>
+                    <p className="text-sm text-muted-foreground mt-2">{s.reason}</p>
                     <Button
                       size="sm"
                       variant="outline"
