@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEVS System Monitor — Developer Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg: #07080a;
+    --surface: #0d0f12;
+    --surface2: #12151a;
+    --surface3: #181c22;
+    --border: rgba(255,255,255,0.06);
+    --border-bright: rgba(255,255,255,0.12);
+    --text: #eef1f8;
+    --text-dim: #8b92a5;
+    --text-muted: #555b6e;
+    --accent-green: #22ff99;
+    --accent-blue: #0075ff;
+    --accent-orange: #ff5900;
+    --accent-yellow: #ffc53d;
+    --accent-red: #ff2047;
+    --accent-cyan: #14c6cb;
+    --accent-purple: #a855f7;
+    --glow-green: rgba(34,255,153,0.15);
+    --glow-blue: rgba(0,117,255,0.15);
+    --glow-orange: rgba(255,89,0,0.15);
+    --glow-red: rgba(255,32,71,0.15);
+    --glow-cyan: rgba(20,198,203,0.15);
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  /* ═══ Scrollbar ═══ */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* ═══ Layout ═══ */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    padding: 16px 32px;
+    background: rgba(7,8,10,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.02em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .header h1 .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 12px var(--glow-green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  .header-meta {
+    display: flex; align-items: center; gap: 16px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .header-meta .refresh-badge {
+    padding: 4px 10px; border-radius: 20px;
+    background: rgba(34,255,153,0.08);
+    border: 1px solid rgba(34,255,153,0.15);
+    color: var(--accent-green);
+    font-weight: 500; font-size: 11px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .main { padding: 24px 32px; max-width: 1800px; margin: 0 auto; }
+
+  /* ═══ Tabs ═══ */
+  .tab-bar {
+    display: flex; gap: 2px; margin-bottom: 24px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 3px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 8px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-dim); cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .tab:hover { color: var(--text); background: var(--surface2); }
+  .tab.active {
+    color: var(--text); background: var(--surface2);
+    border-color: var(--border-bright);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  .panel { display: none; animation: fadeIn 0.3s ease; }
+  .panel.active { display: block; }
+
+  /* ═══ Cards ═══ */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header h3 {
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-body { padding: 20px; }
+  .card-badge {
+    padding: 3px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  /* ═══ Grid ═══ */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-24 { margin-bottom: 24px; }
+
+  /* ═══ Stats ═══ */
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card .stat-glow {
+    position: absolute; top: 0; left: 0; right: 0; height: 60%;
+    pointer-events: none; opacity: 0.4;
+  }
+  .stat-card .stat-label {
+    font-size: 11px; font-weight: 500; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 4px; position: relative;
+  }
+  .stat-card .stat-value {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    position: relative;
+  }
+  .stat-card .stat-sub {
+    font-size: 11px; color: var(--text-muted);
+    margin-top: 2px; position: relative;
+  }
+
+  /* ═══ N×N Matrix ═══ */
+  .matrix-container {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .matrix-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    min-width: 900px;
+  }
+  .matrix-table th, .matrix-table td {
+    padding: 0;
+    text-align: center;
+    font-size: 10px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .matrix-table th:last-child, .matrix-table td:last-child { border-right: none; }
+  .matrix-table tr:last-child td { border-bottom: none; }
+
+  .matrix-table th {
+    padding: 8px 4px;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--surface2);
+    position: sticky;
+    white-space: nowrap;
+  }
+  .matrix-table th:first-child {
+    position: sticky; left: 0; z-index: 10;
+    background: var(--surface2);
+  }
+  .matrix-table thead th { top: 0; z-index: 5; }
+  .matrix-table thead th:first-child { z-index: 15; }
+
+  .matrix-cell {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    margin: auto; cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 4px;
+    position: relative;
+  }
+  .matrix-cell:hover { transform: scale(1.3); z-index: 5; }
+  .matrix-cell .cell-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .cell-fk .cell-dot { background: var(--accent-green); box-shadow: 0 0 8px var(--glow-green); }
+  .cell-trigger .cell-dot { background: var(--accent-blue); box-shadow: 0 0 8px var(--glow-blue); }
+  .cell-rpc .cell-dot { background: var(--accent-yellow); box-shadow: 0 0 8px rgba(255,197,61,0.3); }
+  .cell-self .cell-dot { background: var(--text-muted); width: 6px; height: 6px; opacity: 0.3; }
+  .cell-none .cell-dot { background: transparent; }
+  .cell-multi .cell-dot {
+    background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+    box-shadow: 0 0 10px var(--glow-cyan);
+  }
+
+  .matrix-table td:first-child {
+    text-align: right;
+    padding: 0 8px;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: var(--surface2);
+    position: sticky; left: 0;
+    white-space: nowrap;
+  }
+
+  .matrix-legend {
+    display: flex; gap: 20px; padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .matrix-legend span {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .legend-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  /* ═══ Trigger / Function list ═══ */
+  .item-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    font-size: 13px;
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-row:hover { background: var(--surface2); }
+  .item-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .item-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 500;
+    color: var(--text);
+    flex: 1; min-width: 0;
+  }
+  .item-meta {
+    font-size: 11px; color: var(--text-muted);
+    display: flex; gap: 8px; align-items: center;
+    flex-shrink: 0;
+  }
+  .item-badge {
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge-green { background: rgba(34,255,153,0.1); color: var(--accent-green); border: 1px solid rgba(34,255,153,0.15); }
+  .badge-blue { background: rgba(0,117,255,0.1); color: var(--accent-blue); border: 1px solid rgba(0,117,255,0.15); }
+  .badge-orange { background: rgba(255,89,0,0.1); color: var(--accent-orange); border: 1px solid rgba(255,89,0,0.15); }
+  .badge-yellow { background: rgba(255,197,61,0.1); color: var(--accent-yellow); border: 1px solid rgba(255,197,61,0.15); }
+  .badge-red { background: rgba(255,32,71,0.1); color: var(--accent-red); border: 1px solid rgba(255,32,71,0.15); }
+  .badge-cyan { background: rgba(20,198,203,0.1); color: var(--accent-cyan); border: 1px solid rgba(20,198,203,0.15); }
+  .badge-purple { background: rgba(168,85,247,0.1); color: var(--accent-purple); border: 1px solid rgba(168,85,247,0.15); }
+
+  /* ═══ Flow Pipeline ═══ */
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; padding: 20px 0;
+  }
+  .pipe-stage {
+    flex-shrink: 0;
+    padding: 16px 20px;
+    border-radius: var(--radius);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    min-width: 160px;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s;
+  }
+  .pipe-stage.active {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 20px var(--glow-green), inset 0 1px 0 rgba(34,255,153,0.1);
+  }
+  .pipe-stage.active::before {
+    content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+  }
+  .pipe-stage .stage-name {
+    font-size: 13px; font-weight: 600; margin-bottom: 4px;
+  }
+  .pipe-stage .stage-count {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+    margin-bottom: 2px;
+  }
+  .pipe-stage .stage-sub {
+    font-size: 10px; color: var(--text-muted);
+  }
+  .pipe-arrow {
+    flex-shrink: 0; padding: 0 6px;
+    color: var(--text-muted); font-size: 16px;
+  }
+  .pipe-arrow.active { color: var(--accent-green); }
+
+  /* ═══ Page-Role Matrix ═══ */
+  .role-matrix {
+    border-collapse: separate; border-spacing: 0;
+    width: 100%;
+  }
+  .role-matrix th, .role-matrix td {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .role-matrix th:last-child, .role-matrix td:last-child { border-right: none; }
+  .role-matrix tr:last-child td { border-bottom: none; }
+  .role-matrix th {
+    font-weight: 600; color: var(--text-dim);
+    background: var(--surface2);
+    white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
+  }
+  .role-matrix td:first-child {
+    text-align: left; font-weight: 500;
+    background: var(--surface2);
+    position: sticky; left: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .role-check { color: var(--accent-green); font-weight: 700; font-size: 14px; }
+  .role-deny { color: var(--text-muted); font-size: 12px; }
+
+  /* ═══ Connection Detail Popup ═══ */
+  .popup-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 100; display: none;
+    align-items: center; justify-content: center;
+  }
+  .popup-overlay.show { display: flex; }
+  .popup {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 12px;
+    padding: 24px; max-width: 500px; width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: popIn 0.2s ease;
+  }
+  .popup h3 {
+    font-size: 16px; font-weight: 700; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .popup-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 18px; padding: 4px;
+  }
+  .popup-detail {
+    padding: 8px 12px; margin-bottom: 6px;
+    background: var(--surface2); border-radius: 6px;
+    font-size: 12px; border: 1px solid var(--border);
+  }
+  .popup-detail .label { color: var(--text-muted); font-size: 10px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .popup-detail .value { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+
+  /* ═══ Live indicator ═══ */
+  .live-row { transition: background 0.5s; }
+  .live-row.changed { background: rgba(34,255,153,0.04) !important; }
+  .count-flash {
+    display: inline-block;
+    transition: color 0.3s, transform 0.3s;
+  }
+  .count-flash.flash {
+    color: var(--accent-green) !important;
+    transform: scale(1.15);
+  }
+
+  /* ═══ Animations ═══ */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent-green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* ═══ Responsive ═══ */
+  @media (max-width: 1200px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 800px) {
+    .header { padding: 12px 16px; }
+    .main { padding: 16px; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .tab { padding: 6px 12px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<header class="header">
+  <h1>
+    <div class="dot" id="connection-dot"></div>
+    MEVS System Monitor
+  </h1>
+  <div class="header-meta">
+    <span id="status-text">Connecting...</span>
+    <div class="refresh-badge">
+      <div class="spinner" id="refresh-spinner" style="display:none"></div>
+      <span id="refresh-text">⚡ 5s refresh</span>
+    </div>
+    <span id="last-update"></span>
+  </div>
+</header>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="main">
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <div class="tab active" data-tab="overview">📊 Overview</div>
+    <div class="tab" data-tab="matrix">🔗 N×N Connection Matrix</div>
+    <div class="tab" data-tab="triggers">⚡ Database Triggers</div>
+    <div class="tab" data-tab="functions">🔧 RPC Functions</div>
+    <div class="tab" data-tab="flows">🔄 Active Flows</div>
+    <div class="tab" data-tab="pages">📄 Pages × Roles × Tables</div>
+  </div>
+
+  <!-- ═══ PANEL 1: Overview ═══ -->
+  <div class="panel active" id="panel-overview">
+    <!-- Stats row -->
+    <div class="grid-4 mb-24" id="stats-grid"></div>
+
+    <!-- Two column: Trigger health + Function health -->
+    <div class="grid-2 mb-24">
+      <div class="card">
+        <div class="card-header">
+          <h3>⚡ Trigger Activity <span class="card-badge" id="trigger-active-count">0 active</span></h3>
+        </div>
+        <div class="card-body" id="overview-triggers" style="max-height: 320px; overflow-y: auto;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3>🔧 Function Registry <span class="card-badge" id="function-total-count">0 total</span></h3>
+        </div>
+        <div class="card-body" id="overview-functions" style="max-height: 320px; overflow-y: auto;"></div>
+      </div>
+    </div>
+
+    <!-- Flow Pipeline -->
+    <div class="card">
+      <div class="card-header">
+        <h3>🔄 Operational Pipeline</h3>
+        <span class="card-badge" id="pipeline-status">checking...</span>
+      </div>
+      <div class="card-body">
+        <div class="pipeline" id="overview-pipeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL 2: N×N Matrix ═══ -->
+  <div class="panel" id="panel-matrix">
+    <div class="matrix-container" id="matrix-container"></div>
+  </div>
+
+  <!-- ═══ PANEL 3: Triggers ═══ -->
+  <div class="panel" id="panel-triggers">
+    <div class="card">
+      <div class="card-header">
+        <h3>⚡ All Database Triggers</h3>
+        <span class="card-badge" id="triggers-total">0 triggers</span>
+      </div>
+      <div id="triggers-list"></div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL 4: Functions ═══ -->
+  <div class="panel" id="panel-functions">
+    <div class="card">
+      <div class="card-header">
+        <h3>🔧 All Database Functions & RPCs</h3>
+        <span class="card-badge" id="functions-total">0 functions</span>
+      </div>
+      <div id="functions-list"></div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL 5: Active Flows ═══ -->
+  <div class="panel" id="panel-flows">
+    <div class="card mb-24">
+      <div class="card-header">
+        <h3>🔄 Operational Cycles — Live Pipeline</h3>
+      </div>
+      <div class="card-body">
+        <div class="pipeline" id="flow-pipeline"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>📊 Table Row Counts</h3></div>
+        <div id="table-counts" style="max-height: 500px; overflow-y: auto;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>🕐 Last Activity Per Table</h3></div>
+        <div id="table-activity" style="max-height: 500px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL 6: Pages × Roles ═══ -->
+  <div class="panel" id="panel-pages">
+    <div class="card mb-24">
+      <div class="card-header"><h3>📄 Pages × Role Access Matrix</h3></div>
+      <div style="overflow: auto;">
+        <table class="role-matrix" id="role-matrix"></table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>🗄️ Pages × Database Tables Connection Map</h3></div>
+      <div style="overflow: auto;">
+        <table class="role-matrix" id="page-table-matrix"></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ Popup for matrix cell details ═══ -->
+<div class="popup-overlay" id="popup-overlay" onclick="closePopup()">
+  <div class="popup" onclick="event.stopPropagation()">
+    <h3 id="popup-title">Connection Details</h3>
+    <div id="popup-body"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// MEVS SYSTEM MONITOR — All Platform Knowledge Hardcoded
+// ════════════════════════════════════════════════════════════
+
+const SUPABASE_URL = 'https://gsupqfmwlsmwoybphimx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_dJ9li9n-pwirxncFFVf9lQ_NozRI3n5';
+
+let sb = null;
+let previousCounts = {};
+let isConnected = false;
+
+// ═══ CORE TABLES ═══
+const CORE_TABLES = [
+  'profiles', 'organizations', 'brands', 'locations',
+  'vendors', 'products', 'invoices', 'payments',
+  'inventory', 'wastage_logs', 'recipes', 'auto_orders',
+  'notifications', 'invitations', 'audit_logs', 'error_logs'
+];
+
+const STAR_TABLES = [
+  'dim_vendor', 'dim_product', 'dim_user', 'dim_date',
+  'fact_invoices', 'fact_payments', 'fact_inventory', 'fact_wastage', 'fact_orders'
+];
+
+// ═══ FK RELATIONSHIPS (from migrations) ═══
+const FK_CONNECTIONS = [
+  { from: 'profiles', to: 'organizations', fk: 'organization_id' },
+  { from: 'profiles', to: 'brands', fk: 'brand_id' },
+  { from: 'profiles', to: 'locations', fk: 'location_id' },
+  { from: 'brands', to: 'organizations', fk: 'organization_id' },
+  { from: 'locations', to: 'organizations', fk: 'organization_id' },
+  { from: 'locations', to: 'brands', fk: 'brand_id' },
+  { from: 'invoices', to: 'vendors', fk: 'vendor_id' },
+  { from: 'invoices', to: 'organizations', fk: 'organization_id' },
+  { from: 'invoices', to: 'locations', fk: 'location_id' },
+  { from: 'payments', to: 'invoices', fk: 'invoice_id' },
+  { from: 'payments', to: 'vendors', fk: 'vendor_id' },
+  { from: 'payments', to: 'organizations', fk: 'organization_id' },
+  { from: 'products', to: 'vendors', fk: 'preferred_vendor_id' },
+  { from: 'products', to: 'organizations', fk: 'organization_id' },
+  { from: 'products', to: 'locations', fk: 'location_id' },
+  { from: 'inventory', to: 'organizations', fk: 'organization_id' },
+  { from: 'inventory', to: 'locations', fk: 'location_id' },
+  { from: 'auto_orders', to: 'vendors', fk: 'vendor_id' },
+  { from: 'auto_orders', to: 'organizations', fk: 'organization_id' },
+  { from: 'recipes', to: 'organizations', fk: 'organization_id' },
+  { from: 'wastage_logs', to: 'organizations', fk: 'organization_id' },
+  { from: 'wastage_logs', to: 'locations', fk: 'location_id' },
+  { from: 'notifications', to: 'profiles', fk: 'user_id' },
+  { from: 'invitations', to: 'organizations', fk: 'organization_id' },
+  { from: 'invitations', to: 'brands', fk: 'brand_id' },
+  { from: 'invitations', to: 'locations', fk: 'location_id' },
+  { from: 'audit_logs', to: 'organizations', fk: 'organization_id' },
+  { from: 'organizations', to: 'profiles', fk: 'owner_id (→ auth.users)' },
+];
+
+// ═══ TRIGGER DEFINITIONS (from all migrations) ═══
+const TRIGGERS = [
+  { name: 'on_auth_user_created', table: 'auth.users', timing: 'AFTER INSERT', fn: 'handle_new_user()', target: 'profiles', desc: 'Auto-creates profile row when user signs up' },
+  { name: 'set_updated_at', table: 'profiles', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'profiles', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'vendors', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'vendors', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'products', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'products', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'invoices', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'invoices', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'payments', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'payments', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'inventory', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'inventory', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'recipes', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'recipes', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'set_updated_at', table: 'auto_orders', timing: 'BEFORE UPDATE', fn: 'update_updated_at_column()', target: 'auto_orders', desc: 'Auto-sets updated_at timestamp' },
+  { name: 'trg_sync_dim_vendor', table: 'vendors', timing: 'AFTER INSERT/UPDATE', fn: 'sync_dim_vendor()', target: 'dim_vendor', desc: 'Syncs vendor data to star schema dimension' },
+  { name: 'trg_sync_dim_product', table: 'products', timing: 'AFTER INSERT/UPDATE', fn: 'sync_dim_product()', target: 'dim_product', desc: 'Syncs product data to star schema dimension' },
+  { name: 'trg_sync_dim_user', table: 'profiles', timing: 'AFTER INSERT/UPDATE', fn: 'sync_dim_user()', target: 'dim_user', desc: 'Syncs user data to star schema dimension' },
+  { name: 'trg_sync_fact_invoices', table: 'invoices', timing: 'AFTER INSERT/UPDATE', fn: 'sync_fact_invoices()', target: 'fact_invoices', desc: 'Syncs invoice data to star schema fact table' },
+  { name: 'trg_sync_fact_payments', table: 'payments', timing: 'AFTER INSERT/UPDATE', fn: 'sync_fact_payments()', target: 'fact_payments', desc: 'Syncs payment data to star schema fact table' },
+  { name: 'trg_sync_fact_inventory', table: 'inventory', timing: 'AFTER INSERT/UPDATE', fn: 'sync_fact_inventory()', target: 'fact_inventory', desc: 'Syncs inventory data to star schema fact table' },
+  { name: 'trg_sync_fact_wastage', table: 'wastage_logs', timing: 'AFTER INSERT/UPDATE', fn: 'sync_fact_wastage()', target: 'fact_wastage', desc: 'Syncs wastage data to star schema fact table' },
+  { name: 'trg_sync_fact_orders', table: 'auto_orders', timing: 'AFTER INSERT/UPDATE', fn: 'sync_fact_orders()', target: 'fact_orders', desc: 'Syncs order data to star schema fact table' },
+];
+
+// ═══ DATABASE FUNCTIONS (from all migrations) ═══
+const DB_FUNCTIONS = [
+  { name: 'get_auth_role()', type: 'JWT Helper', security: 'DEFINER', desc: 'Returns role from JWT app_metadata (zero table queries)', calledBy: 'Every RLS policy check' },
+  { name: 'get_auth_org()', type: 'JWT Helper', security: 'DEFINER', desc: 'Returns organization_id from JWT app_metadata', calledBy: 'Every RLS policy check' },
+  { name: 'handle_new_user()', type: 'Trigger', security: 'DEFINER', desc: 'Auto-creates profile when user signs up via auth.users INSERT trigger', calledBy: 'on_auth_user_created trigger' },
+  { name: 'update_updated_at_column()', type: 'Trigger', security: 'DEFINER', desc: 'Sets updated_at = now() on BEFORE UPDATE for 8 tables', calledBy: 'set_updated_at triggers ×8' },
+  { name: 'setup_organization_full()', type: 'RPC', security: 'DEFINER', desc: 'Atomic onboarding: creates org → brand → location → assigns user', calledBy: 'OnboardingPage → apiClient.js' },
+  { name: 'accept_invitation()', type: 'RPC', security: 'DEFINER', desc: 'Accepts pending invitation, assigns role/org/brand/location', calledBy: 'AuthContext → apiClient.js' },
+  { name: 'admin_update_user_role()', type: 'RPC', security: 'DEFINER', desc: 'Securely updates user role with hierarchy enforcement', calledBy: 'UserManagement → apiClient.js' },
+  { name: 'date_to_key()', type: 'Helper', security: 'N/A', desc: 'Converts DATE to YYYYMMDD integer key for star schema', calledBy: 'Star schema sync triggers' },
+  { name: 'sync_dim_vendor()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts vendor data into dim_vendor dimension table', calledBy: 'trg_sync_dim_vendor' },
+  { name: 'sync_dim_product()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts product data into dim_product dimension table', calledBy: 'trg_sync_dim_product' },
+  { name: 'sync_dim_user()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts user data into dim_user dimension table', calledBy: 'trg_sync_dim_user' },
+  { name: 'sync_fact_invoices()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts invoice data into fact_invoices with dimension lookups', calledBy: 'trg_sync_fact_invoices' },
+  { name: 'sync_fact_payments()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts payment data into fact_payments with dimension lookups', calledBy: 'trg_sync_fact_payments' },
+  { name: 'sync_fact_inventory()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts inventory snapshot into fact_inventory', calledBy: 'trg_sync_fact_inventory' },
+  { name: 'sync_fact_wastage()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts wastage data into fact_wastage', calledBy: 'trg_sync_fact_wastage' },
+  { name: 'sync_fact_orders()', type: 'Trigger Fn', security: 'DEFINER', desc: 'Upserts order data into fact_orders', calledBy: 'trg_sync_fact_orders' },
+  { name: 'check_email_exists()', type: 'RPC', security: 'DEFINER', desc: 'Checks if email exists before password reset', calledBy: 'LoginPage (reset flow)' },
+  { name: 'get_invite_details()', type: 'RPC', security: 'DEFINER', desc: 'Fetches invitation details by token for signup page', calledBy: 'SignupPage' },
+  { name: 'can_invite_role()', type: 'Helper', security: 'DEFINER', desc: 'Role hierarchy check — prevents privilege escalation', calledBy: 'admin_update_user_role()' },
+];
+
+// ═══ TRIGGER CONNECTIONS (source table → target via trigger) ═══
+const TRIGGER_CONNECTIONS = [
+  { from: 'vendors', to: 'dim_vendor' },
+  { from: 'products', to: 'dim_product' },
+  { from: 'profiles', to: 'dim_user' },
+  { from: 'invoices', to: 'fact_invoices' },
+  { from: 'payments', to: 'fact_payments' },
+  { from: 'inventory', to: 'fact_inventory' },
+  { from: 'wastage_logs', to: 'fact_wastage' },
+  { from: 'auto_orders', to: 'fact_orders' },
+];
+
+// ═══ PAGES × ROLES ═══
+const ROLES_ORDERED = ['ground_staff', 'location_manager', 'branch_manager', 'org_owner', 'platform_admin'];
+const PAGES_CONFIG = [
+  { page: 'LandingPage', minRole: null, tables: [], desc: 'Public marketing page' },
+  { page: 'LoginPage', minRole: null, tables: ['profiles'], desc: 'Auth login' },
+  { page: 'SignupPage', minRole: null, tables: ['invitations', 'profiles'], desc: 'Invited user signup' },
+  { page: 'Dashboard', minRole: 'ground_staff', tables: ['invoices', 'payments', 'inventory', 'products', 'organizations', 'profiles'], desc: 'KPI overview' },
+  { page: 'Invoices', minRole: 'ground_staff', tables: ['invoices', 'vendors', 'products'], desc: 'Invoice capture & AI extraction' },
+  { page: 'Products', minRole: 'ground_staff', tables: ['products', 'vendors', 'invoices'], desc: 'Product catalog & costs' },
+  { page: 'Inventory', minRole: 'location_manager', tables: ['inventory', 'products', 'wastage_logs'], desc: 'Stock tracking & wastage' },
+  { page: 'Payments', minRole: 'location_manager', tables: ['payments', 'invoices', 'vendors'], desc: 'Vendor bill pay & reconciliation' },
+  { page: 'AutoOrdering', minRole: 'location_manager', tables: ['auto_orders', 'vendors', 'products', 'inventory'], desc: 'Par-level based auto ordering' },
+  { page: 'Recipes', minRole: 'location_manager', tables: ['recipes', 'products', 'inventory'], desc: 'Recipe costing & analysis' },
+  { page: 'Vendors', minRole: 'branch_manager', tables: ['vendors', 'products', 'invoices'], desc: 'Vendor management' },
+  { page: 'OrgManagement', minRole: 'org_owner', tables: ['organizations', 'brands', 'locations', 'profiles'], desc: 'Org hierarchy & settings' },
+  { page: 'UserManagement', minRole: 'org_owner', tables: ['profiles', 'invitations', 'organizations', 'brands', 'locations'], desc: 'Team member & role management' },
+  { page: 'AuditLogs', minRole: 'org_owner', tables: ['audit_logs'], desc: 'Org-scoped audit trail' },
+  { page: 'PlatformAdmin', minRole: 'platform_admin', tables: ['organizations', 'profiles', 'invitations', 'brands', 'locations'], desc: 'System-wide management' },
+  { page: 'PlatformUserManagement', minRole: 'platform_admin', tables: ['profiles', 'organizations', 'brands', 'locations'], desc: 'Cross-org user management' },
+  { page: 'PlatformAuditLogs', minRole: 'platform_admin', tables: ['audit_logs', 'error_logs'], desc: 'Platform audit & errors' },
+  { page: 'OnboardingPage', minRole: 'org_owner', tables: ['organizations', 'brands', 'locations', 'profiles'], desc: 'New org setup wizard' },
+  { page: 'PaymentVerification', minRole: 'org_owner', tables: ['profiles', 'organizations'], desc: 'Stripe payment verification' },
+  { page: 'Profile', minRole: 'ground_staff', tables: ['profiles'], desc: 'User profile settings' },
+  { page: 'MFASetupPage', minRole: 'ground_staff', tables: [], desc: 'MFA TOTP enrollment' },
+];
+
+// ════════════════════════════════════════════════════════════
+// SUPABASE CONNECTION
+// ════════════════════════════════════════════════════════════
+
+async function initSupabase() {
+  try {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Test connection with a lightweight query
+    const { error } = await sb.from('profiles').select('id', { count: 'exact', head: true });
+    if (error) throw error;
+    isConnected = true;
+    document.getElementById('connection-dot').style.background = 'var(--accent-green)';
+    document.getElementById('status-text').textContent = 'Connected to Supabase';
+    document.getElementById('status-text').style.color = 'var(--accent-green)';
+  } catch (err) {
+    isConnected = false;
+    document.getElementById('connection-dot').style.background = 'var(--accent-red)';
+    document.getElementById('status-text').textContent = 'Connection failed — showing static data';
+    document.getElementById('status-text').style.color = 'var(--accent-red)';
+    console.warn('Supabase connection failed:', err);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// LIVE DATA FETCHING
+// ════════════════════════════════════════════════════════════
+
+async function fetchTableCounts() {
+  if (!sb || !isConnected) return {};
+  const counts = {};
+  const tables = [...CORE_TABLES];
+
+  await Promise.all(tables.map(async (table) => {
+    try {
+      const { count, error } = await sb.from(table).select('*', { count: 'exact', head: true });
+      if (!error) counts[table] = count || 0;
+      else counts[table] = '—';
+    } catch {
+      counts[table] = '—';
+    }
+  }));
+
+  return counts;
+}
+
+async function fetchLastActivity() {
+  if (!sb || !isConnected) return {};
+  const activity = {};
+  const tablesWithTimestamp = [
+    'profiles', 'vendors', 'products', 'invoices', 'payments',
+    'inventory', 'recipes', 'auto_orders', 'notifications',
+    'invitations', 'audit_logs', 'wastage_logs', 'organizations',
+    'brands', 'locations'
+  ];
+
+  await Promise.all(tablesWithTimestamp.map(async (table) => {
+    try {
+      const { data, error } = await sb.from(table).select('created_at').order('created_at', { ascending: false }).limit(1);
+      if (!error && data && data.length > 0) {
+        activity[table] = data[0].created_at;
+      }
+    } catch { /* skip */ }
+  }));
+
+  return activity;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: STATS OVERVIEW
+// ════════════════════════════════════════════════════════════
+
+function renderStats(counts) {
+  const grid = document.getElementById('stats-grid');
+  const stats = [
+    { label: 'Organizations', key: 'organizations', color: 'var(--accent-purple)', glow: 'radial-gradient(ellipse at top, rgba(168,85,247,0.15), transparent 70%)' },
+    { label: 'Users', key: 'profiles', color: 'var(--accent-blue)', glow: 'radial-gradient(ellipse at top, rgba(0,117,255,0.15), transparent 70%)' },
+    { label: 'Invoices', key: 'invoices', color: 'var(--accent-orange)', glow: 'radial-gradient(ellipse at top, rgba(255,89,0,0.15), transparent 70%)' },
+    { label: 'Products', key: 'products', color: 'var(--accent-cyan)', glow: 'radial-gradient(ellipse at top, rgba(20,198,203,0.15), transparent 70%)' },
+    { label: 'Payments', key: 'payments', color: 'var(--accent-green)', glow: 'radial-gradient(ellipse at top, rgba(34,255,153,0.15), transparent 70%)' },
+    { label: 'Vendors', key: 'vendors', color: 'var(--accent-yellow)', glow: 'radial-gradient(ellipse at top, rgba(255,197,61,0.15), transparent 70%)' },
+    { label: 'Inventory', key: 'inventory', color: 'var(--accent-blue)', glow: 'radial-gradient(ellipse at top, rgba(0,117,255,0.12), transparent 70%)' },
+    { label: 'Audit Logs', key: 'audit_logs', color: 'var(--text-dim)', glow: 'radial-gradient(ellipse at top, rgba(255,255,255,0.04), transparent 70%)' },
+  ];
+
+  grid.innerHTML = stats.map(s => {
+    const val = counts[s.key] ?? '—';
+    const prev = previousCounts[s.key];
+    const changed = prev !== undefined && prev !== val;
+    return `<div class="stat-card">
+      <div class="stat-glow" style="background: ${s.glow}"></div>
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value count-flash ${changed ? 'flash' : ''}" style="color: ${s.color}" data-key="${s.key}">${val}</div>
+      <div class="stat-sub">${changed ? `↑ was ${prev}` : 'rows in table'}</div>
+    </div>`;
+  }).join('');
+
+  // Clear flash after animation
+  setTimeout(() => {
+    document.querySelectorAll('.count-flash.flash').forEach(el => el.classList.remove('flash'));
+  }, 600);
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: N×N CONNECTION MATRIX
+// ════════════════════════════════════════════════════════════
+
+function getConnectionType(from, to) {
+  if (from === to) return 'self';
+  const connections = [];
+  const hasFk = FK_CONNECTIONS.some(c => (c.from === from && c.to === to) || (c.from === to && c.to === from));
+  const hasTrigger = TRIGGER_CONNECTIONS.some(c => (c.from === from && c.to === to) || (c.from === to && c.to === from));
+  if (hasFk) connections.push('fk');
+  if (hasTrigger) connections.push('trigger');
+  if (connections.length > 1) return 'multi';
+  if (connections.length === 1) return connections[0];
+  return 'none';
+}
+
+function getConnectionDetails(from, to) {
+  const details = [];
+  FK_CONNECTIONS.forEach(c => {
+    if ((c.from === from && c.to === to) || (c.from === to && c.to === from)) {
+      details.push({ type: 'FK', desc: `${c.from}.${c.fk} → ${c.to}` });
+    }
+  });
+  TRIGGER_CONNECTIONS.forEach(c => {
+    if ((c.from === from && c.to === to) || (c.from === to && c.to === from)) {
+      const trig = TRIGGERS.find(t => t.table === c.from && t.target === c.to);
+      details.push({ type: 'Trigger', desc: `${trig?.name || 'trigger'}: ${c.from} → ${trig?.fn || ''} → ${c.to}` });
+    }
+  });
+  return details;
+}
+
+function renderMatrix() {
+  const allTables = [...CORE_TABLES, ...STAR_TABLES];
+  const container = document.getElementById('matrix-container');
+
+  let html = '<table class="matrix-table"><thead><tr><th></th>';
+  allTables.forEach(t => { html += `<th title="${t}">${t.replace(/_/g, '_<br>')}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  allTables.forEach(row => {
+    html += `<tr><td>${row}</td>`;
+    allTables.forEach(col => {
+      const type = getConnectionType(row, col);
+      html += `<td><div class="matrix-cell cell-${type}" onclick="showConnectionDetails('${row}', '${col}')" title="${row} ↔ ${col}"><div class="cell-dot"></div></div></td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  html += `<div class="matrix-legend">
+    <span><div class="legend-dot" style="background: var(--accent-green)"></div> FK Relationship</span>
+    <span><div class="legend-dot" style="background: var(--accent-blue)"></div> Trigger Sync</span>
+    <span><div class="legend-dot" style="background: linear-gradient(135deg, var(--accent-green), var(--accent-blue))"></div> Both FK + Trigger</span>
+    <span><div class="legend-dot" style="background: var(--text-muted); opacity: 0.3"></div> Self</span>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: TRIGGERS
+// ════════════════════════════════════════════════════════════
+
+function renderTriggers(counts) {
+  const list = document.getElementById('triggers-list');
+  const overviewList = document.getElementById('overview-triggers');
+
+  const badgeClass = (type) => {
+    if (type.includes('AFTER INSERT')) return 'badge-green';
+    if (type.includes('BEFORE UPDATE')) return 'badge-blue';
+    return 'badge-orange';
+  };
+
+  const rows = TRIGGERS.map(t => {
+    const sourceCount = counts[t.table] ?? '—';
+    const targetCount = counts[t.target] ?? '—';
+    const isActive = typeof sourceCount === 'number' && sourceCount > 0;
+
+    return `<div class="item-row live-row">
+      <div class="item-dot" style="background: ${isActive ? 'var(--accent-green)' : 'var(--text-muted)'}; box-shadow: ${isActive ? '0 0 8px var(--glow-green)' : 'none'}"></div>
+      <div class="item-name">${t.name}</div>
+      <div class="item-meta">
+        <span class="item-badge ${badgeClass(t.timing)}">${t.timing}</span>
+        <span>${t.table} → ${t.target}</span>
+        <span style="color: var(--accent-cyan)">${typeof sourceCount === 'number' ? sourceCount + ' rows' : ''}</span>
+      </div>
+    </div>`;
+  });
+
+  list.innerHTML = rows.join('');
+  overviewList.innerHTML = rows.slice(0, 8).join('');
+
+  document.getElementById('triggers-total').textContent = `${TRIGGERS.length} triggers`;
+  document.getElementById('trigger-active-count').textContent = `${TRIGGERS.filter(t => (counts[t.table] ?? 0) > 0).length} active`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: FUNCTIONS
+// ════════════════════════════════════════════════════════════
+
+function renderFunctions() {
+  const list = document.getElementById('functions-list');
+  const overviewList = document.getElementById('overview-functions');
+
+  const typeColor = { 'JWT Helper': 'badge-green', 'RPC': 'badge-orange', 'Trigger': 'badge-blue', 'Trigger Fn': 'badge-cyan', 'Helper': 'badge-yellow' };
+
+  const rows = DB_FUNCTIONS.map(f => {
+    return `<div class="item-row">
+      <div class="item-dot" style="background: ${f.type === 'RPC' ? 'var(--accent-orange)' : f.type === 'JWT Helper' ? 'var(--accent-green)' : 'var(--accent-blue)'}"></div>
+      <div class="item-name">${f.name}</div>
+      <div class="item-meta">
+        <span class="item-badge ${typeColor[f.type] || 'badge-blue'}">${f.type}</span>
+        <span title="${f.desc}" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${f.calledBy}</span>
+      </div>
+    </div>`;
+  });
+
+  list.innerHTML = rows.join('');
+  overviewList.innerHTML = rows.slice(0, 8).join('');
+
+  document.getElementById('functions-total').textContent = `${DB_FUNCTIONS.length} functions`;
+  document.getElementById('function-total-count').textContent = `${DB_FUNCTIONS.length} total`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: FLOW PIPELINE
+// ════════════════════════════════════════════════════════════
+
+function renderPipeline(counts, containerId) {
+  const pipeline = document.getElementById(containerId);
+  const stages = [
+    { name: 'Invoices', key: 'invoices', icon: '📄' },
+    { name: 'Products', key: 'products', icon: '📦' },
+    { name: 'Inventory', key: 'inventory', icon: '🏭' },
+    { name: 'Auto Orders', key: 'auto_orders', icon: '🛒' },
+    { name: 'Vendors', key: 'vendors', icon: '🏪' },
+    { name: 'Payments', key: 'payments', icon: '💳' },
+    { name: 'Recipes', key: 'recipes', icon: '👨‍🍳' },
+  ];
+
+  let html = '';
+  stages.forEach((s, i) => {
+    const count = counts[s.key] ?? '—';
+    const active = typeof count === 'number' && count > 0;
+    const prev = previousCounts[s.key];
+    const changed = prev !== undefined && prev !== count;
+
+    if (i > 0) {
+      html += `<div class="pipe-arrow ${active ? 'active' : ''}">→</div>`;
+    }
+    html += `<div class="pipe-stage ${active ? 'active' : ''}">
+      <div style="font-size: 20px; margin-bottom: 4px;">${s.icon}</div>
+      <div class="stage-name">${s.name}</div>
+      <div class="stage-count count-flash ${changed ? 'flash' : ''}" style="${active ? 'color: var(--accent-green)' : ''}">${count}</div>
+      <div class="stage-sub">${changed ? '↑ changed' : 'rows'}</div>
+    </div>`;
+  });
+
+  pipeline.innerHTML = html;
+
+  const activeCount = stages.filter(s => typeof counts[s.key] === 'number' && counts[s.key] > 0).length;
+  const statusEl = document.getElementById('pipeline-status');
+  if (statusEl) statusEl.textContent = `${activeCount}/${stages.length} active`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: TABLE COUNTS & ACTIVITY
+// ════════════════════════════════════════════════════════════
+
+function renderTableCounts(counts) {
+  const el = document.getElementById('table-counts');
+  el.innerHTML = Object.entries(counts).sort((a, b) => (b[1] || 0) - (a[1] || 0)).map(([table, count]) => {
+    const prev = previousCounts[table];
+    const changed = prev !== undefined && prev !== count;
+    return `<div class="item-row live-row ${changed ? 'changed' : ''}">
+      <div class="item-dot" style="background: ${typeof count === 'number' && count > 0 ? 'var(--accent-green)' : 'var(--text-muted)'}"></div>
+      <div class="item-name">${table}</div>
+      <div class="item-meta">
+        <span class="count-flash ${changed ? 'flash' : ''}" style="font-weight: 700; font-size: 14px; ${changed ? 'color: var(--accent-green)' : ''}">${count}</span>
+        ${changed ? `<span style="color: var(--accent-green); font-size: 10px;">↑ was ${prev}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTableActivity(activity) {
+  const el = document.getElementById('table-activity');
+  const sorted = Object.entries(activity).sort((a, b) => new Date(b[1]) - new Date(a[1]));
+
+  el.innerHTML = sorted.map(([table, ts]) => {
+    const ago = timeAgo(ts);
+    const recent = (Date.now() - new Date(ts).getTime()) < 60000; // within 1 min
+    return `<div class="item-row">
+      <div class="item-dot" style="background: ${recent ? 'var(--accent-green)' : 'var(--text-dim)'}; ${recent ? 'box-shadow: 0 0 8px var(--glow-green); animation: pulse-dot 2s ease infinite;' : ''}"></div>
+      <div class="item-name">${table}</div>
+      <div class="item-meta">
+        <span ${recent ? 'style="color: var(--accent-green); font-weight: 600;"' : ''}>${ago}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER: PAGES × ROLES × TABLES
+// ════════════════════════════════════════════════════════════
+
+function renderPageRoleMatrix() {
+  const table = document.getElementById('role-matrix');
+  let html = '<thead><tr><th>Page</th><th>Description</th>';
+  ROLES_ORDERED.forEach(r => { html += `<th>${r.replace('_', '<br>')}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  PAGES_CONFIG.forEach(p => {
+    html += `<tr><td>${p.page}</td><td style="color: var(--text-muted); font-family: Inter; font-size: 11px;">${p.desc}</td>`;
+    ROLES_ORDERED.forEach(role => {
+      const roleIdx = ROLES_ORDERED.indexOf(role);
+      const minIdx = p.minRole ? ROLES_ORDERED.indexOf(p.minRole) : -1;
+      // platform_admin pages are only for platform_admin
+      if (p.minRole === 'platform_admin') {
+        html += `<td>${role === 'platform_admin' ? '<span class="role-check">✓</span>' : '<span class="role-deny">—</span>'}</td>`;
+      } else if (minIdx === -1 || roleIdx >= minIdx) {
+        html += '<td><span class="role-check">✓</span></td>';
+      } else {
+        html += '<td><span class="role-deny">—</span></td>';
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function renderPageTableMatrix() {
+  const table = document.getElementById('page-table-matrix');
+  const allTables = [...new Set(PAGES_CONFIG.flatMap(p => p.tables))].sort();
+
+  let html = '<thead><tr><th>Page</th>';
+  allTables.forEach(t => { html += `<th>${t.replace(/_/g, '_<br>')}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  PAGES_CONFIG.filter(p => p.tables.length > 0).forEach(p => {
+    html += `<tr><td>${p.page}</td>`;
+    allTables.forEach(t => {
+      html += `<td>${p.tables.includes(t) ? '<span class="role-check">✓</span>' : '<span class="role-deny">·</span>'}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════
+// POPUP
+// ════════════════════════════════════════════════════════════
+
+function showConnectionDetails(from, to) {
+  const details = getConnectionDetails(from, to);
+  const popup = document.getElementById('popup-overlay');
+  const title = document.getElementById('popup-title');
+  const body = document.getElementById('popup-body');
+
+  title.innerHTML = `🔗 ${from} ↔ ${to}`;
+
+  if (details.length === 0 && from !== to) {
+    body.innerHTML = '<div class="popup-detail"><div class="label">Status</div><div class="value">No direct connection</div></div>';
+  } else if (from === to) {
+    body.innerHTML = '<div class="popup-detail"><div class="label">Status</div><div class="value">Self reference (diagonal)</div></div>';
+  } else {
+    body.innerHTML = details.map(d => `
+      <div class="popup-detail">
+        <div class="label">${d.type}</div>
+        <div class="value">${d.desc}</div>
+      </div>
+    `).join('');
+  }
+
+  popup.classList.add('show');
+}
+
+function closePopup() {
+  document.getElementById('popup-overlay').classList.remove('show');
+}
+
+// ════════════════════════════════════════════════════════════
+// UTILITY
+// ════════════════════════════════════════════════════════════
+
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+// ════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ════════════════════════════════════════════════════════════
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// MAIN REFRESH LOOP
+// ════════════════════════════════════════════════════════════
+
+async function refresh() {
+  const spinner = document.getElementById('refresh-spinner');
+  spinner.style.display = 'block';
+
+  try {
+    const [counts, activity] = await Promise.all([
+      fetchTableCounts(),
+      fetchLastActivity()
+    ]);
+
+    renderStats(counts);
+    renderTriggers(counts);
+    renderPipeline(counts, 'overview-pipeline');
+    renderPipeline(counts, 'flow-pipeline');
+    renderTableCounts(counts);
+    renderTableActivity(activity);
+
+    // Update previous counts for change detection
+    previousCounts = { ...counts };
+
+    document.getElementById('last-update').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+  } catch (err) {
+    console.warn('Refresh error:', err);
+  }
+
+  spinner.style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+
+async function init() {
+  // Render static content immediately
+  renderMatrix();
+  renderFunctions();
+  renderPageRoleMatrix();
+  renderPageTableMatrix();
+
+  // Connect and fetch live data
+  await initSupabase();
+  await refresh();
+
+  // 5-second auto-refresh
+  setInterval(refresh, 5000);
+}
+
+init();
+</script>
+</body>
+</html>
