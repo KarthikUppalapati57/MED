@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
@@ -40,27 +40,105 @@ import {
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444'];
 
-// â”€â”€ Stat Card Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkText, subtext }) {
+// ── Stat Card Component ──────────────────────────────────────────
+// Custom premium hook to count up numeric values organically
+function useCountUp(targetValue, duration = 1200) {
+  const [count, setCount] = React.useState(0);
+  React.useEffect(() => {
+    // If targetValue is not numeric (e.g. "—"), set it directly
+    const cleanStr = String(targetValue).replace(/[$,]/g, '');
+    const num = parseFloat(cleanStr);
+    if (isNaN(num)) {
+      setCount(targetValue);
+      return;
+    }
+
+    let start = 0;
+    const end = num;
+    if (start === end) {
+      setCount(targetValue);
+      return;
+    }
+
+    const startTime = performance.now();
+
+    const updateCount = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      const currentVal = Math.floor(easeProgress * (end - start) + start);
+      
+      // format back appropriately
+      if (String(targetValue).startsWith('$')) {
+        setCount(`$${currentVal.toLocaleString()}`);
+      } else {
+        setCount(currentVal.toLocaleString());
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(updateCount);
+      } else {
+        setCount(targetValue);
+      }
+    };
+
+    requestAnimationFrame(updateCount);
+  }, [targetValue, duration]);
+
+  return count;
+}
+
+function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkText, subtext, delayClass = 'stagger-1' }) {
+  const displayValue = useCountUp(value);
+  
+  // Extract pure color for ambient halo glows behind card
+  const glowColorClass = 
+    iconColor.includes('resend-blue') ? 'rgba(0, 117, 255, 0.08)' :
+    iconColor.includes('purple') ? 'rgba(147, 51, 234, 0.08)' :
+    iconColor.includes('resend-green') ? 'rgba(34, 255, 153, 0.08)' :
+    iconColor.includes('resend-orange') ? 'rgba(255, 89, 0, 0.08)' :
+    iconColor.includes('resend-red') ? 'rgba(255, 32, 71, 0.08)' :
+    iconColor.includes('resend-yellow') ? 'rgba(255, 197, 61, 0.08)' :
+    'rgba(20, 198, 203, 0.08)';
+
   return (
-    <Card className="border-0 shadow-sm">
-      <CardContent className="p-6">
+    <Card 
+      className={cn(
+        "relative overflow-hidden border border-border/50 bg-card hover:border-brand/35 hover-lift shadow-sm hover:shadow-glow-sm animate-fade-in-up",
+        delayClass
+      )}
+      style={{
+        background: `radial-gradient(circle at 100% 0%, ${glowColorClass} 0%, transparent 60%), hsl(var(--card))`
+      }}
+    >
+      {/* Decorative top border gradient line */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-[2px] opacity-75"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${glowColorClass.replace('0.08', '0.6')}, transparent)`
+        }}
+      />
+      <CardContent className="p-6 relative z-10">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
+            <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">{label}</p>
+            <p className="text-3xl font-extrabold text-foreground mt-2 tracking-tight">{displayValue}</p>
           </div>
-          <div className={`h-12 w-12 rounded-xl ${iconBg} flex items-center justify-center`}>
-            <Icon className={`h-6 w-6 ${iconColor}`} />
+          <div className={cn(
+            "h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110",
+            iconBg
+          )}>
+            <Icon className={cn("h-6 w-6 transition-transform duration-300", iconColor)} />
           </div>
         </div>
         {linkTo && (
-          <Link to={createPageUrl(linkTo)} className="text-sm text-primary hover:opacity-80 mt-3 inline-flex items-center gap-1">
-            {linkText} <ArrowRight className="h-4 w-4" />
+          <Link to={createPageUrl(linkTo)} className="text-xs font-semibold text-brand hover:opacity-85 mt-4 inline-flex items-center gap-1 group/link transition-opacity">
+            {linkText} <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/link:translate-x-1" />
           </Link>
         )}
         {subtext && (
-          <div className="text-sm text-muted-foreground mt-3 flex items-center gap-1">
+          <div className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
             {subtext}
           </div>
         )}
@@ -151,10 +229,10 @@ function PlatformDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" />
-        <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="PlatformUserManagement" linkText="View users" />
-        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-resend-green/10" iconColor="text-resend-green" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" />
-        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-primary/10" iconColor="text-primary" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-resend-yellow font-medium">{trialOrgs.length}</span> trials</>} />
+        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" delayClass="stagger-1" />
+        <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="PlatformUserManagement" linkText="View users" delayClass="stagger-2" />
+        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-resend-green/10" iconColor="text-resend-green" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" delayClass="stagger-3" />
+        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-primary/10" iconColor="text-primary" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-resend-yellow font-medium">{trialOrgs.length}</span> trials</>} delayClass="stagger-4" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -302,10 +380,10 @@ function OrgOwnerDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="UserManagement" linkText="Manage users" />
-        <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="OrgManagement" linkText="View plan" />
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" />
+        <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="UserManagement" linkText="Manage users" delayClass="stagger-1" />
+        <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="OrgManagement" linkText="View plan" delayClass="stagger-2" />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" delayClass="stagger-3" />
+        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" delayClass="stagger-4" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -461,10 +539,10 @@ function BranchManagerDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" />
-        <StatCard label="This Month Spend" value={`$${thisMonthSpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-primary/10" iconColor="text-primary" subtext={<><TrendingUp className="h-4 w-4 text-resend-green" /><span>{products.length} products tracked</span></>} />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" delayClass="stagger-1" />
+        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" delayClass="stagger-2" />
+        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" delayClass="stagger-3" />
+        <StatCard label="This Month Spend" value={`$${thisMonthSpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-primary/10" iconColor="text-primary" subtext={<><TrendingUp className="h-4 w-4 text-resend-green" /><span>{products.length} products tracked</span></>} delayClass="stagger-4" />
       </div>
 
       {/* Recent Invoices */}
@@ -589,9 +667,9 @@ function LocationManagerDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" />
-        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
+        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" delayClass="stagger-1" />
+        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" delayClass="stagger-2" />
+        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" delayClass="stagger-3" />
       </div>
 
       {/* Quick Actions */}

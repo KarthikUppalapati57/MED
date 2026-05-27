@@ -292,12 +292,13 @@ export default function Layout({ children, currentPageName }) {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Brand */}
-        <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0">
+        <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0 relative overflow-hidden">
+          <div className="absolute bottom-0 left-6 right-6 h-[1.5px] bg-gradient-to-r from-transparent via-brand to-transparent opacity-80 animate-pulse" />
           <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2.5 group">
-            <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center transition-transform duration-150 group-hover:scale-105">
-              <Package className="h-4.5 w-4.5 text-background" />
+            <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(20,198,203,0.35)]">
+              <Package className="h-4.5 w-4.5 text-black" />
             </div>
-            <span className="text-lg font-semibold text-foreground tracking-tight">EdgeOps</span>
+            <span className="text-lg font-bold text-foreground tracking-tight group-hover:text-brand transition-colors duration-200">EdgeOps</span>
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}
@@ -326,10 +327,10 @@ export default function Layout({ children, currentPageName }) {
                   <button
                     onClick={() => toggleMenu(item.name)}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                      "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                       isActive
-                        ? "bg-secondary text-foreground"
-                        : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                        ? "border-l-2 border-brand pl-2 text-brand bg-brand/5 shadow-[0_0_12px_rgba(20,198,203,0.06)]"
+                        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground hover:translate-x-1 duration-200"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -339,7 +340,7 @@ export default function Layout({ children, currentPageName }) {
                     <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded ? "rotate-180" : "")} />
                   </button>
                   {isExpanded && (
-                    <div className="pl-10 pr-2 space-y-0.5 mt-0.5">
+                    <div className="pl-6 pr-2 space-y-0.5 mt-0.5 border-l border-border/40 ml-5 animate-fade-in-up">
                       {item.subItems.map(sub => {
                         const isSubActive = (() => {
                           const [base, query] = sub.href.split('?');
@@ -353,10 +354,10 @@ export default function Layout({ children, currentPageName }) {
                             to={createPageUrl(sub.href)}
                             onClick={() => setSidebarOpen(false)}
                             className={cn(
-                              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                              "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                               isSubActive
-                                ? "bg-accent text-accent-foreground shadow-sm border border-border"
-                                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                                ? "bg-brand/10 text-brand shadow-[0_0_8px_rgba(20,198,203,0.1)] border-l-2 border-brand pl-2"
+                                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground hover:translate-x-1 duration-200"
                             )}
                           >
                             <sub.icon className="h-4 w-4" />
@@ -377,10 +378,10 @@ export default function Layout({ children, currentPageName }) {
                 to={createPageUrl(item.href)}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-accent text-accent-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
+                    ? "bg-brand/10 text-brand shadow-[0_0_12px_rgba(20,198,203,0.15)] border-l-2 border-brand pl-2"
+                    : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground hover:translate-x-1 duration-200"
                 )}
               >
                 <item.icon className="h-[18px] w-[18px]" />
@@ -391,16 +392,16 @@ export default function Layout({ children, currentPageName }) {
         </nav>
 
         {/* User info at bottom of sidebar */}
-        <div className="p-4 border-t border-border shrink-0 mt-auto">
-          <div className="flex items-center gap-3 px-3">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground text-xs font-bold">
+        <div className="p-4 border-t border-border shrink-0 mt-auto bg-secondary/10 hover:bg-secondary/20 transition-colors duration-300">
+          <div className="flex items-center gap-3 px-3 py-2.5 glass-card rounded-lg border border-border/40 hover:border-brand/30 shadow-sm transition-all duration-300 hover:shadow-glow-sm">
+            <div className="h-8 w-8 rounded-full bg-brand flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(20,198,203,0.2)]">
+              <span className="text-black text-xs font-bold">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
-              <Badge className={cn("text-[10px] px-1.5 py-0 border-0", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
+              <p className="text-sm font-semibold text-foreground truncate leading-none mb-1">{displayName}</p>
+              <Badge className={cn("text-[9px] px-1.5 py-0 border-0 shadow-none font-medium truncate max-w-full leading-none", roleBadgeColors[displayRole] || roleBadgeColors.ground_staff)}>
                 {(displayRole || '').replace('_', ' ')}
               </Badge>
             </div>

@@ -95,17 +95,12 @@ function SignupPage() {
       // If the user is automatically logged in (session exists), go to root/dashboard
       // Otherwise (email confirmation required), go to login page
       const destination = data?.session ? '/' : '/login';
-      setTimeout(() => navigate(destination), 2000);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      <div className="absolute inset-0 glow-teal opacity-40 pointer-events-none" />
-      <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
+      set  return (
+    <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
+      <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -140,7 +135,7 @@ function SignupPage() {
                 type="text"
                 value={form.full_name}
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
               />
             </div>
@@ -150,7 +145,7 @@ function SignupPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 readOnly={!!inviteInfo?.email}
               />
@@ -161,7 +156,7 @@ function SignupPage() {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
               />
             </div>
@@ -171,7 +166,7 @@ function SignupPage() {
                 type="password"
                 value={form.confirm}
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-                className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
               />
             </div>
@@ -181,29 +176,33 @@ function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shimmer-sweep"
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-primary-foreground/20 border-t-primary-foreground rounded-full animate-spin mr-2" />
+                  <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin mr-2" />
                   Creating account...
                 </>
               ) : 'Create Account'}
             </button>
 
-            <div className="text-center pt-2 border-t border-border">
+            <div className="text-center pt-2 border-t border-border/40">
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <button
                   type="button"
                   onClick={() => navigate('/')}
-                  className="text-foreground hover:opacity-80 font-medium transition-opacity"
+                  className="text-foreground hover:text-brand font-medium transition-colors duration-200"
                 >
                   Sign In
                 </button>
               </p>
             </div>
           </form>
+        )}
+      </Card>
+    </div>
+  );         </form>
         )}
       </div>
     </div>
@@ -274,9 +273,8 @@ function LoginPage() {
 
   if (isResetMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-        <div className="absolute inset-0 glow-blue opacity-30 pointer-events-none" />
-        <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
+      <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
+        <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -291,7 +289,7 @@ function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setIsResetMode(false); setResetSent(false); }}
-                className="text-foreground hover:opacity-80 text-sm font-medium transition-opacity"
+                className="text-foreground hover:text-brand text-sm font-medium transition-colors duration-200"
               >
                 Back to sign in
               </button>
@@ -304,7 +302,7 @@ function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+                  className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                   placeholder="you@restaurant.com"
                   required
                 />
@@ -317,11 +315,11 @@ function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
+                className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
               >
                 {isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </button>
-              <div className="text-center pt-2 border-t border-border mt-4">
+              <div className="text-center pt-2 border-t border-border/40 mt-4">
                 <button
                   type="button"
                   onClick={() => setIsResetMode(false)}
@@ -332,18 +330,17 @@ function LoginPage() {
               </div>
             </form>
           )}
-        </div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
-      <div className="absolute inset-0 glow-orange opacity-30 pointer-events-none" />
-      <div className="w-full max-w-md bg-card rounded-xl shadow-lg p-8 space-y-6 border border-border relative z-10">
+    <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
+      <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground">
             Welcome to EdgeOps
@@ -360,7 +357,7 @@ function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+              className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
               placeholder="you@restaurant.com"
               required
             />
@@ -371,7 +368,7 @@ function LoginPage() {
               <button 
                 type="button" 
                 onClick={() => setIsResetMode(true)}
-                className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+                className="text-xs text-muted-foreground hover:text-brand font-medium transition-colors"
               >
                 Forgot password?
               </button>
@@ -380,7 +377,7 @@ function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent placeholder:text-muted-foreground"
+              className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
               placeholder="••••••••"
               required
             />
@@ -393,12 +390,12 @@ function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -421,11 +418,10 @@ function PendingAssignmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6 animate-fade-in relative overflow-hidden">
-      <div className="absolute inset-0 glow-yellow opacity-30 pointer-events-none" />
-      <div className="w-full max-w-md bg-card rounded-xl shadow-xl p-8 border border-border text-center space-y-6 animate-in fade-in zoom-in duration-300 relative z-10">
-        <div className="w-16 h-16 bg-resend-orange/10 rounded-full flex items-center justify-center mx-auto">
-          <svg className="w-8 h-8 text-resend-orange animate-pulse" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 animated-mesh relative overflow-hidden">
+      <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 border border-border/50 text-center space-y-6 animate-fade-in-scale relative z-10">
+        <div className="w-16 h-16 bg-resend-orange/15 border border-resend-orange/30 rounded-full flex items-center justify-center mx-auto animate-float">
+          <svg className="w-8 h-8 text-resend-orange" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
@@ -433,7 +429,7 @@ function PendingAssignmentPage() {
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-foreground">Account Setup Pending</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Welcome, <span className="font-semibold text-foreground">{userProfile?.full_name || 'User'}</span>! 
+            Welcome, <span className="font-semibold text-brand">{userProfile?.full_name || 'User'}</span>! 
             Your account has been created successfully, but you are not yet assigned to an organization or branch.
           </p>
           <p className="text-muted-foreground/70 text-xs leading-relaxed">
@@ -445,7 +441,7 @@ function PendingAssignmentPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="w-full h-12 inline-flex items-center justify-center bg-primary hover:opacity-90 text-primary-foreground font-bold rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 inline-flex items-center justify-center bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shimmer-sweep"
           >
             {refreshing ? (
               <>
@@ -459,12 +455,12 @@ function PendingAssignmentPage() {
           
           <button
             onClick={logout}
-            className="w-full h-12 inline-flex items-center justify-center border border-border text-muted-foreground font-semibold rounded-lg hover:bg-secondary transition-all"
+            className="w-full h-12 inline-flex items-center justify-center border border-border/60 text-muted-foreground font-semibold rounded-lg hover:bg-secondary/60 transition-all duration-200"
           >
             Sign Out
           </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -507,12 +503,11 @@ function UpdatePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      <div className="absolute inset-0 glow-blue opacity-30 pointer-events-none" />
-      <div className="w-full max-w-md bg-card backdrop-blur-xl rounded-xl shadow-xl p-8 space-y-6 border border-border animate-in fade-in zoom-in duration-300 relative z-10">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 animated-mesh relative overflow-hidden">
+      <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 animate-fade-in-scale relative z-10">
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-primary-foreground">
+          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
           </div>
@@ -527,14 +522,14 @@ function UpdatePasswordPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-border bg-secondary pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all placeholder:text-muted-foreground"
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
                 placeholder="••••••••"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-3 top-3.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showPassword ? (
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
@@ -550,7 +545,7 @@ function UpdatePasswordPage() {
               type={showPassword ? 'text' : 'password'}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border border-border bg-secondary px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all placeholder:text-muted-foreground"
+              className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
               placeholder="••••••••"
               required
             />
@@ -559,7 +554,7 @@ function UpdatePasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-all"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
           >
             {loading ? (
               <>
@@ -569,7 +564,7 @@ function UpdatePasswordPage() {
             ) : 'Update Password'}
           </button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

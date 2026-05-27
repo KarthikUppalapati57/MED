@@ -72,15 +72,15 @@ export function MFAChallenge() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-teal-50 p-4">
-      <Card className="w-full max-w-md border-0 shadow-2xl overflow-hidden">
-        <div className="h-2 bg-teal-500" />
+    <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
+      <Card className="w-full max-w-md glass-card border border-border/50 shadow-2xl overflow-hidden animate-fade-in-scale">
+        <div className="h-1 bg-gradient-to-r from-brand via-indigo-500 to-brand" />
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck className="w-6 h-6 text-teal-600" />
+          <div className="mx-auto w-12 h-12 bg-brand/10 border border-brand/20 rounded-full flex items-center justify-center mb-4 animate-float">
+            <ShieldCheck className="w-6 h-6 text-brand" />
           </div>
-          <CardTitle className="text-2xl font-bold text-slate-900">Multi-Factor Authentication</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-foreground">Multi-Factor Authentication</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Enter the 6-digit code from your authenticator app to continue.
           </CardDescription>
         </CardHeader>
@@ -94,46 +94,46 @@ export function MFAChallenge() {
               disabled={isLoading}
             >
               <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
+                <InputOTPSlot index={0} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                <InputOTPSlot index={1} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                <InputOTPSlot index={2} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
               </InputOTPGroup>
-              <InputOTPSeparator />
+              <InputOTPSeparator className="text-muted-foreground/60" />
               <InputOTPGroup>
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
+                <InputOTPSlot index={3} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                <InputOTPSlot index={4} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                <InputOTPSlot index={5} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
               </InputOTPGroup>
             </InputOTP>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-800">
+            <Alert variant="destructive" className="bg-destructive/15 border-destructive/20 text-destructive-foreground">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          <p className="text-xs text-center text-slate-500">
+          <p className="text-xs text-center text-muted-foreground">
             Open your Microsoft Authenticator, Google Authenticator, or similar app to get your code.
           </p>
 
           {/* Remember this device */}
-          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary/30 border border-border/40 cursor-pointer hover:bg-secondary/60 transition-all duration-200">
             <input
               type="checkbox"
               checked={rememberDevice}
               onChange={(e) => setRememberDevice(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              className="h-4 w-4 rounded border-border/60 text-brand bg-secondary focus:ring-brand"
             />
             <div className="flex items-center gap-2">
-              <Monitor className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-700">Remember this device for 30 days</span>
+              <Monitor className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-foreground/90">Remember this device for 30 days</span>
             </div>
           </label>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           <Button 
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white py-6"
+            className="w-full bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold py-6 shimmer-sweep"
             onClick={() => onSubmit()}
             disabled={isLoading || code.length < 6}
           >
@@ -146,7 +146,7 @@ export function MFAChallenge() {
           </Button>
           <Button 
             variant="ghost" 
-            className="w-full text-slate-500 hover:text-slate-900" 
+            className="w-full text-muted-foreground hover:text-foreground hover:bg-secondary/50" 
             onClick={() => logout()}
             disabled={isLoading}
           >
