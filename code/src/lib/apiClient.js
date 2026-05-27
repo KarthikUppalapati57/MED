@@ -82,6 +82,16 @@ export const api = {
     InventoryMovement: createEntityClient('inventory_movements'),
     PurchaseOrder: createEntityClient('purchase_orders'),
     PurchaseOrderItem: createEntityClient('purchase_order_items'),
+    LedgerBill: createEntityClient('ledger_bills', true),
+    LedgerPayment: createEntityClient('ledger_payments', true),
+    LedgerEntry: createEntityClient('ledger_entries'),
+    AiInsight: createEntityClient('ai_insights'),
+    DomainEvent: createEntityClient('domain_events'),
+    ProcessingJob: createEntityClient('processing_jobs'),
+    Role: createEntityClient('roles'),
+    Permission: createEntityClient('permissions'),
+    RolePermission: createEntityClient('role_permissions'),
+    UserRole: createEntityClient('user_roles'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
