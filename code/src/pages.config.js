@@ -28,6 +28,8 @@ const PlatformUserManagement = React.lazy(() => import('./pages/PlatformUserMana
 const PlatformAuditLogs = React.lazy(() => import('./pages/PlatformAuditLogs'));
 const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification'));
 const Profile = React.lazy(() => import('./pages/Profile'));
+const Labor = React.lazy(() => import('./pages/Labor'));
+const Accounting = React.lazy(() => import('./pages/Accounting'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -47,6 +49,8 @@ export const PAGES = {
     "PlatformAuditLogs": PlatformAuditLogs,
     "PaymentVerification": PaymentVerification,
     "Profile": Profile,
+    "Labor": Labor,
+    "Accounting": Accounting,
 }
 
 export const pagesConfig = {

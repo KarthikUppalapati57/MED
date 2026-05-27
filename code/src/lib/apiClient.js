@@ -59,6 +59,7 @@ export const api = {
     Product: createEntityClient('products'),
     Payment: createEntityClient('payments'),
     Invoice: createEntityClient('invoices'),
+    InvoiceLineItem: createEntityClient('invoice_line_items'),
     WastageLog: createEntityClient('wastage_logs'),
     User: createEntityClient('profiles'),
     Notification: createEntityClient('notifications'),
@@ -67,6 +68,11 @@ export const api = {
     Brand: createEntityClient('brands'),
     Location: createEntityClient('locations'),
     AuditLog: createEntityClient('audit_logs'),
+    Employee: createEntityClient('employees'),
+    EmployeeShift: createEntityClient('employee_shifts'),
+    Integration: createEntityClient('integrations'),
+    AccountingSyncLog: createEntityClient('accounting_sync_logs'),
+    OnboardingProgress: createEntityClient('onboarding_progress'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
