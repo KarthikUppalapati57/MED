@@ -419,6 +419,27 @@
     animation: spin 0.8s linear infinite;
   }
 
+  .auth-warning {
+    background: rgba(255, 197, 61, 0.08);
+    border: 1px solid rgba(255, 197, 61, 0.15);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    color: var(--accent-yellow);
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+  }
+  .auth-warning a {
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .auth-warning a:hover {
+    text-decoration: underline;
+  }
+
   /* ═══ Responsive ═══ */
   @media (max-width: 1200px) {
     .grid-4 { grid-template-columns: repeat(2, 1fr); }
@@ -464,6 +485,16 @@
 
   <!-- ═══ PANEL 1: Overview ═══ -->
   <div class="panel active" id="panel-overview">
+    <!-- Auth Warning Banner -->
+    <div class="auth-warning" id="auth-warning-banner">
+      <span style="font-size: 18px;">⚠️</span>
+      <div>
+        <strong>Viewing as Anonymous User:</strong> Table counts and live metrics are currently protected by database Row Level Security (RLS). 
+        To view live data, please run your Vite development server (`npm run dev`) and access this tool at 
+        <a href="http://localhost:5173/dev-monitor.html" target="_blank">http://localhost:5173/dev-monitor.html</a> while logged in to your account.
+      </div>
+    </div>
+
     <!-- Stats row -->
     <div class="grid-4 mb-24" id="stats-grid"></div>
 
@@ -716,13 +747,22 @@ const PAGES_CONFIG = [
 async function initSupabase() {
   try {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    // Test connection with a lightweight query
-    const { error } = await sb.from('profiles').select('id', { count: 'exact', head: true });
+    // Test connection with a lightweight public query to prevent RLS errors from failing the connection
+    const { error } = await sb.from('plans').select('id', { count: 'exact', head: true });
     if (error) throw error;
     isConnected = true;
     document.getElementById('connection-dot').style.background = 'var(--accent-green)';
     document.getElementById('status-text').textContent = 'Connected to Supabase';
     document.getElementById('status-text').style.color = 'var(--accent-green)';
+
+    // Check if we have an active authenticated session
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      document.getElementById('auth-warning-banner').style.display = 'flex';
+    } else {
+      document.getElementById('auth-warning-banner').style.display = 'none';
+      document.getElementById('status-text').textContent = `Connected (Authenticated as ${session.user.email})`;
+    }
   } catch (err) {
     isConnected = false;
     document.getElementById('connection-dot').style.background = 'var(--accent-red)';
