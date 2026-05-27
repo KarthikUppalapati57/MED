@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 
-const createEntityClient = (table) => ({
+const createEntityClient = (table, useSoftDelete = false) => ({
   list: async (orderBy, options = {}) => {
     let query = supabase.from(table).select('*');
     if (orderBy) {
@@ -44,6 +44,11 @@ const createEntityClient = (table) => ({
     return data;
   },
   delete: async (id) => {
+    if (useSoftDelete) {
+      const { error } = await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+      if (error) throw error;
+      return true;
+    }
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) throw error;
     return true;
@@ -53,12 +58,12 @@ const createEntityClient = (table) => ({
 export const api = {
   entities: {
     AutoOrder: createEntityClient('auto_orders'),
-    Inventory: createEntityClient('inventory'),
+    Inventory: createEntityClient('inventory', true),
     Vendor: createEntityClient('vendors'),
-    Recipe: createEntityClient('recipes'),
-    Product: createEntityClient('products'),
-    Payment: createEntityClient('payments'),
-    Invoice: createEntityClient('invoices'),
+    Recipe: createEntityClient('recipes', true),
+    Product: createEntityClient('products', true),
+    Payment: createEntityClient('payments', true),
+    Invoice: createEntityClient('invoices', true),
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     WastageLog: createEntityClient('wastage_logs'),
     User: createEntityClient('profiles'),
@@ -73,6 +78,10 @@ export const api = {
     Integration: createEntityClient('integrations'),
     AccountingSyncLog: createEntityClient('accounting_sync_logs'),
     OnboardingProgress: createEntityClient('onboarding_progress'),
+    RecipeIngredient: createEntityClient('recipe_ingredients'),
+    InventoryMovement: createEntityClient('inventory_movements'),
+    PurchaseOrder: createEntityClient('purchase_orders'),
+    PurchaseOrderItem: createEntityClient('purchase_order_items'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
