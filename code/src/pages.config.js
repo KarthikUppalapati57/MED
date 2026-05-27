@@ -30,6 +30,7 @@ const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification
 const Profile = React.lazy(() => import('./pages/Profile'));
 const Labor = React.lazy(() => import('./pages/Labor'));
 const Accounting = React.lazy(() => import('./pages/Accounting'));
+const AiInsights = React.lazy(() => import('./pages/AiInsights'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -51,6 +52,7 @@ export const PAGES = {
     "Profile": Profile,
     "Labor": Labor,
     "Accounting": Accounting,
+    "AiInsights": AiInsights,
 }
 
 export const pagesConfig = {

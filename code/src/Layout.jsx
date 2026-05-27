@@ -52,6 +52,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
   { 
     name: 'Platform Admin', 
     icon: Shield, 
@@ -177,7 +178,7 @@ export default function Layout({ children, currentPageName }) {
           .from('notifications')
           .select('*')
           .eq('user_id', user.id)
-          .eq('is_read', false)
+          .eq('read', false)
           .order('created_at', { ascending: false });
         
         if (error) {
@@ -221,7 +222,7 @@ export default function Layout({ children, currentPageName }) {
   const markAsRead = async (notifId) => {
     await supabase
       .from('notifications')
-      .update({ is_read: true })
+      .update({ read: true })
       .eq('id', notifId);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
@@ -229,9 +230,9 @@ export default function Layout({ children, currentPageName }) {
   const markAllAsRead = async () => {
     await supabase
       .from('notifications')
-      .update({ is_read: true })
+      .update({ read: true })
       .eq('user_id', user?.id)
-      .eq('is_read', false);
+      .eq('read', false);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
 
@@ -465,11 +466,11 @@ export default function Layout({ children, currentPageName }) {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm">{notif.title}</p>
-                          {notif.priority === 'high' && (
-                            <Badge className="bg-resend-red/10 text-resend-red text-[10px] px-1 border-0">urgent</Badge>
+                          {notif.type === 'AI_alert' && (
+                            <Badge className="bg-resend-purple/10 text-resend-purple text-[10px] px-1 border-0">AI Insight</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{notif.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{notif.body}</p>
                       </div>
                       <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
                     </DropdownMenuItem>

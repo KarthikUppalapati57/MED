@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -191,10 +191,27 @@ export default function Invoices() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data) => {
+    mutationFn: async (data) => {
+      const lineItems = data.line_items || [];
       const cleaned = sanitizeInvoiceData(data);
       delete cleaned.id; // Ensure no id on create
-      return api.entities.Invoice.create(cleaned);
+      
+      const invoice = await api.entities.Invoice.create(cleaned);
+      
+      if (lineItems.length > 0) {
+        await Promise.all(lineItems.map(item => 
+          api.entities.InvoiceLineItem.create({
+            invoice_id: invoice.id,
+            organization_id: invoice.organization_id,
+            inventory_item_id: item.product_id || null,
+            item_name: item.description || 'Unknown Item',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0,
+            total_price: item.extended_price || 0
+          })
+        ));
+      }
+      return { ...invoice, line_items: lineItems };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -203,10 +220,33 @@ export default function Invoices() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => {
+    mutationFn: async ({ id, data }) => {
+      const lineItems = data.line_items || [];
       const cleaned = sanitizeInvoiceData(data);
       delete cleaned.id; // Don't update id
-      return api.entities.Invoice.update(id, cleaned);
+      
+      const invoice = await api.entities.Invoice.update(id, cleaned);
+      
+      // Delete old line items and insert new ones to keep them synced
+      const oldItems = await api.entities.InvoiceLineItem.filter({ invoice_id: id });
+      if (oldItems && oldItems.length > 0) {
+        await Promise.all(oldItems.map(item => api.entities.InvoiceLineItem.delete(item.id)));
+      }
+      
+      if (lineItems.length > 0) {
+        await Promise.all(lineItems.map(item => 
+          api.entities.InvoiceLineItem.create({
+            invoice_id: invoice.id,
+            organization_id: invoice.organization_id,
+            inventory_item_id: item.product_id || null,
+            item_name: item.description || 'Unknown Item',
+            quantity: item.quantity || 1,
+            unit_price: item.unit_price || 0,
+            total_price: item.extended_price || 0
+          })
+        ));
+      }
+      return { ...invoice, line_items: lineItems };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -435,9 +475,26 @@ export default function Invoices() {
     try {
       await updateMutation.mutateAsync({ 
         id: invoice.id, 
-        data: { status: 'approved' }
+        data: { status: 'approved', line_items: invoice.line_items }
       });
       await syncInvoiceToProductsAndInventory(invoice);
+      
+      // Generate a LedgerBill to satisfy double-entry accounting
+      try {
+        await api.entities.LedgerBill.create({
+          organization_id: invoice.organization_id,
+          vendor_id: invoice.vendor_id || null,
+          invoice_id: invoice.id,
+          subtotal: invoice.subtotal || 0,
+          tax: invoice.tax_amount || 0,
+          total: invoice.total_amount || 0,
+          due_date: invoice.due_date,
+          status: 'pending' // pending payment
+        });
+      } catch (billErr) {
+        console.warn('Could not create LedgerBill:', billErr);
+      }
+      
       toast.success('Invoice approved & products/inventory updated');
     } catch (err) {
       console.error('Approve failed:', err);
