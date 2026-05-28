@@ -31,7 +31,8 @@ import {
   History,
   ArrowRightLeft,
   Trash2,
-  Plus
+  Plus,
+  Receipt
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,12 +62,12 @@ const navigation = [
       { name: 'Requests', href: 'PlatformAdmin?tab=requests', icon: ShieldAlert },
       { name: 'Invite Clients', href: 'PlatformAdmin?tab=invite', icon: UserPlus },
       { name: 'Organisation', href: 'PlatformAdmin?tab=orgs', icon: Building2 },
-      { name: 'Plans', href: 'PlatformAdmin?tab=plans', icon: Sparkles },
-      { name: 'Subscriptions', href: 'PlatformAdmin?tab=subscriptions', icon: Activity },
       { name: 'Accounting', href: 'PlatformAdmin?tab=accounting', icon: DollarSign }
     ]
   },
   { name: 'Platform Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
+  { name: 'Platform Plans', href: 'PlatformPlans', icon: Sparkles, minRole: 'platform_admin' },
+  { name: 'Platform Invoices', href: 'PlatformInvoices', icon: Receipt, minRole: 'platform_admin' },
   { name: 'Admin Management', href: 'PlatformUserManagement', icon: ShieldAlert, minRole: 'platform_admin' },
   { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
@@ -144,6 +145,7 @@ const navigation = [
     ]
   },
   { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
+  { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
   { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
 ];
 

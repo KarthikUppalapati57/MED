@@ -19,7 +19,7 @@ export default function PlatformUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, created_at, updated_at, organization_id");
+        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
       if (error) throw error;
       return data || [];
     },
@@ -29,7 +29,27 @@ export default function PlatformUsers() {
   const { data: orgs = [] } = useAuthQuery({
     queryKey: ['platform-orgs-lookup'],
     queryFn: async () => {
-      const { data, error } = await supabase.from("organizations").select("id, name");
+      const { data, error } = await supabase.from("organizations").select("id, name, subscription_status");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && userRole === 'platform_admin',
+  });
+
+  const { data: brands = [] } = useAuthQuery({
+    queryKey: ['platform-brands-lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("brands").select("id, name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && userRole === 'platform_admin',
+  });
+
+  const { data: locations = [] } = useAuthQuery({
+    queryKey: ['platform-locations-lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("locations").select("id, name");
       if (error) throw error;
       return data || [];
     },
@@ -38,10 +58,24 @@ export default function PlatformUsers() {
 
   const orgMap = useMemo(() => {
     return orgs.reduce((acc, org) => {
-      acc[org.id] = org.name;
+      acc[org.id] = { name: org.name, status: org.subscription_status };
       return acc;
     }, {});
   }, [orgs]);
+
+  const brandMap = useMemo(() => {
+    return brands.reduce((acc, b) => {
+      acc[b.id] = b.name;
+      return acc;
+    }, {});
+  }, [brands]);
+
+  const locationMap = useMemo(() => {
+    return locations.reduce((acc, l) => {
+      acc[l.id] = l.name;
+      return acc;
+    }, {});
+  }, [locations]);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery) return profiles;
@@ -113,6 +147,7 @@ export default function PlatformUsers() {
                 <TableHead className="text-[11px] font-bold">EMAIL</TableHead>
                 <TableHead className="text-[11px] font-bold">ROLE</TableHead>
                 <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
+                <TableHead className="text-[11px] font-bold">BRAND / LOCATION</TableHead>
                 <TableHead className="text-[11px] font-bold">JOINED</TableHead>
               </TableRow>
             </TableHeader>
@@ -142,7 +177,25 @@ export default function PlatformUsers() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm font-medium text-foreground">
-                    {u.organization_id ? orgMap[u.organization_id] || <span className="text-muted-foreground text-xs italic">Loading...</span> : <span className="text-muted-foreground text-xs italic">—</span>}
+                    {u.organization_id ? (
+                      <div className="flex flex-col">
+                        <span>{orgMap[u.organization_id]?.name || <span className="text-muted-foreground text-xs italic">Loading...</span>}</span>
+                        {orgMap[u.organization_id]?.status && (
+                          <span className={cn(
+                            "text-[10px] uppercase font-bold tracking-wider mt-0.5",
+                            orgMap[u.organization_id].status === 'active' ? "text-resend-green" :
+                            orgMap[u.organization_id].status === 'trialing' ? "text-resend-yellow" : "text-resend-red"
+                          )}>
+                            {orgMap[u.organization_id].status}
+                          </span>
+                        )}
+                      </div>
+                    ) : <span className="text-muted-foreground text-xs italic">—</span>}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {u.brand_id && <Badge variant="outline" className="mr-1 bg-secondary text-[10px]">{brandMap[u.brand_id] || 'Loading Brand'}</Badge>}
+                    {u.location_id && <Badge variant="outline" className="bg-secondary text-[10px]">{locationMap[u.location_id] || 'Loading Location'}</Badge>}
+                    {!u.brand_id && !u.location_id && '—'}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}

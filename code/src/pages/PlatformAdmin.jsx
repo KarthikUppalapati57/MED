@@ -35,8 +35,7 @@ import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
 const TABS = [
   { id: 'requests', label: 'Requests', icon: ShieldAlert },
   { id: 'invite', label: 'Invite Clients', icon: UserPlus },
-  { id: 'orgs', label: 'Organisation', icon: Building2 },
-  { id: 'plans', label: 'Plans', icon: Sparkles }
+  { id: 'orgs', label: 'Organisation', icon: Building2 }
 ];
 
 const ACCESS_LEVELS = [
@@ -1344,79 +1343,6 @@ The MEVS Platform Team
              </Card>
           </TabsContent>
 
-          <TabsContent value="plans" className="mt-0 outline-none">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               {plans.map(plan => (
-                 <Card key={plan.id} className="border-0 shadow-sm relative group overflow-hidden">
-                   <CardHeader className="pb-2">
-                     <div className="flex justify-between items-start">
-                        <Badge className="bg-resend-blue/5 text-resend-blue text-[10px] font-bold mb-2">{plan.is_active ? 'Production' : 'Draft'}</Badge>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"><Plus className="w-4 h-4" /></Button>
-                     </div>
-                     <CardTitle className="text-xl font-black text-foreground">{plan.name}</CardTitle>
-                     <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
-                   </CardHeader>
-                   <CardContent>
-                      <p className="text-xs text-muted-foreground mb-6">{plan.description || 'Global service level agreement'}</p>
-                      <div className="space-y-2">
-                        {(Array.isArray(plan.features) ? plan.features : []).map(f => (
-                          <div key={f} className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded-full bg-resend-green/5 flex items-center justify-center"><CheckCircle2 className="w-2.5 h-2.5 text-resend-green" /></div>
-                            <span className="text-[11px] font-medium text-muted-foreground">{MODULE_DEFINITIONS[f]?.label || f}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <Button variant="outline" className="w-full mt-8 rounded-xl border-border font-bold text-xs h-10">Configure Plan</Button>
-                   </CardContent>
-                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-resend-blue/50/5 rounded-full blur-2xl" />
-                 </Card>
-               ))}
-               <button 
-                onClick={() => setShowPlanDialog(true)}
-                className="border-2 border-dashed border-border rounded-3xl p-8 flex flex-col items-center justify-center text-muted-foreground hover:border-border hover:bg-secondary transition-all"
-               >
-                 <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center mb-4"><Plus className="w-6 h-6" /></div>
-                 <p className="font-bold">Create New Plan</p>
-                 <p className="text-[10px] mt-1">Standardize service tiers</p>
-               </button>
-             </div>
-          </TabsContent>
-
-          <TabsContent value="subscriptions" className="mt-0 outline-none">
-             <Card className="border-0 shadow-sm">
-                <CardHeader>
-                   <CardTitle className="text-base">Active Subscriptions</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-secondary/50">
-                        <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
-                        <TableHead className="text-[11px] font-bold">CURRENT PLAN</TableHead>
-                        <TableHead className="text-[11px] font-bold">STATUS</TableHead>
-                        <TableHead className="text-[11px] font-bold">NEXT BILLING</TableHead>
-                        <TableHead className="text-[11px] font-bold">ACTIONS</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {orgs.map(org => {
-                        const plan = plans.find(p => p.id === org.plan_id);
-                        return (
-                          <TableRow key={org.id}>
-                            <TableCell className="font-bold text-sm">{org.name}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground font-medium">{plan?.name || 'Standard'}</TableCell>
-                            <TableCell><Badge className="bg-resend-green/5 text-resend-green text-[10px] font-bold border-none">{org.subscription_status || 'active'}</Badge></TableCell>
-                            <TableCell className="text-xs text-muted-foreground">May 15, 2026</TableCell>
-                            <TableCell>
-                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><RefreshCw className="w-4 h-4" /></Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-             </Card>
           </TabsContent>
 
           <TabsContent value="accounting" className="mt-0 outline-none">

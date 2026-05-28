@@ -26,12 +26,15 @@ const Vendors = React.lazy(() => import('./pages/Vendors'));
 const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
 const PlatformUserManagement = React.lazy(() => import('./pages/PlatformUserManagement'));
 const PlatformUsers = React.lazy(() => import('./pages/PlatformUsers'));
+const PlatformPlans = React.lazy(() => import('./pages/PlatformPlans'));
+const PlatformInvoices = React.lazy(() => import('./pages/PlatformInvoices'));
 const PlatformAuditLogs = React.lazy(() => import('./pages/PlatformAuditLogs'));
 const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 const Labor = React.lazy(() => import('./pages/Labor'));
 const Accounting = React.lazy(() => import('./pages/Accounting'));
 const AiInsights = React.lazy(() => import('./pages/AiInsights'));
+const Integrations = React.lazy(() => import('./pages/Integrations'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -49,6 +52,8 @@ export const PAGES = {
     "AuditLogs": AuditLogs,
     "PlatformUserManagement": PlatformUserManagement,
     "PlatformUsers": PlatformUsers,
+    "PlatformPlans": PlatformPlans,
+    "PlatformInvoices": PlatformInvoices,
     "PlatformAuditLogs": PlatformAuditLogs,
     "PaymentVerification": PaymentVerification,
     "Profile": Profile,
