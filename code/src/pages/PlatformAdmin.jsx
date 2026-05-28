@@ -1017,7 +1017,11 @@ The MEVS Platform Team
             <UserPlus className="w-4 h-4 mr-2" />
             Quick Invite
           </Button>
-          <Button variant="outline" className="rounded-xl border-border h-10 px-6">
+          <Button 
+            variant="outline" 
+            className="rounded-xl border-border h-10 px-6"
+            onClick={() => window.open('/dev-monitor.html', '_blank')}
+          >
             System Status
           </Button>
         </div>
