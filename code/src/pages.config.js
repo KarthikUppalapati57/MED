@@ -31,6 +31,7 @@ const Profile = React.lazy(() => import('./pages/Profile'));
 const Labor = React.lazy(() => import('./pages/Labor'));
 const Accounting = React.lazy(() => import('./pages/Accounting'));
 const AiInsights = React.lazy(() => import('./pages/AiInsights'));
+const TestDeploy = React.lazy(() => import('./pages/TestDeploy'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -53,6 +54,7 @@ export const PAGES = {
     "Labor": Labor,
     "Accounting": Accounting,
     "AiInsights": AiInsights,
+    "TestDeploy": TestDeploy,
 }
 
 export const pagesConfig = {
