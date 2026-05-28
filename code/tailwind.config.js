@@ -69,10 +69,10 @@ module.exports = {
   			'brand': 'hsl(var(--brand))'
   		},
   		boxShadow: {
-  			'glow-sm': '0 0 8px rgba(20, 198, 203, 0.15)',
-  			'glow-md': '0 0 16px rgba(20, 198, 203, 0.25)',
-  			'glow-lg': '0 0 24px rgba(20, 198, 203, 0.35)',
-  			'glow-brand': '0 0 20px rgba(20, 198, 203, 0.3)',
+  			'glow-sm': '0 0 8px hsl(var(--brand) / 0.15)',
+  			'glow-md': '0 0 16px hsl(var(--brand) / 0.25)',
+  			'glow-lg': '0 0 24px hsl(var(--brand) / 0.35)',
+  			'glow-brand': '0 0 20px hsl(var(--brand) / 0.3)',
   		},
   		keyframes: {
   			'accordion-down': {

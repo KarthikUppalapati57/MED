@@ -397,13 +397,25 @@
 
   /* Animated background mesh (ideal for auth page backgrounds) */
   .animated-mesh {
-    background-color: #0c0f16;
+    --brand: 239 84% 67%; /* Elegant Indigo Override */
+    --ring: 239 84% 67%;
+    background-color: #f8fafc;
     background-image: 
-      radial-gradient(at 10% 20%, rgba(20, 198, 203, 0.1) 0px, transparent 50%),
-      radial-gradient(at 90% 10%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-      radial-gradient(at 50% 80%, rgba(245, 158, 11, 0.08) 0px, transparent 50%);
+      radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+      radial-gradient(at 50% 80%, rgba(225, 29, 72, 0.05) 0px, transparent 50%);
     background-size: 200% 200%;
     animation: mesh-shift 15s ease infinite;
+  }
+
+  .dark .animated-mesh {
+    --brand: 239 84% 67%;
+    --ring: 239 84% 67%;
+    background-color: #0c0f16;
+    background-image: 
+      radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
+      radial-gradient(at 50% 80%, rgba(225, 29, 72, 0.08) 0px, transparent 50%);
   }
 
   /* Keyframe Animations */

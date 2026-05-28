@@ -176,7 +176,7 @@ function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shimmer-sweep"
+              className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shimmer-sweep"
             >
               {loading ? (
                 <>
@@ -315,7 +315,7 @@ function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
+                className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
               >
                 {isSubmitting ? 'Sending...' : 'Send Reset Link'}
               </button>
@@ -390,7 +390,7 @@ function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
@@ -441,7 +441,7 @@ function PendingAssignmentPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="w-full h-12 inline-flex items-center justify-center bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shimmer-sweep"
+            className="w-full h-12 inline-flex items-center justify-center bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shimmer-sweep"
           >
             {refreshing ? (
               <>
@@ -554,7 +554,7 @@ function UpdatePasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-black hover:opacity-95 shadow-glow-brand font-bold py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
+            className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold py-3 text-sm disabled:opacity-50 transition-all duration-200 shimmer-sweep"
           >
             {loading ? (
               <>
