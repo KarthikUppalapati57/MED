@@ -206,10 +206,6 @@ function SignupPage() {
         )}
       </Card>
     </div>
-  );         </form>
-        )}
-      </div>
-    </div>
   );
 }
 
