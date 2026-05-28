@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -233,6 +233,9 @@ export default function OnboardingPage() {
         firstBrand.name,
         { name: firstLocation.name, address: firstLocation.address }
       );
+
+      // Force refresh JWT so subsequent inserts use the new app_metadata (organization_id, role)
+      await supabase.auth.refreshSession();
 
       const orgId = result.org.id;
       const firstBrandId = result.brand.id;
