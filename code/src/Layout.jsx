@@ -66,7 +66,8 @@ const navigation = [
       { name: 'Accounting', href: 'PlatformAdmin?tab=accounting', icon: DollarSign }
     ]
   },
-  { name: 'User Management', href: 'PlatformUserManagement', icon: Users, minRole: 'platform_admin' },
+  { name: 'Platform Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
+  { name: 'Admin Management', href: 'PlatformUserManagement', icon: ShieldAlert, minRole: 'platform_admin' },
   { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
   { 

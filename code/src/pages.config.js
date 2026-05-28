@@ -25,6 +25,7 @@ const OrgManagement = React.lazy(() => import('./pages/OrgManagement'));
 const Vendors = React.lazy(() => import('./pages/Vendors'));
 const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
 const PlatformUserManagement = React.lazy(() => import('./pages/PlatformUserManagement'));
+const PlatformUsers = React.lazy(() => import('./pages/PlatformUsers'));
 const PlatformAuditLogs = React.lazy(() => import('./pages/PlatformAuditLogs'));
 const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification'));
 const Profile = React.lazy(() => import('./pages/Profile'));
@@ -47,6 +48,7 @@ export const PAGES = {
     "Vendors": Vendors,
     "AuditLogs": AuditLogs,
     "PlatformUserManagement": PlatformUserManagement,
+    "PlatformUsers": PlatformUsers,
     "PlatformAuditLogs": PlatformAuditLogs,
     "PaymentVerification": PaymentVerification,
     "Profile": Profile,

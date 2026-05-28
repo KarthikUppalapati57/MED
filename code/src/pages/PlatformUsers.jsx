@@ -1,0 +1,158 @@
+import React, { useState, useMemo } from "react";
+import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, Search, Loader2, ShieldAlert } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export default function PlatformUsers() {
+  const { user, role: userRole } = useAuth();
+  const authChecked = !!user;
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: profiles = [], isLoading: isLoadingProfiles } = useAuthQuery({
+    queryKey: ['platform-all-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, role, created_at, updated_at, organization_id");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && userRole === 'platform_admin',
+  });
+
+  const { data: orgs = [] } = useAuthQuery({
+    queryKey: ['platform-orgs-lookup'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("organizations").select("id, name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: authChecked && userRole === 'platform_admin',
+  });
+
+  const orgMap = useMemo(() => {
+    return orgs.reduce((acc, org) => {
+      acc[org.id] = org.name;
+      return acc;
+    }, {});
+  }, [orgs]);
+
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery) return profiles;
+    const term = searchQuery.toLowerCase();
+    return profiles.filter(p => 
+      p.full_name?.toLowerCase().includes(term) ||
+      p.email?.toLowerCase().includes(term) ||
+      p.role?.toLowerCase().includes(term)
+    );
+  }, [profiles, searchQuery]);
+
+  if (!authChecked) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user || userRole !== 'platform_admin') {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center px-4">
+        <div className="w-16 h-16 bg-resend-red/10 rounded-2xl flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8 text-resend-red" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+        <p className="text-muted-foreground max-w-md">Platform Users Management is restricted to platform administrators only.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+            <Users className="w-5 h-5 text-brand" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Platform Users</h1>
+            <p className="text-sm text-muted-foreground">View all users across the entire platform</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Users Table */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base">All Registered Users</CardTitle>
+            <p className="text-xs text-muted-foreground">Comprehensive list of all platform users</p>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              className="pl-9 w-64 h-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-secondary">
+                <TableHead className="text-[11px] font-bold">NAME</TableHead>
+                <TableHead className="text-[11px] font-bold">EMAIL</TableHead>
+                <TableHead className="text-[11px] font-bold">ROLE</TableHead>
+                <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
+                <TableHead className="text-[11px] font-bold">JOINED</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingProfiles ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">No users found</TableCell></TableRow>
+              ) : filteredUsers.map(u => (
+                <TableRow key={u.id} className="hover:bg-secondary/50 transition-colors">
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {u.full_name?.substring(0, 2).toUpperCase() || '??'}
+                      </div>
+                      <span className="font-semibold text-sm">{u.full_name || '—'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{u.email || '—'}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn(
+                      "text-[10px] capitalize font-bold",
+                      u.role === 'platform_admin' ? "bg-purple-500/10 text-purple-500 border-purple-200" :
+                      u.role === 'org_owner' ? "bg-rose-500/10 text-rose-500 border-rose-200" : "bg-card text-muted-foreground"
+                    )}>
+                      {u.role?.replace('_', ' ') || 'User'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm font-medium text-foreground">
+                    {u.organization_id ? orgMap[u.organization_id] || <span className="text-muted-foreground text-xs italic">Loading...</span> : <span className="text-muted-foreground text-xs italic">—</span>}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
