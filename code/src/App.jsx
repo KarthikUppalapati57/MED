@@ -95,7 +95,11 @@ function SignupPage() {
       // If the user is automatically logged in (session exists), go to root/dashboard
       // Otherwise (email confirmation required), go to login page
       const destination = data?.session ? '/' : '/login';
-      set  return (
+      setTimeout(() => navigate(destination), 3000);
+    }
+  };
+
+  return (
     <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
