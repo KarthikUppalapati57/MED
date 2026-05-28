@@ -446,7 +446,9 @@ export const AuthProvider = ({ children }) => {
                 // background while invitation + profile resolve. By the time the
                 // Dashboard component mounts, React Query cache is pre-warmed.
                 const cachedRole = currentUser.app_metadata?.role || getCachedProfile()?.role;
-                if (cachedRole !== 'platform_admin' && !organization_id) {
+                const cachedOrgId = currentUser.app_metadata?.organization_id || getCachedProfile()?.organization_id;
+                
+                if (cachedRole === 'platform_admin' || cachedOrgId) {
                   prefetchDashboardData(cachedRole);
                 }
 
