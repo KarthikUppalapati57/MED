@@ -17,7 +17,7 @@ import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeProvider';
-
+import { Card } from '@/components/ui/card';
 // Initialize global error monitoring
 initGlobalErrorHandlers();
 
