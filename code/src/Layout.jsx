@@ -61,11 +61,11 @@ const navigation = [
     subItems: [
       { name: 'Requests', href: 'PlatformAdmin?tab=requests', icon: ShieldAlert },
       { name: 'Invite Clients', href: 'PlatformAdmin?tab=invite', icon: UserPlus },
-      { name: 'Organisation', href: 'PlatformAdmin?tab=orgs', icon: Building2 },
       { name: 'Accounting', href: 'PlatformAdmin?tab=accounting', icon: DollarSign }
     ]
   },
   { name: 'Platform Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
+  { name: 'Platform Organizations', href: 'PlatformOrganizations', icon: Building2, minRole: 'platform_admin' },
   { name: 'Platform Plans', href: 'PlatformPlans', icon: Sparkles, minRole: 'platform_admin' },
   { name: 'Platform Invoices', href: 'PlatformInvoices', icon: Receipt, minRole: 'platform_admin' },
   { name: 'Admin Management', href: 'PlatformUserManagement', icon: ShieldAlert, minRole: 'platform_admin' },

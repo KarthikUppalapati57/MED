@@ -34,8 +34,7 @@ import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
 
 const TABS = [
   { id: 'requests', label: 'Requests', icon: ShieldAlert },
-  { id: 'invite', label: 'Invite Clients', icon: UserPlus },
-  { id: 'orgs', label: 'Organisation', icon: Building2 }
+  { id: 'invite', label: 'Invite Clients', icon: UserPlus }
 ];
 
 const ACCESS_LEVELS = [
@@ -573,16 +572,16 @@ The MEVS Platform Team
     try {
       const { error } = await supabase
         .from('organizations')
-        .delete()
+        .update({ status: 'archived' })
         .eq('id', id);
       if (error) throw error;
       
-      toast.success("Organization deactivated", { id: toastId });
+      toast.success("Organization archived", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
     } catch (err) {
       if (prev) queryClient.setQueryData(['organizations'], prev);
       console.error(err);
-      toast.error("Failed to delete organization", { id: toastId });
+      toast.error("Failed to archive organization", { id: toastId });
     }
   };
 
@@ -1170,179 +1169,6 @@ The MEVS Platform Team
 
           <TabsContent value="invite" className="mt-0 outline-none">
             {renderInviteTab()}
-          </TabsContent>
-
-          <TabsContent value="orgs" className="mt-0 outline-none">
-             <Card className="border-0 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-6">
-                <div>
-                  <CardTitle className="text-base">Organization Hierarchy</CardTitle>
-                  <p className="text-xs text-muted-foreground">Global tenant distribution and structural breakdown</p>
-                </div>
-                <div className="flex items-center gap-4">
-                   <div className="flex items-center space-x-2 bg-secondary px-3 py-1.5 rounded-lg border border-border">
-                    <Checkbox id="showArchived" checked={showArchivedOrgs} onCheckedChange={setShowArchivedOrgs} />
-                    <Label htmlFor="showArchived" className="text-[10px] font-bold text-muted-foreground cursor-pointer">Show Archived</Label>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100">
-                   {orgs
-                     .filter(org => showArchivedOrgs ? true : org.status !== 'archived')
-                     .map(org => {
-                     const brands = getOrgBrands(org.id);
-                     const isExp = expandedOrgs.has(org.id);
-                     return (
-                       <div key={org.id} className="group">
-                         <div 
-                          className={cn(
-                            "flex items-center gap-4 p-4 px-6 cursor-pointer hover:bg-secondary/80 transition-all",
-                            isExp && "bg-secondary/50 shadow-inner"
-                          )}
-                          onClick={() => toggleOrg(org.id)}
-                         >
-                            <div className="w-6 h-6 flex items-center justify-center shrink-0 transition-transform">
-                              {isExp ? <ChevronDown className="w-4 h-4 text-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                            </div>
-                            <div className="w-10 h-10 bg-card rounded-xl border border-border flex items-center justify-center shadow-sm">
-                              <Building2 className="w-5 h-5 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-foreground">{org.name}</p>
-                                <Badge className="bg-resend-green/5 text-resend-green text-[9px] font-bold border-none">{org.status || 'Active'}</Badge>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{org.admin_email} Â· {brands.length} Brands</p>
-                            </div>
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button size="sm" variant="ghost" className="h-8 px-3 text-[10px] font-bold rounded-lg" onClick={(e) => { e.stopPropagation(); setEditingOrgModules(org); setSelectedModules(org.enabled_modules || []); }}>
-                                <Package className="w-3.5 h-3.5 mr-2" /> Modules
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfirmDeleteOrg({ id: org.id, name: org.name });
-                                }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                         </div>
-                         {isExp && (
-                           <div className="bg-card/50 px-12 pb-2">
-                             {/* Render Org-level users */}
-                             {getOrgUsers(org.id).map(user => (
-                               <div key={user.id} className="py-3 border-l-2 border-border pl-6 flex items-center gap-3 hover:bg-secondary/30 transition-colors">
-                                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                                   <User className="w-4 h-4 text-slate-500" />
-                                 </div>
-                                 <div>
-                                   <p className="text-xs font-bold text-foreground">{user.full_name || 'Unnamed User'}</p>
-                                   <p className="text-[9px] text-muted-foreground">{user.email} &middot; {user.role}</p>
-                                 </div>
-                               </div>
-                             ))}
-                             
-                             {brands.length === 0 && getOrgUsers(org.id).length === 0 ? (
-                               <p className="p-4 text-[10px] text-muted-foreground italic">No brands or users registered under this organization.</p>
-                             ) : brands.map(brand => {
-                               const isBrandExp = expandedBrands.has(brand.id);
-                               const brandLocations = getBrandLocations(brand.id);
-                               const brandUsers = getBrandUsers(brand.id);
-                               return (
-                                 <div key={brand.id} className="group/brand">
-                                   <div 
-                                     className="py-3 border-l-2 border-border pl-6 flex items-center justify-between cursor-pointer hover:bg-secondary/50 transition-colors"
-                                     onClick={() => toggleBrand(brand.id)}
-                                   >
-                                     <div className="flex items-center gap-3">
-                                       <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                                         {isBrandExp ? <ChevronDown className="w-3 h-3 text-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
-                                       </div>
-                                       <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center"><Store className="w-4 h-4 text-violet-600" /></div>
-                                       <div>
-                                          <p className="text-xs font-bold text-foreground">{brand.name}</p>
-                                          <p className="text-[9px] text-muted-foreground">{brandLocations.length} Locations &middot; {brandUsers.length} Users</p>
-                                       </div>
-                                     </div>
-                                     <Button size="sm" variant="ghost" className="h-7 text-[10px] font-bold opacity-0 group-hover/brand:opacity-100">+ Location</Button>
-                                   </div>
-
-                                   {isBrandExp && (
-                                     <div className="pl-14 pb-2 border-l-2 border-border">
-                                       {/* Render Brand-level users */}
-                                       {brandUsers.map(user => (
-                                         <div key={user.id} className="py-2 border-l-2 border-border pl-6 flex items-center gap-3 hover:bg-secondary/30 transition-colors">
-                                           <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center">
-                                             <User className="w-3 h-3 text-slate-500" />
-                                           </div>
-                                           <div>
-                                             <p className="text-[11px] font-bold text-foreground">{user.full_name || 'Unnamed User'}</p>
-                                             <p className="text-[9px] text-muted-foreground">{user.email} &middot; {user.role}</p>
-                                           </div>
-                                         </div>
-                                       ))}
-                                       
-                                       {/* Render Locations */}
-                                       {brandLocations.map(loc => {
-                                         const isLocExp = expandedLocations.has(loc.id);
-                                         const locUsers = getLocationUsers(loc.id);
-                                         return (
-                                           <div key={loc.id} className="group/loc">
-                                             <div 
-                                               className="py-2 border-l-2 border-border pl-6 flex items-center justify-between cursor-pointer hover:bg-secondary/50 transition-colors"
-                                               onClick={() => toggleLocation(loc.id)}
-                                             >
-                                               <div className="flex items-center gap-3">
-                                                 <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                                                   {isLocExp ? <ChevronDown className="w-3 h-3 text-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
-                                                 </div>
-                                                 <div className="w-7 h-7 bg-amber-50 rounded-lg flex items-center justify-center"><MapPin className="w-3 h-3 text-amber-600" /></div>
-                                                 <div>
-                                                    <p className="text-[11px] font-bold text-foreground">{loc.name}</p>
-                                                    <p className="text-[9px] text-muted-foreground">{locUsers.length} Users</p>
-                                                 </div>
-                                               </div>
-                                             </div>
-                                             {isLocExp && (
-                                               <div className="pl-14 pb-2 border-l-2 border-border">
-                                                 {locUsers.length === 0 ? (
-                                                   <p className="py-2 pl-6 text-[9px] text-muted-foreground italic border-l-2 border-border">No users assigned to this location.</p>
-                                                 ) : locUsers.map(user => (
-                                                   <div key={user.id} className="py-2 border-l-2 border-border pl-6 flex items-center gap-3 hover:bg-secondary/30 transition-colors">
-                                                     <div className="w-6 h-6 bg-slate-100 rounded-lg flex items-center justify-center">
-                                                       <User className="w-3 h-3 text-slate-500" />
-                                                     </div>
-                                                     <div>
-                                                       <p className="text-[10px] font-bold text-foreground">{user.full_name || 'Unnamed User'}</p>
-                                                       <p className="text-[8px] text-muted-foreground">{user.email} &middot; {user.role}</p>
-                                                     </div>
-                                                   </div>
-                                                 ))}
-                                               </div>
-                                             )}
-                                           </div>
-                                         );
-                                       })}
-                                     </div>
-                                   )}
-                                 </div>
-                               );
-                             })}
-                           </div>
-                         )}
-                       </div>
-                     )
-                   })}
-                </div>
-              </CardContent>
-             </Card>
-          </TabsContent>
-
           </TabsContent>
 
           <TabsContent value="accounting" className="mt-0 outline-none">

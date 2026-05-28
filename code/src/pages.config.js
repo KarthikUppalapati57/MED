@@ -28,6 +28,7 @@ const PlatformUserManagement = React.lazy(() => import('./pages/PlatformUserMana
 const PlatformUsers = React.lazy(() => import('./pages/PlatformUsers'));
 const PlatformPlans = React.lazy(() => import('./pages/PlatformPlans'));
 const PlatformInvoices = React.lazy(() => import('./pages/PlatformInvoices'));
+const PlatformOrganizations = React.lazy(() => import('./pages/PlatformOrganizations'));
 const PlatformAuditLogs = React.lazy(() => import('./pages/PlatformAuditLogs'));
 const PaymentVerification = React.lazy(() => import('./pages/PaymentVerification'));
 const Profile = React.lazy(() => import('./pages/Profile'));
@@ -54,6 +55,7 @@ export const PAGES = {
     "PlatformUsers": PlatformUsers,
     "PlatformPlans": PlatformPlans,
     "PlatformInvoices": PlatformInvoices,
+    "PlatformOrganizations": PlatformOrganizations,
     "PlatformAuditLogs": PlatformAuditLogs,
     "PaymentVerification": PaymentVerification,
     "Profile": Profile,
