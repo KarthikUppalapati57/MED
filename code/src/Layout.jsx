@@ -53,6 +53,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
   { 
     name: 'Platform Admin', 
