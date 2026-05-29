@@ -12,6 +12,8 @@ import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Sh
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from '@/lib/moduleConfig';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 
@@ -25,7 +27,8 @@ export default function PlatformOrganizations() {
     plan_id: 'none',
     subscription_status: 'unprovisioned',
     stripe_customer_id: '',
-    stripe_subscription_id: ''
+    stripe_subscription_id: '',
+    enabled_modules: []
   });
   
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
@@ -85,7 +88,8 @@ export default function PlatformOrganizations() {
         plan_id: org.plan_id || 'none',
         subscription_status: org.subscription_status || 'unprovisioned',
         stripe_customer_id: org.stripe_customer_id || '',
-        stripe_subscription_id: org.stripe_subscription_id || ''
+        stripe_subscription_id: org.stripe_subscription_id || '',
+        enabled_modules: org.enabled_modules || []
       });
     }
   }, [selectedOrgId, orgs]);
@@ -100,13 +104,32 @@ export default function PlatformOrganizations() {
           plan_id: billingForm.plan_id === 'none' ? null : billingForm.plan_id,
           subscription_status: billingForm.subscription_status,
           stripe_customer_id: billingForm.stripe_customer_id,
-          stripe_subscription_id: billingForm.stripe_subscription_id
+          stripe_subscription_id: billingForm.stripe_subscription_id,
+          enabled_modules: billingForm.enabled_modules
         })
         .eq('id', selectedOrgId);
         
       if (error) throw error;
-      toast.success("Billing information updated");
+      toast.success("Billing & configuration updated");
+
+      // Notify Org Owner
+      const orgOwner = users.find(u => u.organization_id === selectedOrgId && u.role === 'org_owner');
+      if (orgOwner) {
+        await supabase.from('notifications').insert({
+          organization_id: selectedOrgId,
+          user_id: orgOwner.id,
+          type: 'system',
+          title: 'Organization Plan Updated',
+          message: `Your organization's plan and modules have been updated by a Platform Administrator.`,
+          is_read: false
+        });
+      }
+      // Invalidate this page's query
       queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+      // Invalidate Platform Users query
+      queryClient.invalidateQueries({ queryKey: ['platform-orgs-lookup'] });
+      // Invalidate Platform Plans query
+      queryClient.invalidateQueries({ queryKey: ['organizations'] });
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to update billing");
@@ -404,29 +427,60 @@ export default function PlatformOrganizations() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="settings" className="mt-0">
+                 <TabsContent value="settings" className="mt-0">
                    <Card className="border-0 shadow-sm bg-card">
                      <CardHeader>
                        <CardTitle className="text-base flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Platform Configuration</CardTitle>
                      </CardHeader>
                      <CardContent className="space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="p-4 rounded-xl border border-border/50 bg-secondary/50">
-                             <p className="text-xs font-bold text-muted-foreground mb-1">Enabled Modules</p>
-                             <div className="flex flex-wrap gap-2 mt-2">
-                               {selectedOrg.enabled_modules?.map(m => (
-                                 <Badge key={m} variant="secondary" className="bg-card border border-border text-foreground/80 text-[10px] font-bold">{m}</Badge>
-                               )) || <span className="text-xs text-muted-foreground italic">No modules enabled</span>}
+                             <p className="text-sm font-bold text-foreground mb-3">Enabled Modules</p>
+                             <p className="text-xs text-muted-foreground mb-4">Toggle modules for this organization. Changes will take effect immediately.</p>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                               {ALL_MODULE_KEYS.map(moduleKey => {
+                                 const def = MODULE_DEFINITIONS[moduleKey];
+                                 const isChecked = billingForm.enabled_modules.includes(moduleKey);
+                                 return (
+                                   <div key={moduleKey} className="flex items-center space-x-2">
+                                     <Checkbox 
+                                       id={`mod-${moduleKey}`} 
+                                       checked={isChecked}
+                                       onCheckedChange={(checked) => {
+                                         setBillingForm(prev => {
+                                           const newModules = checked 
+                                             ? [...prev.enabled_modules, moduleKey]
+                                             : prev.enabled_modules.filter(m => m !== moduleKey);
+                                           return { ...prev, enabled_modules: newModules };
+                                         });
+                                       }}
+                                     />
+                                     <Label htmlFor={`mod-${moduleKey}`} className="text-xs font-medium cursor-pointer">
+                                       {def.label}
+                                     </Label>
+                                   </div>
+                                 )
+                               })}
                              </div>
                           </div>
-                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50">
+                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit">
                              <p className="text-xs font-bold text-muted-foreground mb-1">Account Timestamps</p>
                              <p className="text-xs text-foreground/80 mt-2">Created: {new Date(selectedOrg.created_at).toLocaleDateString()}</p>
                           </div>
                         </div>
+                        <div className="pt-4 border-t border-border flex justify-end">
+                          <Button 
+                            onClick={handleUpdateBilling} 
+                            disabled={isUpdatingBilling}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
+                          >
+                            {isUpdatingBilling && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Save Configuration
+                          </Button>
+                        </div>
                      </CardContent>
                    </Card>
-                </TabsContent>
+                 </TabsContent>
                 
                 <TabsContent value="billing" className="mt-0">
                    <Card className="border-0 shadow-sm bg-card">

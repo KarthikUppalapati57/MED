@@ -181,7 +181,7 @@ export default function Layout({ children, currentPageName }) {
           .from('notifications')
           .select('*')
           .eq('user_id', user.id)
-          .eq('read', false)
+          .eq('is_read', false)
           .order('created_at', { ascending: false });
         
         if (error) {
@@ -222,10 +222,37 @@ export default function Layout({ children, currentPageName }) {
     };
   }, [user?.id, queryClient]);
 
+  // Real-time organization update subscription
+  useEffect(() => {
+    if (!organization?.id) return;
+    const orgChannel = supabase
+      .channel('org-realtime-layout')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'organizations',
+          filter: `id=eq.${organization.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['organizations'] });
+          queryClient.invalidateQueries({ queryKey: ['platform-orgs-lookup'] });
+          // Force refetch of current user context if needed
+          queryClient.invalidateQueries({ queryKey: ['auth-user'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(orgChannel);
+    };
+  }, [organization?.id, queryClient]);
+
   const markAsRead = async (notifId) => {
     await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('id', notifId);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
@@ -233,9 +260,9 @@ export default function Layout({ children, currentPageName }) {
   const markAllAsRead = async () => {
     await supabase
       .from('notifications')
-      .update({ read: true })
+      .update({ is_read: true })
       .eq('user_id', user?.id)
-      .eq('read', false);
+      .eq('is_read', false);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
 
@@ -473,7 +500,7 @@ export default function Layout({ children, currentPageName }) {
                             <Badge className="bg-resend-purple/10 text-resend-purple text-[10px] px-1 border-0">AI Insight</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{notif.body}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{notif.message || notif.body}</p>
                       </div>
                       <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
                     </DropdownMenuItem>
