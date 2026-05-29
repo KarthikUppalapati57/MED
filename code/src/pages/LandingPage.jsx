@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
+import EdgeOpsLogo from '@/components/EdgeOpsLogo';
 import scannerImg from '../assets/scanner.png';
 import { 
   Menu, 
@@ -138,14 +139,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full z-50 border-b border-black/5 bg-[#fdf8f1]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-sm bg-[#ff5c35] flex items-center justify-center">
-                <Database className="h-4 w-4 text-white" />
-              </div>
-              <span className="text-lg font-bold tracking-tighter uppercase">
-                EDGEOPS
-              </span>
-            </div>
+            <EdgeOpsLogo className="h-8" />
             
             <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/40 uppercase">
               <a href="#features" className="hover:text-[#ff5c35] transition-colors">Infrastructure</a>
@@ -335,9 +329,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-24 mb-32">
             <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-10">
-                <Database className="h-6 w-6 text-[#ff5c35]" />
-                <span className="text-2xl font-bold tracking-tighter uppercase leading-none">EdgeOps</span>
+              <div className="mb-8">
+                <EdgeOpsLogo className="h-10" />
               </div>
               <p className="text-black/40 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Sovereign infrastructure for high-performance hospitality logistics and telemetry.

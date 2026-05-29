@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
+import EdgeOpsLogo from '@/components/EdgeOpsLogo';
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 import { 
@@ -186,14 +187,14 @@ export default function Documentation() {
               <div className="h-6 w-6 rounded-sm bg-black group-hover:bg-[#ff5c35] transition-colors flex items-center justify-center">
                 <ChevronLeft className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-bold tracking-widest uppercase text-black/60 group-hover:text-black transition-colors">
+              <span className="text-xs font-bold tracking-widest uppercase text-black/60 group-hover:text-black transition-colors hidden md:block">
                 Back to Platform
               </span>
             </Link>
             
-            <div className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-[#ff5c35]" />
-              <span className="text-sm font-bold tracking-widest uppercase">
+            <div className="flex items-center">
+              <EdgeOpsLogo className="h-6" showText={false} />
+              <span className="text-sm font-bold tracking-widest uppercase ml-3">
                 Architecture Docs
               </span>
             </div>

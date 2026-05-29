@@ -74,7 +74,7 @@ export function MFAChallenge() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
       <div className="w-full max-w-md glass-card rounded-2xl border border-border/50 shadow-2xl overflow-hidden relative animate-fade-in-scale">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-indigo-500 to-brand" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-orange-500 to-brand" />
         
         <div className="p-8">
           <div className="text-center pb-6">
@@ -97,15 +97,15 @@ export function MFAChallenge() {
                 disabled={isLoading}
               >
                 <InputOTPGroup>
-                  <InputOTPSlot index={0} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={1} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={2} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={0} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={1} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={2} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
                 </InputOTPGroup>
                 <InputOTPSeparator className="text-muted-foreground/60" />
                 <InputOTPGroup>
-                  <InputOTPSlot index={3} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={4} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={5} className="border-border/60 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={3} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={4} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={5} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
                 </InputOTPGroup>
               </InputOTP>
             </div>
