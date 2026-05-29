@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, ShieldAlert, Loader2, CreditCard } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, ShieldAlert, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from '@/lib/moduleConfig';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
+import Papa from 'papaparse';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function PlatformOrganizations() {
   const queryClient = useQueryClient();
@@ -29,6 +32,20 @@ export default function PlatformOrganizations() {
     stripe_customer_id: '',
     stripe_subscription_id: '',
     enabled_modules: []
+  });
+
+  const [isDeletingOrg, setIsDeletingOrg] = useState(false);
+  const [isHierarchyModalOpen, setIsHierarchyModalOpen] = useState(false);
+  const [hierarchyTab, setHierarchyTab] = useState('manual');
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvData, setCsvData] = useState([]);
+  const [isModifyingHierarchy, setIsModifyingHierarchy] = useState(false);
+  const [manualEntry, setManualEntry] = useState({
+    type: 'brand', // 'brand' or 'location'
+    brandName: '',
+    locationName: '',
+    locationAddress: '',
+    selectedBrandId: ''
   });
   
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
@@ -138,6 +155,208 @@ export default function PlatformOrganizations() {
     }
   };
 
+  const handleDeleteOrganization = async () => {
+    if (!selectedOrgId) return;
+    setIsDeletingOrg(true);
+    try {
+      const { error } = await supabase.from('organizations').delete().eq('id', selectedOrgId);
+      if (error) throw error;
+      
+      toast.success("Organization successfully deleted");
+      setSelectedOrgId(null);
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_users_all'] });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete organization");
+    } finally {
+      setIsDeletingOrg(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    if (!selectedOrg) return;
+    const orgBrands = brands.filter(b => b.organization_id === selectedOrg.id);
+    const orgLocations = locations.filter(l => orgBrands.some(b => b.id === l.brand_id));
+    
+    let csvData = [];
+    if (orgBrands.length === 0) {
+      csvData.push([selectedOrg.name, "Example Brand", "Example Location", "123 Main St"]);
+    } else {
+      orgBrands.forEach(brand => {
+        const brandLocs = orgLocations.filter(l => l.brand_id === brand.id);
+        if (brandLocs.length === 0) {
+          csvData.push([selectedOrg.name, brand.name, "", ""]);
+        } else {
+          brandLocs.forEach(loc => {
+            csvData.push([selectedOrg.name, brand.name, loc.name, loc.address || ""]);
+          });
+        }
+      });
+    }
+
+    const csvContent = "data:text/csv;charset=utf-8,Organization Name,Brand Name,Location Name,Location Address\n" 
+      + csvData.map(e => e.map(s => `"${s.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${selectedOrg.slug}_hierarchy_template.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleCsvUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCsvFile(file);
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.data && results.data.length > 0) {
+            setCsvData(results.data);
+            toast.success(`Found ${results.data.length} records in CSV`);
+          } else {
+            toast.error('The CSV file appears to be empty or formatting is invalid.');
+            setCsvFile(null);
+          }
+        },
+        error: (err) => {
+          console.error(err);
+          toast.error('Failed to parse CSV file.');
+          setCsvFile(null);
+        }
+      });
+    }
+  };
+
+  const handleCsvSubmit = async () => {
+    if (!csvData || csvData.length === 0 || !selectedOrgId) return;
+    setIsModifyingHierarchy(true);
+    
+    try {
+      const orgBrands = brands.filter(b => b.organization_id === selectedOrgId);
+      const orgLocations = locations.filter(l => orgBrands.some(b => b.id === l.brand_id));
+      
+      let newBrandsCount = 0;
+      let newLocsCount = 0;
+
+      // Group rows by Brand Name
+      const brandsMap = {};
+      csvData.forEach(row => {
+        const bName = (row['Brand Name'] || '').trim();
+        const lName = (row['Location Name'] || '').trim();
+        const lAddr = (row['Location Address'] || '').trim();
+        
+        if (bName) {
+          if (!brandsMap[bName]) brandsMap[bName] = [];
+          if (lName) {
+            brandsMap[bName].push({ name: lName, address: lAddr });
+          }
+        }
+      });
+
+      for (const [bName, locs] of Object.entries(brandsMap)) {
+        let brandId;
+        const existingBrand = orgBrands.find(b => b.name.toLowerCase() === bName.toLowerCase());
+        
+        if (existingBrand) {
+          brandId = existingBrand.id;
+        } else {
+          const { data: newBrand, error: brandErr } = await supabase
+            .from('brands')
+            .insert({ organization_id: selectedOrgId, name: bName })
+            .select().single();
+          if (brandErr) throw brandErr;
+          brandId = newBrand.id;
+          newBrandsCount++;
+        }
+
+        const brandLocations = existingBrand ? orgLocations.filter(l => l.brand_id === brandId) : [];
+        const locsToInsert = [];
+
+        for (const loc of locs) {
+          const exists = brandLocations.some(l => l.name.toLowerCase() === loc.name.toLowerCase());
+          if (!exists) {
+            locsToInsert.push({
+              organization_id: selectedOrgId,
+              brand_id: brandId,
+              name: loc.name,
+              address: loc.address || 'Address pending'
+            });
+          }
+        }
+
+        if (locsToInsert.length > 0) {
+          const { error: locErr } = await supabase.from('locations').insert(locsToInsert);
+          if (locErr) throw locErr;
+          newLocsCount += locsToInsert.length;
+        }
+      }
+
+      toast.success(`Successfully imported ${newBrandsCount} new brands and ${newLocsCount} new locations.`);
+      setIsHierarchyModalOpen(false);
+      setCsvFile(null);
+      setCsvData([]);
+      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to import hierarchy');
+    } finally {
+      setIsModifyingHierarchy(false);
+    }
+  };
+
+  const handleManualSubmit = async () => {
+    if (!selectedOrgId) return;
+    setIsModifyingHierarchy(true);
+    try {
+      if (manualEntry.type === 'brand') {
+        if (!manualEntry.brandName) throw new Error("Brand name is required");
+        const { data: newBrand, error } = await supabase
+          .from('brands')
+          .insert({ organization_id: selectedOrgId, name: manualEntry.brandName })
+          .select().single();
+        if (error) throw error;
+        
+        if (manualEntry.locationName) {
+          const { error: locErr } = await supabase.from('locations').insert({
+            organization_id: selectedOrgId,
+            brand_id: newBrand.id,
+            name: manualEntry.locationName,
+            address: manualEntry.locationAddress || ''
+          });
+          if (locErr) throw locErr;
+        }
+        toast.success("Brand created successfully");
+      } else {
+        if (!manualEntry.selectedBrandId || !manualEntry.locationName) throw new Error("Brand and Location name are required");
+        const { error } = await supabase.from('locations').insert({
+          organization_id: selectedOrgId,
+          brand_id: manualEntry.selectedBrandId,
+          name: manualEntry.locationName,
+          address: manualEntry.locationAddress || ''
+        });
+        if (error) throw error;
+        toast.success("Location created successfully");
+      }
+
+      setManualEntry({ type: 'brand', brandName: '', locationName: '', locationAddress: '', selectedBrandId: '' });
+      setIsHierarchyModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to modify hierarchy");
+    } finally {
+      setIsModifyingHierarchy(false);
+    }
+  };
+
   const filteredOrgs = orgs.filter(org => 
     org.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     org.admin_email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -242,10 +461,33 @@ export default function PlatformOrganizations() {
                       {selectedOrg.status || 'Active'}
                     </Badge>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground font-medium">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground font-medium mt-3">
                     <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-muted-foreground" /> Admin: {selectedOrg.admin_email}</div>
                     <div className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Plan ID: {selectedOrg.plan_id || 'Free'}</div>
                   </div>
+                </div>
+                <div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors font-bold shadow-sm">
+                        <Trash2 className="w-4 h-4 mr-2" /> Delete Organization
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the <strong>{selectedOrg.name}</strong> organization, along with all of its brands, locations, settings, and remove user access to it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteOrganization} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          {isDeletingOrg ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Organization"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
 
@@ -296,6 +538,11 @@ export default function PlatformOrganizations() {
                 </TabsList>
 
                 <TabsContent value="hierarchy" className="space-y-6 mt-0">
+                  <div className="flex justify-end mb-2">
+                    <Button onClick={() => setIsHierarchyModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm h-8 px-3 text-xs">
+                      <Plus className="w-3.5 h-3.5 mr-1.5" /> Modify Hierarchy
+                    </Button>
+                  </div>
                   {orgBrands.length === 0 ? (
                     <div className="text-center py-20 bg-card rounded-2xl border border-dashed border-border">
                       <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -625,6 +872,150 @@ export default function PlatformOrganizations() {
           </div>
         )}
       </div>
+
+      <Dialog open={isHierarchyModalOpen} onOpenChange={setIsHierarchyModalOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>Modify Organization Hierarchy</DialogTitle>
+            <DialogDescription>
+              Add new brands or locations to this organization using manual entry or bulk CSV import.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs value={hierarchyTab} onValueChange={setHierarchyTab} className="w-full mt-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+              <TabsTrigger value="csv">Bulk Import (CSV)</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="manual" className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <Button 
+                  variant={manualEntry.type === 'brand' ? 'default' : 'outline'}
+                  onClick={() => setManualEntry(prev => ({ ...prev, type: 'brand' }))}
+                  className="w-full"
+                >
+                  Add New Brand
+                </Button>
+                <Button 
+                  variant={manualEntry.type === 'location' ? 'default' : 'outline'}
+                  onClick={() => setManualEntry(prev => ({ ...prev, type: 'location' }))}
+                  className="w-full"
+                >
+                  Add New Location
+                </Button>
+              </div>
+
+              {manualEntry.type === 'brand' ? (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Brand Name</Label>
+                    <Input 
+                      value={manualEntry.brandName}
+                      onChange={e => setManualEntry(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Burgers"
+                    />
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <Label className="text-muted-foreground mb-2 block">Initial Location (Optional)</Label>
+                    <Input 
+                      value={manualEntry.locationName}
+                      onChange={e => setManualEntry(prev => ({ ...prev, locationName: e.target.value }))}
+                      placeholder="Location Name (e.g. Downtown)"
+                      className="mb-2"
+                    />
+                    <Input 
+                      value={manualEntry.locationAddress}
+                      onChange={e => setManualEntry(prev => ({ ...prev, locationAddress: e.target.value }))}
+                      placeholder="Location Address"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Select Brand</Label>
+                    <Select value={manualEntry.selectedBrandId} onValueChange={val => setManualEntry(prev => ({ ...prev, selectedBrandId: val }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {orgBrands.map(b => (
+                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Location Name</Label>
+                    <Input 
+                      value={manualEntry.locationName}
+                      onChange={e => setManualEntry(prev => ({ ...prev, locationName: e.target.value }))}
+                      placeholder="e.g. Airport Branch"
+                    />
+                  </div>
+                  <div>
+                    <Label>Location Address</Label>
+                    <Input 
+                      value={manualEntry.locationAddress}
+                      onChange={e => setManualEntry(prev => ({ ...prev, locationAddress: e.target.value }))}
+                      placeholder="Full Address"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={handleManualSubmit} disabled={isModifyingHierarchy}>
+                  {isModifyingHierarchy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Save Changes"}
+                </Button>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="csv" className="space-y-4 pt-4">
+              <div className="p-4 bg-indigo-50 text-indigo-400 text-sm rounded-lg border border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20">
+                <p className="font-semibold mb-1">How this works:</p>
+                <p className="text-xs mb-3 text-indigo-500/80 dark:text-indigo-300">Download the current hierarchy template, append new rows for the brands and locations you want to add, and upload it back. Existing exact matches will be skipped to prevent duplicates.</p>
+                <Button variant="outline" size="sm" onClick={downloadTemplate} className="w-full border-indigo-200 hover:bg-indigo-100 text-indigo-600 dark:border-indigo-500/30 dark:hover:bg-indigo-500/20 dark:text-indigo-400">
+                  <FileSpreadsheet className="w-4 h-4 mr-2" /> Download Current Hierarchy Template
+                </Button>
+              </div>
+
+              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 hover:border-primary hover:bg-secondary/50 transition-colors">
+                <input 
+                  type="file" 
+                  id="csv-upload-hierarchy" 
+                  accept=".csv" 
+                  className="hidden" 
+                  onChange={handleCsvUpload} 
+                />
+                <label htmlFor="csv-upload-hierarchy" className="cursor-pointer flex flex-col items-center gap-4">
+                  <div className="w-12 h-12 bg-card shadow-sm rounded-full flex items-center justify-center text-primary">
+                    <Upload className="w-6 h-6" />
+                  </div>
+                  <div className="text-center">
+                    <span className="text-primary font-semibold hover:underline">Click to browse</span> or drag and drop
+                    <p className="text-xs text-muted-foreground mt-1">.CSV files only</p>
+                  </div>
+                </label>
+              </div>
+
+              {csvFile && (
+                <div className="p-3 bg-card border rounded-lg flex items-center justify-between shadow-sm">
+                  <span className="text-sm font-medium text-foreground truncate">{csvFile.name}</span>
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full dark:bg-emerald-500/10 dark:text-emerald-400">{csvData.length} Rows Parsed</span>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 border-t border-border mt-4">
+                <Button onClick={handleCsvSubmit} disabled={isModifyingHierarchy || !csvFile || csvData.length === 0} className="w-full sm:w-auto">
+                  {isModifyingHierarchy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Import Hierarchy"}
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
