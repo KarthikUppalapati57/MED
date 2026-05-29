@@ -8,12 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, ShieldAlert } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, ShieldAlert, Loader2, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from "sonner";
 
 export default function PlatformOrganizations() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState(null);
+  
+  const [isUpdatingBilling, setIsUpdatingBilling] = useState(false);
+  const [billingForm, setBillingForm] = useState({
+    plan_id: 'none',
+    subscription_status: 'unprovisioned',
+    stripe_customer_id: '',
+    stripe_subscription_id: ''
+  });
   
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['platform_organizations_full'],
@@ -54,6 +67,53 @@ export default function PlatformOrganizations() {
     },
     enabled: !!orgs.length
   });
+
+  const { data: plans = [] } = useAuthQuery({
+    queryKey: ['platform_plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('plans').select('*').order('price_monthly');
+      if (error) throw error;
+      return data;
+    },
+    enabled: true
+  });
+
+  React.useEffect(() => {
+    const org = orgs.find(o => o.id === selectedOrgId);
+    if (org) {
+      setBillingForm({
+        plan_id: org.plan_id || 'none',
+        subscription_status: org.subscription_status || 'unprovisioned',
+        stripe_customer_id: org.stripe_customer_id || '',
+        stripe_subscription_id: org.stripe_subscription_id || ''
+      });
+    }
+  }, [selectedOrgId, orgs]);
+
+  const handleUpdateBilling = async () => {
+    if (!selectedOrgId) return;
+    setIsUpdatingBilling(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          plan_id: billingForm.plan_id === 'none' ? null : billingForm.plan_id,
+          subscription_status: billingForm.subscription_status,
+          stripe_customer_id: billingForm.stripe_customer_id,
+          stripe_subscription_id: billingForm.stripe_subscription_id
+        })
+        .eq('id', selectedOrgId);
+        
+      if (error) throw error;
+      toast.success("Billing information updated");
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to update billing");
+    } finally {
+      setIsUpdatingBilling(false);
+    }
+  };
 
   const filteredOrgs = orgs.filter(org => 
     org.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -208,6 +268,7 @@ export default function PlatformOrganizations() {
                 <TabsList className="bg-card border shadow-sm p-1 rounded-xl h-auto mb-6">
                   <TabsTrigger value="hierarchy" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Brand & Location Hierarchy</TabsTrigger>
                   <TabsTrigger value="directory" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">User Directory</TabsTrigger>
+                  <TabsTrigger value="billing" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Billing & Plan</TabsTrigger>
                   <TabsTrigger value="settings" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Configuration</TabsTrigger>
                 </TabsList>
 
@@ -362,6 +423,79 @@ export default function PlatformOrganizations() {
                              <p className="text-xs font-bold text-muted-foreground mb-1">Account Timestamps</p>
                              <p className="text-xs text-foreground/80 mt-2">Created: {new Date(selectedOrg.created_at).toLocaleDateString()}</p>
                           </div>
+                        </div>
+                     </CardContent>
+                   </Card>
+                </TabsContent>
+                
+                <TabsContent value="billing" className="mt-0">
+                   <Card className="border-0 shadow-sm bg-card">
+                     <CardHeader>
+                       <CardTitle className="text-base flex items-center gap-2"><CreditCard className="w-4 h-4 text-muted-foreground" /> Billing & Plan Management</CardTitle>
+                     </CardHeader>
+                     <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <div className="space-y-4">
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Subscription Plan</Label>
+                               <Select value={billingForm.plan_id} onValueChange={(val) => setBillingForm(prev => ({ ...prev, plan_id: val }))}>
+                                 <SelectTrigger className="w-full bg-secondary/50 border-border">
+                                   <SelectValue placeholder="Select a plan" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="none">No Plan (Manual)</SelectItem>
+                                   {plans.map(p => (
+                                     <SelectItem key={p.id} value={p.id}>{p.name} (${p.price_monthly}/mo)</SelectItem>
+                                   ))}
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Subscription Status</Label>
+                               <Select value={billingForm.subscription_status} onValueChange={(val) => setBillingForm(prev => ({ ...prev, subscription_status: val }))}>
+                                 <SelectTrigger className="w-full bg-secondary/50 border-border">
+                                   <SelectValue placeholder="Select status" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="unprovisioned">Unprovisioned</SelectItem>
+                                   <SelectItem value="trialing">Trialing</SelectItem>
+                                   <SelectItem value="active">Active</SelectItem>
+                                   <SelectItem value="past_due">Past Due</SelectItem>
+                                   <SelectItem value="canceled">Canceled</SelectItem>
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                           </div>
+                           <div className="space-y-4">
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Stripe Customer ID</Label>
+                               <Input 
+                                 value={billingForm.stripe_customer_id}
+                                 onChange={(e) => setBillingForm(prev => ({ ...prev, stripe_customer_id: e.target.value }))}
+                                 placeholder="cus_..."
+                                 className="bg-secondary/50 border-border font-mono text-xs"
+                               />
+                             </div>
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Stripe Subscription ID</Label>
+                               <Input 
+                                 value={billingForm.stripe_subscription_id}
+                                 onChange={(e) => setBillingForm(prev => ({ ...prev, stripe_subscription_id: e.target.value }))}
+                                 placeholder="sub_..."
+                                 className="bg-secondary/50 border-border font-mono text-xs"
+                               />
+                             </div>
+                           </div>
+                        </div>
+                        <div className="pt-4 border-t border-border flex justify-end">
+                          <Button 
+                            onClick={handleUpdateBilling} 
+                            disabled={isUpdatingBilling}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
+                          >
+                            {isUpdatingBilling && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Save Billing Settings
+                          </Button>
                         </div>
                      </CardContent>
                    </Card>
