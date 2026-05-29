@@ -48,9 +48,10 @@ function SignupPage() {
   React.useEffect(() => {
     if (!token) return;
     const fetchInvite = async () => {
+      const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
       const { supabase } = await import('@/lib/supabaseClient');
       const { data } = await supabase
-        .rpc('get_invite_details', { invite_token: token });
+        .rpc('get_invite_details', { invite_token: cleanToken });
       if (data) {
         setInviteInfo(data);
         setForm(f => ({ ...f, email: data.email || '' }));
@@ -86,10 +87,12 @@ function SignupPage() {
     };
     const mappedRole = roleMapping[inviteInfo.role] || inviteInfo.role;
 
+    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+
     const { data, error: signUpError } = await signUp(form.email, form.password, {
       full_name: form.full_name,
       role: mappedRole, // Use the mapped role instead of the deprecated one
-      invite_token: token,
+      invite_token: cleanToken,
     });
     setLoading(false);
     if (signUpError) {

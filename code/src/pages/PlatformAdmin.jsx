@@ -368,7 +368,7 @@ We are thrilled to inform you that your request for a MEVS system walkthrough an
 We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
 
 Click the link below to create your account and access your environment:
-${signupLink}
+<${signupLink}>
 
 This secure registration link will remain active for 7 days. If you have any questions or require a guided walkthrough with our implementation engineers, please respond directly to this email.
 

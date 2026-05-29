@@ -67,7 +67,7 @@ Hi ${to_name || 'there'},
 
 You've been invited to join ${org_name || 'the organization'} on the MEVS platform as a ${role || 'team member'}.
 
-${invite_link ? `Click the link below to accept your invitation and set up your account:\n${invite_link}` : 'Please log in to accept your invitation.'}
+${invite_link ? `Click the link below to accept your invitation and set up your account:\n<${invite_link}>` : 'Please log in to accept your invitation.'}
 
 This invitation will expire in 7 days.
 

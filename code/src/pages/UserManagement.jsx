@@ -595,6 +595,8 @@ function InviteDialog({ open, onClose, orgId }) {
           .single();
         if (insertErr) throw insertErr;
         token = insertData?.token;
+      } else if (result?.invite?.token) {
+        token = result.invite.token;
       } else if (result?.token) {
         token = result.token;
       }
