@@ -433,39 +433,95 @@ export default function PlatformOrganizations() {
                        <CardTitle className="text-base flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Platform Configuration</CardTitle>
                      </CardHeader>
                      <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50">
-                             <p className="text-sm font-bold text-foreground mb-3">Enabled Modules</p>
-                             <p className="text-xs text-muted-foreground mb-4">Toggle modules for this organization. Changes will take effect immediately.</p>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                               {ALL_MODULE_KEYS.map(moduleKey => {
-                                 const def = MODULE_DEFINITIONS[moduleKey];
-                                 const isChecked = billingForm.enabled_modules.includes(moduleKey);
-                                 return (
-                                   <div key={moduleKey} className="flex items-center space-x-2">
-                                     <Checkbox 
-                                       id={`mod-${moduleKey}`} 
-                                       checked={isChecked}
-                                       onCheckedChange={(checked) => {
-                                         setBillingForm(prev => {
-                                           const newModules = checked 
-                                             ? [...prev.enabled_modules, moduleKey]
-                                             : prev.enabled_modules.filter(m => m !== moduleKey);
-                                           return { ...prev, enabled_modules: newModules };
-                                         });
-                                       }}
-                                     />
-                                     <Label htmlFor={`mod-${moduleKey}`} className="text-xs font-medium cursor-pointer">
-                                       {def.label}
-                                     </Label>
+                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 xl:col-span-2">
+                             <p className="text-sm font-bold text-foreground mb-1">Organization Modules</p>
+                             <p className="text-xs text-muted-foreground mb-6">Manage which modules are enabled for this organization.</p>
+                             
+                             <div className="space-y-6">
+                               <div>
+                                 <h4 className="text-xs font-bold text-foreground/80 mb-3 uppercase tracking-wider flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Currently Enabled</h4>
+                                 {ALL_MODULE_KEYS.filter(m => billingForm.enabled_modules.includes(m)).length === 0 ? (
+                                   <div className="p-6 border border-dashed border-border rounded-xl text-center bg-card/50">
+                                     <p className="text-xs text-muted-foreground font-medium">No modules are currently enabled.</p>
                                    </div>
-                                 )
-                               })}
+                                 ) : (
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                     {ALL_MODULE_KEYS.filter(m => billingForm.enabled_modules.includes(m)).map(moduleKey => {
+                                       const def = MODULE_DEFINITIONS[moduleKey];
+                                       return (
+                                         <div key={moduleKey} className="flex items-center justify-between p-3 rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-500/10">
+                                            <div className="flex items-center gap-2.5">
+                                               <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                               </div>
+                                               <span className="text-xs font-bold text-foreground">{def.label}</span>
+                                            </div>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              className="h-7 px-2.5 text-[10px] font-bold text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                              onClick={() => {
+                                                 setBillingForm(prev => ({
+                                                    ...prev,
+                                                    enabled_modules: prev.enabled_modules.filter(m => m !== moduleKey)
+                                                 }));
+                                              }}
+                                            >
+                                              Remove
+                                            </Button>
+                                         </div>
+                                       )
+                                     })}
+                                   </div>
+                                 )}
+                               </div>
+
+                               <div className="pt-2">
+                                 <h4 className="text-xs font-bold text-foreground/80 mb-3 uppercase tracking-wider flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30" /> Available to Add</h4>
+                                 {ALL_MODULE_KEYS.filter(m => !billingForm.enabled_modules.includes(m)).length === 0 ? (
+                                   <div className="p-6 border border-dashed border-border rounded-xl text-center bg-card/50">
+                                     <p className="text-xs text-muted-foreground font-medium">All available modules are enabled.</p>
+                                   </div>
+                                 ) : (
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                     {ALL_MODULE_KEYS.filter(m => !billingForm.enabled_modules.includes(m)).map(moduleKey => {
+                                       const def = MODULE_DEFINITIONS[moduleKey];
+                                       return (
+                                         <div key={moduleKey} className="flex items-center justify-between p-3 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors group">
+                                            <div className="flex items-center gap-2.5">
+                                               <div className="w-6 h-6 rounded-full border border-border bg-secondary/50 flex items-center justify-center group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors">
+                                                 <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30 group-hover:bg-primary/40 transition-colors" />
+                                               </div>
+                                               <span className="text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">{def.label}</span>
+                                            </div>
+                                            <Button 
+                                              variant="outline" 
+                                              size="sm" 
+                                              className="h-7 px-3 text-[10px] font-bold bg-secondary/50 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
+                                              onClick={() => {
+                                                 setBillingForm(prev => ({
+                                                    ...prev,
+                                                    enabled_modules: [...prev.enabled_modules, moduleKey]
+                                                 }));
+                                              }}
+                                            >
+                                              Add
+                                            </Button>
+                                         </div>
+                                       )
+                                     })}
+                                   </div>
+                                 )}
+                               </div>
                              </div>
                           </div>
-                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit">
+                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit xl:col-span-1">
                              <p className="text-xs font-bold text-muted-foreground mb-1">Account Timestamps</p>
-                             <p className="text-xs text-foreground/80 mt-2">Created: {new Date(selectedOrg.created_at).toLocaleDateString()}</p>
+                             <p className="text-xs text-foreground/80 mt-2 flex justify-between items-center">
+                               <span>Created:</span> 
+                               <span className="font-mono bg-card px-2 py-1 rounded-md border border-border/50">{new Date(selectedOrg.created_at).toLocaleDateString()}</span>
+                             </p>
                           </div>
                         </div>
                         <div className="pt-4 border-t border-border flex justify-end">
