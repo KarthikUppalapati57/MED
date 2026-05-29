@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -155,7 +155,7 @@ export default function PlatformUserManagement() {
     );
 
     try {
-      const { error } = await supabase.from("profiles").delete().eq("id", adminId);
+      const { error } = await supabase.rpc('admin_delete_user', { target_user_id: adminId });
       if (error) throw error;
       
       toast.success("Admin removed", { id: toastId });
