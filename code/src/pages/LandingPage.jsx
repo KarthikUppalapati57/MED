@@ -196,9 +196,11 @@ export default function LandingPage() {
               <Button size="lg" className="h-14 px-12 bg-[#ff5c35] text-white hover:bg-black font-bold text-xs tracking-[4px] rounded-sm transition-all shadow-xl shadow-[#ff5c35]/20 uppercase" onClick={() => setIsDemoModalOpen(true)}>
                 REQUEST ACCESS <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="link" className="text-black font-bold text-xs tracking-[3px] uppercase hover:text-[#ff5c35]">
-                VIEW DOCUMENTATION
-              </Button>
+              <Link to="/docs">
+                <Button size="lg" variant="link" className="text-black font-bold text-xs tracking-[3px] uppercase hover:text-[#ff5c35]">
+                  VIEW DOCUMENTATION
+                </Button>
+              </Link>
             </div>
           </motion.div>
         </div>

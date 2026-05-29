@@ -16,6 +16,7 @@ import MFASetupPage from './pages/MFASetupPage';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import CookiePolicy from './pages/CookiePolicy';
+import Documentation from './pages/Documentation';
 import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -667,6 +668,7 @@ const AuthenticatedApp = () => {
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/cookies" element={<CookiePolicy />} />
+      <Route path="/docs" element={<Documentation />} />
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
       <Route path="/update-password" element={<UpdatePasswordPage />} />
