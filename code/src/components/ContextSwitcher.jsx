@@ -24,7 +24,9 @@ import { cn } from '@/lib/utils';
  *   Org Owner      â†’ Dropdown of their org's brands â†’ locations
  *   Branch Manager  â†’ Dropdown of their assigned branches â†’ locations
  *   Ground Level    â†’ Static text showing assigned location (no dropdown)
- */  const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
+ */
+export default function ContextSwitcher() {
+  const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
   const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 
   // Platform Admin: fetch ALL orgs
