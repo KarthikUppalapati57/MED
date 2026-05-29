@@ -499,23 +499,32 @@ ALTER TABLE public.ledger_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
 
 -- Ledger Bills
+DROP POLICY IF EXISTS "Users can view ledger_bills" ON public.ledger_bills;
 CREATE POLICY "Users can view ledger_bills" ON public.ledger_bills FOR SELECT USING (organization_id = public.get_my_org() AND deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "Manager+ can manage ledger_bills" ON public.ledger_bills;
 CREATE POLICY "Manager+ can manage ledger_bills" ON public.ledger_bills FOR ALL USING (is_manager_or_above() AND organization_id = public.get_my_org());
 
 -- Ledger Payments
+DROP POLICY IF EXISTS "Users can view ledger_payments" ON public.ledger_payments;
 CREATE POLICY "Users can view ledger_payments" ON public.ledger_payments FOR SELECT USING (organization_id = public.get_my_org() AND deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "Manager+ can manage ledger_payments" ON public.ledger_payments;
 CREATE POLICY "Manager+ can manage ledger_payments" ON public.ledger_payments FOR ALL USING (is_manager_or_above() AND organization_id = public.get_my_org());
 
 -- Ledger Entries (Immutable Audit)
+DROP POLICY IF EXISTS "Users can view ledger_entries" ON public.ledger_entries;
 CREATE POLICY "Users can view ledger_entries" ON public.ledger_entries FOR SELECT USING (organization_id = public.get_my_org());
+
+DROP POLICY IF EXISTS "System can insert ledger_entries" ON public.ledger_entries;
 CREATE POLICY "System can insert ledger_entries" ON public.ledger_entries FOR INSERT WITH CHECK (organization_id = public.get_my_org());
 -- No UPDATE or DELETE on ledger_entries to preserve accounting integrity.
 
 -- 6. Indexes
-CREATE INDEX idx_ledger_bills_org ON public.ledger_bills(organization_id);
-CREATE INDEX idx_ledger_payments_org ON public.ledger_payments(organization_id);
-CREATE INDEX idx_ledger_entries_org ON public.ledger_entries(organization_id);
-CREATE INDEX idx_ledger_entries_account ON public.ledger_entries(account_code);
+CREATE INDEX IF NOT EXISTS idx_ledger_bills_org ON public.ledger_bills(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_payments_org ON public.ledger_payments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_org ON public.ledger_entries(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_entries_account ON public.ledger_entries(account_code);
 -- Migration 037: Notification System (Phase 2)
 -- Centralized system for operational and AI alerts.
 
@@ -534,19 +543,22 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- Users can only view their own notifications
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
 CREATE POLICY "Users can view own notifications" ON public.notifications 
     FOR SELECT USING (user_id = auth.uid() AND organization_id = public.get_my_org());
 
 -- System can create notifications for anyone in the org
+DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;
 CREATE POLICY "System can insert notifications" ON public.notifications 
     FOR INSERT WITH CHECK (organization_id = public.get_my_org());
 
 -- Users can mark their own notifications as read
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
 CREATE POLICY "Users can update own notifications" ON public.notifications 
     FOR UPDATE USING (user_id = auth.uid() AND organization_id = public.get_my_org());
 
-CREATE INDEX idx_notifications_user ON public.notifications(user_id);
-CREATE INDEX idx_notifications_org ON public.notifications(organization_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_org ON public.notifications(organization_id);
 -- Migration 038: AI and Event Architecture (Phase 2)
 -- Infrastructure for async pipelines and persistent AI storage.
 
@@ -594,17 +606,25 @@ ALTER TABLE public.domain_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processing_jobs ENABLE ROW LEVEL SECURITY;
 
 -- 5. RLS Policies
+DROP POLICY IF EXISTS "Users can view ai_insights" ON public.ai_insights;
 CREATE POLICY "Users can view ai_insights" ON public.ai_insights FOR SELECT USING (organization_id = public.get_my_org());
+
+DROP POLICY IF EXISTS "System can insert ai_insights" ON public.ai_insights;
 CREATE POLICY "System can insert ai_insights" ON public.ai_insights FOR INSERT WITH CHECK (organization_id = public.get_my_org());
+
+DROP POLICY IF EXISTS "Manager+ can resolve ai_insights" ON public.ai_insights;
 CREATE POLICY "Manager+ can resolve ai_insights" ON public.ai_insights FOR UPDATE USING (is_manager_or_above() AND organization_id = public.get_my_org());
 
+DROP POLICY IF EXISTS "System can manage domain_events" ON public.domain_events;
 CREATE POLICY "System can manage domain_events" ON public.domain_events FOR ALL USING (organization_id = public.get_my_org());
+
+DROP POLICY IF EXISTS "System can manage processing_jobs" ON public.processing_jobs;
 CREATE POLICY "System can manage processing_jobs" ON public.processing_jobs FOR ALL USING (organization_id = public.get_my_org());
 
 -- 6. Indexes
-CREATE INDEX idx_ai_insights_org ON public.ai_insights(organization_id);
-CREATE INDEX idx_domain_events_org ON public.domain_events(organization_id);
-CREATE INDEX idx_processing_jobs_org ON public.processing_jobs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_ai_insights_org ON public.ai_insights(organization_id);
+CREATE INDEX IF NOT EXISTS idx_domain_events_org ON public.domain_events(organization_id);
+CREATE INDEX IF NOT EXISTS idx_processing_jobs_org ON public.processing_jobs(organization_id);
 -- Migration 039: Granular RBAC System (Phase 2)
 -- Replaces single-column role strings with an enterprise RBAC schema.
 -- We are running this in parallel with profiles.role for safety during transition.
@@ -644,10 +664,19 @@ ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 -- 6. RLS Policies
+DROP POLICY IF EXISTS "Users can view roles" ON public.roles;
 CREATE POLICY "Users can view roles" ON public.roles FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can view permissions" ON public.permissions;
 CREATE POLICY "Users can view permissions" ON public.permissions FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can view role_permissions" ON public.role_permissions;
 CREATE POLICY "Users can view role_permissions" ON public.role_permissions FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can view own user_roles" ON public.user_roles;
 CREATE POLICY "Users can view own user_roles" ON public.user_roles FOR SELECT USING (user_id = auth.uid() OR organization_id = public.get_my_org());
+
+DROP POLICY IF EXISTS "Admin can manage user_roles" ON public.user_roles;
 CREATE POLICY "Admin can manage user_roles" ON public.user_roles FOR ALL USING (is_admin() AND organization_id = public.get_my_org());
 
 -- 7. Seed Default Data & Backfill from profiles
@@ -720,8 +749,13 @@ ALTER TABLE public.brand_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.location_members ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS for viewing memberships
+DROP POLICY IF EXISTS "Users can view own organization_members" ON public.organization_members;
 CREATE POLICY "Users can view own organization_members" ON public.organization_members FOR SELECT USING (user_id = auth.uid() OR organization_id = public.get_auth_org() OR public.get_auth_role() = 'platform_admin');
+
+DROP POLICY IF EXISTS "Users can view own brand_members" ON public.brand_members;
 CREATE POLICY "Users can view own brand_members" ON public.brand_members FOR SELECT USING (user_id = auth.uid() OR public.get_auth_role() = 'platform_admin' OR EXISTS (SELECT 1 FROM public.brands WHERE id = brand_id AND organization_id = public.get_auth_org()));
+
+DROP POLICY IF EXISTS "Users can view own location_members" ON public.location_members;
 CREATE POLICY "Users can view own location_members" ON public.location_members FOR SELECT USING (user_id = auth.uid() OR public.get_auth_role() = 'platform_admin' OR EXISTS (SELECT 1 FROM public.locations WHERE id = location_id AND organization_id = public.get_auth_org()));
 
 -- 2. Data Migration: Copy existing users from `profiles` to membership tables
@@ -1084,6 +1118,7 @@ CREATE TABLE IF NOT EXISTS public.archived_users (
 
 -- Protect the archive table
 ALTER TABLE public.archived_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Platform admins can view archived users" ON public.archived_users;
 CREATE POLICY "Platform admins can view archived users" ON public.archived_users 
 FOR SELECT USING (COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', '') = 'platform_admin');
 
@@ -1326,6 +1361,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- Audit logs should be append-only
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Platform admins can view all audit logs" ON audit_logs;
 CREATE POLICY "Platform admins can view all audit logs" ON audit_logs
     FOR SELECT
     USING (
@@ -1336,6 +1372,7 @@ CREATE POLICY "Platform admins can view all audit logs" ON audit_logs
         )
     );
 
+DROP POLICY IF EXISTS "System can insert audit logs" ON audit_logs;
 CREATE POLICY "System can insert audit logs" ON audit_logs
     FOR INSERT
     WITH CHECK (true); -- Usually restricted to service role or authenticated users

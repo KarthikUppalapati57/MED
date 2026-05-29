@@ -38,8 +38,13 @@ ALTER TABLE public.brand_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.location_members ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS for viewing memberships
+DROP POLICY IF EXISTS "Users can view own organization_members" ON public.organization_members;
 CREATE POLICY "Users can view own organization_members" ON public.organization_members FOR SELECT USING (user_id = auth.uid() OR organization_id = public.get_auth_org() OR public.get_auth_role() = 'platform_admin');
+
+DROP POLICY IF EXISTS "Users can view own brand_members" ON public.brand_members;
 CREATE POLICY "Users can view own brand_members" ON public.brand_members FOR SELECT USING (user_id = auth.uid() OR public.get_auth_role() = 'platform_admin' OR EXISTS (SELECT 1 FROM public.brands WHERE id = brand_id AND organization_id = public.get_auth_org()));
+
+DROP POLICY IF EXISTS "Users can view own location_members" ON public.location_members;
 CREATE POLICY "Users can view own location_members" ON public.location_members FOR SELECT USING (user_id = auth.uid() OR public.get_auth_role() = 'platform_admin' OR EXISTS (SELECT 1 FROM public.locations WHERE id = location_id AND organization_id = public.get_auth_org()));
 
 -- 2. Data Migration: Copy existing users from `profiles` to membership tables

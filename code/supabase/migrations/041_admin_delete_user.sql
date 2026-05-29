@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.archived_users (
 
 -- Protect the archive table
 ALTER TABLE public.archived_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Platform admins can view archived users" ON public.archived_users;
 CREATE POLICY "Platform admins can view archived users" ON public.archived_users 
 FOR SELECT USING (COALESCE(auth.jwt() -> 'app_metadata' ->> 'role', '') = 'platform_admin');
 
