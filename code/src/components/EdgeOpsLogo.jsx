@@ -11,46 +11,44 @@ export default function EdgeOpsLogo({ className = "h-12", showText = true }) {
             points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5" 
             fill="none" 
             stroke="currentColor" 
-            className="text-primary/80" 
-            strokeWidth="3" 
+            className="text-primary" 
+            strokeWidth="6" 
             strokeLinejoin="round" 
           />
           
           {/* Circles */}
-          <circle cx="90" cy="27.5" r="7" fill="currentColor" className="text-primary" />
-          <circle cx="50" cy="95" r="7" fill="currentColor" className="text-primary" />
-          <circle cx="10" cy="27.5" r="7" fill="currentColor" className="text-primary" />
+          <circle cx="90" cy="27.5" r="9" fill="currentColor" className="text-primary" />
+          <circle cx="50" cy="95" r="9" fill="currentColor" className="text-primary" />
+          <circle cx="10" cy="27.5" r="9" fill="currentColor" className="text-primary" />
 
           {/* Top Store */}
-          <g transform="translate(40, -5)">
-            <rect x="2" y="10" width="16" height="10" rx="1" fill="currentColor" />
-            <path d="M0 10 L4 2 L16 2 L20 10 Z" fill="currentColor" className="text-primary" />
-            <rect x="8" y="14" width="4" height="6" fill="currentColor" className="text-background" />
+          <g transform="translate(36, -8) scale(1.4)">
+            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
+            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
           </g>
 
           {/* Bottom Right Store */}
-          <g transform="translate(80, 62.5)">
-            <rect x="2" y="10" width="16" height="10" rx="1" fill="currentColor" />
-            <path d="M0 10 L4 2 L16 2 L20 10 Z" fill="currentColor" className="text-primary" />
-            <rect x="8" y="14" width="4" height="6" fill="currentColor" className="text-background" />
+          <g transform="translate(76, 59.5) scale(1.4)">
+            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
+            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
           </g>
 
           {/* Bottom Left Store */}
-          <g transform="translate(0, 62.5)">
-            <rect x="2" y="10" width="16" height="10" rx="1" fill="currentColor" />
-            <path d="M0 10 L4 2 L16 2 L20 10 Z" fill="currentColor" className="text-primary" />
-            <rect x="8" y="14" width="4" height="6" fill="currentColor" className="text-background" />
+          <g transform="translate(-4, 59.5) scale(1.4)">
+            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
+            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
           </g>
 
           {/* Center 'E' */}
           <text 
             x="50" 
-            y="65" 
-            fontSize="48" 
+            y="68" 
+            fontSize="64" 
             fontWeight="900" 
             fill="currentColor" 
             textAnchor="middle" 
             fontFamily="sans-serif"
+            className="tracking-tighter"
           >
             E
           </text>
