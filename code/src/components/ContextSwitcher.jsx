@@ -35,7 +35,7 @@ export default function ContextSwitcher() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug')
+        .select('id, name, slug, enabled_modules')
         .order('name');
       if (error) throw error;
       return data || [];
