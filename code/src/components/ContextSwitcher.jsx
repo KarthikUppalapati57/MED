@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -24,13 +24,11 @@ import { cn } from '@/lib/utils';
  *   Org Owner      â†’ Dropdown of their org's brands â†’ locations
  *   Branch Manager  â†’ Dropdown of their assigned branches â†’ locations
  *   Ground Level    â†’ Static text showing assigned location (no dropdown)
- */
-export default function ContextSwitcher() {
-  const { organization, brand, location, switchContext, userProfile } = useAuth();
-  const { isPlatformAdmin, isOrgOwner, isBranchManager } = usePermissions();
+ */  const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
+  const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 
   // Platform Admin: fetch ALL orgs
-  const { data: allOrgs = [] } = useAuthQuery({
+  const { data: adminAllOrgs = [] } = useAuthQuery({
     queryKey: ['ctx-all-orgs'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -43,7 +41,11 @@ export default function ContextSwitcher() {
     enabled: isPlatformAdmin,
   });
 
-  // Brands: fetch for the active org (platform admin impersonation or user's own org)
+  const availableOrgs = isPlatformAdmin 
+    ? adminAllOrgs 
+    : (accessTree || []).map(node => node.organization).filter(Boolean);
+
+  // Brands: fetch for the active org
   const activeOrgId = organization?.id || userProfile?.organization_id;
   const { data: orgBrands = [] } = useAuthQuery({
     queryKey: ['ctx-brands', activeOrgId],
@@ -56,7 +58,7 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager) && !!activeOrgId,
+    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!activeOrgId,
   });
 
   // Locations: fetch for the active brand (or all locations in org for org_owner)
@@ -69,7 +71,7 @@ export default function ContextSwitcher() {
         .select('id, name, brand_id, organization_id, address')
         .order('name');
 
-      if (isBranchManager && activeBrandId) {
+      if ((isBranchManager || isLocationManager) && activeBrandId) {
         query = query.eq('brand_id', activeBrandId);
       } else if (activeOrgId) {
         query = query.eq('organization_id', activeOrgId);
@@ -79,11 +81,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager) && !!(activeOrgId || activeBrandId),
+    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!(activeOrgId || activeBrandId),
   });
 
   // Ground staff: no switcher, just show assigned location name
-  if (!isPlatformAdmin && !isOrgOwner && !isBranchManager) {
+  if (!isPlatformAdmin && !isOrgOwner && !isBranchManager && !isLocationManager) {
     if (location?.name) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -97,8 +99,8 @@ export default function ContextSwitcher() {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Organization Selector (Platform Admin only) */}
-      {isPlatformAdmin && (
+      {/* Organization Selector */}
+      {(isPlatformAdmin || availableOrgs.length > 0) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[200px]">
@@ -110,15 +112,19 @@ export default function ContextSwitcher() {
           <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
             <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => switchContext('organization', null)}
-              className={cn("gap-2 text-sm", !organization && "bg-resend-blue/5 text-resend-blue")}
-            >
-              <Globe className="h-3.5 w-3.5" />
-              All Organizations
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {allOrgs.map(org => (
+            {isPlatformAdmin && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => switchContext('organization', null)}
+                  className={cn("gap-2 text-sm", !organization && "bg-resend-blue/5 text-resend-blue")}
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  All Organizations
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {availableOrgs.map(org => (
               <DropdownMenuItem
                 key={org.id}
                 onClick={() => switchContext('organization', org)}
@@ -128,17 +134,17 @@ export default function ContextSwitcher() {
                 {org.name}
               </DropdownMenuItem>
             ))}
-            {allOrgs.length === 0 && (
+            {availableOrgs.length === 0 && (
               <div className="p-2 text-center text-xs text-muted-foreground">No organizations</div>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
 
-      {/* Brand Selector (Platform Admin with org selected, or Org Owner) */}
-      {(isPlatformAdmin ? !!organization : (isOrgOwner || isBranchManager)) && orgBrands.length > 0 && (
+      {/* Brand Selector */}
+      {(isPlatformAdmin ? !!organization : true) && orgBrands.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">â€º</span>
+          <span className="text-muted-foreground text-xs">›</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
@@ -173,9 +179,9 @@ export default function ContextSwitcher() {
       )}
 
       {/* Location Selector */}
-      {(isPlatformAdmin ? !!organization : (isOrgOwner || isBranchManager)) && brandLocations.length > 0 && (
+      {(isPlatformAdmin ? !!organization : true) && brandLocations.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">â€º</span>
+          <span className="text-muted-foreground text-xs">›</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
@@ -221,4 +227,3 @@ export default function ContextSwitcher() {
     </div>
   );
 }
-
