@@ -271,23 +271,57 @@ export default function Layout({ children, currentPageName }) {
     navigate('/');
   };
 
-  // Filter navigation based on user role AND enabled modules (FAIL-CLOSED)
+  // Filter navigation based on user role, explicit permissions, AND enabled modules (FAIL-CLOSED)
   const enabledModules = organization?.enabled_modules;
-  const filteredNavigation = navigation.filter(item => {
-    // Role check
-    if (!hasMinRole(item.minRole)) return false;
+  const userPermissions = userProfile?.permissions || {};
+
+  const filteredNavigation = navigation.reduce((acc, item) => {
     // Platform admins should ONLY see Dashboard and platform_admin specific items
     if (isPlatformAdmin) {
-      return item.minRole === 'platform_admin' || item.name === 'Dashboard';
+      if (item.minRole === 'platform_admin' || item.name === 'Dashboard') {
+        acc.push(item);
+      }
+      return acc;
     }
-    // Module check (fail-closed): isPageInEnabledModules handles the null/empty case
-    // For parent menus with subItems (no href), derive page name from the first sub-item
-    const pageName = item.href || (item.subItems?.[0]?.href?.split('?')[0]);
-    if (pageName) {
-      return isPageInEnabledModules(pageName, enabledModules);
+
+    const isParentRoleValid = hasMinRole(item.minRole);
+
+    if (item.subItems) {
+      const filteredSubItems = item.subItems.filter(sub => {
+        const pageKey = sub.href.split('?')[0];
+        const explicitPerm = userPermissions[pageKey];
+        
+        // If explicitly granted
+        if (explicitPerm === 'read' || explicitPerm === 'full') return true;
+        // If explicitly denied
+        if (explicitPerm === 'none') return false;
+        
+        // Fallback to role + module
+        if (!isParentRoleValid) return false;
+        return isPageInEnabledModules(pageKey, enabledModules);
+      });
+
+      if (filteredSubItems.length > 0) {
+        acc.push({ ...item, subItems: filteredSubItems });
+      }
+    } else {
+      const pageKey = item.href?.split('?')[0];
+      const explicitPerm = userPermissions[pageKey];
+      
+      let isVisible = false;
+      if (explicitPerm === 'read' || explicitPerm === 'full') {
+        isVisible = true;
+      } else if (explicitPerm === 'none') {
+        isVisible = false;
+      } else {
+        isVisible = isParentRoleValid && isPageInEnabledModules(pageKey, enabledModules);
+      }
+      
+      if (isVisible) acc.push(item);
     }
-    return true;
-  });
+    
+    return acc;
+  }, []);
 
   // Auto-expand the correct accordion on initial load based on active path
   useEffect(() => {

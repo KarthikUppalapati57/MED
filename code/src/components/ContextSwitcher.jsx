@@ -73,7 +73,7 @@ export default function ContextSwitcher() {
         .select('id, name, brand_id, organization_id, address')
         .order('name');
 
-      if ((isBranchManager || isLocationManager) && activeBrandId) {
+      if (activeBrandId) {
         query = query.eq('brand_id', activeBrandId);
       } else if (activeOrgId) {
         query = query.eq('organization_id', activeOrgId);
@@ -151,19 +151,12 @@ export default function ContextSwitcher() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
                 <Store className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-                <span className="truncate">{brand?.name || 'All Brands'}</span>
+                <span className="truncate">{brand?.name || 'Select Brand'}</span>
                 <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 max-h-72 overflow-y-auto">
               <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Brand</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => switchContext('brand', null)}
-                className={cn("gap-2 text-sm", !brand && "bg-purple-500/5 text-purple-400")}
-              >
-                All Brands
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {orgBrands.map(b => (
                 <DropdownMenuItem
@@ -188,19 +181,12 @@ export default function ContextSwitcher() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
                 <MapPin className="h-3.5 w-3.5 text-resend-green shrink-0" />
-                <span className="truncate">{location?.name || 'All Locations'}</span>
+                <span className="truncate">{location?.name || 'Select Location'}</span>
                 <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 max-h-72 overflow-y-auto">
               <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Location</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => switchContext('location', null)}
-                className={cn("gap-2 text-sm", !location && "bg-resend-green/5 text-resend-green")}
-              >
-                All Locations
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               {brandLocations.map(loc => (
                 <DropdownMenuItem
