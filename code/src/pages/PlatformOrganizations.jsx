@@ -795,7 +795,14 @@ export default function PlatformOrganizations() {
                            <div className="space-y-4">
                              <div>
                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Subscription Plan</Label>
-                               <Select value={billingForm.plan_id} onValueChange={(val) => setBillingForm(prev => ({ ...prev, plan_id: val }))}>
+                               <Select value={billingForm.plan_id} onValueChange={(val) => {
+                                 const selectedPlan = plans.find(p => p.id === val);
+                                 setBillingForm(prev => ({ 
+                                   ...prev, 
+                                   plan_id: val,
+                                   enabled_modules: selectedPlan && selectedPlan.features ? selectedPlan.features : prev.enabled_modules
+                                 }));
+                               }}>
                                  <SelectTrigger className="w-full bg-secondary/50 border-border">
                                    <SelectValue placeholder="Select a plan" />
                                  </SelectTrigger>
@@ -841,6 +848,44 @@ export default function PlatformOrganizations() {
                                  placeholder="sub_..."
                                  className="bg-secondary/50 border-border font-mono text-xs"
                                />
+                             </div>
+                           </div>
+                           <div className="md:col-span-2 pt-4 border-t border-border mt-4">
+                             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-4">Enabled Modules (Overrides Plan Default)</Label>
+                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                               {ALL_MODULE_KEYS.map(key => {
+                                 const mod = MODULE_DEFINITIONS[key];
+                                 if (!mod) return null;
+                                 const isChecked = billingForm.enabled_modules?.includes(key);
+                                 return (
+                                   <div key={key} className="flex items-start space-x-3 bg-secondary/20 p-3 rounded-lg border border-border/50">
+                                     <Checkbox 
+                                       id={`module-${key}`} 
+                                       checked={isChecked}
+                                       onCheckedChange={(checked) => {
+                                         setBillingForm(prev => {
+                                           const current = [...(prev.enabled_modules || [])];
+                                           if (checked) {
+                                             if (!current.includes(key)) current.push(key);
+                                           } else {
+                                             const idx = current.indexOf(key);
+                                             if (idx > -1) current.splice(idx, 1);
+                                           }
+                                           return { ...prev, enabled_modules: current };
+                                         });
+                                       }}
+                                     />
+                                     <div className="grid gap-1.5 leading-none">
+                                       <label
+                                         htmlFor={`module-${key}`}
+                                         className="text-sm font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-foreground"
+                                       >
+                                         {mod.label}
+                                       </label>
+                                     </div>
+                                   </div>
+                                 )
+                               })}
                              </div>
                            </div>
                         </div>
