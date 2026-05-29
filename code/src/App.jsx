@@ -13,6 +13,9 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import MFASetupPage from './pages/MFASetupPage';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import CookiePolicy from './pages/CookiePolicy';
 import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
@@ -661,6 +664,9 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/cookies" element={<CookiePolicy />} />
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
       <Route path="/update-password" element={<UpdatePasswordPage />} />

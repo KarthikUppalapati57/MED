@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
 import scannerImg from '../assets/scanner.png';
@@ -359,8 +359,9 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 gap-8">
             <p className="text-[9px] text-black/30 font-bold tracking-[5px] uppercase">© 2026 EDGEOPS INC. BUILT FOR SCALE.</p>
             <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/30">
-                <a href="#" className="hover:text-black transition-colors">Privacy</a>
-                <a href="#" className="hover:text-black transition-colors">Terms</a>
+                <Link to="/privacy" className="hover:text-black transition-colors">Privacy</Link>
+                <Link to="/terms" className="hover:text-black transition-colors">Terms</Link>
+                <Link to="/cookies" className="hover:text-black transition-colors">Cookies</Link>
             </div>
           </div>
         </div>

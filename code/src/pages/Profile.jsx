@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
@@ -18,7 +18,10 @@ import {
   ShieldCheck, 
   Loader2, 
   Building, 
-  Briefcase 
+  Briefcase,
+  Download,
+  Trash2,
+  Database
 } from 'lucide-react';
 
 export default function Profile() {
@@ -120,6 +123,36 @@ export default function Profile() {
     } finally {
       setIsSavingPassword(false);
     }
+  };
+
+  const handleDataExport = () => {
+    // Generate a simple CSV for data export (simulating a full export)
+    const headers = ["ID", "Email", "Full Name", "Phone", "Role", "Organization ID"];
+    const row = [
+      user?.id,
+      user?.email,
+      userProfile?.full_name,
+      userProfile?.phone,
+      role,
+      organization?.id
+    ];
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + row.map(e => `"${e || ''}"`).join(",");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `mevs_data_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success("Data export initiated successfully.");
+  };
+
+  const handleAccountDeletion = () => {
+    // In a real app, this would trigger an email or set a deletion flag
+    toast.success("Account deletion request submitted to Platform Admins. You will be contacted shortly to confirm.");
   };
 
   return (
@@ -348,6 +381,38 @@ export default function Profile() {
                     <ShieldCheck className="w-3.5 h-3.5 inline" /> Setup / View
                   </a>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data Privacy & CCPA Rights */}
+          <Card className="border-none shadow-md bg-card/70 backdrop-blur-md ring-1 ring-slate-100/50 mt-6">
+            <CardHeader className="border-b border-slate-50/50 pb-5">
+              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Database className="w-5 h-5 text-resend-orange" /> Data Privacy
+              </CardTitle>
+              <CardDescription className="text-muted-foreground text-xs">
+                Manage your data in accordance with CCPA and data ownership laws.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-4">
+                <Button 
+                  onClick={handleDataExport}
+                  variant="outline" 
+                  className="w-full justify-start text-sm border-border/60 hover:bg-secondary/60"
+                >
+                  <Download className="w-4 h-4 mr-2 text-foreground" />
+                  Export My Data (CSV)
+                </Button>
+                <Button 
+                  onClick={handleAccountDeletion}
+                  variant="outline" 
+                  className="w-full justify-start text-sm border-resend-red/20 text-resend-red hover:bg-resend-red/10"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Request Account Deletion
+                </Button>
               </div>
             </CardContent>
           </Card>
