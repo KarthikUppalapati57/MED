@@ -8,42 +8,56 @@ export default function EdgeOpsLogo({ className = "h-12", showText = true }) {
         <svg viewBox="0 0 100 100" className="w-full h-full" overflow="visible">
           {/* Hexagon Backbone */}
           <polygon 
-            points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5" 
+            points="50,10 84.6,30 84.6,70 50,90 15.4,70 15.4,30" 
             fill="none" 
             stroke="currentColor" 
-            className="text-primary" 
-            strokeWidth="6" 
+            className="text-primary/70" 
+            strokeWidth="3" 
             strokeLinejoin="round" 
           />
           
-          {/* Circles */}
-          <circle cx="90" cy="27.5" r="9" fill="currentColor" className="text-primary" />
-          <circle cx="50" cy="95" r="9" fill="currentColor" className="text-primary" />
-          <circle cx="10" cy="27.5" r="9" fill="currentColor" className="text-primary" />
+          {/* Circles at vertices (Top-Right, Bottom, Top-Left) */}
+          <circle cx="84.6" cy="30" r="5" fill="currentColor" className="text-primary" />
+          <circle cx="50" cy="90" r="5" fill="currentColor" className="text-primary" />
+          <circle cx="15.4" cy="30" r="5" fill="currentColor" className="text-primary" />
 
+          {/* Store Icons with circular backgrounds to mask the lines */}
+          
           {/* Top Store */}
-          <g transform="translate(36, -8) scale(1.4)">
-            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
-            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
+          <g>
+            <circle cx="50" cy="10" r="11" style={{ fill: 'hsl(var(--background))' }} />
+            <circle cx="50" cy="10" r="11" fill="none" stroke="currentColor" className="text-primary" strokeWidth="2" />
+            <g transform="translate(42.5, 2.5) scale(0.625)" className="text-primary">
+              <path d="M3 9l1-6h16l1 6v2a2 2 0 0 1-2 2h-18a2 2 0 0 1-2-2v-2z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 13v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
           </g>
 
           {/* Bottom Right Store */}
-          <g transform="translate(76, 59.5) scale(1.4)">
-            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
-            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
+          <g>
+            <circle cx="84.6" cy="70" r="11" style={{ fill: 'hsl(var(--background))' }} />
+            <circle cx="84.6" cy="70" r="11" fill="none" stroke="currentColor" className="text-primary" strokeWidth="2" />
+            <g transform="translate(77.1, 62.5) scale(0.625)" className="text-primary">
+              <path d="M3 9l1-6h16l1 6v2a2 2 0 0 1-2 2h-18a2 2 0 0 1-2-2v-2z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 13v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
           </g>
 
           {/* Bottom Left Store */}
-          <g transform="translate(-4, 59.5) scale(1.4)">
-            <rect x="2" y="8" width="16" height="12" rx="1" fill="currentColor" />
-            <path d="M0 8 L4 0 L16 0 L20 8 Z" fill="currentColor" className="text-primary" />
+          <g>
+            <circle cx="15.4" cy="70" r="11" style={{ fill: 'hsl(var(--background))' }} />
+            <circle cx="15.4" cy="70" r="11" fill="none" stroke="currentColor" className="text-primary" strokeWidth="2" />
+            <g transform="translate(7.9, 62.5) scale(0.625)" className="text-primary">
+              <path d="M3 9l1-6h16l1 6v2a2 2 0 0 1-2 2h-18a2 2 0 0 1-2-2v-2z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 13v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
           </g>
 
           {/* Center 'E' */}
           <text 
             x="50" 
-            y="68" 
-            fontSize="64" 
+            y="65" 
+            fontSize="44" 
             fontWeight="900" 
             fill="currentColor" 
             textAnchor="middle" 
