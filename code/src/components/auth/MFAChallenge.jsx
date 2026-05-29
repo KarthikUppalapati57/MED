@@ -97,15 +97,15 @@ export function MFAChallenge() {
                 disabled={isLoading}
               >
                 <InputOTPGroup>
-                  <InputOTPSlot index={0} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={1} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={2} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={0} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={1} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={2} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
                 </InputOTPGroup>
                 <InputOTPSeparator className="text-muted-foreground/60" />
                 <InputOTPGroup>
-                  <InputOTPSlot index={3} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={4} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
-                  <InputOTPSlot index={5} className="border-border/80 bg-secondary/40 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={3} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={4} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
+                  <InputOTPSlot index={5} className="border-border/80 bg-secondary/80 focus:ring-2 focus:ring-brand focus:border-transparent text-foreground" />
                 </InputOTPGroup>
               </InputOTP>
             </div>
@@ -121,7 +121,7 @@ export function MFAChallenge() {
             </p>
 
             {/* Remember this device */}
-            <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary/30 border border-border/40 cursor-pointer hover:bg-secondary/60 transition-all duration-200">
+            <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-secondary/80 border border-border/40 cursor-pointer hover:bg-secondary transition-all duration-200">
               <input
                 type="checkbox"
                 checked={rememberDevice}
