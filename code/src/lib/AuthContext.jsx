@@ -123,6 +123,7 @@ export const AuthProvider = ({ children }) => {
   const [mfaLevel, setMfaLevel] = useState({ current: 'aal1', next: 'aal1' });
   const [mfaFactors, setMfaFactors] = useState([]);
   const [isMfaReady, setIsMfaReady] = useState(false);
+  const [accessTree, setAccessTree] = useState([]);
   const inviteLock = React.useRef(false);
 
   const refreshMFAStatus = useCallback(async () => {
@@ -231,15 +232,31 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user?.id, fetchProfile]);
 
+  const fetchAccessTree = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('fetch_user_access_tree');
+      if (!error && data) {
+        setAccessTree(data);
+      }
+    } catch (e) {
+      console.warn('Error fetching access tree:', e);
+    }
+  }, []);
+
   // Use refs so the useEffect closure always calls the latest version of these
   // without needing them in the dependency array (which would cause re-subscription).
   const fetchProfileRef = React.useRef(fetchProfile);
+  const fetchAccessTreeRef = React.useRef(fetchAccessTree);
   const processPendingInvitationRef = React.useRef(processPendingInvitation);
   const refreshMFAStatusRef = React.useRef(refreshMFAStatus);
   
   useEffect(() => {
     fetchProfileRef.current = fetchProfile;
   }, [fetchProfile]);
+  
+  useEffect(() => {
+    fetchAccessTreeRef.current = fetchAccessTree;
+  }, [fetchAccessTree]);
   
   useEffect(() => {
     processPendingInvitationRef.current = processPendingInvitation;
@@ -458,6 +475,7 @@ export const AuthProvider = ({ children }) => {
                 const [inviteResult] = await Promise.allSettled([
                   processPendingInvitationRef.current(currentUser.email, currentUser.id),
                   loadProfile(currentUser),
+                  fetchAccessTreeRef.current(),
                 ]);
 
                 // If an invitation was just accepted, the profile loaded in parallel
@@ -683,7 +701,7 @@ export const AuthProvider = ({ children }) => {
     return (permissions[role] || []).includes(action);
   }, [role]);
 
-  const switchContext = useCallback((type, entity) => {
+  const switchContext = useCallback(async (type, entity) => {
     let updatedOrg = activeOrg;
     let updatedBrand = activeBrand;
     let updatedLocation = activeLocation;
@@ -692,33 +710,56 @@ export const AuthProvider = ({ children }) => {
       updatedOrg = entity;
       updatedBrand = null;
       updatedLocation = null;
-      setActiveOrg(entity);
-      setActiveBrand(null);
-      setActiveLocation(null);
     } else if (type === 'brand') {
       updatedBrand = entity;
       updatedLocation = null;
-      setActiveBrand(entity);
-      setActiveLocation(null);
     } else if (type === 'location') {
       updatedLocation = entity;
-      setActiveLocation(entity);
     }
 
-    // Persist the updated context to cached profile in sessionStorage
-    const currentCache = getCachedProfile();
-    if (currentCache) {
-      currentCache.organization = updatedOrg;
-      currentCache.brand = updatedBrand;
-      currentCache.location = updatedLocation;
-      currentCache.organization_id = updatedOrg?.id || null;
-      currentCache.brand_id = updatedBrand?.id || null;
-      currentCache.location_id = updatedLocation?.id || null;
-      setCachedProfile(currentCache);
-    }
+    try {
+      if (updatedOrg) {
+        const { data, error } = await supabase.rpc('switch_user_context', {
+          p_organization_id: updatedOrg.id,
+          p_brand_id: updatedBrand?.id || null,
+          p_location_id: updatedLocation?.id || null
+        });
+        if (error) throw error;
 
-    // Invalidate only org-scoped queries — platform-level data is untouched
-    invalidateOrgScopedQueries();
+        // Force a session refresh to get new JWT app_metadata claims
+        await supabase.auth.refreshSession();
+        
+        // Update role if returned
+        if (data?.role) {
+          const currentCache = getCachedProfile();
+          if (currentCache) {
+            currentCache.role = data.role;
+            setCachedProfile(currentCache);
+          }
+        }
+      }
+
+      setActiveOrg(updatedOrg);
+      setActiveBrand(updatedBrand);
+      setActiveLocation(updatedLocation);
+
+      // Persist the updated context to cached profile in sessionStorage
+      const currentCache = getCachedProfile();
+      if (currentCache) {
+        currentCache.organization = updatedOrg;
+        currentCache.brand = updatedBrand;
+        currentCache.location = updatedLocation;
+        currentCache.organization_id = updatedOrg?.id || null;
+        currentCache.brand_id = updatedBrand?.id || null;
+        currentCache.location_id = updatedLocation?.id || null;
+        setCachedProfile(currentCache);
+      }
+
+      // Invalidate only org-scoped queries — platform-level data is untouched
+      invalidateOrgScopedQueries();
+    } catch (err) {
+      console.error('Failed to switch context:', err);
+    }
   }, [activeOrg, activeBrand, activeLocation]);
 
   const handleSetActiveOrg = useCallback((org) => {
@@ -778,6 +819,8 @@ export const AuthProvider = ({ children }) => {
     hasPermission,
     fetchProfile,
     refreshProfile,
+    accessTree,
+    fetchAccessTree,
     mfaLevel,
     mfaFactors,
     refreshMFAStatus,
@@ -804,6 +847,8 @@ export const AuthProvider = ({ children }) => {
     hasPermission,
     fetchProfile,
     refreshProfile,
+    accessTree,
+    fetchAccessTree,
     mfaLevel,
     mfaFactors,
     refreshMFAStatus,

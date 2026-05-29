@@ -1,0 +1,253 @@
+Multi-Tenant Multi-Role Architecture for EdgeOps SaaS Platform
+Overview
+The EdgeOps platform follows a hierarchical multi-tenant architecture designed for organizations that manage multiple brands and locations. The system must support:
+Multiple Organizations per User
+Multiple Brands per Organization
+Multiple Locations per Brand
+Role-Based Access Control (RBAC)
+Organization Switching
+Brand Switching
+Location Switching
+Fine-Grained Permissions
+Secure Multi-Tenant Data Isolation
+
+1. Business Hierarchy
+Platform Structure
+Platform│├── Organization A│   ││   ├── Brand 1│   │   ├── Location 1│   │   ├── Location 2│   │   └── Location 3│   ││   └── Brand 2│       ├── Location 4│       └── Location 5│└── Organization B    │    ├── Brand 3    └── Brand 4
+Hierarchy Rules
+Organization is the tenant boundary.
+Brands belong to a single Organization.
+Locations belong to a single Brand.
+Users may belong to multiple Organizations.
+Users may have different roles in different Organizations.
+
+2. Core Database Structure
+organizations
+id UUID PRIMARY KEYname TEXTowner_user_id UUIDcreated_at TIMESTAMPupdated_at TIMESTAMP
+Purpose
+Represents a business group or franchise owner.
+
+brands
+id UUID PRIMARY KEYorganization_id UUIDname TEXTcreated_at TIMESTAMPupdated_at TIMESTAMP
+Purpose
+Represents a brand within an organization.
+Examples:
+Pizza House
+Burger Town
+Coffee Express
+
+locations
+id UUID PRIMARY KEYorganization_id UUIDbrand_id UUIDname TEXTaddress TEXTcreated_at TIMESTAMPupdated_at TIMESTAMP
+Purpose
+Represents a physical restaurant/store.
+Examples:
+Pizza House - New York
+Pizza House - Dallas
+Coffee Express - Miami
+
+3. User Management
+users
+id UUID PRIMARY KEYemail TEXTfull_name TEXTavatar_url TEXTcreated_at TIMESTAMP
+Important Rule
+Never store access roles directly inside the users table.
+Users may belong to multiple organizations and therefore require membership-based access.
+
+4. Organization Membership System
+organization_members
+id UUID PRIMARY KEYorganization_id UUIDuser_id UUIDrole TEXTstatus TEXTcreated_at TIMESTAMP
+Example
+User
+Organization
+Role
+John
+Org A
+Owner
+John
+Org B
+Viewer
+Mike
+Org A
+Admin
+
+5. Organization Roles
+Owner
+Permissions:
+Full access
+Manage billing
+Manage subscriptions
+Create brands
+Create locations
+Invite users
+Delete organization
+
+Admin
+Permissions:
+Manage brands
+Manage locations
+Manage users
+Manage settings
+Restrictions:
+Cannot delete organization
+Cannot manage billing
+
+Manager
+Permissions:
+Operational access
+Reports
+Staff management
+Restrictions:
+Cannot manage organization users
+
+Viewer
+Permissions:
+Read-only access
+Restrictions:
+No modifications allowed
+
+6. Brand-Level Access
+Some organizations require users to access only specific brands.
+brand_members
+id UUID PRIMARY KEYbrand_id UUIDuser_id UUIDrole TEXTcreated_at TIMESTAMP
+Example
+Organization ABrand 1  ✓ AccessBrand 2  ✗ No AccessBrand 3  ✗ No Access
+A user may have Organization access but only manage selected Brands.
+
+7. Brand Roles
+Brand Admin
+Can:
+Manage brand settings
+View reports
+Manage locations under the brand
+
+Brand Manager
+Can:
+Manage operations
+View reports
+
+Brand Viewer
+Can:
+View brand information
+
+8. Location-Level Access
+Store managers often need access to only one store.
+location_members
+id UUID PRIMARY KEYlocation_id UUIDuser_id UUIDrole TEXTcreated_at TIMESTAMP
+
+9. Location Roles
+Location Manager
+Can:
+Manage store operations
+View store reports
+Manage local staff
+
+Location Staff
+Can:
+Access operational screens
+Create and update records
+
+Location Viewer
+Can:
+View store information only
+
+10. User Session Context
+After login, build a complete access tree.
+Example:
+{  "user_id": "123",  "organizations": [    {      "id": "org1",      "role": "owner",      "brands": [        {          "id": "brand1",          "role": "admin",          "locations": [            {              "id": "loc1",              "role": "manager"            }          ]        }      ]    }  ]}
+This structure should be cached in the frontend session.
+
+11. Context Switching
+The user interface should always maintain:
+Current OrganizationCurrent BrandCurrent Location
+Example:
+Organization: Restaurant Group ABrand: Pizza HouseLocation: New York
+All API requests must respect the currently selected context.
+
+12. Permission-Based Security
+Avoid direct role checks.
+Bad Example:
+if(role === "owner")
+Recommended:
+if(hasPermission("users.manage"))
+
+permissions
+id UUID PRIMARY KEYkey TEXT UNIQUEdescription TEXT
+Examples:
+organization.managebrand.managelocation.manageusers.managereports.viewreports.exportbilling.manageinvoice.viewinvoice.editstaff.managesettings.manage
+
+role_permissions
+role TEXTpermission_key TEXT
+Benefits
+Easier maintenance
+Future scalability
+Enterprise flexibility
+Custom role support
+
+13. Row Level Security (Supabase)
+All business tables should inherit the hierarchy.
+Example:
+invoices
+id UUID PRIMARY KEYorganization_id UUIDbrand_id UUIDlocation_id UUIDinvoice_number TEXT
+
+orders
+id UUID PRIMARY KEYorganization_id UUIDbrand_id UUIDlocation_id UUID
+
+staff
+id UUID PRIMARY KEYorganization_id UUIDbrand_id UUIDlocation_id UUID
+
+14. RLS Strategy
+Access should be granted only when the authenticated user belongs to the corresponding hierarchy level.
+Example:
+User belongs to OrganizationANDUser belongs to BrandANDUser belongs to Location
+Only then should records be visible.
+
+15. Recommended Enterprise Architecture
+User│├── Organization Membership│      ├── Role│      └── Permissions│├── Brand Membership│      ├── Role│      └── Permissions│└── Location Membership       ├── Role       └── Permissions
+
+16. EdgeOps Production Recommendations
+Tenant Boundary
+Organization should be the primary tenant boundary.
+Benefits:
+Simpler RLS
+Better security
+Easier scaling
+Cleaner permission management
+Faster query performance
+
+Required Features Before Production
+Security
+Full RLS on every table
+Permission-based authorization
+JWT permission claims
+Audit logs
+User Management
+Invite users
+Accept/Reject invitations
+Role assignment
+Role transfer
+Organization Management
+Multiple organizations per owner
+Organization switching
+Brand switching
+Location switching
+Audit System
+Track:
+User login
+User logout
+Record creation
+Record updates
+Record deletion
+Permission changes
+Role changes
+Future Enterprise Features
+Custom Roles
+Custom Permissions
+Regional Managers
+Franchise Managers
+Multi-Country Operations
+White Label Support
+SSO Integration
+SCIM Provisioning
+
+Final Architecture Summary
+Platform│├── Organizations (Tenant)│├── Brands│├── Locations│├── Users│├── Organization Memberships│├── Brand Memberships│├── Location Memberships│├── Roles│├── Permissions│└── RLS Policies
+This architecture provides a scalable, enterprise-grade foundation for EdgeOps and supports restaurant groups, franchise chains, cloud kitchens, and multi-brand operators while maintaining strict data isolation and flexible access control.
