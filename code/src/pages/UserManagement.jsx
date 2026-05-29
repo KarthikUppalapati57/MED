@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
@@ -317,44 +317,18 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Try updating memberships first (CRE-style)
-      const membershipId = member.membership_id || member.id;
-      const capabilities = {
-        role: form.role,
-        signing_privileges: form.signingPrivileges,
-      };
-
-      let updated = false;
-      
-      // Try memberships table
-      try {
-        const { error } = await supabase
-          .from('memberships')
-          .update({
-            role: form.role,
-            status: form.status,
-            capabilities,
-            page_permissions: form.permissions,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', membershipId);
-        if (!error) updated = true;
-      } catch { /* try fallback */ }
-
-      // Fallback: update profiles table
-      if (!updated) {
-        const userId = member.user_id || member.profiles?.id || member.id;
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            role: form.role,
-            status: form.status,
-            permissions: form.permissions,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', userId);
-        if (error) throw error;
-      }
+      // Use secure RPC to update role and privileges
+      const userId = member.user_id || member.profiles?.id || member.id;
+      const { error } = await supabase.rpc('admin_update_user_role', {
+        target_user_id: userId,
+        new_role: form.role,
+        new_status: form.status,
+        new_department: form.department,
+        new_location: form.location,
+        new_permissions: form.permissions,
+        new_signing_privileges: form.signingPrivileges
+      });
+      if (error) throw error;
 
       // Audit
       try {
@@ -1320,17 +1294,17 @@ export default function UserManagement() {
                                     );
 
                                     try {
-                                      const { error } = await supabase.from('profiles').delete().eq('id', userId);
+                                      const { error } = await supabase.rpc('org_remove_member', { target_user_id: userId });
                                       if (error) throw error;
-                                      toast.success('User deleted');
+                                      toast.success('User removed from organization');
                                       queryClient.invalidateQueries({ queryKey: ['team-members'] });
                                     } catch (e) { 
                                       if (previousMembers) queryClient.setQueryData(['team-members'], previousMembers);
-                                      toast.error(e.message || 'Failed to delete user'); 
+                                      toast.error(e.message || 'Failed to remove user'); 
                                     }
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-3" /> Delete Account
+                                  <Trash2 className="h-4 w-4 mr-3" /> Remove User
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
