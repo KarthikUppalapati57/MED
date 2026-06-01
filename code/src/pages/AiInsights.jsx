@@ -11,8 +11,14 @@ import {
   TrendingUp,
   TrendingDown,
   Search,
-  Check
+  Check,
+  MessageSquare,
+  Send,
+  User,
+  Bot
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +53,12 @@ export default function AiInsights() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('unresolved');
+  const [activeTab, setActiveTab] = useState('insights');
+  const [chatInput, setChatInput] = useState('');
+  const [chatHistory, setChatHistory] = useState([
+    { role: 'assistant', content: 'Hello! I am your MEVS AI Assistant. Ask me anything about your restaurant\'s performance, inventory variances, or labor forecasts.' }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
 
   const { data: insights = [], isLoading } = useQuery({
     queryKey: ['ai_insights'],
@@ -75,6 +87,33 @@ export default function AiInsights() {
     });
   }, [insights, search, filter]);
 
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = { role: 'user', content: chatInput };
+    setChatHistory(prev => [...prev, userMsg]);
+    setChatInput('');
+    setIsTyping(true);
+
+    // Mock AI response
+    setTimeout(() => {
+      let aiResponse = "I'm analyzing that right now. Could you be more specific?";
+      const lower = userMsg.content.toLowerCase();
+      
+      if (lower.includes('variance') || lower.includes('food cost')) {
+        aiResponse = "Based on the latest Actual vs Theoretical data, your food cost variance is currently at 3.2% (+$420). The biggest contributor is Salmon (-$150 variance) due to over-portioning. Would you like me to generate a sub-recipe review task for the kitchen?";
+      } else if (lower.includes('labor') || lower.includes('schedule')) {
+        aiResponse = "Tomorrow's forecast predicts $5,200 in sales. Your current scheduled labor is $1,600 (30.7%). I recommend cutting 1 morning prep shift to bring labor down to the 28% target.";
+      } else if (lower.includes('briefing') || lower.includes('yesterday')) {
+        aiResponse = "Here is yesterday's briefing: Sales hit $8,400 (105% of forecast). Labor ran at 27.5% (excellent). However, we had 2 missing invoices flagged by 3-way matching. Check the Accounting tab to resolve them.";
+      }
+
+      setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }]);
+      setIsTyping(false);
+    }, 1200);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -90,7 +129,14 @@ export default function AiInsights() {
         </div>
       </div>
 
-      {/* Filters */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="insights">Automated Insights</TabsTrigger>
+          <TabsTrigger value="chat">Chat with Data <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand text-[10px]">Beta</Badge></TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="insights" className="space-y-6">
+          {/* Filters */}
       <Card className="glass-card shadow-sm border-0">
         <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -209,6 +255,68 @@ export default function AiInsights() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="chat" className="h-[600px] flex flex-col">
+          <Card className="flex-1 flex flex-col overflow-hidden border-border/50 shadow-sm glass-card">
+            <CardHeader className="border-b border-border/40 pb-4 bg-secondary/20">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Bot className="h-5 w-5 text-brand" />
+                MEVS Copilot
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Ask questions about your sales, inventory variances, or labor forecasts in plain English.</p>
+            </CardHeader>
+            <ScrollArea className="flex-1 p-4">
+              <div className="space-y-4 pb-4">
+                {chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && (
+                      <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+                        <Bot className="h-4 w-4 text-brand" />
+                      </div>
+                    )}
+                    <div className={`p-3 rounded-xl text-sm max-w-[80%] ${
+                      msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-secondary rounded-tl-sm'
+                    }`}>
+                      {msg.content}
+                    </div>
+                    {msg.role === 'user' && (
+                      <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+                      <Bot className="h-4 w-4 text-brand" />
+                    </div>
+                    <div className="p-3 rounded-xl bg-secondary rounded-tl-sm text-sm text-muted-foreground flex items-center gap-1">
+                      <span className="animate-bounce delay-75">.</span>
+                      <span className="animate-bounce delay-150">.</span>
+                      <span className="animate-bounce delay-300">.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            <div className="p-4 bg-background border-t border-border/40">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <Input 
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  placeholder="e.g. What is my food cost variance today?" 
+                  className="flex-1 bg-secondary/50"
+                />
+                <Button type="submit" disabled={!chatInput.trim() || isTyping}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
