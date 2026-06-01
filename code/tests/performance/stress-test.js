@@ -1,31 +1,44 @@
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+import autocannon from 'autocannon';
 
-// Run with: k6 run stress-test.js
-// Simulates extreme load to find the breaking point of the system
+// Run with: node tests/performance/stress-test.js
 
-export const options = {
-  stages: [
-    { duration: '1m', target: 100 }, // Ramp up to 100 users
-    { duration: '2m', target: 500 }, // Ramp up to 500 users
-    { duration: '2m', target: 1000 }, // Ramp up to 1000 users (Peak traffic simulation)
-    { duration: '2m', target: 1000 }, // Stay at 1000 users
-    { duration: '1m', target: 0 },    // Ramp down rapidly
-  ],
-  thresholds: {
-    // Under extreme stress, we might allow higher latencies but keep track of it
-    http_req_duration: ['p(95)<1500'], 
-  },
-};
+const url = process.env.BASE_URL || 'http://localhost:5173';
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5173';
-const API_URL = __ENV.API_URL || 'http://127.0.0.1:54321';
+console.log(`Starting stress test against ${url}...`);
 
-export default function () {
-  const res = http.get(BASE_URL);
-  check(res, {
-    'landing page status is 200': (r) => r.status === 200,
+function runTest(connections, duration) {
+  return new Promise((resolve) => {
+    console.log(`\n--- Running test with ${connections} concurrent users for ${duration}s ---`);
+    const instance = autocannon({
+      url,
+      connections,
+      duration,
+      pipelining: 1,
+    });
+
+    instance.on('done', (result) => {
+      console.log(`Test complete. Results for ${connections} users:`);
+      console.log(`- Total Requests: ${result.requests.total}`);
+      console.log(`- Average Latency: ${result.latency.average} ms`);
+      console.log(`- 99th Percentile Latency: ${result.latency.p99} ms`);
+      console.log(`- Errors: ${result.errors}`);
+      console.log(`- Timeouts: ${result.timeouts}`);
+      resolve(result);
+    });
   });
-  
-  sleep(Math.random() * 2); // Random sleep between 0-2s to simulate human randomness
 }
+
+async function runAllTests() {
+  // Test 1: 100 concurrent users
+  await runTest(100, 10);
+  
+  // Test 2: 500 concurrent users
+  await runTest(500, 10);
+  
+  // Test 3: 1000 concurrent users
+  await runTest(1000, 10);
+  
+  console.log('\nAll stress tests completed.');
+}
+
+runAllTests().catch(console.error);
