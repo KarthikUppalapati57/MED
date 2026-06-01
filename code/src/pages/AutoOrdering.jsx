@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,8 +17,9 @@ import {
   Mail,
   MessageSquare,
   Sparkles,
-  Settings,
-  FileText
+  FileText,
+  ArrowRightLeft,
+  Package
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -269,8 +270,14 @@ export default function AutoOrdering() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-
-
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
+          <TabsTrigger value="all-orders">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="place-order">Place Order</TabsTrigger>
+          <TabsTrigger value="invoice-approval">Invoice Approval</TabsTrigger>
+          <TabsTrigger value="transfers">Transfers</TabsTrigger>
+          <TabsTrigger value="receiving">Receiving</TabsTrigger>
+          <TabsTrigger value="order-setup">Settings</TabsTrigger>
+        </TabsList>
         {/* â”€â”€ All Orders Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <TabsContent value="all-orders">
           <Card className="border-0 shadow-sm">
@@ -660,6 +667,77 @@ export default function AutoOrdering() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ── Transfers Tab ────────────────────────────────────────────────────────── */}
+        <TabsContent value="transfers">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ArrowRightLeft className="h-5 w-5" /> Internal Transfers
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Move inventory between your store locations</p>
+              </div>
+              <Button size="sm" className="bg-primary hover:bg-primary">New Transfer</Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Transfer ID</TableHead>
+                    <TableHead>From Location</TableHead>
+                    <TableHead>To Location</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No active transfers.
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Receiving Tab ────────────────────────────────────────────────────────── */}
+        <TabsContent value="receiving">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-5 w-5" /> Receiving Log
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Track physical deliveries against Purchase Orders</p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Receiving ID</TableHead>
+                    <TableHead>PO Reference</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Received Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No receiving logs found.
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

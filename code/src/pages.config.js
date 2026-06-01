@@ -38,6 +38,8 @@ const AiInsights = React.lazy(() => import('./pages/AiInsights'));
 const Integrations = React.lazy(() => import('./pages/Integrations'));
 const Notifications = React.lazy(() => import('./pages/Notifications'));
 const AvTCosting = React.lazy(() => import('./pages/AvTCosting'));
+const Performance = React.lazy(() => import('./pages/Performance'));
+const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -67,6 +69,8 @@ export const PAGES = {
     "Integrations": Integrations,
     "Notifications": Notifications,
     "AvTCosting": AvTCosting,
+    "Performance": Performance,
+    "MenuEngineering": MenuEngineering,
 }
 
 export const pagesConfig = {

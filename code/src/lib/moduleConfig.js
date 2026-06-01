@@ -18,12 +18,13 @@ export const MODULE_DEFINITIONS = {
   products:   { label: "Products",        pages: ["Products"],                                   minRole: "ground_staff",     icon: "Package" },
   inventory:  { label: "Inventory",       pages: ["Inventory"],                                  minRole: "ground_staff",     icon: "Warehouse" },
   orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
-  recipes:    { label: "Recipes",         pages: ["Recipes"],                                    minRole: "location_manager", icon: "ChefHat" },
+  recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering"], minRole: "location_manager", icon: "ChefHat" },
   vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "location_manager", icon: "Store" },
   admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
   integrations: { label: "Integrations",  pages: ["Integrations"], minRole: "org_owner", icon: "Settings" },
+  performance:{ label: "Performance",     pages: ["Performance"], minRole: "manager", icon: "Activity" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
-  accounting: { label: "Accounting",      pages: ["GeneralLedger", "Invoices", "Reporting", "InventoryAudit"], minRole: "org_admin", icon: "DollarSign" },
+  accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_admin", icon: "DollarSign" },
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);

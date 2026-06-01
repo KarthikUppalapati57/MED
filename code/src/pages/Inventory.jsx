@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -471,7 +471,13 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
+          <TabsTrigger value="inventory">Inventory List</TabsTrigger>
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
+          <TabsTrigger value="counts">Stock Counts</TabsTrigger>
+          <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="inventory" className="space-y-4">
           {/* Filters */}
@@ -754,12 +760,48 @@ export default function Inventory() {
                     );
                   })()}
                 </TableBody>
+                </TableBody>
               </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Waste Summary Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Count Sheets Tab ──────────────────────────────────────────────────────── */}
+        <TabsContent value="count-sheets">
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Count Sheets</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Templates and mobile entry forms for inventory counts</p>
+              </div>
+              <Button className="bg-primary hover:bg-primary" size="sm">
+                <Plus className="h-4 w-4 mr-2" /> New Template
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Template Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead>Last Count</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No count sheets configured. Create templates by station (e.g., Bar, Walk-in, Line).
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Waste Summary Tab ─────────────────────────────────────────────────────── */}
         <TabsContent value="waste-summary">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Waste Reasons */}

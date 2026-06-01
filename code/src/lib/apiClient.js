@@ -95,6 +95,10 @@ export const api = {
     PosItem: createEntityClient('pos_items'),
     PosMenuMapping: createEntityClient('pos_menu_mapping'),
     PosSalesData: createEntityClient('pos_sales_data'),
+    Transfer: createEntityClient('transfers'),
+    Receiving: createEntityClient('receivings'),
+    CountSheet: createEntityClient('count_sheets'),
+    CountSession: createEntityClient('count_sessions'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

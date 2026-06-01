@@ -53,6 +53,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
   { 
@@ -135,6 +136,29 @@ const navigation = [
     subItems: [
       { name: 'Vendors List', href: 'Vendors?tab=vendors', icon: Store },
       { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package }
+    ]
+  },
+  { 
+    name: 'Labor', 
+    icon: Users, 
+    minRole: 'location_manager',
+    subItems: [
+      { name: 'Labor Summary', href: 'Labor?tab=summary', icon: FileText },
+      { name: 'Shifts & Scheduling', href: 'Labor?tab=shifts', icon: Check },
+      { name: 'Employees', href: 'Labor?tab=employees', icon: Users },
+      { name: 'Setup', href: 'Labor?tab=setup', icon: Settings }
+    ]
+  },
+  { 
+    name: 'Accounting', 
+    icon: DollarSign, 
+    minRole: 'manager',
+    subItems: [
+      { name: 'Dashboard', href: 'Accounting?tab=dashboard', icon: LayoutDashboard },
+      { name: 'Export & Sync', href: 'Accounting?tab=export', icon: ArrowRightLeft },
+      { name: 'Reconciliation', href: 'Accounting?tab=reconciliation', icon: FileText },
+      { name: 'Mappings', href: 'Accounting?tab=mappings', icon: Settings },
+      { name: 'Close Books', href: 'Accounting?tab=close', icon: Check }
     ]
   },
   { 
