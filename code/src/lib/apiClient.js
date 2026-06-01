@@ -99,6 +99,8 @@ export const api = {
     Receiving: createEntityClient('receivings'),
     CountSheet: createEntityClient('count_sheets'),
     CountSession: createEntityClient('count_sessions'),
+    ClosedPeriod: createEntityClient('closed_periods'),
+    LocationGroup: createEntityClient('location_groups'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

@@ -1,10 +1,11 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { Card, CardContent } from '@/components/ui/card';
+import { api } from '@/lib/apiClient';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -86,6 +87,11 @@ export default function OrgManagement() {
       return data || [];
     },
     enabled: !!user,
+  });
+
+  const { data: locationGroups = [] } = useAuthQuery({
+    queryKey: ['location-groups'],
+    queryFn: () => api.entities.LocationGroup.list('-created_at'),
   });
 
   // Fetch user profiles in the org for staff counts
@@ -361,7 +367,11 @@ export default function OrgManagement() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-
+        <TabsList>
+          <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
+          <TabsTrigger value="groups">Location Groups</TabsTrigger>
+          <TabsTrigger value="security">Security</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="hierarchy" className="space-y-6 mt-6">
           {/* Hierarchy Tree (Original Content) */}
@@ -513,6 +523,35 @@ export default function OrgManagement() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="groups" className="space-y-6 mt-6">
+          <Card className="border-border">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Location Groups</CardTitle>
+              <Button size="sm" onClick={() => toast.info('Creating groups will be supported in the next update.')}>
+                <Plus className="w-4 h-4 mr-2" /> Create Group
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {locationGroups.length === 0 ? (
+                <div className="text-center py-8">
+                  <Store className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No location groups configured.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Group locations by region or concept for easier reporting.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {locationGroups.map(group => (
+                    <div key={group.id} className="p-4 border rounded-lg bg-secondary/30">
+                      <h4 className="font-semibold text-foreground">{group.name}</h4>
+                      <p className="text-sm text-muted-foreground">{group.description || 'No description provided'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="security" className="mt-6">

@@ -249,6 +249,32 @@ export default function Integrations() {
         </div>
       </div>
 
+      <Card className="border-emerald-100 bg-emerald-50/30 overflow-hidden relative">
+        <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-400/10 blur-3xl rounded-full" />
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-center">
+                <svg className="w-20 h-20 transform -rotate-90">
+                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-emerald-100" />
+                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray="226" strokeDashoffset="11" className="text-emerald-500" />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold text-emerald-700">95%</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Integration Health Score</h3>
+                <p className="text-sm text-muted-foreground max-w-md">Your enterprise data sync is healthy. 1 connection requires re-authentication, but 95% of data streams (POS, Accounting, MCP) are flowing without errors.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="bg-white hover:bg-emerald-50">View Sync Logs</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center gap-4 border-b border-border mb-6">
           <button 

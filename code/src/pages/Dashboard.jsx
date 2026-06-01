@@ -380,6 +380,33 @@ function OrgOwnerDashboard() {
         <p className="text-muted-foreground mt-1">Overview of your organization's operations</p>
       </div>
 
+      <Card className="border-brand/30 bg-brand/5 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-center">
+                <svg className="w-16 h-16 transform -rotate-90">
+                  <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-brand/20" />
+                  <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray="175" strokeDashoffset="35" className="text-brand" />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-sm font-bold text-brand">80%</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-md font-bold text-foreground">Data Health Score</h3>
+                <p className="text-sm text-muted-foreground max-w-lg">Your organization is almost fully set up. Complete your POS menu mapping to unlock automated Actual vs. Theoretical reporting and full margin protection.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link to={createPageUrl('Onboarding')}>
+                <Button className="bg-brand text-black hover:opacity-90">Complete Onboarding</Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="UserManagement" linkText="Manage users" delayClass="stagger-1" />
         <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="OrgManagement" linkText="View plan" delayClass="stagger-2" />
