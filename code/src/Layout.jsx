@@ -124,7 +124,7 @@ const navigation = [
     subItems: [
       { name: 'Recipes List', href: 'Recipes?tab=recipes', icon: ChefHat },
       { name: 'Prepared Items', href: 'Recipes?tab=prepared-items', icon: Plus },
-      { name: 'Menu Analysis', href: 'Recipes?tab=menu-analysis', icon: Activity },
+      { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
       { name: 'Setup', href: 'Recipes?tab=setup', icon: Settings }
     ]
   },

@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
-  POS: 'pos'
+  POS: 'pos',
+  ACCOUNTING: 'accounting'
 };
 
 const INTEGRATIONS = [
@@ -85,6 +86,46 @@ const INTEGRATIONS = [
     color: 'emerald',
     connected: false,
     fields: ['Merchant ID', 'API Token']
+  },
+  {
+    id: 'spoton',
+    name: 'SpotOn',
+    type: INTEGRATION_TYPES.POS,
+    description: 'Hardware and software POS solutions',
+    icon: Store,
+    color: 'blue',
+    connected: false,
+    fields: ['App Key', 'Partner Key']
+  },
+  {
+    id: 'quickbooks',
+    name: 'QuickBooks Online',
+    type: INTEGRATION_TYPES.ACCOUNTING,
+    description: 'Cloud accounting and financial management',
+    icon: Database,
+    color: 'green',
+    connected: false,
+    fields: ['Client ID', 'Client Secret', 'Company ID']
+  },
+  {
+    id: 'xero',
+    name: 'Xero',
+    type: INTEGRATION_TYPES.ACCOUNTING,
+    description: 'Online accounting software',
+    icon: Database,
+    color: 'sky',
+    connected: false,
+    fields: ['Client ID', 'Client Secret', 'Tenant ID']
+  },
+  {
+    id: 'sage',
+    name: 'Sage Intacct',
+    type: INTEGRATION_TYPES.ACCOUNTING,
+    description: 'Advanced financial management',
+    icon: Database,
+    color: 'emerald',
+    connected: false,
+    fields: ['Sender ID', 'Sender Password', 'Company ID', 'User ID', 'User Password']
   }
 ];
 
@@ -228,6 +269,15 @@ export default function Integrations() {
           >
             POS Systems (Front-of-House)
           </button>
+          <button 
+            onClick={() => setActiveTab(INTEGRATION_TYPES.ACCOUNTING)}
+            className={cn(
+              "px-4 py-3 text-sm font-bold border-b-2 transition-all",
+              activeTab === INTEGRATION_TYPES.ACCOUNTING ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Accounting Systems (Back-Office)
+          </button>
         </div>
 
         <TabsContent value={INTEGRATION_TYPES.MCP} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -244,8 +294,21 @@ export default function Integrations() {
                <p className="text-xs mt-1">When connecting a POS system, all inbound traffic is routed through our secure `pos-webhook` Edge Function edge network to guarantee payload authenticity.</p>
              </div>
            </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
              {INTEGRATIONS.filter(i => i.type === INTEGRATION_TYPES.POS).map(renderIntegrationCard)}
+           </div>
+        </TabsContent>
+
+        <TabsContent value={INTEGRATION_TYPES.ACCOUNTING} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+           <div className="mb-6 p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200 text-indigo-800 flex items-start gap-3">
+             <Lock className="w-5 h-5 shrink-0 text-indigo-600" />
+             <div>
+               <p className="text-sm font-bold">General Ledger Sync</p>
+               <p className="text-xs mt-1">Connect your accounting software to automatically sync ledger bills, payments, and journal entries. All credentials are encrypted at rest.</p>
+             </div>
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+             {INTEGRATIONS.filter(i => i.type === INTEGRATION_TYPES.ACCOUNTING).map(renderIntegrationCard)}
            </div>
         </TabsContent>
       </Tabs>

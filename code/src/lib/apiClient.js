@@ -92,6 +92,9 @@ export const api = {
     Permission: createEntityClient('permissions'),
     RolePermission: createEntityClient('role_permissions'),
     UserRole: createEntityClient('user_roles'),
+    PosItem: createEntityClient('pos_items'),
+    PosMenuMapping: createEntityClient('pos_menu_mapping'),
+    PosSalesData: createEntityClient('pos_sales_data'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
@@ -162,5 +165,16 @@ export const api = {
       return data;
     },
   },
+  reports: {
+    getMenuEngineering: async (orgId, startDate = null, endDate = null) => {
+      const { data, error } = await supabase.rpc('get_menu_engineering_data', {
+        p_org_id: orgId,
+        p_start_date: startDate,
+        p_end_date: endDate
+      });
+      if (error) throw error;
+      return data;
+    }
+  }
 };
 
