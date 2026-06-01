@@ -13,6 +13,10 @@ RETURNS TABLE (
     cogs NUMERIC
 ) AS $$
 BEGIN
+    IF public.get_my_org() != p_org_id THEN
+        RAISE EXCEPTION 'Unauthorized: You do not have access to this organization''s data.';
+    END IF;
+
     RETURN QUERY
     WITH DateRange AS (
         SELECT (now() - interval '30 days') AS start_date
@@ -66,6 +70,11 @@ RETURNS TABLE (
 DECLARE
     avg_daily_sales NUMERIC;
 BEGIN
+    -- Security Check: Verify user belongs to the org that owns this location
+    IF public.get_my_org() != (SELECT organization_id FROM public.locations WHERE id = p_location_id) THEN
+        RAISE EXCEPTION 'Unauthorized: You do not have access to this location''s data.';
+    END IF;
+
     -- Base calculation on last 30 days avg (mock forecast logic for demo)
     SELECT COALESCE(AVG(total_sales), 3000) INTO avg_daily_sales
     FROM public.pos_sales_data

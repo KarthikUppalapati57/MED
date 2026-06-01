@@ -13,6 +13,10 @@ DECLARE
     v_pending_invoices INT;
     v_variance NUMERIC;
 BEGIN
+    IF public.get_my_org() != p_org_id THEN
+        RAISE EXCEPTION 'Unauthorized: You do not have access to this organization''s data.';
+    END IF;
+
     -- 1. Parse intent: Variance / Food Cost
     IF v_lower_query LIKE '%variance%' OR v_lower_query LIKE '%food cost%' THEN
         -- Calculate actual vs theoretical variance from last 7 days
