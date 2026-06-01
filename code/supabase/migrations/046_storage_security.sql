@@ -1,6 +1,15 @@
 -- Migration 046: Storage Security Policies
 -- Enforces file type (MIME) and file size constraints on uploads to prevent malicious payloads
 
+-- 1. Create a secure database-driven helper for platform_admin role
+CREATE OR REPLACE FUNCTION public.is_platform_admin()
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND role = 'platform_admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
 CREATE OR REPLACE FUNCTION public.check_file_security(bucket text, metadata jsonb)
 RETURNS boolean AS $$
 DECLARE
@@ -40,8 +49,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DROP POLICY IF EXISTS "Tenant Isolation Invoices Insert" ON storage.objects;
 CREATE POLICY "Tenant Isolation Invoices Insert" ON storage.objects FOR INSERT WITH CHECK (
     bucket_id = 'invoices' AND (
-        (auth.jwt() -> 'user_metadata' ->> 'role' = 'platform_admin') OR
-        ( (storage.foldername(name))[1] = (auth.jwt() -> 'user_metadata' ->> 'organization_id') )
+        (public.is_platform_admin()) OR
+        ( (storage.foldername(name))[1] = public.get_my_org()::text )
     ) AND public.check_file_security(bucket_id, metadata)
 );
 
@@ -51,24 +60,27 @@ CREATE POLICY "Tenant Isolation Invoices Insert" ON storage.objects FOR INSERT W
 DROP POLICY IF EXISTS "Tenant Isolation Avatars Manage" ON storage.objects;
 
 -- Recreate SELECT/UPDATE/DELETE
+DROP POLICY IF EXISTS "Tenant Isolation Avatars Update" ON storage.objects;
 CREATE POLICY "Tenant Isolation Avatars Update" ON storage.objects FOR UPDATE USING (
     bucket_id = 'avatars' AND (
-        (auth.jwt() -> 'user_metadata' ->> 'role' = 'platform_admin') OR
-        ( (storage.foldername(name))[1] = (auth.jwt() -> 'user_metadata' ->> 'organization_id') )
+        (public.is_platform_admin()) OR
+        ( (storage.foldername(name))[1] = public.get_my_org()::text )
     )
 );
 
+DROP POLICY IF EXISTS "Tenant Isolation Avatars Delete" ON storage.objects;
 CREATE POLICY "Tenant Isolation Avatars Delete" ON storage.objects FOR DELETE USING (
     bucket_id = 'avatars' AND (
-        (auth.jwt() -> 'user_metadata' ->> 'role' = 'platform_admin') OR
-        ( (storage.foldername(name))[1] = (auth.jwt() -> 'user_metadata' ->> 'organization_id') )
+        (public.is_platform_admin()) OR
+        ( (storage.foldername(name))[1] = public.get_my_org()::text )
     )
 );
 
 -- Recreate INSERT with security check
+DROP POLICY IF EXISTS "Tenant Isolation Avatars Insert" ON storage.objects;
 CREATE POLICY "Tenant Isolation Avatars Insert" ON storage.objects FOR INSERT WITH CHECK (
     bucket_id = 'avatars' AND (
-        (auth.jwt() -> 'user_metadata' ->> 'role' = 'platform_admin') OR
-        ( (storage.foldername(name))[1] = (auth.jwt() -> 'user_metadata' ->> 'organization_id') )
+        (public.is_platform_admin()) OR
+        ( (storage.foldername(name))[1] = public.get_my_org()::text )
     ) AND public.check_file_security(bucket_id, metadata)
 );
