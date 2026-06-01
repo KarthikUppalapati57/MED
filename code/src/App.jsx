@@ -581,9 +581,17 @@ const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   
   // MFA Interceptor
-  const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1';
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
-  const needsMFASetup = user && isMfaReady && verifiedFactors.length === 0;
+  const isEnrolled = verifiedFactors.length > 0;
+  
+  const highPrivilegeRoles = ['platform_admin', 'org_owner', 'branch_manager'];
+  // Platform admins, org owners, and branch managers MUST set up MFA
+  const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled;
+  
+  // Challenge if they are enrolled (regardless of role) but haven't verified this session
+  const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1' && isEnrolled;
+  // Force setup if they haven't enrolled and their role requires it
+  const needsMFASetup = user && isMfaReady && requiresMfaSetup;
 
   // Check if this device is trusted (MFA remembered for 30 days)
   const isDeviceTrusted = React.useMemo(() => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -485,11 +486,16 @@ export default function Inventory() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
           <TabsTrigger value="inventory">Inventory List</TabsTrigger>
+          <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
           <TabsTrigger value="counts">Stock Counts</TabsTrigger>
           <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="receiving" className="space-y-4">
+          <LoadingDockReceiving />
+        </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">
           {/* Filters */}

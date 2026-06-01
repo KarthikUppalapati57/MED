@@ -20,8 +20,9 @@ import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, ChevronDown, ChevronRight,
   FileText, Settings, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle
+  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle, Key
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // â”€â”€â”€ MEVS Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const MEVS_ROLES = {
@@ -897,6 +898,8 @@ export default function UserManagement() {
   const [drawerMember, setDrawerMember] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showArchived, setShowArchived] = useState(false);
+  const [activeTab, setActiveTab] = useState("members");
+  const [customRoles, setCustomRoles] = useState([]);
 
   const queryClient = useQueryClient();
   const { user: currentUser, role: userRole, userProfile } = useAuth();
@@ -918,12 +921,49 @@ export default function UserManagement() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'roles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['custom-roles'] });
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+
+  // —— Fetch custom roles —————————————————————————————————
+  useAuthQuery({
+    queryKey: ['custom-roles', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .eq('organization_id', activeOrgId)
+        .eq('is_system', false);
+      if (error) throw error;
+      setCustomRoles(data || []);
+      return data;
+    },
+    enabled: !!activeOrgId,
+  });
+
+  // Merge MEVS_ROLES and customRoles
+  const ALL_ROLES = useMemo(() => {
+    const merged = { ...MEVS_ROLES };
+    customRoles.forEach(r => {
+      merged[r.name] = {
+        label: r.name,
+        color: r.color || 'slate',
+        description: r.description || 'Custom organization role',
+        icon: Key,
+        isCustom: true,
+        default_page_permissions: r.default_page_permissions,
+        default_signing_privileges: r.default_signing_privileges
+      };
+    });
+    return merged;
+  }, [customRoles]);
 
   // â”€â”€ Fetch team members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: members = [], isLoading } = useAuthQuery({
@@ -1103,6 +1143,15 @@ export default function UserManagement() {
         ))}
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-card shadow-sm rounded-xl p-1 border border-border">
+          <TabsTrigger value="members" className="rounded-lg px-6 font-bold">Team Members</TabsTrigger>
+          {(userRole === 'org_owner' || isPlatformAdmin) && (
+            <TabsTrigger value="roles" className="rounded-lg px-6 font-bold">Role Builder</TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="members" className="space-y-4 animate-in fade-in">
       {/* Table & Controls Section */}
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4 items-center">
@@ -1321,6 +1370,61 @@ export default function UserManagement() {
           </div>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="roles" className="space-y-6 animate-in fade-in">
+          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-card">
+            <div className="p-8 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Custom Roles</h3>
+                <p className="text-sm text-muted-foreground mt-1">Create granular roles tailored to your organization's workflows.</p>
+              </div>
+              <Button className="bg-primary hover:bg-primary text-white rounded-xl">
+                <PlusCircle className="w-4 h-4 mr-2" /> New Role
+              </Button>
+            </div>
+            <div className="p-0">
+              <Table>
+                <TableHeader className="bg-secondary/50">
+                  <TableRow className="h-12 border-border">
+                    <TableHead className="pl-8 text-xs font-bold uppercase tracking-wider text-muted-foreground">Role Name</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type</TableHead>
+                    <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground w-20 pr-8"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(ALL_ROLES).map(([rKey, def]) => (
+                    <TableRow key={rKey} className="h-16 group hover:bg-secondary/30">
+                      <TableCell className="pl-8">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-2 rounded-xl border shadow-sm", ROLE_COLOR_CLASSES[def.color]?.badge)}>
+                            <def.icon className="w-4 h-4" />
+                          </div>
+                          <span className="font-bold text-foreground">{def.label}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-md truncate">{def.description}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-medium text-xs">
+                          {def.isCustom ? 'Custom Role' : 'System Role'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="pr-8">
+                        {def.isCustom && (
+                          <Button variant="ghost" size="icon" className="hover:text-resend-red hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Drawer & Dialogs */}
       {drawerMember && (
