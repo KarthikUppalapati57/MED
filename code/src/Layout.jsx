@@ -102,7 +102,8 @@ const navigation = [
       { name: 'Summary', href: 'Inventory?tab=summary', icon: FileText },
       { name: 'Wastage Log', href: 'Inventory?tab=wastage', icon: Trash2 },
       { name: 'Stock Counts', href: 'Inventory?tab=counts', icon: Check },
-      { name: 'Count Sheets', href: 'Inventory?tab=count-sheets', icon: FileText }
+      { name: 'Count Sheets', href: 'Inventory?tab=count-sheets', icon: FileText },
+      { name: 'AvT Costing', href: 'AvTCosting', icon: Activity }
     ]
   },
   { 

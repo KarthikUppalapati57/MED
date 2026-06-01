@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -94,7 +94,10 @@ export default function Recipes() {
     labor_time_minutes: 0,
     labor_rate_per_hour: 15,
     packaging_items: [],
-    instructions: ''
+    instructions: '',
+    selling_price: 0,
+    target_margin_percent: 70,
+    margin_alert_enabled: true
   });
 
   const queryClient = useQueryClient();
@@ -161,12 +164,19 @@ export default function Recipes() {
     
     const expensiveRecipesCount = recipes.filter(r => (r.cost_per_serving || 0) > 5).length;
     
+    const lowMarginRecipesCount = recipes.filter(r => {
+      if (!r.selling_price || r.selling_price <= 0) return false;
+      const margin = ((r.selling_price - (r.cost_per_serving || 0)) / r.selling_price) * 100;
+      return margin < (r.target_margin_percent || 70);
+    }).length;
+    
     const rankedRecipes = recipes.slice().sort((a, b) => (b.cost_per_serving || 0) - (a.cost_per_serving || 0)).slice(0, 8);
     
     return {
       sortedCategories,
       maxCost,
       expensiveRecipesCount,
+      lowMarginRecipesCount,
       rankedRecipes
     };
   }, [recipes]);
@@ -260,7 +270,10 @@ export default function Recipes() {
       labor_time_minutes: 0,
       labor_rate_per_hour: 15,
       packaging_items: [],
-      instructions: ''
+      instructions: '',
+      selling_price: 0,
+      target_margin_percent: 70,
+      margin_alert_enabled: true
     });
     setEditingRecipe(null);
   };
@@ -279,7 +292,10 @@ export default function Recipes() {
       labor_time_minutes: recipe.labor_time_minutes || 0,
       labor_rate_per_hour: recipe.labor_rate_per_hour || 15,
       packaging_items: recipe.packaging_items || [],
-      instructions: recipe.instructions || ''
+      instructions: recipe.instructions || '',
+      selling_price: recipe.selling_price || 0,
+      target_margin_percent: recipe.target_margin_percent !== undefined ? recipe.target_margin_percent : 70,
+      margin_alert_enabled: recipe.margin_alert_enabled !== undefined ? recipe.margin_alert_enabled : true
     });
     setDialogOpen(true);
   };
@@ -654,11 +670,11 @@ export default function Recipes() {
                     <p className="text-xs text-muted-foreground mt-1">Based on current cost trends, consider adding more beverage recipes â€” beverage category has the highest margin potential at ~75% avg.</p>
                   </div>
                   <div className="p-4 bg-card/80 rounded-lg border border-amber-100">
-                    <p className="text-sm font-medium text-resend-yellow">Modify</p>
+                    <p className="text-sm font-medium text-resend-yellow">Margin Alerts</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {menuAnalysis.expensiveRecipesCount > 0
-                        ? `${menuAnalysis.expensiveRecipesCount} recipes have cost per serving >$5. Consider ingredient substitutions to reduce plate cost.`
-                        : 'All recipes are within healthy cost ranges. No modifications needed.'}
+                      {menuAnalysis.lowMarginRecipesCount > 0
+                        ? `${menuAnalysis.lowMarginRecipesCount} recipes have dropped below their target margin. Review ingredient costs or adjust selling prices.`
+                        : 'All recipes are currently meeting their target margins. Great job!'}
                     </p>
                   </div>
                   <div className="p-4 bg-card/80 rounded-lg border border-green-100">
@@ -1079,6 +1095,41 @@ export default function Recipes() {
               ))}
             </div>
 
+            {/* Margin Protection */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Selling Price ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.selling_price}
+                  onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Target Margin (%)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={formData.target_margin_percent}
+                  onChange={(e) => setFormData({ ...formData, target_margin_percent: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="col-span-2 flex items-center justify-between bg-secondary/50 p-3 rounded-lg border border-border/50">
+                <div className="space-y-0.5">
+                  <Label>Enable Margin Alerts</Label>
+                  <p className="text-xs text-muted-foreground">Get notified when ingredient costs push margin below target.</p>
+                </div>
+                <Button
+                  variant={formData.margin_alert_enabled ? "default" : "outline"}
+                  onClick={() => setFormData({ ...formData, margin_alert_enabled: !formData.margin_alert_enabled })}
+                  className={formData.margin_alert_enabled ? "bg-resend-green hover:bg-resend-green/90 text-white" : ""}
+                >
+                  {formData.margin_alert_enabled ? 'Enabled' : 'Disabled'}
+                </Button>
+              </div>
+            </div>
+
             {/* Instructions */}
             <div className="space-y-2">
               <Label>Instructions</Label>
@@ -1092,7 +1143,14 @@ export default function Recipes() {
 
             {/* Cost Summary */}
             <div className="bg-secondary rounded-lg p-4 space-y-2">
-              <h4 className="font-semibold">Cost Summary</h4>
+              <h4 className="font-semibold flex items-center justify-between">
+                Cost Summary
+                {formData.selling_price > 0 && (
+                  <Badge variant="outline" className={((formData.selling_price - costs.costPerServing) / formData.selling_price * 100) >= formData.target_margin_percent ? "bg-resend-green/10 text-resend-green border-resend-green/20" : "bg-resend-red/10 text-resend-red border-resend-red/20"}>
+                    {(((formData.selling_price - costs.costPerServing) / formData.selling_price) * 100).toFixed(1)}% Margin
+                  </Badge>
+                )}
+              </h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span className="text-muted-foreground">Ingredients:</span>
                 <span className="font-medium text-right">${costs.ingredientCost.toFixed(2)}</span>

@@ -120,6 +120,13 @@ export default function Integrations() {
     toast.success(`${integration.name} disconnected successfully.`);
   };
 
+  const handleSyncMockSales = (integration) => {
+    const toastId = toast.loading(`Syncing mock sales from ${integration.name}...`);
+    setTimeout(() => {
+      toast.success(`Mock sales synchronized! AvT Engine triggered.`, { id: toastId });
+    }, 2000);
+  };
+
   const renderIntegrationCard = (integration) => {
     const isConnected = connections[integration.id];
     
@@ -150,15 +157,26 @@ export default function Integrations() {
            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[32px]">{integration.description}</p>
         </CardHeader>
         <CardContent className="pt-0 relative z-10">
-           <div className="flex items-center gap-2 mt-4">
+           <div className={cn("flex items-center gap-2 mt-4", isConnected && integration.type === INTEGRATION_TYPES.POS ? "flex-col" : "")}>
              {isConnected ? (
-               <Button 
-                variant="outline" 
-                className="w-full h-9 text-xs font-bold border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
-                onClick={() => handleDisconnect(integration)}
-               >
-                 Disconnect
-               </Button>
+               <>
+                 <Button 
+                  variant="outline" 
+                  className="w-full h-9 text-xs font-bold border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                  onClick={() => handleDisconnect(integration)}
+                 >
+                   Disconnect
+                 </Button>
+                 {integration.type === INTEGRATION_TYPES.POS && (
+                   <Button 
+                    variant="outline" 
+                    className="w-full h-9 text-xs font-bold bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:text-amber-800"
+                    onClick={() => handleSyncMockSales(integration)}
+                   >
+                     <Activity className="w-3.5 h-3.5 mr-2" /> Sync Mock Sales
+                   </Button>
+                 )}
+               </>
              ) : (
                <Button 
                 className="w-full h-9 text-xs font-bold bg-slate-900 text-white hover:bg-slate-800"
