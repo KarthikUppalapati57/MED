@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -201,9 +201,21 @@ export default function Payments() {
       await confirmBankTransfer(payment.id);
       // Also update invoice to paid
       if (payment.invoice_id) {
+        let fileDestination = 'storage';
+        if (payment.vendor_id) {
+          try {
+            const vendor = await api.entities.Vendor.get(payment.vendor_id);
+            if (vendor && vendor.file_routing_preference) {
+              fileDestination = vendor.file_routing_preference;
+            }
+          } catch (e) {
+            console.warn('Failed to fetch vendor for file routing:', e);
+          }
+        }
+
         await updateInvoice.mutateAsync({
           id: payment.invoice_id,
-          data: { payment_status: 'paid', status: 'paid' },
+          data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
         });
       }
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -783,9 +795,21 @@ export default function Payments() {
           });
           // Only mark as paid if payment is completed (not pending bank transfer)
           if (paymentData.status === 'completed') {
+            let fileDestination = 'storage';
+            if (selectedInvoice.vendor_id) {
+              try {
+                const vendor = await api.entities.Vendor.get(selectedInvoice.vendor_id);
+                if (vendor && vendor.file_routing_preference) {
+                  fileDestination = vendor.file_routing_preference;
+                }
+              } catch (e) {
+                console.warn('Failed to fetch vendor for file routing:', e);
+              }
+            }
+
             await updateInvoice.mutateAsync({
               id: selectedInvoice.id,
-              data: { payment_status: 'paid', status: 'paid' },
+              data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
             });
           } else if (paymentData.status === 'pending') {
             await updateInvoice.mutateAsync({

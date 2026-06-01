@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -91,7 +91,8 @@ export default function Vendors() {
     payment_terms: 'net_30',
     status: 'active',
     notes: '',
-    whatsapp_number: ''
+    whatsapp_number: '',
+    file_routing_preference: 'storage'
   });
 
   const queryClient = useQueryClient();
@@ -171,7 +172,8 @@ export default function Vendors() {
       payment_terms: 'net_30',
       status: 'active',
       notes: '',
-      whatsapp_number: ''
+      whatsapp_number: '',
+      file_routing_preference: 'storage'
     });
     setEditingVendor(null);
   };
@@ -191,7 +193,8 @@ export default function Vendors() {
       payment_terms: vendor.payment_terms || 'net_30',
       status: vendor.status || 'active',
       notes: vendor.notes || '',
-      whatsapp_number: vendor.whatsapp_number || ''
+      whatsapp_number: vendor.whatsapp_number || '',
+      file_routing_preference: vendor.file_routing_preference || 'storage'
     });
     setDialogOpen(true);
   };
@@ -626,6 +629,21 @@ export default function Vendors() {
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                     <SelectItem value="blacklisted">Blacklisted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>File Routing Preference</Label>
+                <Select
+                  value={formData.file_routing_preference}
+                  onValueChange={(v) => setFormData({ ...formData, file_routing_preference: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="storage">Storage</SelectItem>
+                    <SelectItem value="payments">Payments</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
