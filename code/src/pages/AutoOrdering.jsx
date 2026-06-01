@@ -70,6 +70,8 @@ export default function AutoOrdering() {
   const [suggestions, setSuggestions] = useState([]);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendMethod, setSendMethod] = useState('email');
+  const [newTransferOpen, setNewTransferOpen] = useState(false);
+  const [receiveOrderOpen, setReceiveOrderOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -681,7 +683,7 @@ export default function AutoOrdering() {
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">Move inventory between your store locations</p>
               </div>
-              <Button size="sm" className="bg-primary hover:bg-primary">New Transfer</Button>
+              <Button size="sm" className="bg-primary hover:bg-primary" onClick={() => setNewTransferOpen(true)}>New Transfer</Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -717,6 +719,7 @@ export default function AutoOrdering() {
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">Track physical deliveries against Purchase Orders</p>
               </div>
+              <Button size="sm" className="bg-primary hover:bg-primary" onClick={() => setReceiveOrderOpen(true)}>Receive Order</Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -826,6 +829,44 @@ export default function AutoOrdering() {
             <Button onClick={handleSendOrder} className="bg-primary hover:bg-primary">
               Send Order
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Transfer Dialog */}
+      <Dialog open={newTransferOpen} onOpenChange={setNewTransferOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Internal Transfer</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Select items and destination to transfer inventory. (Workflow under development)</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTransferOpen(false)}>Cancel</Button>
+            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+              toast.success("Transfer initiated");
+              setNewTransferOpen(false);
+            }}>Initiate Transfer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receive Order Dialog */}
+      <Dialog open={receiveOrderOpen} onOpenChange={setReceiveOrderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Receive Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Log physical delivery against a PO, handle partials and discrepancies. (Workflow under development)</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiveOrderOpen(false)}>Cancel</Button>
+            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+              toast.success("Receiving logged");
+              setReceiveOrderOpen(false);
+            }}>Log Receiving</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

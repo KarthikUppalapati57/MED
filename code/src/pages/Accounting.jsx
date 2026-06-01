@@ -26,7 +26,7 @@ export default function Accounting() {
     queryFn: () => api.entities.ClosedPeriod.list('-start_date'),
   });
 
-  const [activeTab, setActiveTab] = React.useState('sync');
+  const [activeTab, setActiveTab] = React.useState('dashboard');
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
 
@@ -103,12 +103,17 @@ export default function Accounting() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="sync">Sync Activity</TabsTrigger>
-          <TabsTrigger value="close-books">Close Books</TabsTrigger>
+        <TabsList className="mb-6 flex flex-wrap gap-2 h-auto bg-transparent border-b rounded-none w-full justify-start">
+          <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Dashboard</TabsTrigger>
+          <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export</TabsTrigger>
+          <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
+          <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
+          <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
+          <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
+          <TabsTrigger value="close-books" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Close Books</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="sync" className="space-y-6">
+        <TabsContent value="dashboard" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-1 space-y-6">
               <Card className="glass-card border-border/50 shadow-sm">
@@ -257,6 +262,42 @@ export default function Accounting() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="export" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader><CardTitle>Accounting Export</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground text-sm">Export module is currently under development. Here you will be able to export entries to QuickBooks and Sage.</p></CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reconciliation" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader><CardTitle>Reconciliation</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground text-sm">Reconciliation module is currently under development.</p></CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sales-mapping" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader><CardTitle>Sales Mapping</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground text-sm">Sales Mapping module is currently under development. Map POS categories to your general ledger accounts here.</p></CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="vendor-mapping" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader><CardTitle>Vendor Mapping</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground text-sm">Vendor Mapping module is currently under development. Map MEVS vendors to your accounting platform vendor IDs.</p></CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pmix-mapping" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader><CardTitle>PMIX Mapping</CardTitle></CardHeader>
+            <CardContent><p className="text-muted-foreground text-sm">PMIX Mapping module is currently under development.</p></CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
 
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>

@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   UserPlus,
   Sparkles,
+  ArrowRightLeft,
   Activity,
   DollarSign,
   History,
@@ -115,6 +116,8 @@ const navigation = [
       { name: 'All Orders', href: 'AutoOrdering?tab=all-orders', icon: ShoppingCart },
       { name: 'Place Order', href: 'AutoOrdering?tab=place-order', icon: Plus },
       { name: 'Invoice Approval', href: 'AutoOrdering?tab=invoice-approval', icon: FileText },
+      { name: 'Transfers', href: 'AutoOrdering?tab=transfers', icon: ArrowRightLeft },
+      { name: 'Receiving', href: 'AutoOrdering?tab=receiving', icon: Package },
       { name: 'Order Setup', href: 'AutoOrdering?tab=order-setup', icon: Settings }
     ]
   },
