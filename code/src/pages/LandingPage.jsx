@@ -248,8 +248,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Content wrapper with dark background to hide 3D scene below fold */}
-      <div className="relative z-10 bg-[#050508] border-t border-white/5 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+      {/* Content wrapper now transparent to show 3D scene below fold */}
+      <div className="relative z-10 bg-transparent border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         
         {/* Stats Bar */}
         <section className="py-16 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
@@ -300,7 +300,7 @@ export default function LandingPage() {
                   {/* Decorative glow behind image */}
                   <div className="absolute inset-0 bg-[#ff5c35]/20 blur-[100px] rounded-full" />
                   <div className="relative p-[1px] bg-gradient-to-br from-white/20 via-white/5 to-transparent rounded-2xl overflow-hidden backdrop-blur-sm">
-                    <div className="bg-[#0a0a0f] rounded-2xl overflow-hidden">
+                    <div className="bg-[#0a0a0f]/40 backdrop-blur-md rounded-2xl overflow-hidden">
                       <img src={scannerImg} alt="Interface" className="w-full max-w-sm mx-auto filter brightness-75 contrast-125 transition-all duration-1000 hover:brightness-100" />
                     </div>
                   </div>
@@ -310,7 +310,7 @@ export default function LandingPage() {
         </section>
 
         {/* Features Modules */}
-        <section id="features" className="py-32 bg-black/50">
+        <section id="features" className="py-32 bg-black/20 backdrop-blur-sm border-y border-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -349,7 +349,7 @@ export default function LandingPage() {
             >
               <div className="relative group p-[1px] rounded-3xl bg-gradient-to-b from-white/20 to-white/5 hover:from-[#ff5c35]/50 transition-all duration-700">
                 <div className="absolute inset-0 bg-[#ff5c35]/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                <div className="relative p-12 bg-[#0a0a0f] rounded-3xl h-full backdrop-blur-xl">
+                <div className="relative p-12 bg-[#0a0a0f]/60 rounded-3xl h-full backdrop-blur-xl">
                   <div className="absolute top-0 right-0 p-8">
                     <span className="text-[9px] font-bold px-3 py-1 bg-white/10 text-white rounded-full uppercase tracking-[2px]">Private Beta</span>
                   </div>
@@ -381,7 +381,7 @@ export default function LandingPage() {
         </section>
 
         {/* Footer */}
-        <footer className="relative py-20 border-t border-white/5 bg-[#050508] z-10">
+        <footer className="relative py-20 border-t border-white/10 bg-[#050508]/60 backdrop-blur-xl z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <EdgeOpsLogo className="h-8 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
