@@ -84,6 +84,8 @@ export default function Inventory() {
   const [wastageForm, setWastageForm] = useState({ quantity: 0, unit: '', reason: 'spoiled', notes: '' });
   const [addForm, setAddForm] = useState({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [newTemplateOpen, setNewTemplateOpen] = useState(false);
+  const [activeSessionOpen, setActiveSessionOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -95,6 +97,16 @@ export default function Inventory() {
   const { data: wastageLogs = [] } = useAuthQuery({
     queryKey: ['wastage'],
     queryFn: () => api.entities.WastageLog.list('-created_at', 50),
+  });
+
+  const { data: countSheets = [] } = useAuthQuery({
+    queryKey: ['count_sheets'],
+    queryFn: () => api.entities.CountSheet.list(),
+  });
+
+  const { data: countSessions = [] } = useAuthQuery({
+    queryKey: ['count_sessions'],
+    queryFn: () => api.entities.CountSession.list(),
   });
 
   useEffect(() => {
@@ -760,7 +772,6 @@ export default function Inventory() {
                     );
                   })()}
                 </TableBody>
-                </TableBody>
               </Table>
             </CardContent>
           </Card>
@@ -774,7 +785,7 @@ export default function Inventory() {
                 <CardTitle>Count Sheets</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">Templates and mobile entry forms for inventory counts</p>
               </div>
-              <Button className="bg-primary hover:bg-primary" size="sm">
+              <Button className="bg-primary hover:bg-primary" size="sm" onClick={() => setNewTemplateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" /> New Template
               </Button>
             </CardHeader>
@@ -790,11 +801,25 @@ export default function Inventory() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No count sheets configured. Create templates by station (e.g., Bar, Walk-in, Line).
-                    </TableCell>
-                  </TableRow>
+                  {countSheets.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No count sheets configured. Create templates by station (e.g., Bar, Walk-in, Line).
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    countSheets.map(sheet => (
+                      <TableRow key={sheet.id}>
+                        <TableCell className="font-medium">{sheet.name}</TableCell>
+                        <TableCell>{sheet.description}</TableCell>
+                        <TableCell>{sheet.items?.length || 0} items</TableCell>
+                        <TableCell>{sheet.last_count_date ? format(new Date(sheet.last_count_date), 'MMM d, yyyy') : 'Never'}</TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="outline" onClick={() => setActiveSessionOpen(true)}>Start Count</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -1240,6 +1265,44 @@ export default function Inventory() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setWastageDialogOpen(false)}>Cancel</Button>
             <Button onClick={saveWastage} className="bg-resend-red hover:bg-resend-red">Log Wastage</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Count Template Dialog */}
+      <Dialog open={newTemplateOpen} onOpenChange={setNewTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Count Sheet Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Create a new count template (e.g., Daily Line Check, Bar Weekly). (Workflow under development)</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTemplateOpen(false)}>Cancel</Button>
+            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+              toast.success("Template created");
+              setNewTemplateOpen(false);
+            }}>Create Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Active Count Session Dialog */}
+      <Dialog open={activeSessionOpen} onOpenChange={setActiveSessionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Active Count Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">Mobile-friendly entry form for counting inventory. (Workflow under development)</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveSessionOpen(false)}>Cancel</Button>
+            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+              toast.success("Count session completed");
+              setActiveSessionOpen(false);
+            }}>Complete Count</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

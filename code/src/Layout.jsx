@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   UserPlus,
   Sparkles,
-  ArrowRightLeft,
   Activity,
   DollarSign,
   History,
@@ -174,6 +173,7 @@ const navigation = [
     ]
   },
   { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
+  { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
   { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
 ];

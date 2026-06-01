@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Server, Database, Store, Link as LinkIcon, CheckCircle2, Lock, KeyRound, Loader2, CreditCard, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { api } from '@/lib/apiClient';
 
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
@@ -134,9 +137,26 @@ export default function Integrations() {
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [formValues, setFormValues] = useState({});
-  const [connections, setConnections] = useState(
-    INTEGRATIONS.reduce((acc, curr) => ({ ...acc, [curr.id]: curr.connected }), {})
-  );
+
+  const queryClient = useQueryClient();
+
+  const { data: dbIntegrations = [] } = useAuthQuery({
+    queryKey: ['integrations'],
+    queryFn: () => api.entities.Integration.list(),
+  });
+
+  const getProviderKey = (id) => {
+    const valid = ['quickbooks', 'xero', 'netsuite', 'stripe'];
+    return valid.includes(id) ? id : 'other';
+  };
+
+  const isConnected = (integrationId) => {
+    const dbInt = dbIntegrations.find(i => 
+      (i.provider === integrationId) || 
+      (i.provider === 'other' && i.metadata?.originalId === integrationId)
+    );
+    return dbInt?.is_active || false;
+  };
 
   const openConnectDialog = (integration) => {
     setSelectedIntegration(integration);
@@ -147,92 +167,36 @@ export default function Integrations() {
     setConnecting(true);
     const toastId = toast.loading(`Connecting to ${selectedIntegration.name}...`);
     
-    // Simulate API call to save credentials and establish connection
-    setTimeout(() => {
+    try {
+      await api.entities.Integration.create({
+        provider: getProviderKey(selectedIntegration.id),
+        metadata: { originalId: selectedIntegration.id, ...formValues },
+        is_active: true
+      });
+      queryClient.invalidateQueries(['integrations']);
+      toast.success(`${selectedIntegration.name} connected successfully`, { id: toastId });
+    } catch (error) {
+      toast.error(`Failed to connect: ${error.message}`, { id: toastId });
+    } finally {
       setConnecting(false);
-      setConnections(prev => ({ ...prev, [selectedIntegration.id]: true }));
-      toast.success(`${selectedIntegration.name} connected successfully! Webhooks active.`, { id: toastId });
       setSelectedIntegration(null);
-    }, 1500);
+    }
   };
 
-  const handleDisconnect = (integration) => {
-    setConnections(prev => ({ ...prev, [integration.id]: false }));
-    toast.success(`${integration.name} disconnected successfully.`);
-  };
-
-  const handleSyncMockSales = (integration) => {
-    const toastId = toast.loading(`Syncing mock sales from ${integration.name}...`);
-    setTimeout(() => {
-      toast.success(`Mock sales synchronized! AvT Engine triggered.`, { id: toastId });
-    }, 2000);
-  };
-
-  const renderIntegrationCard = (integration) => {
-    const isConnected = connections[integration.id];
-    
-    return (
-      <Card key={integration.id} className={cn(
-        "border overflow-hidden transition-all duration-300 relative group",
-        isConnected ? `border-${integration.color}-500/30 shadow-md shadow-${integration.color}-500/5 bg-${integration.color}-50/5` : "border-border hover:border-muted-foreground/30 shadow-sm"
-      )}>
-        <CardHeader className="pb-4 relative z-10">
-           <div className="flex justify-between items-start">
-             <div className={cn(
-               "w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-105",
-               `bg-${integration.color}-100 text-${integration.color}-600`
-             )}>
-               <integration.icon className="w-6 h-6" />
-             </div>
-             {isConnected ? (
-               <Badge className="bg-resend-green/10 text-resend-green hover:bg-resend-green/20 border-none font-bold gap-1">
-                 <CheckCircle2 className="w-3 h-3" /> Connected
-               </Badge>
-             ) : (
-               <Badge variant="outline" className="bg-secondary text-muted-foreground font-semibold">
-                 Not Connected
-               </Badge>
-             )}
-           </div>
-           <CardTitle className="text-xl font-bold">{integration.name}</CardTitle>
-           <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[32px]">{integration.description}</p>
-        </CardHeader>
-        <CardContent className="pt-0 relative z-10">
-           <div className={cn("flex items-center gap-2 mt-4", isConnected && integration.type === INTEGRATION_TYPES.POS ? "flex-col" : "")}>
-             {isConnected ? (
-               <>
-                 <Button 
-                  variant="outline" 
-                  className="w-full h-9 text-xs font-bold border-border hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
-                  onClick={() => handleDisconnect(integration)}
-                 >
-                   Disconnect
-                 </Button>
-                 {integration.type === INTEGRATION_TYPES.POS && (
-                   <Button 
-                    variant="outline" 
-                    className="w-full h-9 text-xs font-bold bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:text-amber-800"
-                    onClick={() => handleSyncMockSales(integration)}
-                   >
-                     <Activity className="w-3.5 h-3.5 mr-2" /> Sync Mock Sales
-                   </Button>
-                 )}
-               </>
-             ) : (
-               <Button 
-                className="w-full h-9 text-xs font-bold bg-slate-900 text-white hover:bg-slate-800"
-                onClick={() => openConnectDialog(integration)}
-               >
-                 <LinkIcon className="w-3.5 h-3.5 mr-2" /> Connect
-               </Button>
-             )}
-           </div>
-        </CardContent>
-        {isConnected && (
-          <div className={cn("absolute -right-12 -bottom-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-20", `bg-${integration.color}-400`)} />
-        )}
-      </Card>
+  const handleDisconnect = async (integrationId, name) => {
+    const dbInt = dbIntegrations.find(i => 
+      (i.provider === integrationId) || 
+      (i.provider === 'other' && i.metadata?.originalId === integrationId)
     );
+    if (dbInt) {
+      try {
+        await api.entities.Integration.delete(dbInt.id);
+        queryClient.invalidateQueries(['integrations']);
+        toast.success(`${name} disconnected`);
+      } catch (error) {
+        toast.error(`Failed to disconnect: ${error.message}`);
+      }
+    }
   };
 
   return (
