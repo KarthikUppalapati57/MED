@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +25,7 @@ export default function Labor() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'summary';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const { location } = useAuth();
   const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
     queryKey: ['employees'],
     queryFn: () => api.entities.Employee.list('-created_at'),
@@ -37,15 +40,21 @@ export default function Labor() {
   const activeShifts = shifts.filter(s => s.status === 'in_progress').length;
   const totalLaborCost = shifts.reduce((sum, shift) => sum + (Number(shift.labor_cost) || 0), 0);
 
-  const forecastData = [
-    { day: 'Mon', sales: 4000, laborCost: 1200, suggestedLabor: 1120 },
-    { day: 'Tue', sales: 3000, laborCost: 1100, suggestedLabor: 840 },
-    { day: 'Wed', sales: 4500, laborCost: 1250, suggestedLabor: 1260 },
-    { day: 'Thu', sales: 5000, laborCost: 1400, suggestedLabor: 1400 },
-    { day: 'Fri', sales: 8500, laborCost: 2000, suggestedLabor: 2380 },
-    { day: 'Sat', sales: 11000, laborCost: 2500, suggestedLabor: 3080 },
-    { day: 'Sun', sales: 9000, laborCost: 2200, suggestedLabor: 2520 },
-  ];
+  const { data: forecastData = [] } = useAuthQuery({
+    queryKey: ['labor_forecast', location?.id],
+    queryFn: async () => {
+      if (!location?.id) return [];
+      const { data, error } = await supabase.rpc('get_labor_forecast', {
+        p_location_id: location.id
+      });
+      if (error) {
+        console.error('Failed to load forecast', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: !!location?.id
+  });
 
   const externalFactors = [
     { name: 'Weather', impact: '-15% (Heavy Rain)', active: true, color: 'bg-resend-blue', textClass: 'text-resend-blue' },
@@ -169,15 +178,15 @@ export default function Labor() {
                           <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="day" />
+                      <XAxis dataKey="date" />
                       <YAxis />
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <RechartsTooltip 
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                       />
                       <Legend />
-                      <Area type="monotone" dataKey="sales" name="Forecasted Sales" stroke="#22c55e" fillOpacity={1} fill="url(#colorSales)" />
-                      <Area type="monotone" dataKey="laborCost" name="Scheduled Labor" stroke="#6366f1" fillOpacity={1} fill="url(#colorLabor)" />
+                      <Area type="monotone" dataKey="salesForecast" name="Forecasted Sales" stroke="#22c55e" fillOpacity={1} fill="url(#colorSales)" />
+                      <Area type="monotone" dataKey="scheduledLabor" name="Scheduled Labor" stroke="#6366f1" fillOpacity={1} fill="url(#colorLabor)" />
                       <Area type="monotone" dataKey="suggestedLabor" name="AI Suggested Labor" stroke="#f59e0b" fillOpacity={0} strokeDasharray="5 5" />
                     </AreaChart>
                   </ResponsiveContainer>

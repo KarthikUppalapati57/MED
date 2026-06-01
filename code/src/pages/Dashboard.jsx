@@ -528,10 +528,8 @@ function OrgOwnerDashboard() {
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart
-                data={[
-                  { name: 'Downtown (HQ)', sales: 125000, laborCost: 35000, cogs: 38000 },
-                  { name: 'Westside', sales: 98000, laborCost: 29000, cogs: 31000 },
-                  { name: 'Airport Kiosk', sales: 45000, laborCost: 12000, cogs: 14000 },
+                data={benchmarks.length > 0 ? benchmarks : [
+                  { name: 'Loading...', sales: 0, laborCost: 0, cogs: 0 }
                 ]}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               >

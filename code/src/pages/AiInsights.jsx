@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import {
   Sparkles,
@@ -48,7 +49,7 @@ const severityIcons = {
 };
 
 export default function AiInsights() {
-  const { userProfile } = useAuth();
+  const { userProfile, organization } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -87,7 +88,7 @@ export default function AiInsights() {
     });
   }, [insights, search, filter]);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
@@ -96,22 +97,21 @@ export default function AiInsights() {
     setChatInput('');
     setIsTyping(true);
 
-    // Mock AI response
-    setTimeout(() => {
-      let aiResponse = "I'm analyzing that right now. Could you be more specific?";
-      const lower = userMsg.content.toLowerCase();
-      
-      if (lower.includes('variance') || lower.includes('food cost')) {
-        aiResponse = "Based on the latest Actual vs Theoretical data, your food cost variance is currently at 3.2% (+$420). The biggest contributor is Salmon (-$150 variance) due to over-portioning. Would you like me to generate a sub-recipe review task for the kitchen?";
-      } else if (lower.includes('labor') || lower.includes('schedule')) {
-        aiResponse = "Tomorrow's forecast predicts $5,200 in sales. Your current scheduled labor is $1,600 (30.7%). I recommend cutting 1 morning prep shift to bring labor down to the 28% target.";
-      } else if (lower.includes('briefing') || lower.includes('yesterday')) {
-        aiResponse = "Here is yesterday's briefing: Sales hit $8,400 (105% of forecast). Labor ran at 27.5% (excellent). However, we had 2 missing invoices flagged by 3-way matching. Check the Accounting tab to resolve them.";
-      }
+    try {
+      const { data, error } = await supabase.rpc('ai_chat_response', {
+        p_org_id: organization?.id,
+        p_query: userMsg.content
+      });
 
-      setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }]);
+      if (error) throw error;
+      
+      setChatHistory(prev => [...prev, { role: 'assistant', content: data || "I couldn't process that request." }]);
+    } catch (err) {
+      console.error(err);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error connecting to the AI engine." }]);
+    } finally {
       setIsTyping(false);
-    }, 1200);
+    }
   };
 
   return (
