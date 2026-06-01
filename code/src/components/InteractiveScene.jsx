@@ -1,166 +1,130 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Float, Sparkles, Sphere, MeshDistortMaterial, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
-const InteractiveScene = () => {
-  const mountRef = useRef(null);
-
-  useEffect(() => {
-    let width = mountRef.current.clientWidth;
-    let height = mountRef.current.clientHeight;
-    let frameId;
-
-    // SCENE
-    const scene = new THREE.Scene();
-
-    // CAMERA
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.z = 6;
-
-    // RENDERER
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
-
-    // CORE OBJECTS
-    const group = new THREE.Group();
-    scene.add(group);
-
-    // High detail Icosahedron for that "mathematical" feel
-    const geometry = new THREE.IcosahedronGeometry(2, 2);
-    const wireframeMaterial = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.15,
-      blending: THREE.MultiplyBlending
-    });
-
-    const sphere = new THREE.Mesh(geometry, wireframeMaterial);
-    group.add(sphere);
-
-    // Vertex points (Orange technical dots)
-    const pointsMaterial = new THREE.PointsMaterial({
-      color: 0xff5c35, // Mistral Orange
-      size: 0.06,
-      transparent: true,
-      opacity: 0.6
-    });
-    const points = new THREE.Points(geometry, pointsMaterial);
-    group.add(points);
-
-    // INNER CORE (Subtle glow)
-    const innerGeometry = new THREE.IcosahedronGeometry(1.95, 2);
-    const innerMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff5c35,
-      transparent: true,
-      opacity: 0.05,
-    });
-    const innerSphere = new THREE.Mesh(innerGeometry, innerMaterial);
-    group.add(innerSphere);
-
-    // SECONDARY BACKGROUND PARTICLES (Depth)
-    const particlesCount = 300;
-    const particlesGeometry = new THREE.BufferGeometry();
-    const posArray = new Float32Array(particlesCount * 3);
-
-    for(let i = 0; i < particlesCount * 3; i++) {
-        posArray[i] = (Math.random() - 0.5) * 20;
+// A dynamic network particle cloud
+function NetworkCloud() {
+  const count = 400;
+  const mesh = useRef();
+  
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const particles = useMemo(() => {
+    const temp = [];
+    for (let i = 0; i < count; i++) {
+      const t = Math.random() * 100;
+      const factor = 20 + Math.random() * 100;
+      const speed = 0.01 + Math.random() / 200;
+      const xFactor = -50 + Math.random() * 100;
+      const yFactor = -50 + Math.random() * 100;
+      const zFactor = -50 + Math.random() * 100;
+      temp.push({ t, factor, speed, xFactor, yFactor, zFactor, mx: 0, my: 0 });
     }
+    return temp;
+  }, [count]);
 
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    const particlesMaterial = new THREE.PointsMaterial({
-        size: 0.02,
-        color: 0x000000,
-        transparent: true,
-        opacity: 0.1
-    });
-
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
-
-    // INTERACTION STATE
-    let mouseX = 0;
-    let mouseY = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let scrollY = 0;
-
-    const onMouseMove = (event) => {
-      mouseX = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
-      mouseY = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
-    };
-
-    const onScroll = () => {
-        scrollY = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
-    };
-
-    window.addEventListener('mousemove', onMouseMove, { passive: true });
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    // ANIMATION
-    const animate = () => {
-      if (document.hidden) {
-        frameId = requestAnimationFrame(animate);
-        return;
-      }
-      targetX += (mouseX - targetX) * 0.05;
-      targetY += (mouseY - targetY) * 0.05;
-
-      // Base auto-rotation influenced by scroll (DrinkSOM style)
-      group.rotation.y += 0.0015 + (scrollY * 0.03);
-      group.rotation.x = targetY * 0.4;
-      group.rotation.z = targetX * 0.1 + (scrollY * 0.5);
-
-      // Background particles motion
-      particles.rotation.y += 0.0003;
-      particles.position.y = scrollY * 3;
-
-      // Subtle scaling core based on scroll
-      const scale = 1 + scrollY * 0.3;
-      group.scale.set(scale, scale, scale);
+  useFrame((state) => {
+    particles.forEach((particle, i) => {
+      let { t, factor, speed, xFactor, yFactor, zFactor } = particle;
+      t = particle.t += speed / 2;
+      const a = Math.cos(t) + Math.sin(t * 1) / 10;
+      const b = Math.sin(t) + Math.cos(t * 2) / 10;
+      const s = Math.cos(t);
       
-      // Dynamic Opacity based on scroll
-      sphere.material.opacity = 0.15 + (scrollY * 0.1);
-      points.material.opacity = 0.6 - (scrollY * 0.3);
+      // Follow mouse slightly
+      particle.mx += (state.pointer.x * 5 - particle.mx) * 0.02;
+      particle.my += (state.pointer.y * 5 - particle.my) * 0.02;
+      
+      dummy.position.set(
+        (particle.mx / 10) + a + xFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 1) * factor) / 10,
+        (particle.my / 10) + b + yFactor + Math.sin((t / 10) * factor) + (Math.cos(t * 2) * factor) / 10,
+        (particle.my / 10) + b + zFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 3) * factor) / 10
+      );
+      dummy.scale.set(s, s, s);
+      dummy.rotation.set(s * 5, s * 5, s * 5);
+      dummy.updateMatrix();
+      
+      mesh.current.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.current.instanceMatrix.needsUpdate = true;
+    
+    // Slow global rotation based on scroll
+    mesh.current.rotation.y = state.clock.elapsedTime * 0.05 + (window.scrollY * 0.001);
+    mesh.current.rotation.x = window.scrollY * 0.0005;
+  });
 
-      renderer.render(scene, camera);
-      frameId = requestAnimationFrame(animate);
-    };
+  return (
+    <instancedMesh ref={mesh} args={[null, null, count]}>
+      <icosahedronGeometry args={[0.15, 0]} />
+      <meshBasicMaterial color="#ff5c35" transparent opacity={0.4} wireframe />
+    </instancedMesh>
+  );
+}
 
-    animate();
+// Core Entity that reacts to scroll and pointer
+function CoreNode() {
+  const coreRef = useRef();
+  
+  useFrame((state) => {
+    coreRef.current.rotation.y = state.clock.elapsedTime * 0.2;
+    coreRef.current.rotation.z = state.clock.elapsedTime * 0.1;
+    
+    // Smoothly interpolate position based on mouse
+    coreRef.current.position.x = THREE.MathUtils.lerp(coreRef.current.position.x, state.pointer.x * 2, 0.05);
+    coreRef.current.position.y = THREE.MathUtils.lerp(coreRef.current.position.y, state.pointer.y * 2, 0.05);
+  });
 
-    const handleResize = () => {
-      if (!mountRef.current) return;
-      width = mountRef.current.clientWidth;
-      height = mountRef.current.clientHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    };
+  return (
+    <Float speed={2} rotationIntensity={1} floatIntensity={2}>
+      <mesh ref={coreRef}>
+        <icosahedronGeometry args={[2.5, 4]} />
+        <MeshDistortMaterial 
+          color="#0a0a0f" 
+          emissive="#ff5c35"
+          emissiveIntensity={0.2}
+          wireframe={true}
+          distort={0.4} 
+          speed={2} 
+          roughness={0.2}
+          transparent
+          opacity={0.8}
+        />
+      </mesh>
+    </Float>
+  );
+}
 
-    window.addEventListener('resize', handleResize);
+const InteractiveScene = () => {
+  return (
+    <div className="w-full h-full absolute inset-0 -z-10 bg-[#050508]">
+      <Canvas 
+        camera={{ position: [0, 0, 10], fov: 45 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: false }}
+      >
+        <color attach="background" args={['#050508']} />
+        
+        {/* Ambient lighting */}
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[10, 10, 5]} intensity={1} color="#ff5c35" />
+        <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#14c6cb" />
 
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(frameId);
-      if (mountRef.current) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-      geometry.dispose();
-      wireframeMaterial.dispose();
-      pointsMaterial.dispose();
-      particlesGeometry.dispose();
-      particlesMaterial.dispose();
-      innerGeometry.dispose();
-      innerMaterial.dispose();
-    };
-  }, []);
+        {/* Central Abstract Object */}
+        <CoreNode />
 
-  return <div ref={mountRef} className="w-full h-full" />;
+        {/* Background Network Particles */}
+        <NetworkCloud />
+        
+        {/* Floating Sparkles & Stars */}
+        <Sparkles count={200} scale={12} size={2} speed={0.4} color="#ff5c35" opacity={0.5} />
+        <Sparkles count={100} scale={15} size={1.5} speed={0.2} color="#14c6cb" opacity={0.3} />
+        <Stars radius={50} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
+        
+        {/* Fog to hide the edges */}
+        <fog attach="fog" args={['#050508', 10, 40]} />
+      </Canvas>
+    </div>
+  );
 };
 
 export default InteractiveScene;

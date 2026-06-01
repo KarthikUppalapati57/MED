@@ -7,130 +7,56 @@
 @layer base {
   :root {
     /* ═══════════════════════════════════════════════════
-       RESEND-INSPIRED LIGHT MODE
-       Clean white canvas, subtle borders, refined surfaces
+       EDGE-OPS PREMIUM DARK MODE (Default)
+       Deep indigo-charcoal canvas, glassmorphic borders, ambient teal glows
        ═══════════════════════════════════════════════════ */
-    --background: 0 0% 100%;
-    --foreground: 240 6% 6%;
+    --background: 228 12% 5%;
+    --foreground: 228 33% 99%;
 
-    --card: 0 0% 99%;
-    --card-foreground: 240 6% 6%;
+    --card: 228 10% 8%;
+    --card-foreground: 228 33% 97%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 6%;
+    --popover: 228 10% 8%;
+    --popover-foreground: 228 33% 97%;
 
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 15 100% 60%; /* #ff5c35 Mistral Orange */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 92%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 228 10% 16%;
+    --secondary-foreground: 228 33% 97%;
 
-    --muted: 240 5% 92%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 228 10% 16%;
+    --muted-foreground: 220 3% 63%;
 
-    --accent: 240 5% 92%;
-    --accent-foreground: 240 6% 10%;
+    --accent: 228 10% 16%;
+    --accent-foreground: 228 33% 99%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 351 100% 56%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 174 90% 46%;
+    --border: 228 10% 16%;
+    --input: 228 10% 16%;
+    --ring: 15 100% 60%;
 
     --radius: 0.6rem;
 
     /* Brand Primary Accent */
-    --brand: 174 90% 46%;
+    --brand: 15 100% 60%;
 
-    /* Resend Accent Palette (Light) */
-    --resend-orange: 24 100% 56%;
-    --resend-yellow: 40 100% 62%;
-    --resend-blue: 212 100% 62%;
-    --resend-green: 156 100% 53%;
-    --resend-red: 351 100% 56%;
+    /* Premium Glow Palette */
+    --glow-orange: 15 100% 60%;
+    --glow-teal: 182 82% 44%;
 
-    /* Surface Layers (Light) */
-    --surface-card: 240 5% 97%;
-    --surface-elevated: 240 5% 94%;
-    --surface-deep: 240 5% 99%;
+    /* Surface Layers */
+    --surface-card: 228 10% 8%;
+    --surface-elevated: 228 10% 12%;
+    --surface-deep: 228 12% 3%;
 
-    /* Hairline borders (Light) */
-    --hairline: 240 6% 92%;
-    --hairline-strong: 240 6% 86%;
-
-    /* Text shades */
-    --ink: 240 6% 6%;
-    --body-text: 240 4% 28%;
-    --charcoal: 240 4% 40%;
-    --mute-text: 240 3% 58%;
-    --ash-text: 240 2% 46%;
-    --stone-text: 240 3% 70%;
-
-    /* Sidebar */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    /* ═══════════════════════════════════════════════════
-       EDGE-OPS PREMIUM DARK MODE
-       Deep indigo-charcoal canvas, glassmorphic borders, ambient teal glows
-       ═══════════════════════════════════════════════════ */
-    --background: 228 12% 7%;
-    --foreground: 228 33% 99%;
-
-    --card: 228 10% 12%;
-    --card-foreground: 228 33% 97%;
-
-    --popover: 228 10% 12%;
-    --popover-foreground: 228 33% 97%;
-
-    --primary: 0 84% 60%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 228 10% 24%;
-    --secondary-foreground: 228 33% 97%;
-
-    --muted: 228 10% 24%;
-    --muted-foreground: 220 3% 63%;
-
-    --accent: 228 10% 24%;
-    --accent-foreground: 228 33% 99%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 228 10% 12%;
-    --input: 228 10% 12%;
-    --ring: 0 84% 60%;
-
-    /* Resend Accent Palette (Dark) */
-    --resend-orange: 24 100% 56%;
-    --resend-yellow: 40 100% 62%;
-    --resend-blue: 212 100% 62%;
-    --resend-green: 156 100% 53%;
-    --resend-red: 351 100% 56%;
-
-    /* Brand Primary Accent */
-    --brand: 0 84% 60%;
-
-    /* Surface Layers (Dark) */
-    --surface-card: 228 10% 12%;
-    --surface-elevated: 228 10% 16%;
-    --surface-deep: 228 12% 5%;
-
-    /* Hairline borders (Dark) - translucent white */
+    /* Hairline borders - translucent white */
     --hairline: 0 0% 100% / 0.04;
     --hairline-strong: 0 0% 100% / 0.08;
 
-    /* Text shades (Dark) */
+    /* Text shades */
     --ink: 228 33% 99%;
     --body-text: 228 33% 86%;
     --charcoal: 228 33% 70%;
@@ -138,15 +64,15 @@
     --ash-text: 200 3% 55%;
     --stone-text: 210 4% 30%;
 
-    /* Sidebar (Dark) */
-    --sidebar-background: 228 12% 8%;
+    /* Sidebar */
+    --sidebar-background: 228 12% 4%;
     --sidebar-foreground: 228 33% 90%;
-    --sidebar-primary: 174 90% 46%;
-    --sidebar-primary-foreground: 228 12% 8%;
-    --sidebar-accent: 228 10% 14%;
+    --sidebar-primary: 15 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 10% 10%;
     --sidebar-accent-foreground: 228 33% 95%;
-    --sidebar-border: 228 10% 14%;
-    --sidebar-ring: 174 90% 46%;
+    --sidebar-border: 228 10% 10%;
+    --sidebar-ring: 15 100% 60%;
   }
 }
 
@@ -155,8 +81,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    @apply bg-background text-foreground antialiased selection:bg-primary/30 selection:text-white;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -166,7 +92,6 @@
     line-height: 1.15;
   }
 
-  /* Resend uses monospace for code-like elements */
   code, pre, .font-mono {
     font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   }
@@ -174,183 +99,42 @@
 
 @layer utilities {
   /* ═══════════════════════════════════════════════════
-     RESEND ACCENT COLORS
+     ATMOSPHERIC GLOW EFFECTS (Premium 3D Vibe)
      ═══════════════════════════════════════════════════ */
-  .text-resend-orange { color: hsl(var(--resend-orange)); }
-  .text-resend-yellow { color: hsl(var(--resend-yellow)); }
-  .text-resend-blue { color: hsl(var(--resend-blue)); }
-  .text-resend-green { color: hsl(var(--resend-green)); }
-  .text-resend-red { color: hsl(var(--resend-red)); }
-
-  .bg-resend-orange { background-color: hsl(var(--resend-orange)); }
-  .bg-resend-yellow { background-color: hsl(var(--resend-yellow)); }
-  .bg-resend-blue { background-color: hsl(var(--resend-blue)); }
-  .bg-resend-green { background-color: hsl(var(--resend-green)); }
-  .bg-resend-red { background-color: hsl(var(--resend-red)); }
+  .glow-orange { background: radial-gradient(circle at 50% 0%, rgba(255,92,53,0.15), transparent 70%); }
+  .glow-teal { background: radial-gradient(circle at 50% 0%, rgba(20,198,203,0.15), transparent 70%); }
+  
+  .glow-orange-strong { box-shadow: 0 0 40px -10px rgba(255,92,53,0.5); }
+  .glow-teal-strong { box-shadow: 0 0 40px -10px rgba(20,198,203,0.5); }
 
   /* ═══════════════════════════════════════════════════
-     ATMOSPHERIC GLOW EFFECTS
-     Subtle radial glows for section accents
+     GLASSMORPHISM & SURFACES
      ═══════════════════════════════════════════════════ */
-  .glow-orange { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,89,0,0.12), transparent 70%); }
-  .glow-blue { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,117,255,0.18), transparent 70%); }
-  .glow-green { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(34,255,153,0.10), transparent 70%); }
-  .glow-red { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,32,71,0.18), transparent 70%); }
-  .glow-yellow { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,197,61,0.12), transparent 70%); }
-  .glow-teal { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(20,198,203,0.12), transparent 70%); }
-
-  .dark .glow-orange { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,89,0,0.22), transparent 70%); }
-  .dark .glow-blue { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,117,255,0.34), transparent 70%); }
-  .dark .glow-green { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(34,255,153,0.18), transparent 70%); }
-  .dark .glow-red { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,32,71,0.34), transparent 70%); }
-  .dark .glow-yellow { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,197,61,0.22), transparent 70%); }
-  .dark .glow-teal { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(20,198,203,0.22), transparent 70%); }
-
-  /* ═══════════════════════════════════════════════════
-     RESEND SURFACE UTILITIES
-     ═══════════════════════════════════════════════════ */
-  .surface-card {
-    background: hsl(var(--surface-card));
-    border: 1px solid hsl(var(--border));
-  }
-  .surface-elevated {
-    background: hsl(var(--surface-elevated));
-    border: 1px solid hsl(var(--border));
-  }
-  .surface-deep {
-    background: hsl(var(--surface-deep));
-    border: 1px solid hsl(var(--border));
-  }
-
-  /* ═══════════════════════════════════════════════════
-     RESEND GLASS EFFECTS
-     ═══════════════════════════════════════════════════ */
-  .glass-header {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-  .dark .glass-header {
-    background: rgba(0,0,0,0.85);
-  }
-
-  /* ═══════════════════════════════════════════════════
-     STATUS INDICATORS (Resend-style)
-     ═══════════════════════════════════════════════════ */
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 9999px;
-    display: inline-block;
-  }
-  .status-dot-green {
-    background: hsl(var(--resend-green));
-    box-shadow: 0 0 8px rgba(34,255,153,0.18);
-  }
-  .status-dot-orange {
-    background: hsl(var(--resend-orange));
-    box-shadow: 0 0 8px rgba(255,89,0,0.22);
-  }
-  .status-dot-red {
-    background: hsl(var(--resend-red));
-    box-shadow: 0 0 8px rgba(255,32,71,0.22);
-  }
-
-  /* ═══════════════════════════════════════════════════
-     LEGACY UTILITIES (kept for backward compatibility)
-     ═══════════════════════════════════════════════════ */
-  .text-brand-teal { color: #14c6cb; }
-  .bg-brand-teal { background-color: #14c6cb; }
-  .border-brand-teal { border-color: #14c6cb; }
-  .bg-brand-charcoal { background-color: #15181e; }
-
-  .enterprise-border {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  .enterprise-border-dark {
-    border: 1px solid rgba(0, 0, 0, 0.08);
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.8s ease-out forwards;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ═══════════════════════════════════════════════════
-     CUSTOM SCROLLBAR (Resend-style)
-     ═══════════════════════════════════════════════════ */
-  .sidebar-nav::-webkit-scrollbar {
-    width: 4px;
-  }
-  .sidebar-nav::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .sidebar-nav::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 4px;
-  }
-  .sidebar-nav::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-  }
-
-  .sidebar-nav button,
-  .sidebar-nav a {
-    letter-spacing: 0.01em;
-  }
-
-  .sidebar-nav a:active {
-    transform: scale(0.98);
-  }
-
-  /* ═══════════════════════════════════════════════════
-     RESEND BADGE STYLES
-     ═══════════════════════════════════════════════════ */
-  .badge-pill {
-    border-radius: 9999px;
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-  }
-
-  /* ═══════════════════════════════════════════════════
-     EDGE-OPS PREMIUM INTERACTION UTILITIES & ANIMATIONS
-     ═══════════════════════════════════════════════════ */
-
-  .text-brand { color: hsl(var(--brand)); }
-  .bg-brand { background-color: hsl(var(--brand)); }
-  .border-brand { border-color: hsl(var(--brand)); }
-
-  /* Glassmorphism card surfaces */
   .glass-card {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(15, 15, 20, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
-  .dark .glass-card {
-    background: rgba(20, 24, 33, 0.55);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.03);
+  
+  .glass-panel {
+    background: linear-gradient(145deg, rgba(30, 30, 35, 0.6) 0%, rgba(15, 15, 20, 0.8) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
-  /* Interactive hover lift effect */
+  /* ═══════════════════════════════════════════════════
+     INTERACTIVE HOVER LIFT (Framer-like smoothness)
+     ═══════════════════════════════════════════════════ */
   .hover-lift {
-    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s ease;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
   }
   .hover-lift:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.15);
-  }
-  .dark .hover-lift:hover {
-    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 32, 71, 0.05);
-    border-color: rgba(255, 32, 71, 0.15);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 92, 53, 0.1);
+    border-color: rgba(255, 92, 53, 0.3);
   }
 
   /* Shimmer sweep animation */
@@ -369,8 +153,8 @@
     background-image: linear-gradient(
       90deg,
       rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.08) 20%,
-      rgba(255, 255, 255, 0.15) 60%,
+      rgba(255, 255, 255, 0.05) 20%,
+      rgba(255, 255, 255, 0.1) 60%,
       rgba(255, 255, 255, 0) 100%
     );
     transition: transform 0.5s ease;
@@ -380,86 +164,21 @@
     transition: transform 0.8s ease;
   }
 
-  /* Pulsing status glow */
-  .pulse-glow-teal {
-    animation: pulse-glow 2s infinite ease-in-out;
+  /* ═══════════════════════════════════════════════════
+     CUSTOM SCROLLBAR
+     ═══════════════════════════════════════════════════ */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
   }
-
-  /* Staggered lists */
-  .stagger-1 { animation-delay: 60ms; }
-  .stagger-2 { animation-delay: 120ms; }
-  .stagger-3 { animation-delay: 180ms; }
-  .stagger-4 { animation-delay: 240ms; }
-  .stagger-5 { animation-delay: 300ms; }
-  .stagger-6 { animation-delay: 360ms; }
-  .stagger-7 { animation-delay: 420ms; }
-  .stagger-8 { animation-delay: 480ms; }
-
-  .animated-mesh {
-    --brand: 0 84% 60%;
-    --ring: 0 84% 60%;
-    background-color: #f8fafc;
-    background-image: 
-      radial-gradient(at 10% 20%, rgba(255, 32, 71, 0.08) 0px, transparent 50%),
-      radial-gradient(at 90% 10%, rgba(255, 92, 53, 0.08) 0px, transparent 50%),
-      radial-gradient(at 50% 80%, rgba(255, 197, 61, 0.05) 0px, transparent 50%);
-    background-size: 200% 200%;
-    animation: mesh-shift 15s ease infinite;
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
-
-  .dark .animated-mesh {
-    --brand: 0 84% 60%;
-    --ring: 0 84% 60%;
-    background-color: #0c0f16;
-    background-image: 
-      radial-gradient(at 10% 20%, rgba(255, 32, 71, 0.15) 0px, transparent 50%),
-      radial-gradient(at 90% 10%, rgba(255, 92, 53, 0.15) 0px, transparent 50%),
-      radial-gradient(at 50% 80%, rgba(255, 197, 61, 0.08) 0px, transparent 50%);
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
   }
-
-  /* Keyframe Animations */
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes fadeInScale {
-    from { opacity: 0; transform: scale(0.96); }
-    to { opacity: 1; transform: scale(1); }
-  }
-
-  @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-16px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-
-  @keyframes mesh-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-
-  @keyframes pulse-glow {
-    0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 0 0 rgba(255, 32, 71, 0.4); }
-    50% { transform: scale(1.08); opacity: 1; box-shadow: 0 0 12px 4px rgba(255, 32, 71, 0.2); }
-  }
-
-  /* Animation Classes */
-  .animate-fade-in-up {
-    animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-  .animate-fade-in-scale {
-    animation: fadeInScale 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-  .animate-slide-in-left {
-    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-  .animate-float {
-    animation: float 4s ease-in-out infinite;
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }

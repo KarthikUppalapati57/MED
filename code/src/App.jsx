@@ -3,7 +3,8 @@ import { Toaster as SonnerToaster, toast } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import OnboardingPage from './pages/OnboardingPage';
@@ -29,9 +30,27 @@ const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const LayoutWrapper = ({ children, currentPageName }) => Layout ?
-  <Layout currentPageName={currentPageName}>{children}</Layout>
-  : <>{children}</>;
+const pageVariants = {
+  initial: { opacity: 0, y: 16, filter: 'blur(8px)', scale: 0.98 },
+  in: { opacity: 1, y: 0, filter: 'blur(0px)', scale: 1 },
+  out: { opacity: 0, y: -16, filter: 'blur(8px)', scale: 1.02 }
+};
+
+const LayoutWrapper = ({ children, currentPageName }) => {
+  const content = (
+    <motion.div
+      initial="initial"
+      animate="in"
+      exit="out"
+      variants={pageVariants}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full h-full"
+    >
+      {children}
+    </motion.div>
+  );
+  return Layout ? <Layout currentPageName={currentPageName}>{content}</Layout> : content;
+};
 
 // ── Signup Page for Invited Users ──────────────────────────
 function SignupPage() {
@@ -579,6 +598,7 @@ function UpdatePasswordPage() {
 // ── Authenticated App ──────────────────────────────────────
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
+  const location = useLocation();
   
   // MFA Interceptor
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
@@ -674,9 +694,10 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/terms" element={<TermsOfService />} />
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        {/* Public routes */}
+        <Route path="/terms" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/cookies" element={<CookiePolicy />} />
       <Route path="/docs" element={<Documentation />} />
@@ -747,7 +768,8 @@ const AuthenticatedApp = () => {
           <Route path="*" element={<PageNotFound />} />
         </>
       )}
-    </Routes>
+      </Routes>
+    </AnimatePresence>
   );
 };
 
@@ -755,7 +777,7 @@ const AuthenticatedApp = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="system" storageKey="edgeops-theme">
+      <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="edgeops-theme">
         <AuthProvider>
           <QueryClientProvider client={queryClientInstance}>
             <Router>
