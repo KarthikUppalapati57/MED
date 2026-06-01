@@ -18,7 +18,7 @@ test.describe('Platform Organizations Management Workflow', () => {
 
     // Without a valid admin token, the app should bounce us to the login page 
     // or show an unauthorized message. This is a critical security validation (Section 1).
-    const isLogin = await page.locator('text=Sign in to EdgeOps').count() > 0;
+    const isLogin = await page.locator('text=Welcome to EdgeOps').count() > 0;
     const isUnauthorized = await page.locator('text=Unauthorized').count() > 0;
     
     // It must either redirect to login OR show unauthorized. It cannot show the Org Management dashboard.

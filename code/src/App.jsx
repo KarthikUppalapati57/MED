@@ -681,7 +681,7 @@ const AuthenticatedApp = () => {
         <>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </>
       ) : (needsPaymentVerification || needsOnboarding || needsAssignment) ? (
         <>

@@ -9,9 +9,8 @@ test.describe('Invoices Workflow (Section 7)', () => {
     // Wait for network idle
     await page.waitForLoadState('networkidle');
 
-    // Without a valid admin token, the app should bounce us to the login page 
-    // or show an unauthorized message.
-    const isLogin = await page.locator('text=Sign in to EdgeOps').count() > 0;
+    // Without a valid admin token, the app should bounce us to the login page.
+    const isLogin = await page.locator('text=Welcome to EdgeOps').count() > 0;
     const isUnauthorized = await page.locator('text=Unauthorized').count() > 0;
     
     expect(isLogin || isUnauthorized).toBeTruthy();

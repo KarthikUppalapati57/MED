@@ -8,7 +8,7 @@ test.describe('Dashboard Workflows (Section 5)', () => {
   test('Dashboard prevents unauthenticated data loading', async ({ page }) => {
     await page.waitForLoadState('networkidle');
 
-    const isLogin = await page.locator('text=Sign in to EdgeOps').count() > 0;
+    const isLogin = await page.locator('text=Welcome to EdgeOps').count() > 0;
     const isUnauthorized = await page.locator('text=Unauthorized').count() > 0;
     
     expect(isLogin || isUnauthorized).toBeTruthy();
