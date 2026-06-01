@@ -1,96 +1,104 @@
 import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Sparkles, Sphere, MeshDistortMaterial, Stars } from '@react-three/drei';
+import { Float, Sparkles, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 
-// A dynamic network particle cloud
-function NetworkCloud() {
-  const count = 400;
+// Highly interactive particle wave terrain
+function ParticleWave() {
+  const count = 2500; // 50x50 grid
   const mesh = useRef();
   
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  
+  // Create a grid of points
   const particles = useMemo(() => {
     const temp = [];
+    const size = Math.sqrt(count);
+    const spacing = 1.2;
+    const offset = (size * spacing) / 2;
+    
     for (let i = 0; i < count; i++) {
-      const t = Math.random() * 100;
-      const factor = 20 + Math.random() * 100;
-      const speed = 0.01 + Math.random() / 200;
-      const xFactor = -50 + Math.random() * 100;
-      const yFactor = -50 + Math.random() * 100;
-      const zFactor = -50 + Math.random() * 100;
-      temp.push({ t, factor, speed, xFactor, yFactor, zFactor, mx: 0, my: 0 });
+      const x = (i % size) * spacing - offset;
+      const z = Math.floor(i / size) * spacing - offset;
+      temp.push({ x, z, phase: Math.random() * Math.PI * 2 });
     }
     return temp;
   }, [count]);
 
   useFrame((state) => {
+    const time = state.clock.elapsedTime;
+    
+    // Calculate scroll progress (0 to ~1000s)
+    const scrollY = window.scrollY;
+    
+    // Smooth pointer data mapped to world space coordinates
+    const pointerX = state.pointer.x * 20; // Spread interaction area
+    const pointerY = state.pointer.y * -20; // Invert Y for correct mapping in 3D
+
     particles.forEach((particle, i) => {
-      let { t, factor, speed, xFactor, yFactor, zFactor } = particle;
-      t = particle.t += speed / 2;
-      const a = Math.cos(t) + Math.sin(t * 1) / 10;
-      const b = Math.sin(t) + Math.cos(t * 2) / 10;
-      const s = Math.cos(t);
+      // Base math wave animation (like an ocean of data)
+      const waveX = Math.sin(particle.x * 0.3 + time * 0.5 + particle.phase * 0.1);
+      const waveZ = Math.cos(particle.z * 0.3 + time * 0.5);
       
-      // Follow mouse slightly
-      particle.mx += (state.pointer.x * 5 - particle.mx) * 0.02;
-      particle.my += (state.pointer.y * 5 - particle.my) * 0.02;
+      let targetY = waveX * waveZ * 2.5;
       
-      dummy.position.set(
-        (particle.mx / 10) + a + xFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 1) * factor) / 10,
-        (particle.my / 10) + b + yFactor + Math.sin((t / 10) * factor) + (Math.cos(t * 2) * factor) / 10,
-        (particle.my / 10) + b + zFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 3) * factor) / 10
+      // Interactive mouse ripple: particles surge up when mouse is near
+      const distanceToMouse = Math.sqrt(
+        Math.pow(particle.x - pointerX, 2) + Math.pow(particle.z - pointerY, 2)
       );
-      dummy.scale.set(s, s, s);
-      dummy.rotation.set(s * 5, s * 5, s * 5);
-      dummy.updateMatrix();
       
+      if (distanceToMouse < 6) {
+         // Create a massive ripple peak if close to mouse
+         const ripple = Math.sin((6 - distanceToMouse) * Math.PI * 0.5);
+         targetY += ripple * 3;
+      }
+      
+      // Add global scroll offset effect (terrain lifts up dynamically on scroll)
+      targetY += (scrollY * 0.01);
+
+      dummy.position.set(particle.x, targetY, particle.z);
+      
+      // Scale based on height so peaks look larger
+      const scale = 0.15 + Math.max(0, targetY * 0.15);
+      dummy.scale.set(scale, scale, scale);
+      
+      // Rotate the individual geometries based on time
+      dummy.rotation.x = time * 0.5 + particle.phase;
+      dummy.rotation.y = time * 0.5 + particle.phase;
+      
+      dummy.updateMatrix();
       mesh.current.setMatrixAt(i, dummy.matrix);
     });
+    
     mesh.current.instanceMatrix.needsUpdate = true;
     
-    // Slow global rotation based on scroll
-    mesh.current.rotation.y = state.clock.elapsedTime * 0.05 + (window.scrollY * 0.001);
-    mesh.current.rotation.x = window.scrollY * 0.0005;
+    // Slowly rotate the entire grid
+    mesh.current.rotation.y = time * 0.02;
+    
+    // --- DRAMATIC CAMERA SCROLL TRACKING ---
+    // Start at z=20, fly *through* the terrain to z=5 as you scroll down
+    const targetCamZ = Math.max(5, 20 - (scrollY * 0.02));
+    // Start high, swoop down close to the terrain
+    const targetCamY = Math.max(2, 8 - (scrollY * 0.005));
+    
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, targetCamZ, 0.05);
+    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, targetCamY, 0.05);
+    state.camera.lookAt(0, 0, 0);
   });
 
   return (
     <instancedMesh ref={mesh} args={[null, null, count]}>
-      <icosahedronGeometry args={[0.15, 0]} />
-      <meshBasicMaterial color="#ff5c35" transparent opacity={0.4} wireframe />
+      {/* Octahedrons look incredible when wireframed */}
+      <octahedronGeometry args={[0.3, 0]} />
+      <meshStandardMaterial 
+        color="#14c6cb" 
+        emissive="#14c6cb"
+        emissiveIntensity={0.8}
+        wireframe={true}
+        transparent 
+        opacity={0.6} 
+      />
     </instancedMesh>
-  );
-}
-
-// Core Entity that reacts to scroll and pointer
-function CoreNode() {
-  const coreRef = useRef();
-  
-  useFrame((state) => {
-    coreRef.current.rotation.y = state.clock.elapsedTime * 0.2;
-    coreRef.current.rotation.z = state.clock.elapsedTime * 0.1;
-    
-    // Smoothly interpolate position based on mouse
-    coreRef.current.position.x = THREE.MathUtils.lerp(coreRef.current.position.x, state.pointer.x * 2, 0.05);
-    coreRef.current.position.y = THREE.MathUtils.lerp(coreRef.current.position.y, state.pointer.y * 2, 0.05);
-  });
-
-  return (
-    <Float speed={2} rotationIntensity={1} floatIntensity={2}>
-      <mesh ref={coreRef}>
-        <icosahedronGeometry args={[2.5, 4]} />
-        <MeshDistortMaterial 
-          color="#0a0a0f" 
-          emissive="#ff5c35"
-          emissiveIntensity={0.2}
-          wireframe={true}
-          distort={0.4} 
-          speed={2} 
-          roughness={0.2}
-          transparent
-          opacity={0.8}
-        />
-      </mesh>
-    </Float>
   );
 }
 
@@ -98,30 +106,32 @@ const InteractiveScene = () => {
   return (
     <div className="w-full h-full absolute inset-0 -z-10 bg-[#050508]">
       <Canvas 
-        camera={{ position: [0, 0, 10], fov: 45 }}
-        dpr={[1, 2]}
-        gl={{ antialias: true, alpha: false }}
+        camera={{ position: [0, 8, 20], fov: 60 }}
+        dpr={[1, 2]} // High DPI for crisp lines
+        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       >
         <color attach="background" args={['#050508']} />
         
-        {/* Ambient lighting */}
+        {/* Intense lighting for reflections */}
         <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} color="#ff5c35" />
-        <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#14c6cb" />
+        <spotLight position={[0, 20, 0]} penumbra={1} intensity={3} color="#ff5c35" castShadow />
+        <pointLight position={[-10, 5, -10]} intensity={4} color="#ff5c35" />
+        <pointLight position={[10, 5, 10]} intensity={2} color="#14c6cb" />
 
-        {/* Central Abstract Object */}
-        <CoreNode />
-
-        {/* Background Network Particles */}
-        <NetworkCloud />
+        {/* The massive interactive terrain */}
+        <Float speed={1.5} floatIntensity={0.5} rotationIntensity={0.1}>
+          <ParticleWave />
+        </Float>
         
-        {/* Floating Sparkles & Stars */}
-        <Sparkles count={200} scale={12} size={2} speed={0.4} color="#ff5c35" opacity={0.5} />
-        <Sparkles count={100} scale={15} size={1.5} speed={0.2} color="#14c6cb" opacity={0.3} />
-        <Stars radius={50} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
+        {/* Background elements (Orange & Teal sparkles) */}
+        <Sparkles count={400} scale={30} size={3} speed={0.8} color="#ff5c35" opacity={0.6} />
+        <Sparkles count={200} scale={30} size={2} speed={0.5} color="#14c6cb" opacity={0.4} />
         
-        {/* Fog to hide the edges */}
-        <fog attach="fog" args={['#050508', 10, 40]} />
+        {/* Deep starfield */}
+        <Stars radius={100} depth={50} count={8000} factor={4} saturation={0} fade speed={2} />
+        
+        {/* Fog to cut off the grid elegantly in the distance */}
+        <fog attach="fog" args={['#050508', 10, 30]} />
       </Canvas>
     </div>
   );
