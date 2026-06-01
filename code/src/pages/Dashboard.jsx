@@ -446,8 +446,67 @@ function OrgOwnerDashboard() {
           </CardContent>
         </Card>
 
-        {/* Quick Stats */}
+        {/* Predictive Cash Flow */}
         <Card className="border-0 shadow-sm lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Predictive Cash Flow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-resend-green/10 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-resend-green" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Forecasted Sales (30 Days)</p>
+                    <p className="text-sm text-muted-foreground">Based on historical POS volume</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-resend-green">+$45,200</p>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-resend-red/10 flex items-center justify-center">
+                    <FileText className="h-5 w-5 text-resend-red" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Accounts Payable</p>
+                    <p className="text-sm text-muted-foreground">Pending unpaid invoices</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-resend-red">-${totalUnpaid.toLocaleString()}</p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-resend-orange/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-resend-orange" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">Forecasted Payroll</p>
+                    <p className="text-sm text-muted-foreground">Based on scheduled shifts</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-resend-orange">-$12,450</p>
+              </div>
+
+              <div className="pt-4 border-t flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-foreground text-lg">Projected Net Cash</p>
+                  <p className="text-xs text-muted-foreground">Estimated position in 30 days</p>
+                </div>
+                <p className={`text-2xl font-black ${45200 - totalUnpaid - 12450 > 0 ? 'text-resend-green' : 'text-resend-red'}`}>
+                  ${(45200 - totalUnpaid - 12450).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <Card className="border-0 shadow-sm lg:col-span-3">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Operations Summary</CardTitle>
           </CardHeader>

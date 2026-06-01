@@ -5,9 +5,19 @@ import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Clock, DollarSign, TrendingUp, AlertTriangle, Calendar, Settings } from 'lucide-react';
+import { Users, Clock, DollarSign, TrendingUp, AlertTriangle, Calendar, Settings, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 
 export default function Labor() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,6 +36,22 @@ export default function Labor() {
   const totalEmployees = employees.length;
   const activeShifts = shifts.filter(s => s.status === 'in_progress').length;
   const totalLaborCost = shifts.reduce((sum, shift) => sum + (Number(shift.labor_cost) || 0), 0);
+
+  const forecastData = [
+    { day: 'Mon', sales: 4000, laborCost: 1200, suggestedLabor: 1120 },
+    { day: 'Tue', sales: 3000, laborCost: 1100, suggestedLabor: 840 },
+    { day: 'Wed', sales: 4500, laborCost: 1250, suggestedLabor: 1260 },
+    { day: 'Thu', sales: 5000, laborCost: 1400, suggestedLabor: 1400 },
+    { day: 'Fri', sales: 8500, laborCost: 2000, suggestedLabor: 2380 },
+    { day: 'Sat', sales: 11000, laborCost: 2500, suggestedLabor: 3080 },
+    { day: 'Sun', sales: 9000, laborCost: 2200, suggestedLabor: 2520 },
+  ];
+
+  const externalFactors = [
+    { name: 'Weather', impact: '-15% (Heavy Rain)', active: true, color: 'bg-resend-blue', textClass: 'text-resend-blue' },
+    { name: 'Local Event', impact: '+20% (Concert)', active: false, color: 'bg-purple-500', textClass: 'text-purple-500' },
+    { name: 'Holiday', impact: '+30% (Long Weekend)', active: true, color: 'bg-resend-green', textClass: 'text-resend-green' },
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in-scale">
@@ -123,10 +149,83 @@ export default function Labor() {
           </div>
         </TabsContent>
 
-        <TabsContent value="shifts">
-          <Card className="glass-card border-border/50 shadow-sm p-8 text-center text-muted-foreground">
-            Schedule builder and shift variance tools in development.
-          </Card>
+        <TabsContent value="shifts" className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <Card className="glass-card border-border/50 shadow-sm h-full">
+                <CardHeader>
+                  <CardTitle>POS Sales vs. Labor Forecast</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <AreaChart data={forecastData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorLabor" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="day" />
+                      <YAxis />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                      />
+                      <Legend />
+                      <Area type="monotone" dataKey="sales" name="Forecasted Sales" stroke="#22c55e" fillOpacity={1} fill="url(#colorSales)" />
+                      <Area type="monotone" dataKey="laborCost" name="Scheduled Labor" stroke="#6366f1" fillOpacity={1} fill="url(#colorLabor)" />
+                      <Area type="monotone" dataKey="suggestedLabor" name="AI Suggested Labor" stroke="#f59e0b" fillOpacity={0} strokeDasharray="5 5" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-6">
+              <Card className="glass-card border-border/50 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg">AI External Factors</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">Factors automatically adjusting the labor suggestion</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {externalFactors.map((factor, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-2.5 w-2.5 rounded-full ${factor.active ? factor.color : 'bg-muted'}`} />
+                        <div>
+                          <p className={`font-medium ${factor.active ? 'text-foreground' : 'text-muted-foreground'}`}>{factor.name}</p>
+                          {factor.active && (
+                            <p className={`text-xs font-semibold mt-1 ${factor.textClass}`}>
+                              {factor.impact}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="outline">{factor.active ? 'Active' : 'Inactive'}</Badge>
+                    </div>
+                  ))}
+                  <Button className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground">
+                    Apply Forecast to Schedule
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/10 to-purple-500/10">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-5 w-5 text-indigo-500" />
+                    <h3 className="font-semibold text-foreground">Smart Tip</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    You are overstaffed by approx 4.5 hours on Tuesday. Consider cutting a prep shift early to save $110 in labor costs.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="employees">

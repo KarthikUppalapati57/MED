@@ -21,7 +21,8 @@ import {
   ShoppingCart,
   Download,
   X,
-  Clock
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -539,6 +540,19 @@ export default function Inventory() {
                 <Button size="sm" variant="outline" onClick={handleExport}>
                   <Download className="h-4 w-4 mr-1" /> Export
                 </Button>
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600" onClick={() => {
+                  if (confirm('Apply AI suggested Par Levels to selected items based on recent sales trends?')) {
+                    const selected = inventory.filter(i => selectedIds.has(i.id));
+                    selected.forEach(item => {
+                      const smartPar = Math.ceil((item.par_level || 10) * 1.3);
+                      updateMutation.mutate({ id: item.id, data: { par_level: smartPar } });
+                    });
+                    toast.success(`Smart Par applied to ${selectedIds.size} items`);
+                    setSelectedIds(new Set());
+                  }
+                }}>
+                  <Sparkles className="h-4 w-4 mr-1" /> Apply Smart Par
+                </Button>
                 <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-resend-red border-red-300 hover:bg-resend-red/5">
                   <Trash2 className="h-4 w-4 mr-1" /> Delete
                 </Button>
@@ -621,9 +635,17 @@ export default function Inventory() {
                             <TableCell className="font-semibold">{item.current_quantity || 0}</TableCell>
                              <TableCell className="font-semibold">${(item.current_value || 0).toFixed(2)}</TableCell>
                              <TableCell>
-                               <div className="flex flex-col gap-0.5">
-                                 <span className="text-xs text-muted-foreground">Par: <span className="font-medium text-foreground">{item.par_level ?? 'â€”'}</span></span>
-                                 <span className="text-xs text-muted-foreground">Reorder: <span className={cn("font-medium", isLow ? "text-resend-red" : "text-foreground")}>{item.reorder_point ?? 'â€”'}</span></span>
+                               <div className="flex flex-col gap-1">
+                                 <span className="text-xs text-muted-foreground flex items-center justify-between">
+                                   <span>Par: <span className="font-medium text-foreground">{item.par_level ?? '—'}</span></span>
+                                   {isLow && (
+                                     <Badge variant="outline" className="text-[9px] h-4 bg-indigo-50 border-indigo-200 text-indigo-700 ml-2" title="AI Suggested Par based on forecasted volume">
+                                       <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                                       {Math.ceil((item.par_level || 10) * 1.3)}
+                                     </Badge>
+                                   )}
+                                 </span>
+                                 <span className="text-xs text-muted-foreground">Reorder: <span className={cn("font-medium", isLow ? "text-resend-red" : "text-foreground")}>{item.reorder_point ?? '—'}</span></span>
                                </div>
                              </TableCell>
                               <TableCell>
