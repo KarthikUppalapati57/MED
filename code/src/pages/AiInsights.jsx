@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -43,6 +44,7 @@ const severityIcons = {
 export default function AiInsights() {
   const { userProfile } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('unresolved');
 
@@ -163,15 +165,37 @@ export default function AiInsights() {
                       Type: {insight.insight_type}
                     </span>
                     {!insight.resolved ? (
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => resolveMutation.mutate(insight.id)}
-                        className="text-resend-green hover:text-resend-green hover:bg-resend-green/10 -mr-2"
-                      >
-                        <Check className="w-4 h-4 mr-1.5" />
-                        Resolve
-                      </Button>
+                      <div className="flex gap-2">
+                        {insight.metadata?.action && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              const actionType = insight.metadata.action.type;
+                              if (actionType === 'adjust_recipe_price') {
+                                navigate(`/MenuEngineering?tab=recipes`);
+                              } else if (actionType === 'create_order') {
+                                navigate(`/AutoOrdering?tab=place-order`);
+                              } else if (actionType === 'investigate_variance') {
+                                navigate(`/Performance?tab=usage`);
+                              } else {
+                                toast.info(`Action ${actionType} triggered`);
+                              }
+                            }}
+                          >
+                            {insight.metadata.action.label}
+                          </Button>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => resolveMutation.mutate(insight.id)}
+                          className="text-resend-green hover:text-resend-green hover:bg-resend-green/10 -mr-2"
+                        >
+                          <Check className="w-4 h-4 mr-1.5" />
+                          Resolve
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-xs font-medium text-resend-green flex items-center">
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1" />

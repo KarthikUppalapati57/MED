@@ -74,28 +74,35 @@ BEGIN
             IF new_margin < r.target_margin_percent THEN
                 -- Check if an alert already exists in the last 24h to avoid spam
                 IF NOT EXISTS (
-                    SELECT 1 FROM public.notifications 
-                    WHERE type = 'AI_alert' 
+                    SELECT 1 FROM public.ai_insights 
+                    WHERE insight_type = 'margin_alert' 
                       AND organization_id = r.organization_id 
                       AND metadata->>'recipe_id' = r.id::text
                       AND created_at > now() - interval '24 hours'
                 ) THEN
-                    INSERT INTO public.notifications (
+                    INSERT INTO public.ai_insights (
                         organization_id,
-                        type,
+                        insight_type,
+                        severity,
                         title,
-                        body,
+                        description,
                         metadata
                     ) VALUES (
                         r.organization_id,
-                        'AI_alert',
+                        'margin_alert',
+                        'high',
                         'Margin Alert: ' || r.name,
                         'The cost of ' || NEW.name || ' increased to $' || NEW.latest_price || '. The estimated margin for ' || r.name || ' has dropped to ' || round(new_margin, 1) || '%, which is below your target of ' || r.target_margin_percent || '%.',
                         jsonb_build_object(
                             'recipe_id', r.id, 
                             'product_id', NEW.id, 
                             'new_margin', new_margin,
-                            'target_margin', r.target_margin_percent
+                            'target_margin', r.target_margin_percent,
+                            'action', jsonb_build_object(
+                                'type', 'adjust_recipe_price',
+                                'label', 'Update Pricing',
+                                'payload', jsonb_build_object('recipe_id', r.id)
+                            )
                         )
                     );
                 END IF;

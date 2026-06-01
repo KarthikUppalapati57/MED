@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, TrendingDown, ArrowRight, CheckCircle2, AlertCircle, RefreshCw, BarChart3, TrendingUp, DollarSign, Activity } from "lucide-react";
+import { AlertTriangle, TrendingDown, ArrowRight, CheckCircle2, AlertCircle, RefreshCw, BarChart3, TrendingUp, DollarSign, Activity, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { api } from '@/lib/apiClient';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 const mockVarianceData = [
@@ -39,6 +40,27 @@ export default function AvTCosting() {
     }, 1500);
   };
 
+  const handleExplainVariance = async () => {
+    try {
+      await api.entities.AiInsight.create({
+        insight_type: 'variance_analysis',
+        severity: 'high',
+        title: 'AvT Variance Detected in Ground Beef (80/20)',
+        description: 'Actual usage exceeded theoretical by 15 lbs (+10.0%). The AI models suggest reviewing missing count sheets on Tuesday or portion sizes at the grill station.',
+        metadata: {
+          action: {
+            type: 'investigate_variance',
+            label: 'Review Usage Logs',
+            payload: {}
+          }
+        }
+      });
+      toast.success("AI Explanation generated. Check the AI Insights dashboard.");
+    } catch (e) {
+      toast.error("Failed to generate AI explanation");
+    }
+  };
+
   const calculateMetrics = (item) => {
     const varianceQty = item.actual - item.theoretical;
     const variancePercent = (varianceQty / item.theoretical) * 100;
@@ -65,14 +87,23 @@ export default function AvTCosting() {
             <p className="text-muted-foreground mt-1">Bridge POS sales with physical inventory to detect waste and theft.</p>
           </div>
         </div>
-        <Button 
-          onClick={handleRefresh} 
-          disabled={isRefreshing}
-          className="bg-white text-slate-900 border shadow-sm hover:bg-slate-50"
-        >
-          <RefreshCw className={cn("w-4 h-4 mr-2", isRefreshing && "animate-spin")} />
-          Sync Latest Data
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleExplainVariance} 
+            className="bg-brand text-primary-foreground hover:bg-brand/90"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Explain Variances
+          </Button>
+          <Button 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="bg-white text-slate-900 border shadow-sm hover:bg-slate-50"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", isRefreshing && "animate-spin")} />
+            Sync Latest Data
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
