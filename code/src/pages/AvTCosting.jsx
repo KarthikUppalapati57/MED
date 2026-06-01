@@ -9,15 +9,9 @@ import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
-const mockVarianceData = [
-  { id: 1, ingredient: 'Ground Beef (80/20)', theoretical: 150, actual: 165, unit: 'lbs', costPerUnit: 4.50, status: 'critical' },
-  { id: 2, ingredient: 'Cheddar Cheese', theoretical: 45, actual: 52, unit: 'lbs', costPerUnit: 3.20, status: 'warning' },
-  { id: 3, ingredient: 'Brioche Buns', theoretical: 500, actual: 510, unit: 'ea', costPerUnit: 0.50, status: 'good' },
-  { id: 4, ingredient: 'Romaine Lettuce', theoretical: 30, actual: 42, unit: 'heads', costPerUnit: 1.10, status: 'critical' },
-  { id: 5, ingredient: 'Tomatoes', theoretical: 40, actual: 45, unit: 'lbs', costPerUnit: 1.80, status: 'warning' },
-  { id: 6, ingredient: 'French Fries', theoretical: 200, actual: 235, unit: 'lbs', costPerUnit: 2.10, status: 'critical' },
-  { id: 7, ingredient: 'Ketchup', theoretical: 10, actual: 11, unit: 'gal', costPerUnit: 8.50, status: 'good' },
-];
+import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { supabase } from '@/lib/supabaseClient';
+import { format, subDays } from 'date-fns';
 
 const trendData = [
   { day: 'Mon', theoretical: 850, actual: 920 },
@@ -32,12 +26,26 @@ const trendData = [
 export default function AvTCosting() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = () => {
+  const startDate = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+  const endDate = format(new Date(), 'yyyy-MM-dd');
+
+  const { data: varianceData = [], refetch } = useAuthQuery({
+    queryKey: ['avt_variance', startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_avt_variance_report', {
+        p_start_date: startDate,
+        p_end_date: endDate
+      });
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success("AvT metrics updated from latest POS and Inventory data");
-    }, 1500);
+    await refetch();
+    setIsRefreshing(false);
+    toast.success("AvT metrics updated from latest POS and Inventory data");
   };
 
   const handleExplainVariance = async () => {
@@ -68,7 +76,7 @@ export default function AvTCosting() {
     return { varianceQty, variancePercent, varianceCost };
   };
 
-  const topBleeders = mockVarianceData
+  const topBleeders = varianceData
     .map(item => ({ ...item, ...calculateMetrics(item) }))
     .sort((a, b) => b.varianceCost - a.varianceCost)
     .slice(0, 5);
@@ -227,7 +235,7 @@ export default function AvTCosting() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockVarianceData.map((item) => {
+              {varianceData.map((item) => {
                 const metrics = calculateMetrics(item);
                 return (
                   <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">

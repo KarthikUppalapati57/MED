@@ -44,6 +44,8 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -119,6 +121,14 @@ export default function Recipes() {
     }
     return map;
   }, [products]);
+
+  const recipesMap = React.useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < recipes.length; i++) {
+      map.set(recipes[i].id, recipes[i]);
+    }
+    return map;
+  }, [recipes]);
 
   const stats = React.useMemo(() => {
     const totalRecipes = recipes.length;
@@ -304,7 +314,8 @@ export default function Recipes() {
     setFormData({
       ...formData,
       ingredients: [...formData.ingredients, {
-        product_id: '',
+        product_id: null,
+        sub_recipe_id: null,
         product_name: '',
         quantity: 0,
         unit: 'ea',
@@ -316,22 +327,36 @@ export default function Recipes() {
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients];
-    newIngredients[index][field] = value;
     
-    // Update product info from selection
-    if (field === 'product_id') {
-      const product = productsMap.get(value);
-      if (product) {
-        newIngredients[index].product_name = product.name;
-        newIngredients[index].unit_cost = product.latest_price || 0;
-        newIngredients[index].total_cost = newIngredients[index].quantity * (product.latest_price || 0);
+    if (field === 'item_id') {
+      if (value.startsWith('product_')) {
+        const id = value.replace('product_', '');
+        const p = productsMap.get(id);
+        if (p) {
+          newIngredients[index].product_id = id;
+          newIngredients[index].sub_recipe_id = null;
+          newIngredients[index].product_name = p.name;
+          newIngredients[index].unit_cost = p.latest_price || 0;
+          newIngredients[index].total_cost = newIngredients[index].quantity * (p.latest_price || 0);
+        }
+      } else if (value.startsWith('recipe_')) {
+        const id = value.replace('recipe_', '');
+        const r = recipesMap.get(id);
+        if (r) {
+          newIngredients[index].sub_recipe_id = id;
+          newIngredients[index].product_id = null;
+          newIngredients[index].product_name = r.name;
+          newIngredients[index].unit_cost = r.cost_per_serving || 0;
+          newIngredients[index].total_cost = newIngredients[index].quantity * (r.cost_per_serving || 0);
+        }
       }
-    }
-    
-    // Update total cost
-    if (field === 'quantity' || field === 'unit_cost') {
-      newIngredients[index].total_cost = 
-        (newIngredients[index].quantity || 0) * (newIngredients[index].unit_cost || 0);
+    } else {
+      newIngredients[index][field] = value;
+      // Update total cost
+      if (field === 'quantity' || field === 'unit_cost') {
+        newIngredients[index].total_cost = 
+          (newIngredients[index].quantity || 0) * (newIngredients[index].unit_cost || 0);
+      }
     }
     
     setFormData({ ...formData, ingredients: newIngredients });
@@ -998,20 +1023,33 @@ export default function Recipes() {
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
-              {formData.ingredients.map((ing, idx) => (
+              {formData.ingredients.map((ing, idx) => {
+                const itemVal = ing.product_id ? `product_${ing.product_id}` : (ing.sub_recipe_id ? `recipe_${ing.sub_recipe_id}` : '');
+                return (
                 <div key={idx} className="flex gap-2 items-end">
                   <div className="flex-1">
                     <Select
-                      value={ing.product_id}
-                      onValueChange={(v) => updateIngredient(idx, 'product_id', v)}
+                      value={itemVal}
+                      onValueChange={(v) => updateIngredient(idx, 'item_id', v)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select product" />
+                        <SelectValue placeholder="Select ingredient" />
                       </SelectTrigger>
                       <SelectContent>
-                        {products.map(p => (
-                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          <SelectLabel>Raw Products</SelectLabel>
+                          {products.map(p => (
+                            <SelectItem key={`prod-${p.id}`} value={`product_${p.id}`}>{p.name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                        {recipes.length > 0 && (
+                          <SelectGroup>
+                            <SelectLabel>Prepared Recipes</SelectLabel>
+                            {recipes.map(r => (
+                              <SelectItem key={`rec-${r.id}`} value={`recipe_${r.id}`}>{r.name}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1033,7 +1071,7 @@ export default function Recipes() {
                     <Trash2 className="h-4 w-4 text-resend-red" />
                   </Button>
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* Labor */}
