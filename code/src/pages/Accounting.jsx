@@ -26,6 +26,11 @@ export default function Accounting() {
     queryFn: () => api.entities.ClosedPeriod.list('-start_date'),
   });
 
+  const { data: glMappings = [], isLoading: loadingGlMappings, refetch: refetchGlMappings } = useAuthQuery({
+    queryKey: ['gl_mappings'],
+    queryFn: () => api.entities.GlMapping.list('category'),
+  });
+
   const [activeTab, setActiveTab] = React.useState('dashboard');
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
@@ -107,6 +112,7 @@ export default function Accounting() {
           <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Dashboard</TabsTrigger>
           <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export</TabsTrigger>
           <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
+          <TabsTrigger value="gl-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">GL Mapping</TabsTrigger>
           <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
           <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
           <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
@@ -274,6 +280,50 @@ export default function Accounting() {
           <Card className="glass-card border-border/50 shadow-sm">
             <CardHeader><CardTitle>Reconciliation</CardTitle></CardHeader>
             <CardContent><p className="text-muted-foreground text-sm">Reconciliation module is currently under development.</p></CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="gl-mapping" className="space-y-6">
+          <Card className="glass-card border-border/50 shadow-sm">
+            <CardHeader>
+              <CardTitle>GL Accounts Mapping</CardTitle>
+              <CardDescription>Map inventory categories to General Ledger accounts for accounting sync.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingGlMappings ? (
+                <p className="text-sm text-muted-foreground">Loading GL mappings...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>GL Code</TableHead>
+                      <TableHead>GL Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {glMappings.map(mapping => (
+                      <TableRow key={mapping.id}>
+                        <TableCell className="font-medium capitalize">{mapping.category}</TableCell>
+                        <TableCell className="font-mono text-brand">{mapping.gl_code}</TableCell>
+                        <TableCell>{mapping.gl_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{mapping.description}</TableCell>
+                        <TableCell>
+                          <Button variant="outline" size="sm">Edit</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {glMappings.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No GL mappings found.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 

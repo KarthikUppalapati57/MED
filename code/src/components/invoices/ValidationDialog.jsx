@@ -98,7 +98,6 @@ export default function ValidationDialog({
 
         try {
           // 1. Duplicate Check
-          await new Promise(r => setTimeout(r, 800));
           let duplicateStatus = 'pass';
           if (invoice.invoice_number && invoice.vendor_name) {
             try {
@@ -118,20 +117,76 @@ export default function ValidationDialog({
           if (!isMounted) return;
           setResults(prev => ({ ...prev, duplicate_check: duplicateStatus }));
 
-          // 2. Fraud & Price
-          await new Promise(r => setTimeout(r, 600));
-          if (!isMounted) return;
-          setResults(prev => ({ ...prev, fraud_detection: 'pass' }));
-          
-          await new Promise(r => setTimeout(r, 600));
-          const priceStatus = (invoice.total_amount > 5000) ? 'warning' : 'pass';
-          if (!isMounted) return;
-          setResults(prev => ({ ...prev, price_deviation: priceStatus }));
+          // 2. Fraud & Price + 3. Delivery Match (3-Way Matching)
+          let fraudStatus = 'pass';
+          let priceStatus = (invoice.total_amount > 5000) ? 'warning' : 'pass';
+          let deliveryStatus = 'pass';
 
-          // 3. Delivery
-          await new Promise(r => setTimeout(r, 600));
+          if (invoice.vendor_name && invoice.line_items?.length > 0) {
+            try {
+              // Find recent POs for this vendor
+              const vendorOrders = await api.entities.AutoOrder.list('-created_at', { limit: 50 });
+              const recentPO = vendorOrders.find(o => 
+                o.vendor_name?.toLowerCase() === invoice.vendor_name.toLowerCase() && 
+                (o.status === 'received' || o.status === 'partially_received')
+              );
+
+              if (recentPO) {
+                // Get receiving log for this PO
+                const receivings = await api.entities.Receiving.filter({ order_id: recentPO.id });
+                const receipt = receivings[0];
+
+                if (receipt && receipt.items) {
+                  // Compare quantities
+                  const invoiceItemMap = {};
+                  invoice.line_items.forEach(i => {
+                    const desc = (i.description || i.item_name || i.product_name || '').toLowerCase().trim();
+                    if (desc) invoiceItemMap[desc] = i;
+                  });
+
+                  let hasMismatch = false;
+                  let hasPriceDeviation = false;
+
+                  receipt.items.forEach(receivedItem => {
+                    const itemName = (receivedItem.product_name || '').toLowerCase().trim();
+                    const invItem = invoiceItemMap[itemName];
+                    if (invItem) {
+                      // Invoice charges for more than what was received
+                      if ((invItem.quantity || 0) > (receivedItem.received_quantity || 0)) {
+                        hasMismatch = true; 
+                      }
+                      // Check price vs PO (allow 5% tolerance)
+                      const poPrice = parseFloat(receivedItem.cost_per_unit || receivedItem.price || 0);
+                      const invPrice = parseFloat(invItem.unit_price || 0);
+                      if (poPrice > 0 && invPrice > poPrice * 1.05) {
+                        hasPriceDeviation = true;
+                      }
+                    }
+                  });
+
+                  if (hasMismatch) deliveryStatus = 'fail';
+                  if (hasPriceDeviation) priceStatus = 'fail'; // Stronger than warning for 3-way match
+                } else {
+                  deliveryStatus = 'warning'; // No receiving log found
+                }
+              } else {
+                deliveryStatus = 'warning'; // No matching PO found
+              }
+            } catch (err) {
+              console.error("[Validation] 3-way matching error:", err);
+              deliveryStatus = 'warning';
+            }
+          } else {
+            deliveryStatus = 'warning'; // Not enough data to match
+          }
+
           if (!isMounted) return;
-          setResults(prev => ({ ...prev, delivery_match: 'pass' }));
+          setResults(prev => ({ 
+            ...prev, 
+            fraud_detection: fraudStatus,
+            price_deviation: priceStatus,
+            delivery_match: deliveryStatus 
+          }));
         } catch (err) {
           console.error("[Validation] Global failure:", err);
         } finally {

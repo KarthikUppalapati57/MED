@@ -101,6 +101,8 @@ export const api = {
     CountSession: createEntityClient('count_sessions'),
     ClosedPeriod: createEntityClient('closed_periods'),
     LocationGroup: createEntityClient('location_groups'),
+    GlMapping: createEntityClient('gl_mappings'),
+    VendorItemPrice: createEntityClient('vendor_item_prices'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

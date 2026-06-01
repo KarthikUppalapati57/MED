@@ -102,6 +102,11 @@ export default function AutoOrdering() {
     queryFn: () => api.entities.Vendor.list(),
   });
 
+  const { data: vendorPrices = [] } = useAuthQuery({
+    queryKey: ['vendor_item_prices'],
+    queryFn: () => api.entities.VendorItemPrice.list(),
+  });
+
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.AutoOrder.create(data),
     onSuccess: () => {
@@ -134,18 +139,48 @@ export default function AutoOrdering() {
         return;
       }
 
-      // Smart Purchasing simulation - replaces static thresholds with AI forecast
-      const generatedSuggestions = lowItems.map((item) => ({
+      const generatedSuggestions = [{
         type: 'smart_forecast',
-        description: `Forecasted spike for ${item.product_name} due to upcoming weekend trend.`,
-        impact: `Current stock: ${item.current_quantity || 0}. Adding 20% buffer to par level based on AI demand forecast.`,
-      }));
+        description: `Forecasted spike for upcoming weekend trend.`,
+        impact: `Adding 20% buffer to par level based on AI demand forecast.`,
+      }];
 
-      setSuggestions(generatedSuggestions);
+      // Group items by cheapest vendor
+      const vendorOrdersMap = {};
 
-      const orderItems = lowItems.map(item => {
+      lowItems.forEach(item => {
         const smartQuantity = Math.ceil(((item.par_level || 10) - (item.current_quantity || 0)) * 1.2);
-        return {
+        
+        // Find cheapest vendor for this item
+        let bestPrice = item.unit_cost || 0;
+        let bestVendorName = item.vendor_name || 'Preferred Vendor';
+        
+        const itemPrices = vendorPrices.filter(vp => 
+          vp.product_name.toLowerCase() === item.product_name.toLowerCase() && vp.is_approved_supplier
+        );
+
+        if (itemPrices.length > 0) {
+          const cheapest = itemPrices.reduce((prev, curr) => prev.price < curr.price ? prev : curr);
+          bestPrice = parseFloat(cheapest.price);
+          const v = vendors.find(v => v.id === cheapest.vendor_id);
+          if (v) {
+            bestVendorName = v.name;
+          }
+          
+          if (!generatedSuggestions.some(s => s.description.includes(item.product_name))) {
+            generatedSuggestions.push({
+              type: 'price_comparison',
+              description: `Cheapest supplier chosen for ${item.product_name}`,
+              impact: `Selected ${bestVendorName} at $${bestPrice.toFixed(2)}/${item.current_unit}.`
+            });
+          }
+        }
+
+        if (!vendorOrdersMap[bestVendorName]) {
+          vendorOrdersMap[bestVendorName] = [];
+        }
+
+        vendorOrdersMap[bestVendorName].push({
           product_id: item.product_id,
           product_name: item.product_name,
           current_stock: item.current_quantity || 0,
@@ -153,25 +188,31 @@ export default function AutoOrdering() {
           suggested_quantity: smartQuantity,
           approved_quantity: smartQuantity,
           unit: item.current_unit || 'ea',
-          unit_price: item.unit_cost || 0,
-          total_price: smartQuantity * (item.unit_cost || 0)
-        };
+          unit_price: bestPrice,
+          total_price: smartQuantity * bestPrice
+        });
       });
 
-      const order = {
-        order_number: `ORD-${Date.now()}`,
-        vendor_name: 'Multiple Vendors',
-        status: 'pending_approval',
-        items: orderItems,
-        total_amount: orderItems.reduce((sum, i) => sum + i.total_price, 0),
-        external_suggestions: generatedSuggestions,
-        chat_history: []
-      };
+      setSuggestions(generatedSuggestions);
 
-      await createMutation.mutateAsync(order);
-      toast.success('Smart Order generated based on AI demand forecasts');
+      // Create an order for each vendor
+      const orderPromises = Object.entries(vendorOrdersMap).map(([vendorName, items]) => {
+        const order = {
+          order_number: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          vendor_name: vendorName,
+          status: 'pending_approval',
+          items: items,
+          total_amount: items.reduce((sum, i) => sum + i.total_price, 0),
+          external_suggestions: generatedSuggestions,
+          chat_history: []
+        };
+        return createMutation.mutateAsync(order);
+      });
+
+      await Promise.all(orderPromises);
+      toast.success('Smart Orders generated and routed to cheapest vendors');
     } catch (error) {
-      toast.error('Failed to generate order');
+      toast.error('Failed to generate orders');
     } finally {
       setGenerating(false);
     }
