@@ -395,11 +395,19 @@ export const AuthProvider = ({ children }) => {
       }, 500);
     };
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
-        
-        const currentUser = session?.user ?? null;
+    let subscription = null;
+
+    const initAuth = async () => {
+      // Ensure session is fully restored from storage before handling auth state
+      await supabase.auth.getSession();
+      
+      if (!isMounted) return;
+
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!isMounted) return;
+          
+          const currentUser = session?.user ?? null;
         
         try {
           if (event === 'PASSWORD_RECOVERY') {
@@ -575,6 +583,11 @@ export const AuthProvider = ({ children }) => {
         }
       }
     );
+    
+      subscription = data;
+    };
+    
+    initAuth();
 
     // Safety net: if INITIAL_SESSION + profile loading hasn't completed
     // within 3s, force loading to complete so the UI isn't stuck.
