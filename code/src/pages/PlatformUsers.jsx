@@ -6,20 +6,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Search, Loader2, ShieldAlert } from "lucide-react";
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { Button } from "@/components/ui/button";
+import { Users, Search, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function PlatformUsers() {
   const { user, role: userRole } = useAuth();
   const authChecked = !!user;
   const [searchQuery, setSearchQuery] = useState("");
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDelete = async (userId) => {
+    if (!window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) return;
+    
+    setDeletingId(userId);
+    try {
+      const { error } = await supabase.rpc('admin_delete_user', { target_user_id: userId });
+      if (error) throw error;
+      toast.success("User deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['platform-all-users'] });
+    } catch (err) {
+      console.error("Delete user error:", err);
+      toast.error(err.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const { data: profiles = [], isLoading: isLoadingProfiles } = useAuthQuery({
     queryKey: ['platform-all-users'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
+        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id")
+        .neq("role", "platform_admin");
       if (error) throw error;
       return data || [];
     },
@@ -149,6 +172,7 @@ export default function PlatformUsers() {
                 <TableHead className="text-[11px] font-bold">ORGANIZATION</TableHead>
                 <TableHead className="text-[11px] font-bold">BRAND / LOCATION</TableHead>
                 <TableHead className="text-[11px] font-bold">JOINED</TableHead>
+                <TableHead className="text-[11px] font-bold text-right">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,6 +223,18 @@ export default function PlatformUsers() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(u.id)}
+                      disabled={deletingId === u.id || u.id === user.id}
+                      className="text-resend-red hover:bg-resend-red/10 hover:text-resend-red transition-colors"
+                      title={u.id === user.id ? "Cannot delete yourself" : "Delete user"}
+                    >
+                      {deletingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
