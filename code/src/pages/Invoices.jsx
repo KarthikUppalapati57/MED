@@ -16,7 +16,8 @@ import {
   MoreVertical,
   Upload,
   Trash2,
-  Save
+  Save,
+  Mail
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ import { cn } from "@/lib/utils";
 import InvoiceUploader from '../components/invoices/InvoiceUploader';
 import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
+import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
 
 const statusColors = {
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
@@ -68,6 +70,7 @@ const statusColors = {
 
 export default function Invoices() {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [emailConfigOpen, setEmailConfigOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -678,10 +681,16 @@ export default function Invoices() {
           <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
           <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
         </div>
-        <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Invoice
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setEmailConfigOpen(true)} className="bg-white hover:bg-slate-50 border-slate-200">
+            <Mail className="h-4 w-4 mr-2 text-primary" />
+            Email Settings
+          </Button>
+          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Invoice
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -932,6 +941,12 @@ export default function Invoices() {
         invoice={editingInvoice}
         onSave={handleSaveValidated}
         onCancel={() => setValidationOpen(false)}
+      />
+
+      {/* Email Ingestion Dialog */}
+      <EmailIngestionDialog 
+        open={emailConfigOpen} 
+        onClose={() => setEmailConfigOpen(false)} 
       />
     </div>
   );
