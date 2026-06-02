@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { captureError } from '@/lib/errorMonitor';
 
 /**
@@ -25,7 +25,9 @@ export default class ErrorBoundary extends React.Component {
       const hasReloaded = sessionStorage.getItem('chunk_failed_reload');
       if (!hasReloaded) {
         sessionStorage.setItem('chunk_failed_reload', 'true');
-        window.location.reload();
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('t', Date.now().toString());
+        window.location.href = newUrl.toString();
         return;
       }
     } else {

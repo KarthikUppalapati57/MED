@@ -384,7 +384,8 @@ function OrgOwnerDashboard() {
       lowStockItems: lowStock,
       activeModules: active,
       spendByCategory: spend,
-      pieData: pie
+      pieData: pie,
+      benchmarks: []
     };
   }, [invoices, inventory, organization]);
 
