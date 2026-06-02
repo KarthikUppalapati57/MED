@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
-import EdgeOpsLogo from '@/components/EdgeOpsLogo';
+import RestopsLogo from '@/components/RestopsLogo';
 import scannerImg from '../assets/scanner.png';
 import { 
   Menu, 
@@ -154,7 +154,7 @@ export default function LandingPage() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <EdgeOpsLogo className="h-8" />
+            <RestopsLogo className="h-8" />
             
             <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-white/60 uppercase">
               <a href="#features" className="hover:text-white transition-colors">Infrastructure</a>
@@ -224,7 +224,7 @@ export default function LandingPage() {
               transition={{ duration: 1, delay: 0.8 }}
               className="max-w-xl text-lg sm:text-xl text-white/50 mb-12 leading-relaxed font-medium tracking-wide"
             >
-              EdgeOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
+              Restops delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
             </motion.p>
 
             <motion.div 
@@ -384,8 +384,8 @@ export default function LandingPage() {
         <footer className="relative py-20 border-t border-white/10 bg-[#050508]/60 backdrop-blur-xl z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-              <EdgeOpsLogo className="h-8 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
-              <p className="text-[9px] text-white/30 font-bold tracking-[5px] uppercase">© 2026 EDGEOPS INC. BUILT FOR SCALE.</p>
+              <RestopsLogo className="h-8 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
+              <p className="text-[9px] text-white/30 font-bold tracking-[5px] uppercase">© 2026 RESTOPS INC. BUILT FOR SCALE.</p>
               <div className="flex gap-8 text-[9px] font-bold uppercase tracking-[4px] text-white/30">
                   <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
                   <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>

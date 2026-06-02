@@ -307,7 +307,7 @@ export default function PlatformAdmin() {
         to_email: inviteEmail,
         to_name: inviteEmail.split('@')[0],
         role: "Organization Owner",
-        org_name: "MEVS Platform",
+        org_name: "Restops Platform",
         invite_link: link
       });
 
@@ -376,11 +376,11 @@ export default function PlatformAdmin() {
       const emailResult = await sendEmail({
         to_email: request.email,
         to_name: request.full_name,
-        subject: "Your MEVS Demo Request has been Approved!",
+        subject: "Your Restops Demo Request has been Approved!",
         message: `
 Hi ${request.full_name},
 
-We are thrilled to inform you that your request for a MEVS system walkthrough and demo has been approved! 
+We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
 We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
 
@@ -392,7 +392,7 @@ This secure registration link will remain active for 7 days. If you have any que
 Welcome to the future of multi-tenant enterprise management!
 
 Best regards,
-The MEVS Platform Team
+The Restops Platform Team
         `.trim()
       });
 
@@ -439,20 +439,20 @@ The MEVS Platform Team
       const emailResult = await sendEmail({
         to_email: request.email,
         to_name: request.full_name,
-        subject: "Update on your MEVS Demo Request",
+        subject: "Update on your Restops Demo Request",
         message: `
 Hi ${request.full_name},
 
-Thank you for your interest in the MEVS platform and requesting a demo walkthrough.
+Thank you for your interest in the Restops platform and requesting a demo walkthrough.
 
 After reviewing your company profile and current requirements, we regret to inform you that we are unable to approve your demo request at this time. Our current onboarding pipeline is highly curated to ensure high service standards for matching enterprise profiles.
 
 We will keep your details on file and reach out if our capacity opens up or if there is a better alignment in the future.
 
-Thank you again for your time and interest in MEVS.
+Thank you again for your time and interest in Restops.
 
 Best regards,
-The MEVS Platform Team
+The Restops Platform Team
         `.trim()
       });
 
@@ -495,11 +495,11 @@ The MEVS Platform Team
         const emailResult = await sendEmail({
           to_email: request.email,
           to_name: request.full_name,
-          subject: "Your MEVS Demo Request has been Approved!",
+          subject: "Your Restops Demo Request has been Approved!",
           message: `
 Hi ${request.full_name},
 
-We are thrilled to inform you that your request for a MEVS system walkthrough and demo has been approved! 
+We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
 We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
 
@@ -511,7 +511,7 @@ This secure registration link will remain active for 7 days. If you have any que
 Welcome to the future of multi-tenant enterprise management!
 
 Best regards,
-The MEVS Platform Team
+The Restops Platform Team
           `.trim()
         });
 
@@ -524,20 +524,20 @@ The MEVS Platform Team
         const emailResult = await sendEmail({
           to_email: request.email,
           to_name: request.full_name,
-          subject: "Update on your MEVS Demo Request",
+          subject: "Update on your Restops Demo Request",
           message: `
 Hi ${request.full_name},
 
-Thank you for your interest in the MEVS platform and requesting a demo walkthrough.
+Thank you for your interest in the Restops platform and requesting a demo walkthrough.
 
 After reviewing your company profile and current requirements, we regret to inform you that we are unable to approve your demo request at this time. Our current onboarding pipeline is highly curated to ensure high service standards for matching enterprise profiles.
 
 We will keep your details on file and reach out if our capacity opens up or if there is a better alignment in the future.
 
-Thank you again for your time and interest in MEVS.
+Thank you again for your time and interest in Restops.
 
 Best regards,
-The MEVS Platform Team
+The Restops Platform Team
           `.trim()
         });
 

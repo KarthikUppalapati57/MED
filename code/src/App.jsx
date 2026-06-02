@@ -369,7 +369,7 @@ function LoginPage() {
             <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground">
-            Welcome to EdgeOps
+            Welcome to Restops
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Sign in with your credentials
@@ -617,13 +617,13 @@ const AuthenticatedApp = () => {
   const isDeviceTrusted = React.useMemo(() => {
     if (!user || !needsMFAChallenge) return false;
     try {
-      const raw = localStorage.getItem('edgeops_mfa_trust');
+      const raw = localStorage.getItem('restops_mfa_trust');
       if (!raw) return false;
       const token = JSON.parse(raw);
       // Validate: correct user, not expired
       if (token.userId !== user.id) return false;
       if (Date.now() > token.expiresAt) {
-        localStorage.removeItem('edgeops_mfa_trust');
+        localStorage.removeItem('restops_mfa_trust');
         return false;
       }
       return true;
@@ -777,7 +777,7 @@ const AuthenticatedApp = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="edgeops-theme">
+      <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="restops-theme">
         <AuthProvider>
           <QueryClientProvider client={queryClientInstance}>
             <Router>

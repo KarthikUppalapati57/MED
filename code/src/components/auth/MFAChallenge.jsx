@@ -57,7 +57,7 @@ export function MFAChallenge() {
                 trustedAt: Date.now(),
                 expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
               };
-              localStorage.setItem('edgeops_mfa_trust', JSON.stringify(trustToken));
+              localStorage.setItem('restops_mfa_trust', JSON.stringify(trustToken));
             }
           }
         } catch (e) {

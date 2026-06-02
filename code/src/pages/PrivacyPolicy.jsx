@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
         </Button>
         <div className="flex items-center gap-2">
           <Lock className="w-5 h-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">MEVS Platform</span>
+          <span className="font-bold text-slate-900">Restops Platform</span>
         </div>
       </nav>
 
@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
               <section>
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">2. How We Use Your Information</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  We use your data solely to provide, maintain, and improve the MEVS platform. We do not sell your personal or enterprise data to third parties. Uploaded financial documents are processed securely and isolated per organization.
+                  We use your data solely to provide, maintain, and improve the Restops platform. We do not sell your personal or enterprise data to third parties. Uploaded financial documents are processed securely and isolated per organization.
                 </p>
               </section>
 

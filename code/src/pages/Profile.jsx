@@ -143,7 +143,7 @@ export default function Profile() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `mevs_data_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `restops_data_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();

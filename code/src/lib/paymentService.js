@@ -63,8 +63,8 @@ export function getPayPalClientId() {
 
 // ── Bank Transfer ───────────────────────────────────────────
 export const BANK_DETAILS = {
-  bank_name: 'EdgeOps Business Account',
-  account_name: 'EdgeOps Restaurant Solutions Inc.',
+  bank_name: 'Restops Business Account',
+  account_name: 'Restops Restaurant Solutions Inc.',
   account_number: '****7890',
   routing_number: '021000021',
   swift_code: 'CHASUS33',

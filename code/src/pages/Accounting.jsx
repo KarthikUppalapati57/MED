@@ -247,7 +247,7 @@ export default function Accounting() {
               <div className="flex flex-col md:flex-row gap-6 items-start justify-between">
                 <div className="space-y-4 max-w-xl">
                   <p className="text-sm text-muted-foreground">
-                    Closing a period will lock all invoices, inventory counts, and waste logs prior to the end date. This ensures that what is exported to QuickBooks or Sage Intacct perfectly matches the data in MEVS, ensuring full enterprise audit readiness.
+                    Closing a period will lock all invoices, inventory counts, and waste logs prior to the end date. This ensures that what is exported to QuickBooks or Sage Intacct perfectly matches the data in Restops, ensuring full enterprise audit readiness.
                   </p>
                   <Button onClick={() => setCloseDialogOpen(true)} className="bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20">
                     <Calendar className="w-4 h-4 mr-2" />
@@ -362,7 +362,7 @@ export default function Accounting() {
         <TabsContent value="vendor-mapping" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
             <CardHeader><CardTitle>Vendor Mapping</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">Vendor Mapping module is currently under development. Map MEVS vendors to your accounting platform vendor IDs.</p></CardContent>
+            <CardContent><p className="text-muted-foreground text-sm">Vendor Mapping module is currently under development. Map Restops vendors to your accounting platform vendor IDs.</p></CardContent>
           </Card>
         </TabsContent>
 

@@ -24,8 +24,8 @@ import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// â”€â”€â”€ MEVS Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const MEVS_ROLES = {
+// â”€â”€â”€ Restops Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const Restops_ROLES = {
   org_owner:        { label: "Organization Owner", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
   branch_manager:   { label: "Branch Manager",     color: "purple", description: "Manages multiple locations and local team members", icon: Building2 },
   location_manager: { label: "Location Manager",   color: "blue",   description: "Manages daily operations, inventory, and approvals", icon: UserCheck },
@@ -42,7 +42,7 @@ const ROLE_COLOR_CLASSES = {
   slate:  { badge: "bg-secondary text-muted-foreground border-border",    dot: "bg-slate-400" },
 };
 
-// â”€â”€â”€ MEVS Permission Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Restops Permission Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PAGE_PERMISSION_GROUPS = [
   {
     key: "core", label: "General", icon: <LayoutDashboard className="w-4 h-4" />,
@@ -88,7 +88,7 @@ const ACCESS_LEVELS = {
   none: { label: "None", chipClass: "bg-secondary text-muted-foreground border-border",       btnActive: "bg-secondary text-muted-foreground border-transparent" },
 };
 
-// â”€â”€â”€ Signing Authority Levels (Adapted for MEVS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ Signing Authority Levels (Adapted for Restops) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SIGNING_LEVELS = [
   { value: 0, label: "None",         badgeClass: "bg-secondary text-muted-foreground border-border" },
   { value: 1, label: "L1 â€“ Review",  badgeClass: "bg-sky-100 text-sky-700 border-sky-200" },
@@ -271,7 +271,7 @@ function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }
 // â”€â”€â”€ RoleBadges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function RoleBadges({ member, maxVisible = 2 }) {
   const role = member.role || member.capabilities?.role || 'ground_staff';
-  const roleDef = MEVS_ROLES[role] || MEVS_ROLES.ground_staff;
+  const roleDef = Restops_ROLES[role] || Restops_ROLES.ground_staff;
   const colors = ROLE_COLOR_CLASSES[roleDef.color] || ROLE_COLOR_CLASSES.slate;
   const Icon = roleDef.icon;
   return (
@@ -351,7 +351,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
     setSaving(false);
   };
 
-  const roleDef = MEVS_ROLES[form.role] || MEVS_ROLES.ground_staff;
+  const roleDef = Restops_ROLES[form.role] || Restops_ROLES.ground_staff;
   const statusDef = STATUS_CONFIG[form.status] || STATUS_CONFIG.active;
   const RoleIcon = roleDef.icon;
   const StatusIcon = statusDef.icon;
@@ -427,7 +427,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">System Role</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(MEVS_ROLES)
+                  {Object.entries(Restops_ROLES)
                     .filter(([r]) => r !== 'platform_admin')
                     .map(([r, def]) => {
                     const isSelected = form.role === r;
@@ -619,8 +619,8 @@ function InviteDialog({ open, onClose, orgId }) {
         setGeneratedLink(link);
 
         // Send invitation email via EmailJS
-        const orgName = userProfile?.organization?.name || 'MEVS';
-        const roleDef = MEVS_ROLES[role];
+        const orgName = userProfile?.organization?.name || 'Restops';
+        const roleDef = Restops_ROLES[role];
         sendInvitationEmail({
           to_email: email,
           to_name: email.split('@')[0],
@@ -708,7 +708,7 @@ function InviteDialog({ open, onClose, orgId }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border">
-                {Object.entries(MEVS_ROLES)
+                {Object.entries(Restops_ROLES)
                   .filter(([r]) => r !== 'platform_admin')
                   .map(([r, def]) => (
                   <SelectItem key={r} value={r} className="rounded-xl font-bold py-2.5">
@@ -867,7 +867,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
                     {parsed.map((row, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-xs">{row.email}</TableCell>
-                        <TableCell className="text-xs">{MEVS_ROLES[row.role]?.label || row.role || 'Ground Staff'}</TableCell>
+                        <TableCell className="text-xs">{Restops_ROLES[row.role]?.label || row.role || 'Ground Staff'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -948,9 +948,9 @@ export default function UserManagement() {
     enabled: !!activeOrgId,
   });
 
-  // Merge MEVS_ROLES and customRoles
+  // Merge Restops_ROLES and customRoles
   const ALL_ROLES = useMemo(() => {
-    const merged = { ...MEVS_ROLES };
+    const merged = { ...Restops_ROLES };
     customRoles.forEach(r => {
       merged[r.name] = {
         label: r.name,
@@ -991,7 +991,7 @@ export default function UserManagement() {
       } catch { /* fall through */ }
 
       if (finalUsers.length === 0) {
-        // Fallback: profiles table (MEVS-style)
+        // Fallback: profiles table (Restops-style)
         let q = supabase
           .from('profiles')
           .select('*')
@@ -1171,7 +1171,7 @@ export default function UserManagement() {
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border shadow-xl">
                 <SelectItem value="all">All Access Levels</SelectItem>
-                {Object.entries(MEVS_ROLES).map(([r, def]) => (
+                {Object.entries(Restops_ROLES).map(([r, def]) => (
                   <SelectItem key={r} value={r}>{def.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -1227,7 +1227,7 @@ export default function UserManagement() {
                 ) : (
                   filteredMembers.map((member) => {
                     const memberRole = member.role || member.capabilities?.role || 'ground_staff';
-                    const roleDef = MEVS_ROLES[memberRole] || MEVS_ROLES.ground_staff;
+                    const roleDef = Restops_ROLES[memberRole] || Restops_ROLES.ground_staff;
                     const status = member.status || 'active';
                     const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
                     const StatusIcon = statusCfg.icon;

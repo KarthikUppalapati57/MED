@@ -392,7 +392,7 @@ export default function Layout({ children, currentPageName }) {
             <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(20,198,203,0.35)]">
               <Package className="h-4.5 w-4.5 text-black" />
             </div>
-            <span className="text-lg font-bold text-foreground tracking-tight group-hover:text-brand transition-colors duration-200">EdgeOps</span>
+            <span className="text-lg font-bold text-foreground tracking-tight group-hover:text-brand transition-colors duration-200">Restops</span>
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}

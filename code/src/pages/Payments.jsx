@@ -731,7 +731,7 @@ export default function Payments() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">Platform Subscription</h2>
-                  <p className="text-muted-foreground mt-1">Manage your MEVS workspace plan and billing</p>
+                  <p className="text-muted-foreground mt-1">Manage your Restops workspace plan and billing</p>
                 </div>
               </div>
             </div>

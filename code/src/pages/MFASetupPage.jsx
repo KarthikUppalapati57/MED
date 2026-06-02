@@ -77,7 +77,7 @@ export default function MFASetupPage() {
         </Card>
         
         <p className="text-center mt-8 text-muted-foreground text-[11px] font-medium uppercase tracking-widest">
-          EdgeOps Security Protocol &copy; 2026
+          Restops Security Protocol &copy; 2026
         </p>
       </div>
     </div>

@@ -201,7 +201,7 @@ export default function OnboardingPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "mevs_onboarding_template.csv");
+    link.setAttribute("download", "restops_onboarding_template.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -474,7 +474,7 @@ export default function OnboardingPage() {
         <div className="w-full max-w-2xl">
           <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
             <CardHeader className="text-center pb-8 border-b">
-              <CardTitle className="text-3xl font-bold text-foreground">Welcome to EdgeOps</CardTitle>
+              <CardTitle className="text-3xl font-bold text-foreground">Welcome to Restops</CardTitle>
               <CardDescription className="text-muted-foreground text-lg mt-2">
                 How would you like to set up your primary organization?
               </CardDescription>
@@ -652,7 +652,7 @@ export default function OnboardingPage() {
                 <div className="space-y-2">
                   <Label htmlFor="orgSlug">Slug (URL identifier)</Label>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-sm">edgeops.io/</span>
+                    <span className="text-muted-foreground text-sm">restops.io/</span>
                     <Input 
                       id="orgSlug" 
                       placeholder="acme-hospitality" 

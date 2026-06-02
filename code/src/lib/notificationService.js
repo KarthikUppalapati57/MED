@@ -1,5 +1,5 @@
 /**
- * Notification Service – Creates in-app notifications for MEVS users.
+ * Notification Service – Creates in-app notifications for Restops users.
  *
  * Inserts rows into the `notifications` table so that the realtime
  * subscription in Layout.jsx picks them up and badges the bell icon.

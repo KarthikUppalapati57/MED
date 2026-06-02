@@ -57,7 +57,7 @@ export default function AiInsights() {
   const [activeTab, setActiveTab] = useState('insights');
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([
-    { role: 'assistant', content: 'Hello! I am your MEVS AI Assistant. Ask me anything about your restaurant\'s performance, inventory variances, or labor forecasts.' }
+    { role: 'assistant', content: 'Hello! I am your Restops AI Assistant. Ask me anything about your restaurant\'s performance, inventory variances, or labor forecasts.' }
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -262,7 +262,7 @@ export default function AiInsights() {
             <CardHeader className="border-b border-border/40 pb-4 bg-secondary/20">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Bot className="h-5 w-5 text-brand" />
-                MEVS Copilot
+                Restops Copilot
               </CardTitle>
               <p className="text-xs text-muted-foreground">Ask questions about your sales, inventory variances, or labor forecasts in plain English.</p>
             </CardHeader>

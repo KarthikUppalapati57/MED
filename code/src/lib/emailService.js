@@ -1,5 +1,5 @@
 /**
- * EmailJS Service – Reusable email utility for the MEVS platform.
+ * EmailJS Service – Reusable email utility for the Restops platform.
  *
  * Sends transactional emails via EmailJS (client-side, no backend needed).
  * Used for: invitations, invoice notifications, approval alerts, and requests.
@@ -22,10 +22,10 @@ const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
  * @param {string} params.to_name    - Recipient name
  * @param {string} params.subject    - Email subject line
  * @param {string} params.message    - Email body (plain text or HTML)
- * @param {string} [params.from_name] - Sender name (defaults to "MEVS Platform")
+ * @param {string} [params.from_name] - Sender name (defaults to "Restops Platform")
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function sendEmail({ to_email, to_name, subject, message, from_name = 'MEVS Platform' }) {
+export async function sendEmail({ to_email, to_name, subject, message, from_name = 'Restops Platform' }) {
   if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
     console.warn('[EmailService] EmailJS is not configured. Skipping email.');
     return { success: false, error: 'EmailJS not configured' };
@@ -61,17 +61,17 @@ export async function sendInvitationEmail({ to_email, to_name, role, org_name, i
   return sendEmail({
     to_email,
     to_name,
-    subject: `You've been invited to join ${org_name || 'MEVS'} as ${role || 'team member'}`,
+    subject: `You've been invited to join ${org_name || 'Restops'} as ${role || 'team member'}`,
     message: `
 Hi ${to_name || 'there'},
 
-You've been invited to join ${org_name || 'the organization'} on the MEVS platform as a ${role || 'team member'}.
+You've been invited to join ${org_name || 'the organization'} on the Restops platform as a ${role || 'team member'}.
 
 ${invite_link ? `Click the link below to accept your invitation and set up your account:\n<${invite_link}>` : 'Please log in to accept your invitation.'}
 
 This invitation will expire in 7 days.
 
-— MEVS Platform
+— Restops Platform
     `.trim(),
   });
 }
@@ -83,11 +83,11 @@ export async function sendDemoConfirmationEmail({ to_email, to_name }) {
   return sendEmail({
     to_email,
     to_name,
-    subject: `Your MEVS System Demo Request is Received!`,
+    subject: `Your Restops System Demo Request is Received!`,
     message: `
 Hi ${to_name || 'Valued Guest'},
 
-Thank you for your interest in the MEVS (Multi-tenant Enterprise Valuation & Stock-control) platform!
+Thank you for your interest in the Restops (Multi-tenant Enterprise Valuation & Stock-control) platform!
 
 We have successfully received your request for a live system walkthrough demo. Our administrative team is currently preparing a secure, personalized demo environment space for your company.
 
@@ -96,7 +96,7 @@ An administrator will contact you shortly and send your personalized demo login 
 If you have any questions or additional business requirements in the meantime, feel free to reply directly to this email.
 
 Best regards,
-The MEVS Onboarding Team
+The Restops Onboarding Team
     `.trim(),
   });
 }
@@ -108,7 +108,7 @@ export async function sendDemoAccessEmail({ to_email, to_name, invite_link }) {
   return sendEmail({
     to_email,
     to_name,
-    subject: `Your MEVS Live Demo Environment is Ready!`,
+    subject: `Your Restops Live Demo Environment is Ready!`,
     message: `
 Hi ${to_name || 'Valued Guest'},
 
@@ -125,7 +125,7 @@ Note: For security reasons, this personalized demo link is only active for 7 day
 We look forward to hearing your feedback!
 
 Warmly,
-The MEVS Administrative Team
+The Restops Administrative Team
     `.trim(),
   });
 }
@@ -148,9 +148,9 @@ Invoice Details:
 • Vendor: ${vendor_name || 'N/A'}
 • Total Amount: $${total_amount ? Number(total_amount).toFixed(2) : '0.00'}
 
-Please log in to the MEVS platform to review and approve this invoice.
+Please log in to the Restops platform to review and approve this invoice.
 
-— MEVS Platform
+— Restops Platform
     `.trim(),
   });
 }
@@ -173,7 +173,7 @@ ${status === 'approved'
   ? 'The items from this invoice have been staged for review and will be added to inventory within 24 hours.'
   : 'Please review the invoice and make any necessary corrections before resubmitting.'}
 
-— MEVS Platform
+— Restops Platform
     `.trim(),
   });
 }
@@ -195,9 +195,9 @@ A new ${request_type || 'access'} request has been submitted:
 • Email: ${requester_email || 'N/A'}
 • Type: ${request_type || 'General'}
 
-Please log in to the MEVS admin panel to review this request.
+Please log in to the Restops admin panel to review this request.
 
-— MEVS Platform
+— Restops Platform
     `.trim(),
   });
 }

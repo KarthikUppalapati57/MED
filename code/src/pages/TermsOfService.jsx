@@ -15,7 +15,7 @@ export default function TermsOfService() {
         </Button>
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">MEVS Platform</span>
+          <span className="font-bold text-slate-900">Restops Platform</span>
         </div>
       </nav>
 
@@ -29,14 +29,14 @@ export default function TermsOfService() {
               <section>
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">1. Acceptance of Terms</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  By accessing or using the MEVS (Multi-tenant Enterprise Valuation & Stock-control) platform, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+                  By accessing or using the Restops (Multi-tenant Enterprise Valuation & Stock-control) platform, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
                 </p>
               </section>
 
               <section>
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">2. Enterprise Licensing & Access</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  Access to the MEVS platform is provided on a subscription basis. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your organization's tenant workspace.
+                  Access to the Restops platform is provided on a subscription basis. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your organization's tenant workspace.
                 </p>
               </section>
 
@@ -50,14 +50,14 @@ export default function TermsOfService() {
               <section>
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">4. Data Ownership & Retention</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  You retain all rights to the data (invoices, inventory logs, user records) uploaded to the platform. Upon subscription termination or upon explicit request via your User Profile, MEVS will permanently delete your organizational data in compliance with data privacy regulations.
+                  You retain all rights to the data (invoices, inventory logs, user records) uploaded to the platform. Upon subscription termination or upon explicit request via your User Profile, Restops will permanently delete your organizational data in compliance with data privacy regulations.
                 </p>
               </section>
 
               <section>
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">5. Limitation of Liability</h2>
                 <p className="text-slate-600 leading-relaxed">
-                  MEVS provides inventory intelligence and automated OCR extraction. We do not guarantee 100% accuracy of extracted text. Users are responsible for validating financial data before finalizing ledger entries. In no event shall MEVS be liable for indirect or consequential damages.
+                  Restops provides inventory intelligence and automated OCR extraction. We do not guarantee 100% accuracy of extracted text. Users are responsible for validating financial data before finalizing ledger entries. In no event shall Restops be liable for indirect or consequential damages.
                 </p>
               </section>
             </div>

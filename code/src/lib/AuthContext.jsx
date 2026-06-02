@@ -12,7 +12,7 @@ const AuthContext = createContext(null);
 // ── Session cache helpers ────────────────────────────────────
 // Cache the user profile in sessionStorage so that on page reload
 // the role is available IMMEDIATELY (no flash of 'ground_staff').
-const PROFILE_CACHE_KEY = 'edgeops_profile_cache';
+const PROFILE_CACHE_KEY = 'restops_profile_cache';
 
 function getCachedProfile() {
   try {

@@ -320,7 +320,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
                   Forward invoices to your dedicated email address:
                 </p>
                 <p className="font-mono text-sm bg-white px-3 py-2 rounded mt-2 border">
-                  invoices@your-company.edgeops.io
+                  invoices@your-company.restops.io
                 </p>
               </div>
               <p className="text-sm text-slate-500">

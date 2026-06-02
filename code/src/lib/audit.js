@@ -2,7 +2,7 @@
  * Audit Logging Service (Lightweight)
  *
  * Provides a centralised helper for recording audit trail entries.
- * Adapted from CRE Financial Suite for MEVS.
+ * Adapted from CRE Financial Suite for Restops.
  * Never crashes the caller — audit failures are logged to console.
  *
  * Supports per-module filtering via the `module` field.
@@ -29,7 +29,7 @@ export const AUDIT_MODULES = {
 
 /**
  * Record an audit log entry.
- * Accepts either the CRE-style shape or a simple MEVS shape.
+ * Accepts either the CRE-style shape or a simple Restops shape.
  *
  * @param {Object} entry
  * @param {string} [entry.action]           - Action performed (e.g. "update_user_permissions")

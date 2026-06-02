@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
-import EdgeOpsLogo from '@/components/EdgeOpsLogo';
+import RestopsLogo from '@/components/RestopsLogo';
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 import { 
@@ -193,7 +193,7 @@ export default function Documentation() {
             </Link>
             
             <div className="flex items-center">
-              <EdgeOpsLogo className="h-6" showText={false} />
+              <RestopsLogo className="h-6" showText={false} />
               <span className="text-sm font-bold tracking-widest uppercase ml-3">
                 Architecture Docs
               </span>
@@ -219,7 +219,7 @@ export default function Documentation() {
             </h1>
             
             <p className="max-w-2xl mx-auto text-lg md:text-xl text-black/60 leading-relaxed font-medium technical-tracking">
-              EdgeOps is an end-to-end enterprise platform designed to automate physical supply chains, digitize financial audits, and orchestrate complex multi-unit operations through localized intelligence.
+              Restops is an end-to-end enterprise platform designed to automate physical supply chains, digitize financial audits, and orchestrate complex multi-unit operations through localized intelligence.
             </p>
           </motion.div>
         </div>
@@ -274,7 +274,7 @@ export default function Documentation() {
             <Button size="lg" className="h-14 px-12 bg-black text-white hover:bg-[#ff5c35] font-bold text-xs tracking-[4px] rounded-sm transition-all shadow-xl uppercase" onClick={() => setIsDemoModalOpen(true)}>
               <Calendar className="mr-3 h-4 w-4" /> BOOK A DEMO
             </Button>
-            <a href="mailto:support@edgeops.com">
+            <a href="mailto:support@restops.com">
               <Button size="lg" variant="outline" className="h-14 px-12 border-2 border-black text-black hover:bg-black hover:text-white font-bold text-xs tracking-[4px] rounded-sm transition-all uppercase bg-transparent">
                 <MessageSquare className="mr-3 h-4 w-4" /> CONTACT SUPPORT
               </Button>
@@ -286,7 +286,7 @@ export default function Documentation() {
               <ChevronLeft className="h-3 w-3 mr-1" /> RETURN TO HOME
             </Link>
             <p className="text-[9px] text-black/30 font-bold tracking-[5px] uppercase">
-              © 2026 EDGEOPS INC. ARCHITECTURE DOCS.
+              © 2026 RESTOPS INC. ARCHITECTURE DOCS.
             </p>
           </div>
         </div>
