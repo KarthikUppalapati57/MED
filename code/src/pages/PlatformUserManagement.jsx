@@ -90,8 +90,8 @@ export default function PlatformUserManagement() {
     }
   }, [adminQueryError]);
 
-  // â”€â”€ Pending Invitations Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const { data: pendingInvites = [], isLoading: isLoadingInvites } = useAuthQuery({
+  // ── Pending Invitations Query ─────────────────────────
+  const { data: pendingInvitesRaw = [], isLoading: isLoadingInvites } = useAuthQuery({
     queryKey: ['platform-admin-invites'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -106,7 +106,13 @@ export default function PlatformUserManagement() {
     enabled: authChecked,
   });
 
-  // â”€â”€ Invite Platform Admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const pendingInvites = React.useMemo(() => {
+    return pendingInvitesRaw.filter(invite => 
+      !platformAdmins.some(admin => admin.email?.toLowerCase() === invite.email?.toLowerCase())
+    );
+  }, [pendingInvitesRaw, platformAdmins]);
+
+  // ── Invite Platform Admin ──────────────────────────────────────────
   const handleInvitePlatformAdmin = async () => {
     if (!platformInviteEmail) return;
     setPlatformInviting(true);

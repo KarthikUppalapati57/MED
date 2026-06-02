@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,10 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
-import { Users, Search, Loader2, ShieldAlert, Trash2 } from "lucide-react";
+import { Users, Search, Loader2, ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function PlatformUsers() {
+  const navigate = useNavigate();
   const { user, role: userRole } = useAuth();
   const authChecked = !!user;
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,6 +145,10 @@ export default function PlatformUsers() {
             <p className="text-sm text-muted-foreground">View all users across the entire platform</p>
           </div>
         </div>
+        <Button onClick={() => navigate('/PlatformAdmin?tab=invite')} className="bg-brand hover:bg-brand/90 text-white">
+          <UserPlus className="w-4 h-4 mr-2" />
+          Invite Client
+        </Button>
       </div>
 
       {/* Users Table */}
