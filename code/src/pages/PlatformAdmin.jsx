@@ -230,13 +230,13 @@ export default function PlatformAdmin() {
 
 
 
-  const { data: pendingClientInvites = [] } = useAuthQuery({
+  const { data: pendingClientInvitesRaw = [] } = useAuthQuery({
     queryKey: ['pending-client-invites'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
-        .eq('role', 'org_owner')
+        .eq('role', 'owner')
         .is('accepted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -244,6 +244,12 @@ export default function PlatformAdmin() {
     },
     enabled: authChecked && userRole === 'platform_admin',
   });
+
+  const pendingClientInvites = React.useMemo(() => {
+    return pendingClientInvitesRaw.filter(invite => 
+      !allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase())
+    );
+  }, [pendingClientInvitesRaw, allProfiles]);
 
   // â”€â”€ Mutators & Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleInviteClient = async () => {

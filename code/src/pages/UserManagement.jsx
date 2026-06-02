@@ -1017,10 +1017,7 @@ export default function UserManagement() {
         if (invs) {
           invs.forEach(inv => {
             const existing = finalUsers.find(u => u.profiles?.email === inv.email || u.email === inv.email);
-            if (existing) {
-              existing.token = inv.token;
-              existing.status = 'invited';
-            } else {
+            if (!existing) {
               finalUsers.push({
                 id: 'inv_' + inv.id,
                 membership_id: 'inv_' + inv.id,
