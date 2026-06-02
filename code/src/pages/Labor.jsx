@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,8 @@ export default function Labor() {
   const activeTab = searchParams.get('tab') || 'summary';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const { location } = useAuth();
+  const queryClient = useQueryClient();
+
   const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
     queryKey: ['employees'],
     queryFn: () => api.entities.Employee.list('-created_at'),
@@ -35,6 +38,21 @@ export default function Labor() {
     queryKey: ['employee_shifts'],
     queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('labor-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['employee_shifts'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const totalEmployees = employees.length;
   const activeShifts = shifts.filter(s => s.status === 'in_progress').length;

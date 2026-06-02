@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
@@ -144,6 +145,18 @@ export default function Integrations() {
     queryKey: ['integrations'],
     queryFn: () => api.entities.Integration.list(),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('integrations-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'integrations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const getProviderKey = (id) => {
     const valid = ['quickbooks', 'xero', 'netsuite', 'stripe'];

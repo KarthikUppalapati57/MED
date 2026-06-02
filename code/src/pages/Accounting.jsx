@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -11,6 +13,8 @@ import { toast } from "sonner";
 import { format } from 'date-fns';
 
 export default function Accounting() {
+  const queryClient = useQueryClient();
+
   const { data: logs = [], isLoading: loadingLogs } = useAuthQuery({
     queryKey: ['accounting_sync_logs'],
     queryFn: () => api.entities.AccountingSyncLog.list('-created_at'),
@@ -30,6 +34,27 @@ export default function Accounting() {
     queryKey: ['gl_mappings'],
     queryFn: () => api.entities.GlMapping.list('category'),
   });
+
+  useEffect(() => {
+    const channel = supabase.channel('accounting-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounting_sync_logs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['accounting_sync_logs'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'integrations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'closed_periods' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['closed_periods'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gl_mappings' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['gl_mappings'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const [activeTab, setActiveTab] = React.useState('dashboard');
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);

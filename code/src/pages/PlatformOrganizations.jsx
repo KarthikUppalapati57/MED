@@ -99,6 +99,30 @@ export default function PlatformOrganizations() {
   });
 
   React.useEffect(() => {
+    const channel = supabase.channel('platform-orgs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform_users_all'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform_plans'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  React.useEffect(() => {
     const org = orgs.find(o => o.id === selectedOrgId);
     if (org) {
       setBillingForm({

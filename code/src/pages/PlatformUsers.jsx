@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -20,6 +20,20 @@ export default function PlatformUsers() {
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState(null);
+
+  useEffect(() => {
+    if (!authChecked || userRole !== 'platform_admin') return;
+
+    const channel = supabase.channel('platform-users-dir-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['platform-all-users'] });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authChecked, userRole, queryClient]);
 
   const handleDelete = async (userId) => {
     if (!window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) return;
