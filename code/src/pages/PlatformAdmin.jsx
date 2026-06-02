@@ -125,7 +125,7 @@ export default function PlatformAdmin() {
         queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+        queryClient.invalidateQueries({ queryKey: ['client-invites'] });
       })
       .subscribe();
 
