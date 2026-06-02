@@ -230,14 +230,13 @@ export default function PlatformAdmin() {
 
 
 
-  const { data: pendingClientInvitesRaw = [] } = useAuthQuery({
-    queryKey: ['pending-client-invites'],
+  const { data: allClientInvites = [] } = useAuthQuery({
+    queryKey: ['client-invites'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invitations')
         .select('*')
         .eq('role', 'owner')
-        .is('accepted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -246,10 +245,22 @@ export default function PlatformAdmin() {
   });
 
   const pendingClientInvites = React.useMemo(() => {
-    return pendingClientInvitesRaw.filter(invite => 
-      !allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase())
-    );
-  }, [pendingClientInvitesRaw, allProfiles]);
+    return allClientInvites.filter(invite => {
+      const isAccepted = !!invite.accepted_at;
+      const hasProfile = allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase());
+      const isExpired = new Date(invite.expires_at) <= new Date();
+      return !isAccepted && !hasProfile && !isExpired;
+    });
+  }, [allClientInvites, allProfiles]);
+
+  const clientHistoryInvites = React.useMemo(() => {
+    return allClientInvites.filter(invite => {
+      const isAccepted = !!invite.accepted_at;
+      const hasProfile = allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase());
+      const isExpired = new Date(invite.expires_at) <= new Date();
+      return isAccepted || hasProfile || isExpired;
+    });
+  }, [allClientInvites, allProfiles]);
 
   // â”€â”€ Mutators & Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleInviteClient = async () => {
@@ -548,21 +559,20 @@ The MEVS Platform Team
     setConfirmDeleteInvite(null);
     const toastId = toast.loading("Revoking invitation...");
     
-    await queryClient.cancelQueries({ queryKey: ['pending-client-invites'] });
-    const prev = queryClient.getQueryData(['pending-client-invites']);
-    queryClient.setQueryData(['pending-client-invites'], old => old ? old.filter(i => i.id !== id) : []);
-  
+    await queryClient.cancelQueries({ queryKey: ['client-invites'] });
+    const prev = queryClient.getQueryData(['client-invites']);
+    
     try {
       const { error } = await supabase
         .from('invitations')
-        .delete()
+        .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
         .eq('id', id);
       if (error) throw error;
       
-      toast.success("Invitation revoked", { id: toastId });
-      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+      toast.success("Invitation revoked & moved to history", { id: toastId });
+      queryClient.invalidateQueries({ queryKey: ['client-invites'] });
     } catch (err) {
-      if (prev) queryClient.setQueryData(['pending-client-invites'], prev);
+      if (prev) queryClient.setQueryData(['client-invites'], prev);
       toast.error("Failed to revoke invitation", { id: toastId });
     }
   };
@@ -987,6 +997,64 @@ The MEVS Platform Team
                   </TableCell>
                 </TableRow>
               ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* History Table */}
+      <Card className="rounded-3xl border-none shadow-xl bg-card overflow-hidden">
+        <CardHeader className="border-b border-border bg-muted/20 px-8 py-5 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-xl font-black flex items-center gap-2">
+              <History className="w-5 h-5 text-resend-blue" />
+              Accepted Clients & History
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Record of completed, expired, or manually revoked invitations</p>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-secondary/50">
+                <TableHead className="text-[11px] font-bold">CLIENT EMAIL</TableHead>
+                <TableHead className="text-[11px] font-bold">MODULES</TableHead>
+                <TableHead className="text-[11px] font-bold">CREATED</TableHead>
+                <TableHead className="text-[11px] font-bold">STATUS</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clientHistoryInvites.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground">No history available</TableCell></TableRow>
+              ) : clientHistoryInvites.map(invite => {
+                const isAccepted = !!invite.accepted_at;
+                const hasProfile = allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase());
+                const isExpired = new Date(invite.expires_at) <= new Date();
+                
+                let statusBadge;
+                if (isAccepted || hasProfile) {
+                  statusBadge = <Badge className="bg-emerald-100 text-emerald-700 text-[9px] font-bold border-none">Accepted</Badge>;
+                } else if (isExpired) {
+                  statusBadge = <Badge className="bg-slate-100 text-slate-700 text-[9px] font-bold border-none">Expired / Revoked</Badge>;
+                }
+
+                return (
+                  <TableRow key={invite.id} className="hover:bg-secondary/50 transition-colors">
+                    <TableCell className="font-semibold text-sm text-foreground opacity-70">{invite.email}</TableCell>
+                    <TableCell className="opacity-70">
+                      <div className="flex flex-wrap gap-1">
+                        {invite.metadata?.modules?.map(m => (
+                          <Badge key={m} variant="secondary" className="text-[9px] px-1.5 py-0 bg-secondary text-muted-foreground">
+                            {MODULE_DEFINITIONS[m]?.label || m}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[10px] text-muted-foreground opacity-70">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>{statusBadge}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
