@@ -7,10 +7,9 @@ import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigat
 import { AnimatePresence, motion } from 'framer-motion';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import OnboardingPage from './pages/OnboardingPage';
-import PaymentVerification from './pages/PaymentVerification';
 import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { supabase } from '@/lib/supabaseClient';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import MFASetupPage from './pages/MFASetupPage';
@@ -27,6 +26,7 @@ import { Card } from '@/components/ui/card';
 initGlobalErrorHandlers();
 
 const { Pages, Layout, mainPage } = pagesConfig;
+const { OnboardingPage, PaymentVerification } = Pages;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
@@ -68,7 +68,6 @@ function SignupPage() {
     if (!token) return;
     const fetchInvite = async () => {
       const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
-      const { supabase } = await import('@/lib/supabaseClient');
       const { data } = await supabase
         .rpc('get_invite_details', { invite_token: cleanToken });
       if (data) {
@@ -515,7 +514,6 @@ function UpdatePasswordPage() {
     setLoading(true);
     setError('');
     try {
-      const { supabase } = await import('@/lib/supabaseClient');
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       

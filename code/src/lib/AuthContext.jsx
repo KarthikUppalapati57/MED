@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/lib/query-client';
 import { queryClientInstance } from '@/lib/query-client';
 
@@ -82,7 +83,6 @@ async function prefetchDashboardData(role) {
         staleTime,
       });
     } else if (role === 'org_owner') {
-      const { api } = await import('@/lib/apiClient');
       queryClientInstance.prefetchQuery({
         queryKey: ['invoices'],
         queryFn: () => api.entities.Invoice.list('-created_at'),
@@ -157,7 +157,6 @@ export const AuthProvider = ({ children }) => {
       
       if (invite) {
         // Use secure RPC to accept invitation (bypasses RLS on profiles update)
-        const { api } = await import('@/lib/apiClient');
         await api.onboarding.acceptInvitation(invite.token);
 
         // Apply pre-provisioned permissions from invitation metadata if available
