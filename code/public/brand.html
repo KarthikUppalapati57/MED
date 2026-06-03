@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restops - Brand Identity & DNA</title>
+    <meta name="description" content="Restops is the complete, premium restaurant management platform designed to streamline inventory, recipes, and operations.">
+    
+    <!-- Google Fonts for Typography Extraction -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Restops Premium Dark Mode Palette */
+            --background-color: #0c0d11; /* Deep indigo-charcoal */
+            --text-primary: #fcfcfd;
+            --text-secondary: #b3b6c2;
+            --brand-primary: #ff5c35; /* Mistral Orange */
+            --brand-secondary: #14c6cb; /* Ambient Teal */
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 800px;
+            background: rgba(15, 15, 20, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo {
+            max-width: 200px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            color: var(--text-primary);
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+
+        h2 {
+            color: var(--brand-primary);
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            font-weight: 500;
+        }
+
+        p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 32px;
+        }
+
+        .colors {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .color-swatch {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .primary-bg { background-color: var(--brand-primary); }
+        .secondary-bg { background-color: var(--brand-secondary); }
+        .dark-bg { background-color: var(--background-color); border: 1px solid #333; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Logo for extraction -->
+        <img src="/app-logo.png" alt="Restops Logo" class="logo">
+
+        <!-- Marketing Copy / Tone of Voice -->
+        <h1>Restops</h1>
+        <h2>The Complete Restaurant Management Platform</h2>
+        
+        <p>
+            Welcome to Restops. We provide premium, edge-ops restaurant management software that helps modern kitchens thrive. 
+            From precision inventory tracking and dynamic recipe costing to loading dock receiving and organization management, 
+            Restops is built to streamline operations with unparalleled speed and reliability. Our tone is professional, 
+            innovative, and empowering—we give restaurateurs the tools they need to cut costs and maximize efficiency.
+        </p>
+
+        <!-- Color Palette for extraction -->
+        <h3>Our Brand Colors</h3>
+        <div class="colors">
+            <div class="color-swatch primary-bg">#ff5c35</div>
+            <div class="color-swatch secondary-bg">#14c6cb</div>
+            <div class="color-swatch dark-bg">#0c0d11</div>
+        </div>
+    </div>
+
+</body>
+</html>
