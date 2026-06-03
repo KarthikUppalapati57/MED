@@ -40,6 +40,7 @@ const Notifications = React.lazy(() => import('./pages/Notifications'));
 const AvTCosting = React.lazy(() => import('./pages/AvTCosting'));
 const Performance = React.lazy(() => import('./pages/Performance'));
 const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
+const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -71,6 +72,7 @@ export const PAGES = {
     "AvTCosting": AvTCosting,
     "Performance": Performance,
     "MenuEngineering": MenuEngineering,
+    "RestaurantSetup": RestaurantSetup,
 }
 
 export const pagesConfig = {

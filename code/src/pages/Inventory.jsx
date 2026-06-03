@@ -485,13 +485,15 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-8 mb-6">
           <TabsTrigger value="inventory">Inventory List</TabsTrigger>
           <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
           <TabsTrigger value="counts">Stock Counts</TabsTrigger>
           <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
+          <TabsTrigger value="waste-summary">Waste Summary</TabsTrigger>
+          <TabsTrigger value="daily-snapshot">Daily Snapshot</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receiving" className="space-y-4">
@@ -971,7 +973,7 @@ export default function Inventory() {
         </TabsContent>
 
         {/* â”€â”€ Count Sheets Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-        <TabsContent value="count-sheets">
+        <TabsContent value="daily-snapshot">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Items Added Today (new inventory received) */}
             <Card className="border-0 shadow-sm">

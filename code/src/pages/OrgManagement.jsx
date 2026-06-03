@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   Building2, Store, MapPin, Plus, Trash2, Pencil, ChevronDown, ChevronRight,
-  Loader2, ShieldCheck, ShieldAlert, KeyRound, Smartphone
+  Loader2, ShieldAlert, KeyRound, Smartphone
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MFAEnrollment } from '@/components/auth/MFAEnrollment';

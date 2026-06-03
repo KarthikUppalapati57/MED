@@ -25,6 +25,7 @@ export const MODULE_DEFINITIONS = {
   performance:{ label: "Performance",     pages: ["Performance"], minRole: "manager", icon: "Activity" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
   accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
+  setup:      { label: "Setup",            pages: ["RestaurantSetup"], minRole: "location_manager", icon: "Settings" },
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);

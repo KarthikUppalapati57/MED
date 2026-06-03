@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Package, Truck, CheckCircle2, AlertTriangle, ChevronLeft } from 'lucide-react';
-import { format } from 'date-fns';
 
 export default function LoadingDockReceiving() {
   const queryClient = useQueryClient();

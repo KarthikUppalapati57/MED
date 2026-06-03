@@ -10,10 +10,8 @@ import {
   Info,
   CheckCircle2,
   TrendingUp,
-  TrendingDown,
   Search,
   Check,
-  MessageSquare,
   Send,
   User,
   Bot

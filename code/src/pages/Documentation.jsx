@@ -5,8 +5,7 @@ import InteractiveScene from '@/components/InteractiveScene';
 import RestopsLogo from '@/components/RestopsLogo';
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
-import { 
-  Database,
+import {
   ChevronLeft,
   LayoutDashboard,
   Bot,

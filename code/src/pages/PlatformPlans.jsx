@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Plus, CheckCircle2, Edit3, Trash2, Building2, RefreshCw, Loader2, DollarSign } from "lucide-react";
+import { Sparkles, Plus, CheckCircle2, Edit3, Building2, Loader2, DollarSign } from "lucide-react";
 import { MODULE_DEFINITIONS, ALL_MODULE_KEYS } from "@/lib/moduleConfig";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";

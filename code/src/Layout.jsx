@@ -159,8 +159,8 @@ const navigation = [
       { name: 'Dashboard', href: 'Accounting?tab=dashboard', icon: LayoutDashboard },
       { name: 'Export & Sync', href: 'Accounting?tab=export', icon: ArrowRightLeft },
       { name: 'Reconciliation', href: 'Accounting?tab=reconciliation', icon: FileText },
-      { name: 'Mappings', href: 'Accounting?tab=mappings', icon: Settings },
-      { name: 'Close Books', href: 'Accounting?tab=close', icon: Check }
+      { name: 'GL Mapping', href: 'Accounting?tab=gl-mapping', icon: Settings },
+      { name: 'Close Books', href: 'Accounting?tab=close-books', icon: Check }
     ]
   },
   { 

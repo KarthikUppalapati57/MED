@@ -14,8 +14,7 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  ChevronRight,
-  Database
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -29,7 +28,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { motion, useScroll, useTransform, useSpring, useInView } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 
 // Magnetic Button Component for premium hover effects

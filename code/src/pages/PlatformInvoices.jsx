@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, CheckCircle2, Building2, Send, Loader2, ExternalLink } from "lucide-react";
+import { Receipt, Building2, Send, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 export default function PlatformInvoices() {
   const { user, role: userRole } = useAuth();

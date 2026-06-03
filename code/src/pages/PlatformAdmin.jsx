@@ -20,9 +20,8 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { 
-  Shield, Search, Download, CheckCircle2, X, Loader2, Package, Trash2, Mail, 
-  ChevronDown, ChevronRight, Building2, Store, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, Sparkles, 
-  Receipt, History, RefreshCw, Fingerprint, Send, User, MapPin
+  Shield, Search, Download, CheckCircle2, X, Loader2, Trash2, Mail, Building2, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, 
+  Receipt, History, Fingerprint, Send
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";

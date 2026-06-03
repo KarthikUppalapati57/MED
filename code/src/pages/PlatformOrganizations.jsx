@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, ShieldAlert, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, AlertTriangle } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
