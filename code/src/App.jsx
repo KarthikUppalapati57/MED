@@ -494,6 +494,11 @@ function PendingAssignmentPage() {
 function UpdatePasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isRecovery = searchParams.get('type') === 'recovery';
+
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -513,6 +518,20 @@ function UpdatePasswordPage() {
 
     setLoading(true);
     setError('');
+
+    // If not in recovery mode, verify the current password first
+    if (!isRecovery && user?.email) {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword
+      });
+      if (verifyError) {
+        setError('Current password is incorrect');
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
@@ -539,6 +558,21 @@ function UpdatePasswordPage() {
           <p className="text-muted-foreground text-sm">Enter your new secure password below.</p>
         </div>
         <form className="space-y-4" onSubmit={handleUpdate}>
+          {!isRecovery && (
+            <div className="space-y-1.5 mb-4 border-b border-border/40 pb-4">
+              <label className="block text-sm font-semibold text-foreground">Current Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="block text-sm font-semibold text-foreground">New Password</label>
             <div className="relative">
@@ -712,10 +746,9 @@ const AuthenticatedApp = () => {
         </>
       ) : (needsPaymentVerification || needsOnboarding || needsAssignment) ? (
         <>
-          {/* New users without an organization must complete payment verification THEN onboarding, or wait for assignment */}
-          <Route path="/verify-payment" element={<PaymentVerification />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/pending-assignment" element={<PendingAssignmentPage />} />
+          {needsPaymentVerification && <Route path="/verify-payment" element={<PaymentVerification />} />}
+          {needsOnboarding && <Route path="/onboarding" element={<OnboardingPage />} />}
+          {needsAssignment && <Route path="/pending-assignment" element={<PendingAssignmentPage />} />}
           <Route path="*" element={
             <Navigate to={
               needsPaymentVerification ? "/verify-payment" :

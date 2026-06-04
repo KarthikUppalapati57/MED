@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -13,11 +13,11 @@ const CARD_ELEMENT_OPTIONS = {
   style: {
     base: {
       fontSize: '16px',
-      color: '#1e293b',
+      color: '#ffffff',
       fontFamily: 'Inter, system-ui, sans-serif',
-      '::placeholder': { color: '#94a3b8' },
+      '::placeholder': { color: '#a1a1aa' },
     },
-    invalid: { color: '#dc2626' },
+    invalid: { color: '#ef4444' },
   },
   hidePostalCode: true,
 };

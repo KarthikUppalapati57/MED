@@ -362,8 +362,14 @@ export const AuthProvider = ({ children }) => {
           return newProfile;
         }
 
+        // FAILED to insert skeleton profile -> User probably deleted from auth.users
+        console.warn('Failed to insert skeleton profile, logging out...', error);
+        await supabase.auth.signOut();
+        setUser(null);
         setUserProfile(null);
         clearCachedProfile();
+        if (isMounted) setIsLoadingAuth(false);
+        return null;
       }
       return null;
     };
@@ -417,7 +423,7 @@ export const AuthProvider = ({ children }) => {
               setIsLoadingAuth(false);
               // Navigate to update-password page
               if (!window.location.pathname.includes('update-password')) {
-                window.location.replace(`${APP_URL}/update-password`);
+                window.location.replace(`${APP_URL}/update-password?type=recovery`);
               }
             }
           } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
