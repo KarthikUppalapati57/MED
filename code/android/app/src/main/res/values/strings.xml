@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Restops</string>
+    <string name="title_activity_main">Restops</string>
+    <string name="package_name">com.restops.app</string>
+    <string name="custom_url_scheme">com.restops.app</string>
+</resources>
