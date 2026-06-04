@@ -15,6 +15,7 @@ export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
+  // â”€â”€ All hooks MUST be called before any conditional returns (React rules of hooks) â”€â”€
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -33,22 +34,25 @@ export default function OnboardingPage() {
     fetchPlans();
   }, []);
 
-  // Hierarchical state for multiple organizations
-  const [organizations, setOrganizations] = useState([
-    { 
-      name: '', slug: '', slugManual: false, 
-      brands: [{ name: '', locations: [{ name: '', address: '' }] }] 
-    }
+  // Organization (single)
+  const [orgName, setOrgName] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
+  const [orgSlugManual, setOrgSlugManual] = useState(false);
+
+  // Brands â€” array of { name, locations: [{ name, address }] }
+  const [brands, setBrands] = useState([
+    { name: '', locations: [{ name: '', address: '' }] }
   ]);
 
   const retryCountRef = useRef(0);
 
+  // â”€â”€ After onboarding completes, poll refreshProfile until org_id is confirmed, then redirect â”€â”€
   useEffect(() => {
     if (!completed) return;
     let cancelled = false;
 
     const pollUntilReady = async () => {
-      const MAX_RETRIES = 12; 
+      const MAX_RETRIES = 12; // Increased retries
       let success = false;
 
       for (let i = 0; i < MAX_RETRIES; i++) {
@@ -68,6 +72,7 @@ export default function OnboardingPage() {
       }
 
       if (!cancelled && !success) {
+        // Fallback to home anyway
         navigate('/', { replace: true });
       }
     };
@@ -76,20 +81,24 @@ export default function OnboardingPage() {
     return () => { cancelled = true; };
   }, [completed, refreshProfile, navigate]);
 
+  // â”€â”€ If profile org_id becomes available (from polling above), navigate cleanly â”€â”€
   useEffect(() => {
     if (completed && userProfile?.organization_id) {
       navigate('/', { replace: true });
     }
   }, [completed, userProfile?.organization_id, navigate]);
 
+  // Guard: If the user already has an organization assigned, they don't need onboarding.
   if (userProfile?.organization_id && !completed) {
     return <Navigate to="/" replace />;
   }
 
+  // Guard: If payment is not verified, they must go back to verification
   if (userProfile && !userProfile.payment_verified && !completed) {
     return <Navigate to="/verify-payment" replace />;
   }
 
+  // â”€â”€ Success screen while waiting for profile to update â”€â”€
   if (completed) {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
@@ -98,101 +107,57 @@ export default function OnboardingPage() {
             <CheckCircle2 className="w-8 h-8 text-primary" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">Onboarding Complete!</h2>
-          <p className="text-muted-foreground">Setting up your workspace. Redirecting shortly...</p>
+          <p className="text-muted-foreground">Setting up your workspace. Redirecting shortlyâ€¦</p>
           <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
         </div>
       </div>
     );
   }
 
-  // Organization helpers
-  const handleOrgNameChange = (orgIdx, value) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        name: value,
-        slug: org.slugManual ? org.slug : value.toLowerCase().replace(/[^a-z0-9]/g, '-')
-      };
-    }));
-  };
-
-  const handleOrgSlugChange = (orgIdx, value) => {
-    setOrganizations(prev => prev.map((org, i) => i === orgIdx ? { ...org, slug: value, slugManual: true } : org));
-  };
-
-  const addOrganization = () => {
-    setOrganizations(prev => [...prev, { name: '', slug: '', slugManual: false, brands: [{ name: '', locations: [{ name: '', address: '' }] }] }]);
-  };
-
-  const removeOrganization = (idx) => {
-    if (organizations.length <= 1) return;
-    setOrganizations(prev => prev.filter((_, i) => i !== idx));
+  const handleOrgNameChange = (value) => {
+    setOrgName(value);
+    if (!orgSlugManual) {
+      setOrgSlug(value.toLowerCase().replace(/[^a-z0-9]/g, '-'));
+    }
   };
 
   // Brand helpers
-  const addBrand = (orgIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return { ...org, brands: [...org.brands, { name: '', locations: [{ name: '', address: '' }] }] };
-    }));
+  const addBrand = () => {
+    setBrands(prev => [...prev, { name: '', locations: [{ name: '', address: '' }] }]);
   };
 
-  const removeBrand = (orgIdx, brandIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      if (org.brands.length <= 1) return org;
-      return { ...org, brands: org.brands.filter((_, bi) => bi !== brandIdx) };
-    }));
+  const removeBrand = (idx) => {
+    if (brands.length <= 1) return;
+    setBrands(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const updateBrandName = (orgIdx, brandIdx, name) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => bi === brandIdx ? { ...b, name } : b)
-      };
-    }));
+  const updateBrandName = (idx, name) => {
+    setBrands(prev => prev.map((b, i) => i === idx ? { ...b, name } : b));
   };
 
   // Location helpers
-  const addLocation = (orgIdx, brandIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => bi === brandIdx ? { ...b, locations: [...b.locations, { name: '', address: '' }] } : b)
-      };
+  const addLocation = (brandIdx) => {
+    setBrands(prev => prev.map((b, i) =>
+      i === brandIdx ? { ...b, locations: [...b.locations, { name: '', address: '' }] } : b
+    ));
+  };
+
+  const removeLocation = (brandIdx, locIdx) => {
+    setBrands(prev => prev.map((b, i) => {
+      if (i !== brandIdx) return b;
+      if (b.locations.length <= 1) return b;
+      return { ...b, locations: b.locations.filter((_, li) => li !== locIdx) };
     }));
   };
 
-  const removeLocation = (orgIdx, brandIdx, locIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
+  const updateLocation = (brandIdx, locIdx, field, value) => {
+    setBrands(prev => prev.map((b, i) => {
+      if (i !== brandIdx) return b;
       return {
-        ...org,
-        brands: org.brands.map((b, bi) => {
-          if (bi !== brandIdx) return b;
-          if (b.locations.length <= 1) return b;
-          return { ...b, locations: b.locations.filter((_, li) => li !== locIdx) };
-        })
-      };
-    }));
-  };
-
-  const updateLocation = (orgIdx, brandIdx, locIdx, field, value) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => {
-          if (bi !== brandIdx) return b;
-          return {
-            ...b,
-            locations: b.locations.map((loc, li) => li === locIdx ? { ...loc, [field]: value } : loc)
-          };
-        })
+        ...b,
+        locations: b.locations.map((loc, li) =>
+          li === locIdx ? { ...loc, [field]: value } : loc
+        )
       };
     }));
   };
@@ -201,9 +166,10 @@ export default function OnboardingPage() {
   const prevStep = () => setStep((s) => s - 1);
 
   // Validation helpers
-  const hasValidOrgs = organizations.length > 0 && organizations.every(o => o.name.trim() !== '' && o.slug.trim() !== '');
-  const hasValidBrands = organizations.every(o => o.brands.length > 0 && o.brands.every(b => b.name.trim() !== ''));
-  const hasValidLocations = organizations.every(o => o.brands.every(b => b.locations.length > 0 && b.locations.every(l => l.name.trim() !== '')));
+  const hasValidBrands = brands.length > 0 && brands[0].name.trim() !== '';
+  const hasValidLocations = brands.every(b =>
+    b.locations.length > 0 && b.locations[0].name.trim() !== ''
+  );
 
   const handleCsvUpload = (e) => {
     const file = e.target.files[0];
@@ -231,7 +197,7 @@ export default function OnboardingPage() {
   };
 
   const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8,Organization Name,Brand Name,Location Name,Location Address\nAcme Corp,Acme Burgers,Downtown Branch,123 Main St NY\nAcme Corp,Acme Pizza,Uptown Branch,456 High St NY\nGlobal Eats,Sushi World,Tokyo Spot,789 Broad St";
+    const csvContent = "data:text/csv;charset=utf-8,Organization Name,Brand Name,Location Name,Location Address\nAcme Corp,Acme Burgers,Downtown Branch,123 Main St NY";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -241,7 +207,7 @@ export default function OnboardingPage() {
     document.body.removeChild(link);
   };
 
-  const performOnboarding = async (finalOrganizations) => {
+  const performOnboarding = async (finalOrgName, finalOrgSlug, finalBrands) => {
     if (!user) {
       toast.error('You must be logged in to complete onboarding');
       return;
@@ -249,85 +215,80 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      if (finalOrganizations.length === 0) {
-        throw new Error('No valid organizations to create');
+      if (!finalOrgName || !finalOrgSlug || finalBrands.length === 0) {
+        throw new Error('Please fill in all required fields');
       }
 
-      let primaryOrgId = null;
+      // Step 1: Create org + first brand + first location via the atomic RPC
+      const firstBrand = finalBrands[0];
+      const firstLocation = firstBrand.locations[0];
 
-      for (const org of finalOrganizations) {
-        if (!org.name || !org.slug || org.brands.length === 0) {
-          throw new Error('Please fill in all required fields for each organization');
-        }
-
-        const firstBrand = org.brands[0];
-        const firstLocation = firstBrand.locations[0];
-
-        if (!firstBrand || !firstLocation) {
-           throw new Error('You need at least one brand and one location per organization');
-        }
-
-        const result = await api.onboarding.setupOrgAndFirstLocation(
-          user.id,
-          { name: org.name, slug: org.slug },
-          firstBrand.name,
-          { name: firstLocation.name, address: firstLocation.address }
-        );
-
-        if (!primaryOrgId) primaryOrgId = result.org.id;
-
-        const orgId = result.org.id;
-        const firstBrandId = result.brand.id;
-
-        if (firstBrand.locations.length > 1) {
-          const extraLocations = firstBrand.locations.slice(1)
-            .filter(loc => loc.name.trim())
-            .map(loc => ({
-              organization_id: orgId,
-              brand_id: firstBrandId,
-              name: loc.name.trim(),
-              address: loc.address.trim() || 'Address pending',
-            }));
-
-          if (extraLocations.length > 0) {
-            const { error } = await supabase.from('locations').insert(extraLocations);
-            if (error) console.warn('Extra locations insert warning:', error.message);
-          }
-        }
-
-        for (let i = 1; i < org.brands.length; i++) {
-          const brand = org.brands[i];
-          if (!brand.name.trim()) continue;
-
-          const { data: newBrand, error: brandErr } = await supabase
-            .from('brands')
-            .insert({ organization_id: orgId, name: brand.name.trim() })
-            .select()
-            .single();
-
-          if (brandErr) {
-            console.warn(`Brand "${brand.name}" creation warning:`, brandErr.message);
-            continue;
-          }
-
-          const locs = brand.locations
-            .filter(loc => loc.name.trim())
-            .map(loc => ({
-              organization_id: orgId,
-              brand_id: newBrand.id,
-              name: loc.name.trim(),
-              address: loc.address.trim() || 'Address pending',
-            }));
-
-          if (locs.length > 0) {
-            const { error: locErr } = await supabase.from('locations').insert(locs);
-            if (locErr) console.warn('Locations insert warning:', locErr.message);
-          }
-        }
+      if (!firstBrand || !firstLocation) {
+         throw new Error('You need at least one brand and one location');
       }
 
+      const result = await api.onboarding.setupOrgAndFirstLocation(
+        user.id,
+        { name: finalOrgName, slug: finalOrgSlug },
+        firstBrand.name,
+        { name: firstLocation.name, address: firstLocation.address }
+      );
+
+      // Force refresh JWT so subsequent inserts use the new app_metadata (organization_id, role)
       await supabase.auth.refreshSession();
 
+      const orgId = result.org.id;
+      const firstBrandId = result.brand.id;
+
+      // Step 2: Create additional locations for the first brand
+      if (firstBrand.locations.length > 1) {
+        const extraLocations = firstBrand.locations.slice(1)
+          .filter(loc => loc.name.trim())
+          .map(loc => ({
+            organization_id: orgId,
+            brand_id: firstBrandId,
+            name: loc.name.trim(),
+            address: loc.address.trim() || 'Address pending',
+          }));
+
+        if (extraLocations.length > 0) {
+          const { error } = await supabase.from('locations').insert(extraLocations);
+          if (error) console.warn('Extra locations insert warning:', error.message);
+        }
+      }
+
+      // Step 3: Create additional brands (each with their own locations)
+      for (let i = 1; i < finalBrands.length; i++) {
+        const brand = finalBrands[i];
+        if (!brand.name.trim()) continue;
+
+        const { data: newBrand, error: brandErr } = await supabase
+          .from('brands')
+          .insert({ organization_id: orgId, name: brand.name.trim() })
+          .select()
+          .single();
+
+        if (brandErr) {
+          console.warn(`Brand "${brand.name}" creation warning:`, brandErr.message);
+          continue;
+        }
+
+        const locs = brand.locations
+          .filter(loc => loc.name.trim())
+          .map(loc => ({
+            organization_id: orgId,
+            brand_id: newBrand.id,
+            name: loc.name.trim(),
+            address: loc.address.trim() || 'Address pending',
+          }));
+
+        if (locs.length > 0) {
+          const { error: locErr } = await supabase.from('locations').insert(locs);
+          if (locErr) console.warn('Locations insert warning:', locErr.message);
+        }
+      }
+
+      // Step 4: Apply modules and permissions from invitation
       try {
         const { data: invs } = await supabase
           .from('invitations')
@@ -337,14 +298,14 @@ export default function OnboardingPage() {
           .order('accepted_at', { ascending: false })
           .limit(1);
 
-        if (invs && invs[0] && primaryOrgId) {
+        if (invs && invs[0]) {
           const meta = invs[0].metadata || {};
           
           if (meta.modules) {
             await supabase
               .from('organizations')
               .update({ enabled_modules: meta.modules })
-              .eq('id', primaryOrgId);
+              .eq('id', orgId);
           }
 
           if (meta.access) {
@@ -368,15 +329,19 @@ export default function OnboardingPage() {
         console.warn('Failed to apply invitation metadata:', err);
       }
 
-      toast.success(`Organization(s) created! Proceed to select a plan.`);
+      const totalBrands = finalBrands.filter(b => b.name.trim()).length;
+      const totalLocations = finalBrands.reduce((sum, b) => sum + b.locations.filter(l => l.name.trim()).length, 0);
+      toast.success(`Organization created! Proceed to select a plan.`);
       
+      // Refresh profile to get the organization_id in context
       await refreshProfile();
       
+      // Move to plan selection step
       setStep(4);
     } catch (error) {
       console.error('Onboarding failed:', error);
       const message = error.message?.includes('organizations_slug_key')
-        ? 'One of your organization slugs is already taken. Please try a different one.'
+        ? 'This organization slug is already taken. Please try a different one.'
         : (error.message || 'Failed to complete onboarding');
       toast.error(message, { duration: 5000 });
     } finally {
@@ -385,11 +350,11 @@ export default function OnboardingPage() {
   };
 
   const handleManualSubmit = async () => {
-    if (!hasValidOrgs || !hasValidBrands || !hasValidLocations) {
-      toast.error('Please fill in all required fields for each organization');
+    if (!orgName || !orgSlug || !hasValidBrands || !hasValidLocations) {
+      toast.error('Please fill in all required fields');
       return;
     }
-    await performOnboarding(organizations);
+    await performOnboarding(orgName, orgSlug, brands);
   };
 
   const handleCsvSubmit = async () => {
@@ -403,17 +368,21 @@ export default function OnboardingPage() {
     const processedRows = [];
 
     for (const row of csvData) {
+      // Flexibly match column headers (exact match or common variations)
       let oName = (row['Organization Name'] || row['organization_name'] || row['orgName'] || row['Org Name'] || row['org'] || '').trim();
       let bName = (row['Brand Name'] || row['brand_name'] || row['brandName'] || row['Brand'] || row['brand'] || '').trim();
       let lName = (row['Location Name'] || row['location_name'] || row['locationName'] || row['Location'] || row['location'] || '').trim();
       let lAddr = (row['Location Address'] || row['address'] || row['locationAddress'] || row['Address'] || '').trim();
 
+      // Update current tracking variables ONLY when an explicit name is given
       if (oName) currentOrg = oName;
       if (bName) currentBrand = bName;
 
+      // Carry forward from previous rows when cells are blank
       if (!oName) oName = currentOrg;
       if (!bName) bName = currentBrand;
 
+      // A row is valid if we have at least a location name (org/brand inherited is fine)
       if (oName && bName && lName) {
         processedRows.push({
           oName,
@@ -429,47 +398,37 @@ export default function OnboardingPage() {
       return;
     }
 
-    const orgsMap = {};
+    // Use the first org name as the primary organization for onboarding.
+    // During onboarding we can only create ONE org â€” aggregate ALL rows
+    // (even if they list different org names) under this single org.
+    const finalOrgName = processedRows[0].oName;
+    const finalOrgSlug = finalOrgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
+
+    // Group ALL rows by brand name (regardless of org column value)
+    // This ensures brands/locations from rows with different org names aren't dropped
+    const brandsMap = {};
     processedRows.forEach(row => {
-      const oKey = row.oName.toLowerCase();
-      if (!orgsMap[oKey]) {
-        orgsMap[oKey] = {
-           name: row.oName,
-           slug: row.oName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000),
-           brandsMap: {}
-        };
+      if (!brandsMap[row.bName]) {
+        brandsMap[row.bName] = { name: row.bName, locations: [] };
       }
-      
-      const bKey = row.bName.toLowerCase();
-      if (!orgsMap[oKey].brandsMap[bKey]) {
-         orgsMap[oKey].brandsMap[bKey] = { name: row.bName, locations: [] };
-      }
-      
-      const existingLoc = orgsMap[oKey].brandsMap[bKey].locations.find(
+      // Deduplicate locations with same name under the same brand
+      const existingLoc = brandsMap[row.bName].locations.find(
         l => l.name.toLowerCase() === row.lName.toLowerCase()
       );
       if (!existingLoc) {
-        orgsMap[oKey].brandsMap[bKey].locations.push({ name: row.lName, address: row.lAddr });
+        brandsMap[row.bName].locations.push({ name: row.lName, address: row.lAddr });
       }
     });
 
-    const parsedOrganizations = Object.values(orgsMap).map(o => ({
-       name: o.name,
-       slug: o.slug,
-       slugManual: true,
-       brands: Object.values(o.brandsMap)
-    }));
+    const parsedBrands = Object.values(brandsMap);
 
-    if (parsedOrganizations.length === 0) {
-      toast.error('Could not parse any organizations from the CSV.');
+    if (parsedBrands.length === 0) {
+      toast.error('Could not parse any brands from the CSV. Check your column headers.');
       return;
     }
 
-    const totalBrands = parsedOrganizations.reduce((s, o) => s + o.brands.length, 0);
-    const totalLocations = parsedOrganizations.reduce((s, o) => s + o.brands.reduce((bs, b) => bs + b.locations.length, 0), 0);
-    
-    toast.info(`Importing ${parsedOrganizations.length} organization(s) with ${totalBrands} brand(s) and ${totalLocations} location(s)`);
-    await performOnboarding(parsedOrganizations);
+    toast.info(`Importing ${parsedBrands.length} brand(s) with ${parsedBrands.reduce((s, b) => s + b.locations.length, 0)} location(s)`);
+    await performOnboarding(finalOrgName, finalOrgSlug, parsedBrands);
   };
 
   const handleSubscribe = async () => {
@@ -478,6 +437,7 @@ export default function OnboardingPage() {
       return;
     }
     
+    // If it's a free plan or no Stripe Price ID, we can just complete onboarding
     if (!selectedPlan.stripe_price_id) {
       toast.success('Free plan selected!');
       setCompleted(true);
@@ -507,6 +467,7 @@ export default function OnboardingPage() {
     }
   };
 
+  // Render initial selection screen
   if (!onboardingMode) {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
@@ -515,7 +476,7 @@ export default function OnboardingPage() {
             <CardHeader className="text-center pb-8 border-b">
               <CardTitle className="text-3xl font-bold text-foreground">Welcome to Restops</CardTitle>
               <CardDescription className="text-muted-foreground text-lg mt-2">
-                How would you like to set up your organizations?
+                How would you like to set up your primary organization?
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
@@ -554,6 +515,7 @@ export default function OnboardingPage() {
     );
   }
 
+  // Render CSV Mode
   if (onboardingMode === 'csv') {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
@@ -567,7 +529,7 @@ export default function OnboardingPage() {
                 <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)}>Change Method</Button>
               </div>
               <CardDescription className="text-muted-foreground text-base">
-                Upload a CSV file containing your organization details.
+                Upload a CSV file containing your organization details. We will set up the first valid row as your primary organization. 
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-4">
@@ -627,14 +589,16 @@ export default function OnboardingPage() {
     );
   }
 
+  // Render Manual Mode
   return (
     <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
       <div className="w-full max-w-2xl">
         <div className="flex justify-between mb-2">
           <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)} className="text-muted-foreground hover:text-foreground">
-            &larr; Back to options
+            â† Back to options
           </Button>
         </div>
+        {/* Progress Bar */}
         <div className="flex items-center justify-between mb-8 px-2">
           {[1, 2, 3, 4].map((i) => (
             <React.Fragment key={i}>
@@ -645,7 +609,7 @@ export default function OnboardingPage() {
                   {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
                 </div>
                 <span className={`text-xs font-medium ${step >= i ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {i === 1 ? 'Organizations' : i === 2 ? 'Brands' : i === 3 ? 'Locations' : 'Plan'}
+                  {i === 1 ? 'Organization' : i === 2 ? 'Brands' : i === 3 ? 'Locations' : 'Plan'}
                 </span>
               </div>
               {i < 4 && (
@@ -664,109 +628,135 @@ export default function OnboardingPage() {
               {step === 4 && <><Sparkles className="w-6 h-6 text-primary" /> Select a Plan</>}
             </CardTitle>
             <CardDescription className="text-muted-foreground text-base">
-              {step === 1 && "What are the names of your overall business entities?"}
-              {step === 2 && "Add all your restaurant brands for each organization."}
-              {step === 3 && "Add locations for each brand."}
+              {step === 1 && "What's the name of your overall business entity?"}
+              {step === 2 && "Add all your restaurant brands. You need at least one."}
+              {step === 3 && "Add locations for each brand. Each brand needs at least one."}
               {step === 4 && "Choose the subscription tier that best fits your needs."}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Step 1: Organizations */}
+            {/* â”€â”€ Step 1: Organization â”€â”€ */}
             {step === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {organizations.map((org, idx) => (
-                  <div key={idx} className="space-y-4 p-5 border rounded-xl bg-card/50 relative group shadow-sm transition-all hover:border-primary/50">
-                    <div className="flex justify-between items-center border-b pb-3">
-                       <Label className="text-foreground font-bold flex items-center gap-2">
-                         <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs">{idx + 1}</span> 
-                         Organization Details
-                       </Label>
-                       {organizations.length > 1 && (
-                         <Button variant="ghost" size="icon" onClick={() => removeOrganization(idx)} className="h-8 w-8 text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 transition-colors">
-                           <Trash2 className="w-4 h-4" />
-                         </Button>
-                       )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`orgName-${idx}`}>Organization Name</Label>
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="space-y-2">
+                  <Label htmlFor="orgName">Organization Name</Label>
+                  <Input 
+                    id="orgName" 
+                    placeholder="e.g. Acme Hospitality Group" 
+                    value={orgName} 
+                    onChange={(e) => handleOrgNameChange(e.target.value)}
+                    className="h-12 text-lg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="orgSlug">Slug (URL identifier)</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-sm">restops.io/</span>
+                    <Input 
+                      id="orgSlug" 
+                      placeholder="acme-hospitality" 
+                      value={orgSlug} 
+                      onChange={(e) => {
+                        setOrgSlug(e.target.value);
+                        setOrgSlugManual(true);
+                      }}
+                      className="h-10 text-sm italic text-primary font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* â”€â”€ Step 2: Brands â”€â”€ */}
+            {step === 2 && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {brands.map((brand, idx) => (
+                  <div key={idx} className="flex items-center gap-2 group">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded-full">
+                          Brand {idx + 1}
+                        </span>
+                      </div>
                       <Input 
-                        id={`orgName-${idx}`}
-                        placeholder="e.g. Acme Hospitality Group" 
-                        value={org.name} 
-                        onChange={(e) => handleOrgNameChange(idx, e.target.value)}
-                        className="h-12 text-lg bg-card"
+                        placeholder={idx === 0 ? "e.g. Acme Burgers" : "e.g. Acme Pizza"} 
+                        value={brand.name} 
+                        onChange={(e) => updateBrandName(idx, e.target.value)}
+                        className="h-12 text-lg"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`orgSlug-${idx}`}>Slug (URL identifier)</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-sm">restops.io/</span>
-                        <Input 
-                          id={`orgSlug-${idx}`}
-                          placeholder="acme-hospitality" 
-                          value={org.slug} 
-                          onChange={(e) => handleOrgSlugChange(idx, e.target.value)}
-                          className="h-10 text-sm italic text-primary font-medium bg-card"
-                        />
-                      </div>
-                    </div>
+                    {brands.length > 1 && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/5 mt-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeBrand(idx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 ))}
                 <Button 
                   variant="outline" 
-                  onClick={addOrganization}
-                  className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-teal-400 transition-colors h-14"
+                  onClick={addBrand}
+                  className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-teal-400 transition-colors"
                 >
-                  <Plus className="w-5 h-5 mr-2" /> Add Another Organization
+                  <Plus className="w-4 h-4 mr-2" /> Add Another Brand
                 </Button>
               </div>
             )}
 
-            {/* Step 2: Brands */}
-            {step === 2 && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {organizations.map((org, orgIdx) => (
-                  <div key={orgIdx} className="space-y-4">
-                    <h3 className="text-lg font-bold text-foreground border-b pb-2 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                      {org.name || `Organization ${orgIdx + 1}`}
-                    </h3>
-                    <div className="pl-2 border-l-2 border-primary/20 space-y-4">
-                      {org.brands.map((brand, brandIdx) => (
-                        <div key={brandIdx} className="flex items-center gap-3 group">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                                Brand {brandIdx + 1}
-                              </span>
+            {/* â”€â”€ Step 3: Locations (grouped by brand) â”€â”€ */}
+            {step === 3 && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {brands.filter(b => b.name.trim()).map((brand, brandIdx) => (
+                  <div key={brandIdx} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Store className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-bold text-foreground">{brand.name}</h3>
+                      <span className="text-xs text-muted-foreground">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
+                    </div>
+
+                    <div className="pl-4 border-l-2 border-teal-100 space-y-3">
+                      {brand.locations.map((loc, locIdx) => (
+                        <div key={locIdx} className="group bg-secondary rounded-lg p-3 border border-border hover:border-primary/20 transition-colors">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 space-y-2">
+                              <Input 
+                                placeholder={locIdx === 0 ? "e.g. Downtown Branch" : "e.g. Airport Location"} 
+                                value={loc.name} 
+                                onChange={(e) => updateLocation(brandIdx, locIdx, 'name', e.target.value)}
+                                className="h-10 bg-card"
+                              />
+                              <Input 
+                                placeholder="123 Street, City, State, ZIP" 
+                                value={loc.address} 
+                                onChange={(e) => updateLocation(brandIdx, locIdx, 'address', e.target.value)}
+                                className="h-9 bg-card text-sm text-muted-foreground"
+                              />
                             </div>
-                            <Input 
-                              placeholder={brandIdx === 0 ? "e.g. Acme Burgers" : "e.g. Acme Pizza"} 
-                              value={brand.name} 
-                              onChange={(e) => updateBrandName(orgIdx, brandIdx, e.target.value)}
-                              className="h-12 text-lg bg-card"
-                            />
+                            {brand.locations.length > 1 && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeLocation(brandIdx, locIdx)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                           </div>
-                          {org.brands.length > 1 && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 mt-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeBrand(orgIdx, brandIdx)}
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </Button>
-                          )}
                         </div>
                       ))}
                       <Button 
-                        variant="outline" 
+                        variant="ghost" 
                         size="sm"
-                        onClick={() => addBrand(orgIdx)}
-                        className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 transition-colors"
+                        onClick={() => addLocation(brandIdx)}
+                        className="text-primary hover:text-primary hover:bg-primary/5 text-xs w-full border border-dashed border-primary/20"
                       >
-                        <Plus className="w-4 h-4 mr-2" /> Add Another Brand to {org.name || `Org ${orgIdx + 1}`}
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Location to {brand.name}
                       </Button>
                     </div>
                   </div>
@@ -774,74 +764,7 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 3: Locations */}
-            {step === 3 && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {organizations.map((org, orgIdx) => (
-                  <div key={orgIdx} className="space-y-6">
-                    <h3 className="text-lg font-bold text-foreground border-b pb-2 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                      {org.name || `Organization ${orgIdx + 1}`}
-                    </h3>
-                    
-                    <div className="space-y-6 pl-2">
-                      {org.brands.filter(b => b.name.trim()).map((brand, brandIdx) => (
-                        <div key={brandIdx} className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Store className="w-4 h-4 text-primary" />
-                            <h4 className="text-sm font-bold text-foreground">{brand.name}</h4>
-                            <span className="text-xs text-muted-foreground">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
-                          </div>
-
-                          <div className="pl-4 border-l-2 border-teal-100 space-y-3">
-                            {brand.locations.map((loc, locIdx) => (
-                              <div key={locIdx} className="group bg-secondary/50 rounded-lg p-3 border border-border hover:border-primary/30 transition-colors">
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-1 space-y-2">
-                                    <Input 
-                                      placeholder={locIdx === 0 ? "e.g. Downtown Branch" : "e.g. Airport Location"} 
-                                      value={loc.name} 
-                                      onChange={(e) => updateLocation(orgIdx, brandIdx, locIdx, 'name', e.target.value)}
-                                      className="h-10 bg-card"
-                                    />
-                                    <Input 
-                                      placeholder="123 Street, City, State, ZIP" 
-                                      value={loc.address} 
-                                      onChange={(e) => updateLocation(orgIdx, brandIdx, locIdx, 'address', e.target.value)}
-                                      className="h-9 bg-card text-sm text-muted-foreground"
-                                    />
-                                  </div>
-                                  {brand.locations.length > 1 && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => addLocation(orgIdx, brandIdx)}
-                              className="text-primary hover:text-primary hover:bg-primary/5 text-xs w-full border border-dashed border-primary/20"
-                            >
-                              <Plus className="w-3.5 h-3.5 mr-1" /> Add Location to {brand.name}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Step 4: Plans */}
+            {/* â”€â”€ Step 4: Plans â”€â”€ */}
             {step === 4 && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -905,7 +828,7 @@ export default function OnboardingPage() {
                 onClick={nextStep} 
                 className="bg-primary hover:bg-primary text-white min-w-[120px]"
                 disabled={
-                  (step === 1 && !hasValidOrgs) || 
+                  (step === 1 && !orgName) || 
                   (step === 2 && !hasValidBrands)
                 }
               >
@@ -946,3 +869,4 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
