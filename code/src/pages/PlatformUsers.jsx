@@ -57,8 +57,7 @@ export default function PlatformUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id")
-        .neq("role", "platform_admin");
+        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
       if (error) throw error;
       return data || [];
     },

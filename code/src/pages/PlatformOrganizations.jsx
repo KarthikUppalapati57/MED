@@ -381,10 +381,11 @@ export default function PlatformOrganizations() {
     }
   };
 
-  const filteredOrgs = orgs.filter(org => 
-    org.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    org.admin_email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrgs = orgs.filter(org => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    return org.name?.toLowerCase().includes(term) || org.admin_email?.toLowerCase().includes(term);
+  });
 
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const orgBrands = brands.filter(b => b.organization_id === selectedOrgId);
