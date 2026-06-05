@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
@@ -61,9 +61,9 @@ export default function PlatformAuditLogs() {
 
   // Filter logs by search
   const filteredLogs = React.useMemo(() => {
-    if (!searchQuery) return auditLogs;
-    const term = searchQuery.toLowerCase();
     return auditLogs.filter(log => {
+      const term = searchQuery.trim().toLowerCase();
+      if (!term) return true;
       return (
         log.action?.toLowerCase().includes(term) ||
         log.table_name?.toLowerCase().includes(term) ||

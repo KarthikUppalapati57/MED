@@ -116,14 +116,16 @@ export default function PlatformUsers() {
   }, [locations]);
 
   const filteredUsers = useMemo(() => {
-    if (!searchQuery) return profiles;
-    const term = searchQuery.toLowerCase();
-    return profiles.filter(p => 
-      p.full_name?.toLowerCase().includes(term) ||
-      p.email?.toLowerCase().includes(term) ||
-      p.role?.toLowerCase().includes(term)
-    );
-  }, [profiles, searchQuery]);
+    const term = searchQuery.trim().toLowerCase();
+    return profiles.filter((p) => {
+      if (!term) return true;
+      const matchSearch =
+        p.full_name?.toLowerCase().includes(term) ||
+        p.email?.toLowerCase().includes(term) ||
+        orgMap[p.organization_id]?.name?.toLowerCase().includes(term);
+      return matchSearch;
+    });
+  }, [profiles, searchQuery, orgMap]);
 
   if (!authChecked) {
     return (

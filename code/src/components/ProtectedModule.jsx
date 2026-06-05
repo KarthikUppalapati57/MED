@@ -21,7 +21,7 @@ import AccessDenied from '@/components/AccessDenied';
  *   </ProtectedModule>
  */
 export default function ProtectedModule({ pageName, children }) {
-  const { organization } = useAuth();
+  const { organization, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
 
   // Look up which module this page belongs to
@@ -39,6 +39,19 @@ export default function ProtectedModule({ pageName, children }) {
   // If the page isn't in any module definition, allow it through
   // (handles pages like OnboardingPage, PaymentVerification that aren't module-gated)
   if (!moduleInfo) return <>{children}</>;
+
+  const userPermissions = userProfile?.page_permissions || userProfile?.permissions || {};
+  const explicitPerm = userPermissions[pageName];
+
+  // If explicitly denied, block immediately
+  if (explicitPerm === 'none') {
+    return <AccessDenied reason="role" requiredRole={moduleInfo.minRole || 'explicit_grant'} />;
+  }
+
+  // If explicitly granted, bypass role and module checks
+  if (explicitPerm === 'read' || explicitPerm === 'full') {
+    return <>{children}</>;
+  }
 
   // Check 1: Role requirement
   if (moduleInfo.minRole && !hasMinRole(moduleInfo.minRole)) {
