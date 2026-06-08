@@ -2,37 +2,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { serve as serveInngest } from "npm:inngest/deno";
 import { inngest } from "../_shared/inngest.ts";
-import { demoRequestedWorkflow } from "./functions/demoRequested.ts";
-import { invoiceProcessedWorkflow } from "./functions/invoiceProcessed.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+
+// Import all functions
+import * as billing from "./functions/billing.ts";
+import * as onboarding from "./functions/onboarding.ts";
+import * as invoices from "./functions/invoices.ts";
+import * as team from "./functions/team.ts";
+
+const functions = [
+  ...Object.values(billing),
+  ...Object.values(onboarding),
+  ...Object.values(invoices),
+  ...Object.values(team),
+];
 
 const handler = serveInngest({
   client: inngest,
-  functions: [
-    demoRequestedWorkflow,
-    invoiceProcessedWorkflow,
-  ],
-  // By default, Inngest looks for a POST/PUT/GET. Supabase Edge Functions pass the req through.
+  functions,
 });
 
 serve(async (req) => {
-  // Handle CORS for browser requests (though Inngest usually hits this directly)
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  const url = new URL(req.url);
+  
+  if (url.pathname === '/functions/v1/inngest') {
+    return await handler(req);
   }
 
-  try {
-    const res = await handler(req);
-    // Add CORS headers to the response
-    for (const [key, value] of Object.entries(corsHeaders)) {
-      res.headers.set(key, value);
-    }
-    return res;
-  } catch (err: any) {
-    console.error("Inngest handler error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+  return new Response(JSON.stringify({ error: "Not Found" }), { 
+    status: 404,
+    headers: { "Content-Type": "application/json" }
+  });
 });
