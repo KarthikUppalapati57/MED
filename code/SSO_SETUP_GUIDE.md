@@ -1,8 +1,9 @@
 # Single Sign-On (SSO) Configuration Guide
 
-To complete Phase 1 and enable Enterprise SSO, you must configure the Identity Providers in your Supabase Dashboard. 
+To complete Phase 1 and enable Enterprise SSO, you must configure the Identity Providers in your Supabase Dashboard.
 
 ## Google SSO
+
 1. Go to the **Google Cloud Console** and create a new project.
 2. Navigate to **APIs & Services > Credentials**.
 3. Create an **OAuth Client ID** (Application type: Web application).
@@ -12,6 +13,7 @@ To complete Phase 1 and enable Enterprise SSO, you must configure the Identity P
 7. Enable **Google**, paste the Client ID and Secret, and click Save.
 
 ## Microsoft / Azure AD SSO
+
 1. Go to the **Azure Active Directory Portal**.
 2. Click **App registrations** -> **New registration**.
 3. Enter a name (e.g., "MEVS Login").
@@ -22,7 +24,9 @@ To complete Phase 1 and enable Enterprise SSO, you must configure the Identity P
 8. Enable **Azure**, paste the Client ID and Secret, and click Save.
 
 ## MFA Update Completed
+
 The application (`App.jsx`) has been updated to **enforce Multi-Factor Authentication (MFA)** *only* for the following high-privilege roles:
+
 - `platform_admin`
 - `org_owner`
 - `branch_manager`
