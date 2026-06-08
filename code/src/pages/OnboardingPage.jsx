@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import posthog from '@/lib/posthog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -273,6 +274,8 @@ export default function OnboardingPage() {
           firstBrand.name,
           { name: firstLocation.name, address: firstLocation.address }
         );
+        
+        posthog.capture('workspace_created', { orgName: org.name });
 
         if (!primaryOrgId) primaryOrgId = result.org.id;
 

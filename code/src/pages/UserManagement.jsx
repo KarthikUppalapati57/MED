@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { logAudit } from '@/lib/audit';
 import { sendInvitationEmail } from '@/lib/emailService';
+import posthog from '@/lib/posthog';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -633,8 +634,10 @@ function InviteDialog({ open, onClose, orgId }) {
           }
         }).catch(e => console.warn('Invitation email failed (non-fatal):', e));
 
+        posthog.capture('team_member_invited', { role, method: 'link' });
         toast.success(`Invitation generated for ${email}`);
       } else {
+        posthog.capture('team_member_invited', { role, method: 'email' });
         toast.success(`Invitation sent to ${email}`);
         setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
         onClose();
@@ -817,6 +820,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           }]);
         }
+        posthog.capture('team_member_invited', { role, method: 'csv' });
         successCount++;
       } catch (err) {
         console.warn('CSV row invite failed:', err.message);
@@ -1344,6 +1348,7 @@ export default function UserManagement() {
                                     try {
                                       const { error } = await supabase.rpc('org_remove_member', { target_user_id: userId });
                                       if (error) throw error;
+                                      posthog.capture('team_member_removed');
                                       toast.success('User removed from organization');
                                       queryClient.invalidateQueries({ queryKey: ['team-members'] });
                                     } catch (e) { 

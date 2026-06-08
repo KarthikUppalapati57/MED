@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { notifyManagers } from '@/lib/notificationService';
 import { sendInvoiceUploadNotification, sendInvoiceStatusEmail } from '@/lib/emailService';
+import posthog from '@/lib/posthog';
 import { format } from 'date-fns';
 import {
   Search,
@@ -310,7 +311,10 @@ export default function Invoices() {
       
       if (savedInvoice.status === 'approved') {
         await syncInvoiceToProductsAndInventory(savedInvoice);
+        posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
         toast.success('Invoice approved & products/inventory updated');
+      } else {
+        posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
       }
       
       setEditorOpen(false);
@@ -498,6 +502,7 @@ export default function Invoices() {
         console.warn('Could not create LedgerBill:', billErr);
       }
       
+      posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
       toast.success('Invoice approved & products/inventory updated');
     } catch (err) {
       console.error('Approve failed:', err);
@@ -510,6 +515,7 @@ export default function Invoices() {
       id: invoice.id, 
       data: { status: 'rejected' }
     });
+    posthog.capture('invoice_failed', { invoiceId: invoice.id, reason: 'rejected' });
   };
 
   const handleEditorSave = async () => {
@@ -527,6 +533,7 @@ export default function Invoices() {
         savedInvoice = await createMutation.mutateAsync(invoiceData);
         setEditingInvoice(savedInvoice);
       }
+      posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
       toast.success('Invoice saved for later');
 
       // â”€â”€ Notify managers (in-app + email) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -579,6 +586,7 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       await syncInvoiceToProductsAndInventory(savedInvoice);
+      posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
       toast.success('Invoice approved â€” items staged for 24h review before finalizing in inventory');
 
       // Email the original uploader that their invoice was approved
@@ -618,6 +626,7 @@ export default function Invoices() {
       } else {
         savedInvoice = await createMutation.mutateAsync(data);
       }
+      posthog.capture('invoice_failed', { invoiceId: savedInvoice.id, reason: 'rejected' });
 
       // Email the original uploader that their invoice was rejected
       const createdBy = savedInvoice?.created_by || editingInvoice?.created_by;

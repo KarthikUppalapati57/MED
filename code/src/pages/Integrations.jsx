@@ -12,6 +12,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import posthog from '@/lib/posthog';
 
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
@@ -186,6 +187,7 @@ export default function Integrations() {
         is_active: true
       });
       queryClient.invalidateQueries(['integrations']);
+      posthog.capture('integration_enabled', { integration: selectedIntegration.id, type: selectedIntegration.type });
       toast.success(`${selectedIntegration.name} connected successfully`, { id: toastId });
     } catch (error) {
       toast.error(`Failed to connect: ${error.message}`, { id: toastId });
@@ -204,6 +206,7 @@ export default function Integrations() {
       try {
         await api.entities.Integration.delete(dbInt.id);
         queryClient.invalidateQueries(['integrations']);
+        posthog.capture('integration_disabled', { integration: integrationId });
         toast.success(`${name} disconnected`);
       } catch (error) {
         toast.error(`Failed to disconnect: ${error.message}`);

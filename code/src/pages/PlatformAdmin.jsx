@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import InventoryAudit from '@/components/accounting/InventoryAudit';
 import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
+import posthog from '@/lib/posthog';
 
 
 const TABS = [
@@ -321,6 +322,7 @@ export default function PlatformAdmin() {
       } else {
         toast.success("Onboarding link generated and invitation email sent!", { id: toastId });
       }
+      posthog.capture('client_invited', { email: inviteEmail, role: 'owner' });
     } catch (e) {
       console.error('Invite generation failed:', e);
       toast.error(e.message || "Failed to generate invitation", { id: toastId });
@@ -402,6 +404,8 @@ The Restops Platform Team
         toast.success("Demo request accepted! Onboarding link sent to client.", { id: toastId });
       }
 
+      posthog.capture('demo_request_approved', { email: request.email });
+
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
       queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
@@ -461,6 +465,7 @@ The Restops Platform Team
       } else {
         toast.success("Request rejected and notification email sent.", { id: toastId });
       }
+      posthog.capture('demo_request_rejected', { email: request.email });
       queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
 
     } catch (err) {
@@ -591,6 +596,7 @@ The Restops Platform Team
         .eq('id', id);
       if (error) throw error;
       
+      posthog.capture('organization_deleted', { org_id: id });
       toast.success("Organization archived", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['organizations'] });
     } catch (err) {

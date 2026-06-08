@@ -636,6 +636,7 @@ export const AuthProvider = ({ children }) => {
         setAuthError(error);
         return { data: null, error };
       }
+      posthog.capture('user_logged_in');
       return { data, error: null };
     } catch (err) {
       setAuthError(err);
@@ -680,6 +681,7 @@ export const AuthProvider = ({ children }) => {
         setAuthError(error);
         return { data: null, error };
       }
+      posthog.capture('user_registered');
       return { data, error: null };
     } catch (err) {
       setAuthError(err);
@@ -700,6 +702,7 @@ export const AuthProvider = ({ children }) => {
         setAuthError(error);
         return { data: null, error };
       }
+      posthog.capture('password_reset_requested');
       return { data, error: null };
     } catch (err) {
       setAuthError(err);

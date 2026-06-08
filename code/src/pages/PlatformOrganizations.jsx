@@ -17,6 +17,7 @@ import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from '@/lib/moduleConfig';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import Papa from 'papaparse';
+import posthog from '@/lib/posthog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -151,6 +152,7 @@ export default function PlatformOrganizations() {
         .eq('id', selectedOrgId);
         
       if (error) throw error;
+      posthog.capture('workspace_updated');
       toast.success("Billing & configuration updated");
 
       // Notify Org Owner
@@ -186,6 +188,7 @@ export default function PlatformOrganizations() {
       const { error } = await supabase.from('organizations').delete().eq('id', selectedOrgId);
       if (error) throw error;
       
+      posthog.capture('workspace_deleted');
       toast.success("Organization successfully deleted");
       setSelectedOrgId(null);
       queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
