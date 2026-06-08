@@ -9,6 +9,7 @@ import os
 import tempfile
 import traceback
 
+import posthog
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from invoice_parser import parse_with_docling, extract_invoice_fields
 
 load_dotenv()
+
+posthog.project_api_key = os.environ.get("POSTHOG_API_KEY", "")
+posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
 
 app = FastAPI(
     title="MEVS Invoice Extraction API",
@@ -90,12 +94,31 @@ async def extract_invoice(file: UploadFile = File(...)):
         invoice_data["extraction_method"] = "docling"
         invoice_data["raw_text"] = markdown_text
 
+        posthog.capture(
+            "backend",
+            "invoice_extracted",
+            {
+                "file_type": file.content_type,
+                "filename": file.filename,
+                "extraction_method": "docling",
+            },
+        )
+
         return invoice_data
 
     except HTTPException:
         raise
     except Exception as e:
         traceback.print_exc()
+        posthog.capture(
+            "backend",
+            "invoice_extraction_failed",
+            {
+                "file_type": file.content_type,
+                "filename": file.filename,
+                "error": str(e),
+            },
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Extraction failed: {str(e)}",
