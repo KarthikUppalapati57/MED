@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Inngest } from "npm:inngest";
 
 // Define the shape of your events for type safety

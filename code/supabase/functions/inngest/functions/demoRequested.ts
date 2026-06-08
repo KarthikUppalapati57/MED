@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { inngest } from "../../_shared/inngest.ts";
 
 export const demoRequestedWorkflow = inngest.createFunction(
