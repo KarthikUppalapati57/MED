@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/lib/query-client';
 import { queryClientInstance } from '@/lib/query-client';
+import posthog from '@/lib/posthog';
 
 // Canonical app URL — use VITE_APP_URL if set, otherwise fall back to current origin.
 // This prevents the password reset redirecting to Vercel's default login page.
@@ -441,6 +442,12 @@ export const AuthProvider = ({ children }) => {
               // 1. Set the user IMMEDIATELY from the session
               setUser(currentUser);
               
+              if (currentUser) {
+                posthog.identify(currentUser.id, {
+                  email: currentUser.email,
+                  role: currentUser.app_metadata?.role
+                });
+              }
               // 2. Set MFA from session data SYNCHRONOUSLY
               const factors = currentUser.factors || [];
               setMfaFactors(factors);
@@ -535,6 +542,7 @@ export const AuthProvider = ({ children }) => {
             clearCachedProfile();
             // Clear all cached query data to prevent data leaks after logout
             clearAllQueries();
+            posthog.reset();
             setIsLoadingAuth(false);
           } else if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
             if (currentUser) {
