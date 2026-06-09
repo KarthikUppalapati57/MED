@@ -387,7 +387,7 @@ export default function Layout({ children, currentPageName }) {
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Brand */}
-        <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0 relative overflow-hidden">
+        <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0 relative overflow-visible z-10">
           <div className="absolute bottom-0 left-6 right-6 h-[1.5px] bg-gradient-to-r from-transparent via-brand to-transparent opacity-80 animate-pulse" />
           <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity">
             <RestopsLogo className="h-12" />
