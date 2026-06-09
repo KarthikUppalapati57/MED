@@ -130,7 +130,7 @@ function SignupPage() {
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
           <div className="flex justify-center mb-6 animate-float">
-            <RestopsLogo className="h-16" />
+            <RestopsLogo className="h-16" origin="origin-center" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -302,7 +302,7 @@ function LoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
         <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
           <div className="flex justify-center mb-6 animate-float">
-            <RestopsLogo className="h-16" />
+            <RestopsLogo className="h-16" origin="origin-center" />
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
@@ -369,7 +369,7 @@ function LoginPage() {
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
           <div className="flex justify-center mb-6 animate-float">
-            <RestopsLogo className="h-16" />
+            <RestopsLogo className="h-16" origin="origin-center" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">
             Welcome Back
@@ -450,7 +450,7 @@ function PendingAssignmentPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6 animated-mesh relative overflow-hidden">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 border border-border/50 text-center space-y-6 animate-fade-in-scale relative z-10">
         <div className="flex justify-center mb-2 animate-float">
-          <RestopsLogo className="h-16" />
+          <RestopsLogo className="h-16" origin="origin-center" />
         </div>
         
         <div className="space-y-2">
@@ -552,7 +552,7 @@ function UpdatePasswordPage() {
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 animate-fade-in-scale relative z-10">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-6 animate-float">
-            <RestopsLogo className="h-16" />
+            <RestopsLogo className="h-16" origin="origin-center" />
           </div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Update Password</h1>
           <p className="text-muted-foreground text-sm">Enter your new secure password below.</p>
