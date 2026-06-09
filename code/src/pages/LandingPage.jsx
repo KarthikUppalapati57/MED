@@ -29,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { motion, useScroll, useTransform, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring, AnimatePresence } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 
 // Magnetic Button Component for premium hover effects
@@ -178,11 +178,35 @@ export default function LandingPage() {
               </button>
             </div>
           </div>
+
+          <AnimatePresence>
+            {isMenuOpen && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="md:hidden border-t border-border mt-2 py-4 flex flex-col gap-4 text-[11px] font-bold tracking-[2px] text-muted-foreground uppercase overflow-hidden"
+              >
+                <a href="#features" onClick={() => setIsMenuOpen(false)} className="hover:text-foreground transition-colors px-2 py-2">Infrastructure</a>
+                <a href="#showcase" onClick={() => setIsMenuOpen(false)} className="hover:text-foreground transition-colors px-2 py-2">Telemetry</a>
+                <a href="#pricing" onClick={() => setIsMenuOpen(false)} className="hover:text-foreground transition-colors px-2 py-2">Pricing</a>
+                <div className="flex items-center justify-between px-2 py-2">
+                  <span>Theme</span>
+                  <ThemeToggle />
+                </div>
+                <button onClick={() => { setIsMenuOpen(false); navigate('/login'); }} className="text-left hover:text-foreground transition-colors px-2 py-2">Log in</button>
+                <Button onClick={() => { setIsMenuOpen(false); setIsDemoModalOpen(true); }} className="mt-2 w-full bg-foreground text-background hover:bg-brand hover:text-foreground tracking-[2px] uppercase h-10 rounded-xl">
+                  BOOK DEMO
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.nav>
 
       {/* Hero Section */}
-      <section className="relative h-screen flex flex-col justify-center overflow-hidden z-10 pt-20">
+      <section className="relative min-h-screen flex flex-col justify-center overflow-hidden z-10 pt-32 pb-20">
         <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <motion.div 
             style={{ opacity: heroOpacity, scale: heroScale }}
