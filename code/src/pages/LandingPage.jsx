@@ -139,7 +139,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground selection:bg-brand/30 font-sans antialiased overflow-x-hidden">
       
       {/* 3D BACKBONE */}
       <div className="fixed inset-0 z-0 pointer-events-none">
