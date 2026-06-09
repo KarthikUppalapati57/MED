@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
 import RestopsLogo from '@/components/RestopsLogo';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import scannerImg from '../assets/scanner.png';
 import { 
   Menu, 
@@ -159,7 +160,8 @@ export default function LandingPage() {
               <a href="#features" className="hover:text-foreground transition-colors">Infrastructure</a>
               <a href="#showcase" className="hover:text-foreground transition-colors">Telemetry</a>
               <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-              <div className="h-4 w-[1px] bg-foreground/10 mx-2" />
+              <div className="h-4 w-[1px] bg-border mx-2" />
+              <ThemeToggle />
               <button className="hover:text-foreground transition-colors" onClick={() => navigate('/login')}>Log in</button>
               
               <MagneticButton 
