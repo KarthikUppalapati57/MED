@@ -8,12 +8,12 @@ export default function RestopsLogo({ className = "h-12", showText = true }) {
         <img 
           src="/app-name.png" 
           alt="Platform Name" 
-          className="h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[1.75] origin-left mix-blend-multiply" 
+          className="h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[3.5] origin-left mix-blend-multiply" 
         />
         <img 
           src="/app-name-dark.png" 
           alt="Platform Name" 
-          className="h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[1.75] origin-left invert mix-blend-screen opacity-90" 
+          className="h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[3.5] origin-left invert mix-blend-screen opacity-90" 
         />
       </div>
     </div>
