@@ -2,22 +2,27 @@ import React from 'react';
 
 export default function RestopsLogo({ className = "h-12", showText = true }) {
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      {/* Brand Wordmark Image (Scaled up for prominence) */}
-      <div className="h-full flex items-center overflow-visible">
-        <img 
-          src="/app-name.png" 
-          alt="Platform Name" 
-          draggable={false}
-          className="h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[3.5] origin-left mix-blend-multiply select-none" 
-        />
-        <img 
-          src="/app-name-dark.png" 
-          alt="Platform Name" 
-          draggable={false}
-          className="h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[3.5] origin-left invert mix-blend-screen opacity-90 select-none" 
-        />
-      </div>
+    <div className={`relative flex items-center justify-center overflow-hidden aspect-[4/1] shrink-0 ${className}`}>
+      {/* 
+        Instead of using CSS transform scale (which breaks layout boundaries and causes overlapping patches),
+        we use an absolute image inside an overflow-hidden container to natively crop out the image's built-in padding.
+      */}
+      <img 
+        src="/app-name.png" 
+        alt="Platform Name" 
+        draggable={false}
+        className="absolute top-1/2 left-1/2 w-[180%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain dark:hidden block mix-blend-multiply select-none pointer-events-none" 
+      />
+      {/* 
+        For dark mode: mix-blend-lighten or screen naturally drops the dark background 
+        without needing to invert it, preventing grey patch artifacts.
+      */}
+      <img 
+        src="/app-name-dark.png" 
+        alt="Platform Name" 
+        draggable={false}
+        className="absolute top-1/2 left-1/2 w-[180%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain hidden dark:block mix-blend-screen opacity-90 select-none pointer-events-none" 
+      />
     </div>
   );
 }
