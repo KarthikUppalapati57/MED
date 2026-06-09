@@ -101,7 +101,7 @@ export default function Notifications() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-300">
+    <div className="p-8 w-full max-w-[2400px] mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-300">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">

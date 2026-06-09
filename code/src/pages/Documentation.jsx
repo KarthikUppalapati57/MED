@@ -172,7 +172,7 @@ export default function Documentation() {
           style={{ scale: sphereScale, opacity: sphereOpacity }}
           className="absolute inset-0 flex items-center justify-center opacity-40"
         >
-          <div className="w-full h-full max-w-7xl max-h-[100vh]">
+          <div className="w-full h-full max-w-[2400px] max-h-[100vh]">
             <InteractiveScene />
           </div>
         </motion.div>
@@ -180,7 +180,7 @@ export default function Documentation() {
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 border-b border-black/5 bg-[#fdf8f1]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <Link to="/" className="flex items-center gap-2 group">
               <div className="h-6 w-6 rounded-sm bg-black group-hover:bg-[#ff5c35] transition-colors flex items-center justify-center">
@@ -226,7 +226,7 @@ export default function Documentation() {
 
       {/* Modules Section */}
       <section className="relative py-24 border-t border-black/5 z-10 bg-[#fdf8f1]/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-20 text-center">
             <h2 className="text-3xl font-bold tracking-tighter mb-4 text-black uppercase">Core Modules</h2>
             <div className="h-0.5 w-16 bg-[#ff5c35] mx-auto" />

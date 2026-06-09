@@ -156,7 +156,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="flex-1 space-y-6 p-4 md:p-8 w-full max-w-[2400px] mx-auto">
       {/* Welcome Banner */}
       <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-6 md:p-8 text-white shadow-xl overflow-hidden animate-in fade-in duration-500">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />

@@ -475,7 +475,7 @@ export default function PlatformOrganizations() {
       <div className="flex-1 bg-secondary/10 flex flex-col h-full overflow-hidden relative">
         {selectedOrg ? (
           <ScrollArea className="flex-1">
-            <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-300">
+            <div className="p-8 w-full max-w-[2400px] mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-300">
               
               {/* Header */}
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">

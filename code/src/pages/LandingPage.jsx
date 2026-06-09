@@ -151,7 +151,7 @@ export default function LandingPage() {
         style={{ backgroundColor: navBackground, borderColor: navBorder, backdropFilter: "blur(12px)" }}
         className="fixed top-0 w-full z-50 border-b"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <RestopsLogo className="h-8" />
             
@@ -181,7 +181,7 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative h-screen flex flex-col justify-center overflow-hidden z-10 pt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <motion.div 
             style={{ opacity: heroOpacity, scale: heroScale }}
             className="max-w-5xl"
@@ -252,7 +252,7 @@ export default function LandingPage() {
         
         {/* Stats Bar */}
         <section className="py-16 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-16">
               <StatItem value="99.9%" label="Sync Fidelity" />
               <StatItem value="0.8ms" label="Latency Delta" />
@@ -264,7 +264,7 @@ export default function LandingPage() {
 
         {/* Showcase Section */}
         <section id="showcase" className="py-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col lg:flex-row items-center gap-32">
               <motion.div 
                 initial={{ opacity: 0, x: -60 }}
@@ -310,7 +310,7 @@ export default function LandingPage() {
 
         {/* Features Modules */}
         <section id="features" className="py-32 bg-black/20 backdrop-blur-sm border-y border-white/5">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -334,7 +334,7 @@ export default function LandingPage() {
 
         {/* Pricing */}
         <section id="pricing" className="py-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-24">
               <h2 className="text-5xl font-bold tracking-tighter mb-6 text-white">Licensing</h2>
               <p className="text-white/40 text-lg font-bold tracking-widest uppercase">Select your tier</p>
@@ -381,7 +381,7 @@ export default function LandingPage() {
 
         {/* Footer */}
         <footer className="relative py-20 border-t border-white/10 bg-[#050508]/60 backdrop-blur-xl z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-8">
               <RestopsLogo className="h-8 grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all" />
               <p className="text-[9px] text-white/30 font-bold tracking-[5px] uppercase">© 2026 RESTOPS INC. BUILT FOR SCALE.</p>
