@@ -5,7 +5,54 @@
 @tailwind utilities;
 
 @layer base {
+  
   :root {
+    --background: 0 0% 100%;
+    --foreground: 228 33% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 228 33% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 228 33% 15%;
+    --primary: 15 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 10% 92%;
+    --secondary-foreground: 228 33% 20%;
+    --muted: 228 10% 96%;
+    --muted-foreground: 220 3% 40%;
+    --accent: 228 10% 92%;
+    --accent-foreground: 228 33% 15%;
+    --destructive: 351 100% 56%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 228 10% 90%;
+    --input: 228 10% 90%;
+    --ring: 15 100% 60%;
+    --radius: 0.6rem;
+    --brand: 15 100% 60%;
+    --glow-orange: 15 100% 60%;
+    --glow-teal: 182 82% 44%;
+    --surface-card: 0 0% 100%;
+    --surface-elevated: 228 20% 98%;
+    --surface-deep: 228 20% 95%;
+    --hairline: 0 0% 0% / 0.04;
+    --hairline-strong: 0 0% 0% / 0.08;
+    --ink: 228 33% 10%;
+    --body-text: 228 33% 20%;
+    --charcoal: 228 33% 30%;
+    --mute-text: 210 4% 45%;
+    --ash-text: 200 3% 55%;
+    --stone-text: 210 4% 70%;
+    --sidebar-background: 228 10% 98%;
+    --sidebar-foreground: 228 33% 20%;
+    --sidebar-primary: 15 100% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 228 10% 92%;
+    --sidebar-accent-foreground: 228 33% 15%;
+    --sidebar-border: 228 10% 90%;
+    --sidebar-ring: 15 100% 60%;
+  }
+
+  .dark {
+
     /* ═══════════════════════════════════════════════════
        EDGE-OPS PREMIUM DARK MODE (Default)
        Deep indigo-charcoal canvas, glassmorphic borders, ambient teal glows
