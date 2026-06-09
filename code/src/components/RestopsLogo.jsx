@@ -17,7 +17,7 @@ export default function RestopsLogo({ className = "h-12", showText = true }) {
           src="/app-name-dark.png" 
           alt="Platform Name" 
           draggable={false}
-          className="h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[2.5] origin-left select-none pointer-events-none" 
+          className="h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[2.5] origin-left invert mix-blend-screen opacity-90 select-none pointer-events-none" 
         />
       </div>
     </div>
