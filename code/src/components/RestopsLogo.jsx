@@ -11,7 +11,7 @@ export default function RestopsLogo({ className = "h-12", origin = "origin-left"
           src="/app-name.png" 
           alt="Platform Name" 
           draggable={false}
-          className={`h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[2.5] ${origin} select-none pointer-events-none`} 
+          className={`h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[2.5] ${origin} mix-blend-multiply select-none pointer-events-none`} 
         />
         <img 
           src="/app-name-dark.png" 
