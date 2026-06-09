@@ -9,14 +9,14 @@ export default function RestopsLogo({ className = "h-12", origin = "origin-left"
           src="/app-name.png" 
           alt="Platform Name" 
           draggable={false}
-          className={`h-full w-auto object-contain shrink-0 dark:hidden block ${origin} select-none pointer-events-none`} 
+          className={`h-full w-auto object-contain shrink-0 dark:hidden block transform scale-[2] ${origin} select-none pointer-events-none`} 
         />
         {/* Dark Mode Logo - Preserves original colors, uses a subtle white drop-shadow for text legibility against dark backgrounds */}
         <img 
           src="/app-name-dark.png" 
           alt="Platform Name" 
           draggable={false}
-          className={`h-full w-auto object-contain shrink-0 hidden dark:block ${origin} select-none pointer-events-none drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]`} 
+          className={`h-full w-auto object-contain shrink-0 hidden dark:block transform scale-[2] ${origin} select-none pointer-events-none drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]`} 
         />
       </div>
     </div>
