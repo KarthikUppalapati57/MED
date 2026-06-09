@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, Sparkles, Stars } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from '@/components/ThemeProvider';
 
 // Highly interactive particle wave terrain
 function ParticleWave() {
@@ -103,20 +104,26 @@ function ParticleWave() {
 }
 
 const InteractiveScene = () => {
+  const { theme } = useTheme();
+  
+  // Resolve actual theme if set to 'system'
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const bgColor = isDark ? '#050508' : '#ffffff';
+
   return (
-    <div className="w-full h-full absolute inset-0 -z-10 bg-[#050508]">
+    <div className="w-full h-full absolute inset-0 -z-10 bg-transparent">
       <Canvas 
         camera={{ position: [0, 8, 20], fov: 60 }}
         dpr={[1, 2]} // High DPI for crisp lines
-        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       >
-        <color attach="background" args={['#050508']} />
+        <color attach="background" args={[bgColor]} />
         
         {/* Intense lighting for reflections */}
-        <ambientLight intensity={0.5} />
-        <spotLight position={[0, 20, 0]} penumbra={1} intensity={3} color="#ff5c35" castShadow />
-        <pointLight position={[-10, 5, -10]} intensity={4} color="#ff5c35" />
-        <pointLight position={[10, 5, 10]} intensity={2} color="#14c6cb" />
+        <ambientLight intensity={isDark ? 0.5 : 0.8} />
+        <spotLight position={[0, 20, 0]} penumbra={1} intensity={isDark ? 3 : 1.5} color="#ff5c35" castShadow />
+        <pointLight position={[-10, 5, -10]} intensity={isDark ? 4 : 2} color="#ff5c35" />
+        <pointLight position={[10, 5, 10]} intensity={isDark ? 2 : 1} color="#14c6cb" />
 
         {/* The massive interactive terrain */}
         <Float speed={1.5} floatIntensity={0.5} rotationIntensity={0.1}>
@@ -124,14 +131,14 @@ const InteractiveScene = () => {
         </Float>
         
         {/* Background elements (Orange & Teal sparkles) */}
-        <Sparkles count={400} scale={30} size={3} speed={0.8} color="#ff5c35" opacity={0.6} />
-        <Sparkles count={200} scale={30} size={2} speed={0.5} color="#14c6cb" opacity={0.4} />
+        <Sparkles count={400} scale={30} size={3} speed={0.8} color="#ff5c35" opacity={isDark ? 0.6 : 0.3} />
+        <Sparkles count={200} scale={30} size={2} speed={0.5} color="#14c6cb" opacity={isDark ? 0.4 : 0.2} />
         
         {/* Deep starfield */}
-        <Stars radius={100} depth={50} count={8000} factor={4} saturation={0} fade speed={2} />
+        <Stars radius={100} depth={50} count={8000} factor={isDark ? 4 : 2} saturation={0} fade speed={2} color={isDark ? '#ffffff' : '#000000'} />
         
         {/* Fog to cut off the grid elegantly in the distance */}
-        <fog attach="fog" args={['#050508', 10, 30]} />
+        <fog attach="fog" args={[bgColor, 10, 30]} />
       </Canvas>
     </div>
   );
