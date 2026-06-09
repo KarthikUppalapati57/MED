@@ -22,6 +22,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Card } from '@/components/ui/card';
+import RestopsLogo from '@/components/RestopsLogo';
 // Initialize global error monitoring
 initGlobalErrorHandlers();
 
@@ -128,8 +129,8 @@ function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <div className="flex justify-center mb-6 animate-float">
+            <RestopsLogo className="h-16" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -300,6 +301,9 @@ function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
         <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
+          <div className="flex justify-center mb-6 animate-float">
+            <RestopsLogo className="h-16" />
+          </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -364,11 +368,11 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
         <div className="text-center">
-          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <div className="flex justify-center mb-6 animate-float">
+            <RestopsLogo className="h-16" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">
-            Welcome to Restops
+            Welcome Back
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Sign in with your credentials
@@ -445,10 +449,8 @@ function PendingAssignmentPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 animated-mesh relative overflow-hidden">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 border border-border/50 text-center space-y-6 animate-fade-in-scale relative z-10">
-        <div className="w-16 h-16 bg-resend-orange/15 border border-resend-orange/30 rounded-full flex items-center justify-center mx-auto animate-float">
-          <svg className="w-8 h-8 text-resend-orange" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+        <div className="flex justify-center mb-2 animate-float">
+          <RestopsLogo className="h-16" />
         </div>
         
         <div className="space-y-2">
@@ -549,10 +551,8 @@ function UpdatePasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4 animated-mesh relative overflow-hidden">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 animate-fade-in-scale relative z-10">
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-3 animate-float">
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-brand">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-            </svg>
+          <div className="flex justify-center mb-6 animate-float">
+            <RestopsLogo className="h-16" />
           </div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Update Password</h1>
           <p className="text-muted-foreground text-sm">Enter your new secure password below.</p>

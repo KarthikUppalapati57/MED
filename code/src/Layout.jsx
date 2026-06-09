@@ -50,6 +50,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { isPageInEnabledModules } from '@/lib/moduleConfig';
 import ContextSwitcher from '@/components/ContextSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import RestopsLogo from '@/components/RestopsLogo';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -388,11 +389,8 @@ export default function Layout({ children, currentPageName }) {
         {/* Brand */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-border shrink-0 relative overflow-hidden">
           <div className="absolute bottom-0 left-6 right-6 h-[1.5px] bg-gradient-to-r from-transparent via-brand to-transparent opacity-80 animate-pulse" />
-          <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2.5 group">
-            <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(20,198,203,0.35)]">
-              <Package className="h-4.5 w-4.5 text-black" />
-            </div>
-            <span className="text-lg font-bold text-foreground tracking-tight group-hover:text-brand transition-colors duration-200">Restops</span>
+          <Link to={createPageUrl('Dashboard')} className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity">
+            <RestopsLogo className="h-12" />
           </Link>
           <button 
             onClick={() => setSidebarOpen(false)}
