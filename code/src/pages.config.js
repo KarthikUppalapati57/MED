@@ -41,6 +41,7 @@ const AvTCosting = React.lazy(() => import('./pages/AvTCosting'));
 const Performance = React.lazy(() => import('./pages/Performance'));
 const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
 const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
+const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -73,6 +74,7 @@ export const PAGES = {
     "Performance": Performance,
     "MenuEngineering": MenuEngineering,
     "RestaurantSetup": RestaurantSetup,
+    "DeveloperPortal": DeveloperPortal,
 }
 
 export const pagesConfig = {

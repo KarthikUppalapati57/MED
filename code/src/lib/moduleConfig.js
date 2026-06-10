@@ -21,7 +21,7 @@ export const MODULE_DEFINITIONS = {
   recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering"], minRole: "location_manager", icon: "ChefHat" },
   vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "location_manager", icon: "Store" },
   admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
-  integrations: { label: "Integrations",  pages: ["Integrations"], minRole: "org_owner", icon: "Settings" },
+  integrations: { label: "Integrations",  pages: ["Integrations", "DeveloperPortal"], minRole: "org_owner", icon: "Settings" },
   performance:{ label: "Performance",     pages: ["Performance"], minRole: "manager", icon: "Activity" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
   accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
