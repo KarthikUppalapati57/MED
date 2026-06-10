@@ -44,7 +44,7 @@ export function getEnabledPages(enabledModules) {
     : CORE_MODULE_KEYS;
   const pages = new Set();
   modulesList.forEach(moduleKey => {
-    const mod = MODULE_DEFINITIONS[moduleKey];
+    const mod = MODULE_DEFINITIONS[moduleKey.toLowerCase()];
     if (mod) mod.pages.forEach(p => pages.add(p));
   });
   // Always include core module pages even if not explicitly listed
@@ -71,7 +71,8 @@ export function isPageInEnabledModules(pageName, enabledModules) {
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
   // Operational modules: require explicit inclusion
   const modulesList = enabledModules || [];
-  return modulesList.includes(moduleInfo.key);
+  const normalizedList = modulesList.map(m => m.toLowerCase());
+  return normalizedList.includes(moduleInfo.key.toLowerCase());
 }
 
 /**
