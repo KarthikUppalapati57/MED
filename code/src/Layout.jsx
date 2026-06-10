@@ -32,7 +32,8 @@ import {
   ArrowRightLeft,
   Trash2,
   Plus,
-  Receipt
+  Receipt,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -613,6 +614,17 @@ export default function Layout({ children, currentPageName }) {
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
+          {currentPageName !== 'Dashboard' && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="mb-4 text-muted-foreground hover:text-foreground group -ml-2"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+              Back
+            </Button>
+          )}
           {children}
         </main>
       </div>
