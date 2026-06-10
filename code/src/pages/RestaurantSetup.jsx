@@ -8,7 +8,10 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, Plus, Trash2, Smartphone } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 export default function RestaurantSetup() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'pos';
@@ -19,6 +22,24 @@ export default function RestaurantSetup() {
   const [syncInterval, setSyncInterval] = React.useState('15');
   const [isTesting, setIsTesting] = React.useState(false);
   const [testStatus, setTestStatus] = React.useState(null); // 'success' | 'error' | null
+
+  // Store Groups
+  const [storeGroup, setStoreGroup] = React.useState('');
+  const [newGroup, setNewGroup] = React.useState('');
+
+  // Shared Devices
+  const [devices, setDevices] = React.useState([
+    { id: 1, name: 'Kitchen KDS', status: 'Active', lastActive: '2 mins ago' },
+    { id: 2, name: 'Front Register', status: 'Active', lastActive: 'Just now' },
+  ]);
+
+  // Notifications
+  const [notifications, setNotifications] = React.useState({
+    lowStock: true,
+    largeOrders: true,
+    eodSummary: false,
+    systemAlerts: true
+  });
 
   const handleSave = () => {
     toast.success("Settings saved successfully!");
@@ -133,20 +154,105 @@ export default function RestaurantSetup() {
               <CardTitle>Store Groupings</CardTitle>
               <CardDescription>Assign this location to organizational groups for consolidated reporting.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Manage reporting groups. (Workflow under development)</p>
+            <CardContent className="space-y-6 max-w-md">
+              <div className="space-y-2">
+                <Label>Primary Region/District</Label>
+                <Select value={storeGroup} onValueChange={setStoreGroup}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="north">North Region</SelectItem>
+                    <SelectItem value="south">South Region</SelectItem>
+                    <SelectItem value="east">East Region</SelectItem>
+                    <SelectItem value="west">West Region</SelectItem>
+                    <SelectItem value="central">Central District</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-4 border-t border-border/40 space-y-4">
+                <Label>Create New Group</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Enter new group name..." 
+                    value={newGroup}
+                    onChange={(e) => setNewGroup(e.target.value)}
+                  />
+                  <Button type="button" variant="secondary" onClick={() => {
+                    if (newGroup) {
+                      toast.success(`Group "${newGroup}" created`);
+                      setNewGroup('');
+                    }
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" /> Add
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="devices" className="space-y-6">
           <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>Shared Devices</CardTitle>
-              <CardDescription>Manage terminals and tablets used by staff without individual logins.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-1.5">
+                <CardTitle>Shared Devices</CardTitle>
+                <CardDescription>Manage terminals and tablets used by staff without individual logins.</CardDescription>
+              </div>
+              <Button onClick={() => toast.success("New PIN: 8492-4192. Valid for 10 minutes.")}>
+                <Plus className="h-4 w-4 mr-2" /> Register Device
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Register devices via PIN. (Workflow under development)</p>
+            <CardContent>
+              <div className="rounded-md border border-border/50">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Device Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Active</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {devices.map((device) => (
+                      <TableRow key={device.id}>
+                        <TableCell className="font-medium flex items-center">
+                          <Smartphone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {device.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                            {device.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{device.lastActive}</TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={() => {
+                              setDevices(devices.filter(d => d.id !== device.id));
+                              toast.success("Device removed successfully");
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {devices.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          No shared devices registered.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -157,8 +263,50 @@ export default function RestaurantSetup() {
               <CardTitle>Notification Rules</CardTitle>
               <CardDescription>Configure alerts for inventory thresholds, large orders, and system events.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Define custom rules. (Workflow under development)</p>
+            <CardContent className="space-y-6 max-w-md">
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label>Low Stock Alerts</Label>
+                  <p className="text-sm text-muted-foreground">Receive alerts when inventory falls below minimums.</p>
+                </div>
+                <Switch 
+                  checked={notifications.lowStock}
+                  onCheckedChange={(c) => setNotifications({...notifications, lowStock: c})}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label>Large Order Approvals</Label>
+                  <p className="text-sm text-muted-foreground">Notify managers for POs exceeding $500.</p>
+                </div>
+                <Switch 
+                  checked={notifications.largeOrders}
+                  onCheckedChange={(c) => setNotifications({...notifications, largeOrders: c})}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label>End of Day Summary</Label>
+                  <p className="text-sm text-muted-foreground">Daily sales and labor cost digest at 11:00 PM.</p>
+                </div>
+                <Switch 
+                  checked={notifications.eodSummary}
+                  onCheckedChange={(c) => setNotifications({...notifications, eodSummary: c})}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label>System Health Alerts</Label>
+                  <p className="text-sm text-muted-foreground">Notices for POS sync failures or integration errors.</p>
+                </div>
+                <Switch 
+                  checked={notifications.systemAlerts}
+                  onCheckedChange={(c) => setNotifications({...notifications, systemAlerts: c})}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
