@@ -143,10 +143,10 @@ export default function Performance() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dx={-10} tickFormatter={(val) => \`$\${val/1000}k\`} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dx={-10} tickFormatter={(val) => `$${val/1000}k`} />
                     <RechartsTooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value) => [\`$\${value}\`, 'Sales']}
+                      formatter={(value) => [`$${value}`, 'Sales']}
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                     <Area type="monotone" dataKey="actual" name="Actual Sales" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" />
@@ -174,10 +174,10 @@ export default function Performance() {
                       dataKey="value"
                     >
                       {categoryData.map((entry, index) => (
-                        <Cell key={\`cell-\${index}\`} fill={entry.color} />
+                        <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RechartsTooltip formatter={(value) => [\`\${value}%\`, 'Share']} />
+                    <RechartsTooltip formatter={(value) => [`${value}%`, 'Share']} />
                     <Legend layout="vertical" verticalAlign="bottom" align="center" />
                   </PieChart>
                 </ResponsiveContainer>
