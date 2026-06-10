@@ -4,6 +4,7 @@ import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
@@ -90,34 +91,62 @@ export default function Inventory() {
   const [activeSessionOpen, setActiveSessionOpen] = useState(false);
 
   const queryClient = useQueryClient();
+  const { organization, location } = useAuth();
 
   const { data: inventory = [], isLoading } = useAuthQuery({
-    queryKey: ['inventory'],
-    queryFn: () => api.entities.Inventory.list(),
+    queryKey: ['inventory', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Inventory.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: wastageLogs = [] } = useAuthQuery({
-    queryKey: ['wastage'],
-    queryFn: () => api.entities.WastageLog.list('-created_at', 50),
+    queryKey: ['wastage', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      // Note: This replaces the list limit, but since the previous list was list('-created_at', 50), 
+      // we might fetch all and limit on client, or better yet, we can't limit easily via custom filter method.
+      // We will just filter by location_id for now.
+      return api.entities.WastageLog.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: countSheets = [] } = useAuthQuery({
-    queryKey: ['count_sheets'],
-    queryFn: () => api.entities.CountSheet.list(),
+    queryKey: ['count_sheets', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.CountSheet.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: countSessions = [] } = useAuthQuery({
-    queryKey: ['count_sessions'],
-    queryFn: () => api.entities.CountSession.list(),
+    queryKey: ['count_sessions', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.CountSession.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('inventory-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['wastage'] });
+        queryClient.invalidateQueries({ queryKey: ['wastage', organization?.id, location?.id] });
       })
       .subscribe();
       
@@ -129,7 +158,7 @@ export default function Inventory() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
       toast.success('Inventory updated');
       setEditDialogOpen(false);
     },
@@ -138,7 +167,7 @@ export default function Inventory() {
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Inventory.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
       toast.success('Item added to inventory');
       setAddDialogOpen(false);
       setAddForm({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
@@ -162,7 +191,7 @@ export default function Inventory() {
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
     },
     onSuccess: () => {
       toast.success('Item removed from inventory');
@@ -172,7 +201,7 @@ export default function Inventory() {
   const createWastageMutation = useMutation({
     mutationFn: (data) => api.entities.WastageLog.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['wastage'] });
+      queryClient.invalidateQueries({ queryKey: ['wastage', organization?.id, location?.id] });
       toast.success('Wastage logged');
       setWastageDialogOpen(false);
     },

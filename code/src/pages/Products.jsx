@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import {
@@ -123,16 +124,23 @@ export default function Products() {
   });
 
   const queryClient = useQueryClient();
+  const { organization, location } = useAuth();
 
   const { data: products = [], isLoading } = useAuthQuery({
-    queryKey: ['products'],
-    queryFn: () => api.entities.Product.list('-created_at'),
+    queryKey: ['products', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Product.filter(filters, '-created_at');
+    },
+    enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['products', organization?.id, location?.id] });
       })
       .subscribe();
       

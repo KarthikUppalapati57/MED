@@ -26,26 +26,38 @@ export default function Labor() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'summary';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
-  const { location } = useAuth();
+  const { organization, location } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
-    queryKey: ['employees'],
-    queryFn: () => api.entities.Employee.list('-created_at'),
+    queryKey: ['employees', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Employee.filter(filters, '-created_at');
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: shifts = [], isLoading: loadingShifts } = useAuthQuery({
-    queryKey: ['employee_shifts'],
-    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
+    queryKey: ['employee_shifts', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.EmployeeShift.filter(filters, '-shift_start');
+    },
+    enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('labor-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees', organization?.id, location?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['employee_shifts'] });
+        queryClient.invalidateQueries({ queryKey: ['employee_shifts', organization?.id, location?.id] });
       })
       .subscribe();
       

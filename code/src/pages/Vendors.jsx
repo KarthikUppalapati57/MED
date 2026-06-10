@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import {
@@ -94,17 +95,24 @@ export default function Vendors() {
   });
 
   const queryClient = useQueryClient();
+  const { organization, location } = useAuth();
 
   const { data: vendors = [], isLoading } = useAuthQuery({
-    queryKey: ['vendors'],
-    queryFn: () => api.entities.Vendor.list('-created_at'),
+    queryKey: ['vendors', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Vendor.filter(filters, '-created_at');
+    },
+    enabled: !!organization?.id,
   });
 
   // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const channel = supabase.channel('vendors-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['vendors'] });
+        queryClient.invalidateQueries({ queryKey: ['vendors', organization?.id, location?.id] });
       })
       .subscribe();
 

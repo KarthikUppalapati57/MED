@@ -12,29 +12,47 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export default function MenuEngineering() {
-  const { organization } = useAuth();
+  const { organization, location } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('matrix');
   
   const { data: matrixData = [], isLoading: isLoadingMatrix } = useQuery({
-    queryKey: ['menu-engineering', organization?.id],
+    queryKey: ['menu-engineering', organization?.id, location?.id],
     queryFn: () => api.reports.getMenuEngineering(organization?.id),
     enabled: !!organization?.id
   });
 
   const { data: posItems = [], isLoading: isLoadingPos } = useQuery({
-    queryKey: ['pos_items'],
-    queryFn: () => api.entities.PosItem.list(),
+    queryKey: ['pos_items', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.PosItem.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: recipes = [], isLoading: isLoadingRecipes } = useQuery({
-    queryKey: ['recipes'],
-    queryFn: () => api.entities.Recipe.list(),
+    queryKey: ['recipes', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Recipe.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: mappings = [], isLoading: isLoadingMappings } = useQuery({
-    queryKey: ['pos_menu_mapping'],
-    queryFn: () => api.entities.PosMenuMapping.list(),
+    queryKey: ['pos_menu_mapping', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      // mappings are typically per organization
+      if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.PosMenuMapping.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const createMapping = useMutation({
@@ -46,7 +64,7 @@ export default function MenuEngineering() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping'] });
+      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id, location?.id] });
       toast.success("Mapping saved");
     },
     onError: (err) => {
@@ -59,7 +77,7 @@ export default function MenuEngineering() {
       return api.entities.PosMenuMapping.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping'] });
+      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id, location?.id] });
       toast.success("Mapping removed");
     }
   });

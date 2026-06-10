@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import {
@@ -101,15 +102,28 @@ export default function Recipes() {
   });
 
   const queryClient = useQueryClient();
+  const { organization, location } = useAuth();
 
   const { data: recipes = [], isLoading } = useAuthQuery({
-    queryKey: ['recipes'],
-    queryFn: () => api.entities.Recipe.list('-created_at'),
+    queryKey: ['recipes', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Recipe.filter(filters, '-created_at');
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: products = [] } = useAuthQuery({
-    queryKey: ['products'],
-    queryFn: () => api.entities.Product.list(),
+    queryKey: ['products', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Product.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const productsMap = React.useMemo(() => {
@@ -209,10 +223,10 @@ export default function Recipes() {
   useEffect(() => {
     const channel = supabase.channel('recipes-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['recipes'] });
+        queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['products', organization?.id, location?.id] });
       })
       .subscribe();
 
@@ -224,7 +238,7 @@ export default function Recipes() {
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Recipe.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
       toast.success('Recipe created');
       setDialogOpen(false);
       resetForm();
@@ -234,7 +248,7 @@ export default function Recipes() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Recipe.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
       toast.success('Recipe updated');
       setDialogOpen(false);
       resetForm();
@@ -244,21 +258,21 @@ export default function Recipes() {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Recipe.delete(id),
     onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ['recipes'] });
-      const previousData = queryClient.getQueryData(['recipes']);
-      queryClient.setQueryData(['recipes'], (old) => 
+      await queryClient.cancelQueries({ queryKey: ['recipes', organization?.id, location?.id] });
+      const previousData = queryClient.getQueryData(['recipes', organization?.id, location?.id]);
+      queryClient.setQueryData(['recipes', organization?.id, location?.id], (old) => 
         old ? old.filter(item => item.id !== deletedId) : []
       );
       return { previousData };
     },
     onError: (err, deletedId, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['recipes'], context.previousData);
+        queryClient.setQueryData(['recipes', organization?.id, location?.id], context.previousData);
       }
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
     },
     onSuccess: () => {
       toast.success('Recipe deleted');

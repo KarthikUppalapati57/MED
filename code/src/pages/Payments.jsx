@@ -101,15 +101,28 @@ export default function Payments() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
   const queryClient = useQueryClient();
+  const { organization, location } = useAuth();
 
   const { data: invoices = [], isLoading: invoicesLoading } = useAuthQuery({
-    queryKey: ['invoices-payments'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryKey: ['invoices-payments', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Invoice.filter(filters, '-created_at');
+    },
+    enabled: !!(organization?.id),
   });
 
   const { data: payments = [], isLoading: paymentsLoading } = useAuthQuery({
-    queryKey: ['payments'],
-    queryFn: () => api.entities.Payment.list('-created_at'),
+    queryKey: ['payments', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.Payment.filter(filters, '-created_at');
+    },
+    enabled: !!(organization?.id),
   });
 
   const { data: orgPlans = [] } = useAuthQuery({
@@ -142,10 +155,10 @@ export default function Payments() {
   useEffect(() => {
     const channel = supabase.channel('payments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
+        queryClient.invalidateQueries({ queryKey: ['payments', organization?.id, location?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id, location?.id] });
       })
       .subscribe();
       

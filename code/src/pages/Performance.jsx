@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -17,14 +18,28 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 export default function Performance() {
   const [activeTab, setActiveTab] = useState('sales');
 
+  const { organization, location } = useAuth();
+
   const { data: salesData = [] } = useAuthQuery({
-    queryKey: ['pos_sales_data'],
-    queryFn: () => api.entities.PosSalesData.list(),
+    queryKey: ['pos_sales_data', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.PosSalesData.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const { data: posItems = [] } = useAuthQuery({
-    queryKey: ['pos_items'],
-    queryFn: () => api.entities.PosItem.list(),
+    queryKey: ['pos_items', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      return api.entities.PosItem.filter(filters);
+    },
+    enabled: !!organization?.id,
   });
 
   const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue), 0);
