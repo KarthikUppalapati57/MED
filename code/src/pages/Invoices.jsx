@@ -79,7 +79,7 @@ export default function Invoices() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
 
-  const { userProfile, role } = useAuth();
+  const { userProfile, role, organization, location } = useAuth();
   const queryClient = useQueryClient();
   const isHigherRole = ['org_owner', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
 
@@ -129,14 +129,21 @@ export default function Invoices() {
   }, [isResizing, resize, stopResizing]);
 
   const { data: invoices = [], isLoading } = useAuthQuery({
-    queryKey: ['invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryKey: ['invoices', organization?.id, location?.id],
+    queryFn: () => {
+      const filters = {};
+      if (location?.id) filters.location_id = location.id;
+      else if (organization?.id) filters.organization_id = organization.id;
+      
+      return api.entities.Invoice.filter(filters, '-created_at');
+    },
+    enabled: !!(organization?.id || userProfile?.organization_id),
   });
 
   useEffect(() => {
     const channel = supabase.channel('invoices-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
+        queryClient.invalidateQueries({ queryKey: ['invoices', organization?.id, location?.id] });
       })
       .subscribe();
       
@@ -146,14 +153,19 @@ export default function Invoices() {
   }, [queryClient]);
 
   // Sanitize invoice data before saving to Supabase
-  const sanitizeInvoiceData = (data) => {
-    const cleaned = { ...data };
-    
-    // Auto-inject context fields for RLS if missing
-    if (!cleaned.organization_id && userProfile?.organization_id) {
-      cleaned.organization_id = userProfile.organization_id;
-    }
-    if (!cleaned.location_id && userProfile?.location_id) {
+  const sanitizeInvoiceData = (invoiceData) => {
+    const cleaned = {
+      ...invoiceData,
+      status: 'pending',
+      line_items: JSON.stringify(invoiceData.line_items || []),
+      validation_results: JSON.stringify({}),
+      organization_id: organization?.id || userProfile?.organization_id,
+    };
+
+    // Assign to active Location context if available, fallback to userProfile location
+    if (!cleaned.location_id && location?.id) {
+      cleaned.location_id = location.id;
+    } else if (!cleaned.location_id && userProfile?.location_id) {
       cleaned.location_id = userProfile.location_id;
     }
     if (!cleaned.created_by && userProfile?.id) {
