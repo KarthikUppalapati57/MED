@@ -314,7 +314,7 @@ export default function PlatformAdmin() {
       setGeneratedInviteLink(link);
       setIsInviteLinkDialogOpen(true);
       setInviteEmail("");
-      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['client-invites'] });
 
       if (!emailResult.success) {
         console.warn("Email sending failed or skipped:", emailResult.error);
@@ -408,7 +408,7 @@ The Restops Platform Team
 
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-client-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['client-invites'] });
 
       // Open the link dialog for the admin to see/copy too!
       setGeneratedInviteLink(signupLink);

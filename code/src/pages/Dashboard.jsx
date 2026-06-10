@@ -362,7 +362,7 @@ function OrgOwnerDashboard() {
     };
   }, [queryClient]);
 
-  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData } = React.useMemo(() => {
+  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData, benchmarks } = React.useMemo(() => {
     const pending = invoices.filter(i => i.status === 'pending_review').length;
     const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
     const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
