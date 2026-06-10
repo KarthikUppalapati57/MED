@@ -1,0 +1,319 @@
+PWA Service Worker Fix Plan (Critical Launch Blocker)
+Problem Summary
+The platform is experiencing a caching issue where:
+Users opening the application in Incognito mode receive the latest deployment.
+Users opening the application in a normal browser session receive an older version of the platform.
+A hard refresh (Ctrl + Shift + R / Ctrl + F5) immediately loads the latest version.
+This confirms that the issue is caused by Service Worker and browser caching, not by Vercel deployment or DNS configuration.
+Root Causes Identified
+1. Cache-First Strategy for HTML Routes
+Current implementation:
+return
+ response 
+||
+ 
+fetch
+(
+event
+.
+request
+)
+The Service Worker checks the cache first and only requests the network if the asset is not found.
+Because
+ 
+/index.html
+ 
+is pre-cached during installation, users continue receiving an outdated HTML file after deployments.
+Impact:
+Old application versions remain visible.
+Users do not automatically receive updates.
+New deployments are effectively hidden behind cached HTML.
+2. Missing skipWaiting()
+Current Service Worker does not call:
+self
+.
+skipWaiting
+()
+;
+Impact:
+New Service Workers remain in the waiting state.
+Updated versions do not activate immediately.
+Users continue running older Service Worker versions.
+3. Missing clients.claim()
+Current Service Worker does not call:
+clients
+.
+claim
+()
+;
+Impact:
+Newly activated Service Workers do not immediately control open pages.
+Additional refreshes may be required before updates become visible.
+4. No Cache Cleanup
+Current implementation does not remove old caches.
+Missing logic:
+caches
+.
+keys
+()
+combined with deletion of outdated cache versions.
+Impact:
+Old caches accumulate indefinitely.
+Users may continue loading stale resources.
+Browser storage usage grows over time.
+5. Cached index.html Causes Permanent Stale Versions
+Because index.html is cached using a Cache-First strategy:
+Users keep receiving old HTML.
+Old HTML references outdated Vite bundles.
+New deployments may never be loaded until cache is manually cleared.
+This is the primary reason users see different versions of the platform.
+Required Fixes
+Fix 1: Use Network-First for HTML Routes
+Replace Cache-First behavior for navigation requests.
+Recommended logic:
+if
+ (
+event
+.
+request
+.
+mode
+ 
+===
+ 
+'navigate'
+) {
+  
+event
+.
+respondWith
+(
+    
+fetch
+(
+event
+.
+request
+)
+      
+.
+then
+(response 
+=>
+ {
+        
+const
+ copy 
+=
+ response
+.
+clone
+()
+;
+        caches
+.
+open
+(CACHE_NAME)
+.
+then
+(cache 
+=>
+ {
+          cache
+.
+put
+(
+event
+.
+request
+,
+ copy)
+;
+        })
+;
+        
+return
+ response
+;
+      })
+      
+.
+catch
+(() 
+=>
+ caches
+.
+match
+(
+event
+.
+request
+))
+  )
+;
+}
+Expected Result:
+Latest HTML is fetched from the server first.
+Cached version is used only when offline.
+Fix 2: Add skipWaiting()
+Inside install event:
+self
+.
+addEventListener
+(
+'install'
+,
+ 
+event
+ 
+=>
+ {
+  self
+.
+skipWaiting
+()
+;
+})
+;
+Expected Result:
+New Service Worker activates immediately after installation.
+Fix 3: Add clients.claim()
+Inside activate event:
+self
+.
+addEventListener
+(
+'activate'
+,
+ 
+event
+ 
+=>
+ {
+  
+event
+.
+waitUntil
+(clients
+.
+claim
+())
+;
+})
+;
+Expected Result:
+New Service Worker immediately controls all open tabs.
+Fix 4: Delete Old Caches
+Add cache cleanup logic:
+self
+.
+addEventListener
+(
+'activate'
+,
+ 
+event
+ 
+=>
+ {
+  
+event
+.
+waitUntil
+(
+    caches
+.
+keys
+()
+.
+then
+(keys 
+=>
+      
+Promise
+.
+all
+(
+        keys
+.
+map
+(key 
+=>
+ {
+          
+if
+ (key 
+!==
+ CACHE_NAME) {
+            
+return
+ caches
+.
+delete
+(key)
+;
+          }
+        })
+      )
+    )
+  )
+;
+})
+;
+Expected Result:
+Outdated caches are removed automatically.
+Users cannot continue loading stale assets.
+Fix 5: Version Cache Names
+Current:
+const
+ CACHE_NAME 
+=
+ 
+'edgeops-cache'
+;
+Change to:
+const
+ CACHE_NAME 
+=
+ 
+'edgeops-cache-v1'
+;
+Increment version number whenever cache structure changes.
+Example:
+const
+ CACHE_NAME 
+=
+ 
+'edgeops-cache-v2'
+;
+Expected Result:
+Cache updates become predictable.
+Old versions are cleaned up safely.
+Recommended Long-Term Solution
+Replace Custom Service Worker with vite-plugin-pwa
+Current architecture uses a manually maintained Service Worker.
+Recommended migration:
+npm
+ install vite-plugin-pwa
+Benefits:
+Automatic Workbox integration.
+Automatic Vite asset hashing support.
+Automatic cache invalidation.
+Automatic Service Worker lifecycle management.
+Built-in skipWaiting and clients.claim support.
+Safer deployment process.
+Reduced maintenance burden.
+Priority
+Priority Level: P1 (Must Fix Before Public Launch)
+Reason:
+This issue directly affects deployment reliability and can result in customers using different versions of the platform simultaneously.
+The platform should not be publicly launched until Service Worker update handling and cache invalidation are corrected.
+Acceptance Criteria
+After implementation:
+✅ Users receive the latest deployment automatically.
+✅ Normal browser and Incognito show the same version.
+✅ No manual cache clearing required.
+✅ No Ctrl + F5 required.
+✅ Old caches are removed automatically.
+✅ Service Worker updates activate immediately.
+✅ Deployments become visible to users without intervention.
