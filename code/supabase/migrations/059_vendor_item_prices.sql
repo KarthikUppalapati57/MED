@@ -15,8 +15,10 @@ CREATE TABLE IF NOT EXISTS public.vendor_item_prices (
 
 ALTER TABLE public.vendor_item_prices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view vendor item prices" ON public.vendor_item_prices;
 CREATE POLICY "Users can view vendor item prices" ON public.vendor_item_prices 
     FOR SELECT USING (organization_id = public.get_my_org());
 
+DROP POLICY IF EXISTS "Managers can manage vendor item prices" ON public.vendor_item_prices;
 CREATE POLICY "Managers can manage vendor item prices" ON public.vendor_item_prices 
     FOR ALL USING (is_manager_or_above() AND organization_id = public.get_my_org());

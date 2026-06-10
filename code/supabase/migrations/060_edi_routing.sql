@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.edi_transmissions (
 
 ALTER TABLE public.edi_transmissions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view EDI transmissions" ON public.edi_transmissions;
 CREATE POLICY "Users can view EDI transmissions" ON public.edi_transmissions 
     FOR SELECT USING (organization_id = public.get_my_org());
 

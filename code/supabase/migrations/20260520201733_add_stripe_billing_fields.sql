@@ -8,21 +8,22 @@ ADD COLUMN IF NOT EXISTS subscription_status text;
 -- Create an index for faster lookups during webhooks
 CREATE INDEX IF NOT EXISTS idx_org_stripe_customer_id ON organizations(stripe_customer_id);
 
--- Optional: Create audit log table (for Phase 3, might as well do it now)
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-    action text NOT NULL,
-    entity_type text NOT NULL,
-    entity_id uuid,
-    details jsonb,
-    ip_address text,
-    created_at timestamptz DEFAULT now()
-);
+-- Add missing fields to audit_logs so the frontend tracking works correctly
+ALTER TABLE audit_logs 
+ADD COLUMN IF NOT EXISTS entity_type text,
+ADD COLUMN IF NOT EXISTS entity_id uuid,
+ADD COLUMN IF NOT EXISTS module text,
+ADD COLUMN IF NOT EXISTS org_id uuid,
+ADD COLUMN IF NOT EXISTS field_changed text,
+ADD COLUMN IF NOT EXISTS old_value text,
+ADD COLUMN IF NOT EXISTS new_value text,
+ADD COLUMN IF NOT EXISTS user_email text,
+ADD COLUMN IF NOT EXISTS details jsonb;
 
 -- Audit logs should be append-only
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Platform admins can view all audit logs" ON audit_logs;
 CREATE POLICY "Platform admins can view all audit logs" ON audit_logs
     FOR SELECT
     USING (
@@ -33,6 +34,7 @@ CREATE POLICY "Platform admins can view all audit logs" ON audit_logs
         )
     );
 
+DROP POLICY IF EXISTS "System can insert audit logs" ON audit_logs;
 CREATE POLICY "System can insert audit logs" ON audit_logs
     FOR INSERT
     WITH CHECK (true); -- Usually restricted to service role or authenticated users
