@@ -32,7 +32,7 @@ export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
 // Core modules that are ALWAYS accessible regardless of subscription plan.
 // These are non-revenue operational essentials.
-const CORE_MODULE_KEYS = ['dashboard', 'admin'];
+const CORE_MODULE_KEYS = ['dashboard', 'admin', 'setup'];
 
 /**
  * Returns the Set of page names that are enabled for the given module list.
