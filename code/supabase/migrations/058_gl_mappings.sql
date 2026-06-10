@@ -15,9 +15,11 @@ CREATE TABLE IF NOT EXISTS public.gl_mappings (
 
 ALTER TABLE public.gl_mappings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view org gl mappings" ON public.gl_mappings;
 CREATE POLICY "Users can view org gl mappings" ON public.gl_mappings 
     FOR SELECT USING (organization_id = public.get_my_org());
 
+DROP POLICY IF EXISTS "Manager+ can manage gl mappings" ON public.gl_mappings;
 CREATE POLICY "Manager+ can manage gl mappings" ON public.gl_mappings 
     FOR ALL USING (is_manager_or_above() AND organization_id = public.get_my_org());
 
