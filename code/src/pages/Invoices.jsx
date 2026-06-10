@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { filterByContext } from '@/lib/contextUtils';
 import { supabase } from '@/lib/supabaseClient';
 import { notifyManagers } from '@/lib/notificationService';
 import { sendInvoiceUploadNotification, sendInvoiceStatusEmail } from '@/lib/emailService';
@@ -79,7 +81,7 @@ export default function Invoices() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
 
-  const { userProfile, role, organization, location } = useAuth();
+  const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const isHigherRole = ['org_owner', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
 
@@ -128,22 +130,17 @@ export default function Invoices() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  const { data: invoices = [], isLoading } = useAuthQuery({
-    queryKey: ['invoices', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      
-      return api.entities.Invoice.filter(filters, '-created_at');
-    },
-    enabled: !!(organization?.id || userProfile?.organization_id),
+  const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
+    queryKey: ['invoices-dashboard', organization?.id],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!(organization?.id),
   });
 
   useEffect(() => {
     const channel = supabase.channel('invoices-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
       })
       .subscribe();
       

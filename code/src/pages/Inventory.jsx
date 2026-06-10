@@ -7,6 +7,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import { format } from 'date-fns';
 import {
   Search,
@@ -91,69 +92,56 @@ export default function Inventory() {
   const [activeSessionOpen, setActiveSessionOpen] = useState(false);
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: inventory = [], isLoading } = useAuthQuery({
-    queryKey: ['inventory', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Inventory.filter(filters);
-    },
+    queryKey: ['inventory', organization?.id],
+    queryFn: () => api.entities.Inventory.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: wastageLogs = [] } = useAuthQuery({
-    queryKey: ['wastage', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      // Note: This replaces the list limit, but since the previous list was list('-created_at', 50), 
-      // we might fetch all and limit on client, or better yet, we can't limit easily via custom filter method.
-      // We will just filter by location_id for now.
-      return api.entities.WastageLog.filter(filters);
-    },
+    queryKey: ['wastage', organization?.id],
+    queryFn: () => api.entities.WastageLog.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: countSheets = [] } = useAuthQuery({
-    queryKey: ['count_sheets', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.CountSheet.filter(filters);
-    },
+    queryKey: ['count_sheets', organization?.id],
+    queryFn: () => api.entities.CountSheet.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: countSessions = [] } = useAuthQuery({
-    queryKey: ['count_sessions', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.CountSession.filter(filters);
-    },
+    queryKey: ['count_sessions', organization?.id],
+    queryFn: () => api.entities.CountSession.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('inventory-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['wastage', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['wastage', organization?.id] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sheets' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['count_sheets', organization?.id] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sessions' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
       })
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, organization?.id]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),

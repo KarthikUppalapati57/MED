@@ -3,8 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
   Search,
@@ -95,16 +95,12 @@ export default function Vendors() {
   });
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: vendors = [], isLoading } = useAuthQuery({
-    queryKey: ['vendors', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Vendor.filter(filters, '-created_at');
-    },
+    queryKey: ['vendors', organization?.id],
+    queryFn: () => api.entities.Vendor.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
@@ -112,14 +108,14 @@ export default function Vendors() {
   useEffect(() => {
     const channel = supabase.channel('vendors-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['vendors', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['vendors', organization?.id] });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, organization?.id]);
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Vendor.create(data),
     onSuccess: () => {

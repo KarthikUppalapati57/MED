@@ -5,6 +5,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
   Search,
@@ -102,27 +103,19 @@ export default function Recipes() {
   });
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: recipes = [], isLoading } = useAuthQuery({
-    queryKey: ['recipes', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Recipe.filter(filters, '-created_at');
-    },
+    queryKey: ['recipes', organization?.id],
+    queryFn: () => api.entities.Recipe.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: products = [] } = useAuthQuery({
-    queryKey: ['products', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Product.filter(filters);
-    },
+    queryKey: ['products', organization?.id],
+    queryFn: () => api.entities.Product.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 

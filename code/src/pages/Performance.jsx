@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell, LineChart, Line
@@ -18,27 +19,19 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 export default function Performance() {
   const [activeTab, setActiveTab] = useState('sales');
 
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: salesData = [] } = useAuthQuery({
-    queryKey: ['pos_sales_data', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.PosSalesData.filter(filters);
-    },
+    queryKey: ['pos_sales_data', organization?.id],
+    queryFn: () => api.entities.PosSalesData.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: posItems = [] } = useAuthQuery({
-    queryKey: ['pos_items', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.PosItem.filter(filters);
-    },
+    queryKey: ['pos_items', organization?.id],
+    queryFn: () => api.entities.PosItem.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 

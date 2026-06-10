@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export default function MenuEngineering() {
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('matrix');
   
@@ -23,35 +24,23 @@ export default function MenuEngineering() {
   });
 
   const { data: posItems = [], isLoading: isLoadingPos } = useQuery({
-    queryKey: ['pos_items', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.PosItem.filter(filters);
-    },
+    queryKey: ['pos_items', organization?.id],
+    queryFn: () => api.entities.PosItem.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: recipes = [], isLoading: isLoadingRecipes } = useQuery({
-    queryKey: ['recipes', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Recipe.filter(filters);
-    },
+    queryKey: ['recipes', organization?.id],
+    queryFn: () => api.entities.Recipe.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: mappings = [], isLoading: isLoadingMappings } = useQuery({
-    queryKey: ['pos_menu_mapping', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      // mappings are typically per organization
-      if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.PosMenuMapping.filter(filters);
-    },
+    queryKey: ['pos_menu_mapping', organization?.id],
+    queryFn: () => api.entities.PosMenuMapping.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
@@ -64,7 +53,7 @@ export default function MenuEngineering() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id] });
       toast.success("Mapping saved");
     },
     onError: (err) => {
@@ -77,7 +66,7 @@ export default function MenuEngineering() {
       return api.entities.PosMenuMapping.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping', organization?.id] });
       toast.success("Mapping removed");
     }
   });

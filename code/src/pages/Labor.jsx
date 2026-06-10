@@ -4,6 +4,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import { filterByContext } from '@/lib/contextUtils';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,38 +27,30 @@ export default function Labor() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'summary';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
-    queryKey: ['employees', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Employee.filter(filters, '-created_at');
-    },
+    queryKey: ['employees', organization?.id],
+    queryFn: () => api.entities.Employee.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: shifts = [], isLoading: loadingShifts } = useAuthQuery({
-    queryKey: ['employee_shifts', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.EmployeeShift.filter(filters, '-shift_start');
-    },
+    queryKey: ['employee_shifts', organization?.id],
+    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('labor-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['employees', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['employees', organization?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['employee_shifts', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['employee_shifts', organization?.id] });
       })
       .subscribe();
       

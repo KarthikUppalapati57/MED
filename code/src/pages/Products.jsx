@@ -6,6 +6,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
   Search,
@@ -124,16 +125,12 @@ export default function Products() {
   });
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: products = [], isLoading } = useAuthQuery({
-    queryKey: ['products', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Product.filter(filters, '-created_at');
-    },
+    queryKey: ['products', organization?.id],
+    queryFn: () => api.entities.Product.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 

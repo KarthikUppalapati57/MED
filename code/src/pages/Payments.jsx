@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
-import { confirmBankTransfer } from '@/lib/paymentService';
+import { useAuth } from '@/lib/AuthContext';
+import { filterByContext } from '@/lib/contextUtils';
 import { format } from 'date-fns';
 import {
   Search,
@@ -101,27 +102,19 @@ export default function Payments() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: invoices = [], isLoading: invoicesLoading } = useAuthQuery({
-    queryKey: ['invoices-payments', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Invoice.filter(filters, '-created_at');
-    },
+    queryKey: ['invoices-payments', organization?.id],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
   });
 
   const { data: payments = [], isLoading: paymentsLoading } = useAuthQuery({
-    queryKey: ['payments', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Payment.filter(filters, '-created_at');
-    },
+    queryKey: ['payments', organization?.id],
+    queryFn: () => api.entities.Payment.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
   });
 
@@ -155,10 +148,10 @@ export default function Payments() {
   useEffect(() => {
     const channel = supabase.channel('payments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['payments', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
       })
       .subscribe();
       

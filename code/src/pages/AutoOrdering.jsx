@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { filterByContext } from '@/lib/contextUtils';
 import {
   ShoppingCart,
   Send,
@@ -75,70 +76,52 @@ export default function AutoOrdering() {
   const [receiveOrderOpen, setReceiveOrderOpen] = useState(false);
 
   const queryClient = useQueryClient();
-  const { organization, location } = useAuth();
+  const { organization, brand, location } = useAuth();
 
   const { data: orders = [], isLoading } = useAuthQuery({
-    queryKey: ['auto-orders', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.AutoOrder.filter(filters, '-created_at');
-    },
+    queryKey: ['auto-orders', organization?.id],
+    queryFn: () => api.entities.AutoOrder.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   useEffect(() => {
     const channel = supabase.channel('auto-orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'auto_orders' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       })
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, organization?.id]);
 
   const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['inventory', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Inventory.filter(filters);
-    },
+    queryKey: ['inventory', organization?.id],
+    queryFn: () => api.entities.Inventory.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: vendors = [] } = useAuthQuery({
-    queryKey: ['vendors', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.Vendor.filter(filters);
-    },
+    queryKey: ['vendors', organization?.id],
+    queryFn: () => api.entities.Vendor.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const { data: vendorPrices = [] } = useAuthQuery({
-    queryKey: ['vendor_item_prices', organization?.id, location?.id],
-    queryFn: () => {
-      const filters = {};
-      // Vendor item prices don't strictly have a location usually, 
-      // but they might belong to an org. For now, filter by org if needed.
-      if (location?.id) filters.location_id = location.id;
-      else if (organization?.id) filters.organization_id = organization.id;
-      return api.entities.VendorItemPrice.filter(filters);
-    },
+    queryKey: ['vendor_item_prices', organization?.id],
+    queryFn: () => api.entities.VendorItemPrice.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.AutoOrder.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       toast.success('Order created');
     },
   });
@@ -146,7 +129,7 @@ export default function AutoOrdering() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.AutoOrder.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
     },
   });
 
