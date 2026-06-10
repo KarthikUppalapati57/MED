@@ -108,10 +108,11 @@ const ThemedStars = ({ isDark }) => {
   const starsRef = useRef();
   
   // We use the exact same highly polished Stars from drei, but we forcefully 
-  // rewrite the vertex color buffer to respect our light/dark mode.
+  // rewrite the vertex color buffer and adjust blending to respect our light/dark mode.
   React.useEffect(() => {
     if (starsRef.current) {
       const geometry = starsRef.current.geometry;
+      const material = starsRef.current.material;
       const colorAttribute = geometry.attributes.color;
       
       if (colorAttribute) {
@@ -123,6 +124,14 @@ const ThemedStars = ({ isDark }) => {
         }
         colorAttribute.needsUpdate = true;
       }
+      
+      if (material) {
+        // AdditiveBlending makes black/colored stars invisible on a white background.
+        // We must use NormalBlending in light mode so they show up.
+        material.blending = isDark ? THREE.AdditiveBlending : THREE.NormalBlending;
+        material.transparent = true;
+        material.needsUpdate = true;
+      }
     }
   }, [isDark]);
 
@@ -132,12 +141,29 @@ const ThemedStars = ({ isDark }) => {
       radius={100} 
       depth={50} 
       count={8000} 
-      factor={isDark ? 4 : 3} // Slightly larger in light mode to remain visible
+      factor={isDark ? 4 : 4} 
       saturation={0} 
       fade 
       speed={2} 
     />
   );
+};
+
+// Wrapper for Sparkles to fix AdditiveBlending in light mode
+const ThemedSparkles = ({ isDark, ...props }) => {
+  const sparklesRef = useRef();
+
+  React.useEffect(() => {
+    if (sparklesRef.current) {
+      const material = sparklesRef.current.material;
+      if (material) {
+        material.blending = isDark ? THREE.AdditiveBlending : THREE.NormalBlending;
+        material.needsUpdate = true;
+      }
+    }
+  }, [isDark]);
+
+  return <Sparkles ref={sparklesRef} {...props} />;
 };
 
 const InteractiveScene = () => {
@@ -167,9 +193,9 @@ const InteractiveScene = () => {
           <ParticleWave />
         </Float>
         
-        {/* Background elements (Orange & Teal sparkles) */}
-        <Sparkles count={400} scale={30} size={3} speed={0.8} color="#ff5c35" opacity={isDark ? 0.6 : 0.3} />
-        <Sparkles count={200} scale={30} size={2} speed={0.5} color="#14c6cb" opacity={isDark ? 0.4 : 0.2} />
+        {/* Background elements (Orange & Teal sparkles) - Use wrapper to fix blending */}
+        <ThemedSparkles isDark={isDark} count={400} scale={30} size={isDark ? 3 : 4} speed={0.8} color="#ff5c35" opacity={isDark ? 0.6 : 0.8} />
+        <ThemedSparkles isDark={isDark} count={200} scale={30} size={isDark ? 2 : 3} speed={0.5} color="#14c6cb" opacity={isDark ? 0.4 : 0.6} />
         
         {/* Deep starfield (Restored professional version with forced colors) */}
         <ThemedStars isDark={isDark} />
