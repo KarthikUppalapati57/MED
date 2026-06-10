@@ -354,7 +354,7 @@ export default function OnboardingPage() {
             const access = meta.access;
             const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
             
-            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs'];
+            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs', 'RestaurantSetup'];
             const perms = {};
             allPages.forEach(p => perms[p] = level);
 

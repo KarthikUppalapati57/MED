@@ -79,6 +79,7 @@ const PAGE_PERMISSION_GROUPS = [
     pages: [
       { key: "UserManagement", label: "Team Management" },
       { key: "Onboarding", label: "Onboarding Flow" },
+      { key: "RestaurantSetup", label: "Restaurant Setup" },
     ],
   },
 ];
