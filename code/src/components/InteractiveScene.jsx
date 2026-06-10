@@ -103,6 +103,49 @@ function ParticleWave() {
   );
 }
 
+// Custom Stars that properly respect the color prop (unlike drei's Stars)
+function CustomStars({ isDark }) {
+  const count = 8000;
+  const positions = useMemo(() => {
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 200;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+    }
+    return positions;
+  }, []);
+
+  const ref = useRef();
+  useFrame((state, delta) => {
+    if (ref.current) {
+      ref.current.rotation.y -= delta * 0.05;
+      ref.current.rotation.x -= delta * 0.02;
+    }
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={isDark ? 0.5 : 1.2}
+        color={isDark ? "#ffffff" : "#000000"}
+        transparent
+        opacity={isDark ? 0.7 : 0.3}
+        sizeAttenuation={true}
+        depthWrite={false}
+      />
+    </points>
+  );
+}
+
 const InteractiveScene = () => {
   const { theme } = useTheme();
   
@@ -134,8 +177,8 @@ const InteractiveScene = () => {
         <Sparkles count={400} scale={30} size={3} speed={0.8} color="#ff5c35" opacity={isDark ? 0.6 : 0.3} />
         <Sparkles count={200} scale={30} size={2} speed={0.5} color="#14c6cb" opacity={isDark ? 0.4 : 0.2} />
         
-        {/* Deep starfield */}
-        <Stars radius={100} depth={50} count={8000} factor={isDark ? 4 : 2} saturation={0} fade speed={2} color={isDark ? '#ffffff' : '#000000'} />
+        {/* Deep starfield (Custom implementation to fix color issue) */}
+        <CustomStars isDark={isDark} />
         
         {/* Fog to cut off the grid elegantly in the distance */}
         <fog attach="fog" args={[bgColor, 10, 30]} />
