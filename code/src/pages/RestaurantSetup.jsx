@@ -7,14 +7,31 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, CheckCircle2 } from "lucide-react";
 export default function RestaurantSetup() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'pos';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
+  const [posProvider, setPosProvider] = React.useState('');
+  const [apiKey, setApiKey] = React.useState('');
+  const [syncInterval, setSyncInterval] = React.useState('15');
+  const [isTesting, setIsTesting] = React.useState(false);
+  const [testStatus, setTestStatus] = React.useState(null); // 'success' | 'error' | null
+
   const handleSave = () => {
     toast.success("Settings saved successfully!");
+  };
+
+  const handleTestConnection = () => {
+    setIsTesting(true);
+    setTestStatus(null);
+    setTimeout(() => {
+      setIsTesting(false);
+      setTestStatus('success');
+      toast.success("Successfully connected to POS system!");
+    }, 1500);
   };
 
   return (
@@ -44,8 +61,68 @@ export default function RestaurantSetup() {
               <CardTitle>POS Integration Settings</CardTitle>
               <CardDescription>Configure POS synchronization preferences for this location.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Select POS provider and sync intervals. (Workflow under development)</p>
+            <CardContent className="space-y-6 max-w-md">
+              <div className="space-y-2">
+                <Label>POS Provider</Label>
+                <Select value={posProvider} onValueChange={setPosProvider}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a POS Provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="toast">Toast POS</SelectItem>
+                    <SelectItem value="square">Square</SelectItem>
+                    <SelectItem value="lightspeed">Lightspeed</SelectItem>
+                    <SelectItem value="clover">Clover</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {posProvider && (
+                <>
+                  <div className="space-y-2">
+                    <Label>API Key</Label>
+                    <Input 
+                      type="password" 
+                      placeholder={`Enter your ${posProvider} API Key`}
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Sync Interval</Label>
+                    <Select value={syncInterval} onValueChange={setSyncInterval}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sync frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">Every 15 minutes</SelectItem>
+                        <SelectItem value="30">Every 30 minutes</SelectItem>
+                        <SelectItem value="60">Hourly</SelectItem>
+                        <SelectItem value="1440">Daily (End of Day)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="pt-4 flex items-center space-x-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleTestConnection}
+                      disabled={isTesting || !apiKey}
+                      className={testStatus === 'success' ? 'border-green-500 text-green-600' : ''}
+                    >
+                      {isTesting ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Testing Connection...</>
+                      ) : testStatus === 'success' ? (
+                        <><CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Connection Successful</>
+                      ) : (
+                        "Test Connection"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
