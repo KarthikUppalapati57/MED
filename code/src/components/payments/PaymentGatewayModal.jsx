@@ -119,24 +119,24 @@ export default function PaymentGatewayModal({
         ) : (
           <>
             {/* Payment summary */}
-            <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-1.5">
+            <div className="bg-secondary/40 border border-border/50 rounded-lg p-4 text-sm space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-500">Vendor</span>
-                <span className="font-medium">{payment.vendor_name}</span>
+                <span className="text-muted-foreground">Vendor</span>
+                <span className="font-medium text-foreground">{payment.vendor_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Invoice #</span>
-                <span className="font-medium">{payment.invoice_number}</span>
+                <span className="text-muted-foreground">Invoice #</span>
+                <span className="font-medium text-foreground">{payment.invoice_number}</span>
               </div>
               {payment.due_date && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Due Date</span>
-                  <span className="font-medium">{payment.due_date}</span>
+                  <span className="text-muted-foreground">Due Date</span>
+                  <span className="font-medium text-foreground">{payment.due_date}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t pt-2 mt-2">
-                <span className="text-slate-500">Amount</span>
-                <span className="font-bold text-lg text-slate-900">${payment.amount?.toLocaleString()}</span>
+              <div className="flex justify-between border-t border-border/50 pt-2 mt-2">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-bold text-lg text-foreground">${payment.amount?.toLocaleString()}</span>
               </div>
             </div>
 
