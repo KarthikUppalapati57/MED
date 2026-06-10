@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { format } from 'date-fns';
 import { RefreshCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function WebhookLogsTab() {
-  const { supabase, organizationId } = useSupabaseAuth();
+  const { activeOrg } = useAuth();
+  const organizationId = activeOrg?.id;
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState(null);

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { Download, FileJson, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 
 export default function DataExportTab() {
-  const { supabase, organizationId } = useSupabaseAuth();
+  const { activeOrg } = useAuth();
+  const organizationId = activeOrg?.id;
   const [exporting, setExporting] = useState(null);
 
   const EXPORTABLE_ENTITIES = [

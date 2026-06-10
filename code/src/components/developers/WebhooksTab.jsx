@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { Plus, Trash, Check, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -17,7 +18,8 @@ const AVAILABLE_EVENTS = [
 ];
 
 export default function WebhooksTab() {
-  const { supabase, organizationId } = useSupabaseAuth();
+  const { activeOrg } = useAuth();
+  const organizationId = activeOrg?.id;
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newUrl, setNewUrl] = useState('');

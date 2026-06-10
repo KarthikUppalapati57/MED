@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 import { Plus, Trash, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function ApiKeysTab() {
-  const { supabase, organizationId } = useSupabaseAuth();
+  const { activeOrg } = useAuth();
+  const organizationId = activeOrg?.id;
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newKeyName, setNewKeyName] = useState('');
