@@ -691,8 +691,8 @@ export default function Invoices() {
           <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setEmailConfigOpen(true)} className="bg-white hover:bg-slate-50 border-slate-200">
-            <Mail className="h-4 w-4 mr-2 text-primary" />
+          <Button variant="outline" onClick={() => setEmailConfigOpen(true)}>
+            <Mail className="h-4 w-4 mr-2 text-brand" />
             Email Settings
           </Button>
           <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
