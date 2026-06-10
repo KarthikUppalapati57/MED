@@ -810,17 +810,15 @@ const AuthenticatedApp = () => {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark" forcedTheme="dark" storageKey="restops-theme">
-        <AuthProvider>
-          <QueryClientProvider client={queryClientInstance}>
-            <Router>
-              <AuthenticatedApp />
-            </Router>
-            <Toaster />
-            <SonnerToaster position="top-right" richColors />
-          </QueryClientProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router>
+            <AuthenticatedApp />
+          </Router>
+          <Toaster />
+          <SonnerToaster position="top-right" richColors />
+        </QueryClientProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
