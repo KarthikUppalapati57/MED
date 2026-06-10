@@ -308,6 +308,7 @@ export default function Layout({ children, currentPageName }) {
   // Filter navigation based on user role, explicit permissions, AND enabled modules (FAIL-CLOSED)
   const enabledModules = organization?.enabled_modules;
   const userPermissions = userProfile?.permissions || {};
+  const userRole = userProfile?.role;
 
   const filteredNavigation = navigation.reduce((acc, item) => {
     // Platform admins should ONLY see Dashboard and platform_admin specific items
@@ -332,7 +333,7 @@ export default function Layout({ children, currentPageName }) {
         
         // Fallback to role + module
         if (!isParentRoleValid) return false;
-        return isPageInEnabledModules(pageKey, enabledModules);
+        return isPageInEnabledModules(pageKey, enabledModules, userRole);
       });
 
       if (filteredSubItems.length > 0) {
@@ -348,7 +349,7 @@ export default function Layout({ children, currentPageName }) {
       } else if (explicitPerm === 'none') {
         isVisible = false;
       } else {
-        isVisible = isParentRoleValid && isPageInEnabledModules(pageKey, enabledModules);
+        isVisible = isParentRoleValid && isPageInEnabledModules(pageKey, enabledModules, userRole);
       }
       
       if (isVisible) acc.push(item);

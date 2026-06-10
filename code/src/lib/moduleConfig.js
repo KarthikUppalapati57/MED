@@ -63,12 +63,14 @@ export function getEnabledPages(enabledModules) {
  *   - Core modules (dashboard, admin) → always allowed
  *   - Operational modules → ONLY allowed if explicitly in enabledModules
  */
-export function isPageInEnabledModules(pageName, enabledModules) {
+export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);
   // Ungated pages (not assigned to any module) are always allowed
   if (!moduleInfo) return true;
   // Core modules are always allowed
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
+  // Org owners bypass module restrictions and can access everything
+  if (userRole === 'org_owner') return true;
   // Operational modules: require explicit inclusion
   const modulesList = enabledModules || [];
   const normalizedList = modulesList.map(m => m.toLowerCase());

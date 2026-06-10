@@ -63,7 +63,8 @@ export default function ProtectedModule({ pageName, children }) {
   // explicit inclusion in org.enabled_modules. If enabled_modules is empty/null,
   // only core modules are accessible — this is secure-by-default.
   const enabledModules = organization?.enabled_modules;
-  if (!isPageInEnabledModules(pageName, enabledModules)) {
+  const userRole = userProfile?.role;
+  if (!isPageInEnabledModules(pageName, enabledModules, userRole)) {
     return <AccessDenied reason="module" moduleName={moduleInfo.label} />;
   }
 
