@@ -375,6 +375,14 @@ export default function OnboardingPage() {
       
       await refreshProfile();
       
+      // Emit Domain Event
+      await supabase.rpc('log_frontend_event', {
+        p_event_name: 'user.onboarding.completed',
+        p_entity_type: 'user',
+        p_entity_id: user.id,
+        p_payload: { step: 'organizations_created' }
+      }).catch(err => console.warn('Failed to log onboarding completion:', err));
+
       setStep(4);
     } catch (error) {
       console.error('Onboarding failed:', error);

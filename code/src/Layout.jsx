@@ -52,6 +52,7 @@ import { isPageInEnabledModules } from '@/lib/moduleConfig';
 import ContextSwitcher from '@/components/ContextSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
+import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -200,6 +201,8 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+
+  useRealtimeEvents();
 
   // Accordion toggle: clicking an open menu closes it; clicking a different menu opens it and closes the previous
   const toggleMenu = (name) => setExpandedMenu(prev => prev === name ? null : name);

@@ -74,6 +74,9 @@ function SignupPage() {
       if (data) {
         setInviteInfo(data);
         setForm(f => ({ ...f, email: data.email || '' }));
+        // Emit Real-Time Domain Event
+        supabase.rpc('log_invitation_opened', { p_token: cleanToken })
+          .catch(err => console.warn('Failed to log invite open:', err));
       } else {
         setError('Invalid or expired invitation link.');
       }
