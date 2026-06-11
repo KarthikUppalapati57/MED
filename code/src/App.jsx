@@ -729,8 +729,8 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+    <>
+      <Routes>
         {/* Public routes */}
         <Route path="/terms" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -805,7 +805,7 @@ const AuthenticatedApp = () => {
         </>
       )}
       </Routes>
-    </AnimatePresence>
+    </>
   );
 };
 
