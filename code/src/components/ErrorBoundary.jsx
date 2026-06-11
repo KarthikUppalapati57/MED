@@ -2,7 +2,7 @@ import React from 'react';
 import { captureError } from '@/lib/errorMonitor';
 
 /**
- * React Error Boundary â€” catches render errors in children.
+ * React Error Boundary — catches render errors in children.
  * Shows a user-friendly fallback UI with recovery options.
  */
 export default class ErrorBoundary extends React.Component {

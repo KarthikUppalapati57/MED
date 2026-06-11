@@ -172,7 +172,7 @@ export default function Profile() {
               <span className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> {user?.email}
               </span>
-              <span className="text-muted-foreground">â€¢</span>
+              <span className="text-muted-foreground">•</span>
               <span className="flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5" /> {(role || '').replace('_', ' ')}
               </span>
@@ -288,7 +288,7 @@ export default function Profile() {
                     <Input
                       id="currentPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"
@@ -304,7 +304,7 @@ export default function Profile() {
                     <Input
                       id="newPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"
@@ -327,7 +327,7 @@ export default function Profile() {
                     <Input
                       id="confirmPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                      placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"

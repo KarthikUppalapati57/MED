@@ -359,7 +359,7 @@ export default function Inventory() {
       total_amount: orderItems.reduce((s, i) => s + i.total_price, 0),
       chat_history: [],
     });
-    toast.success(`Order created for ${selectedIds.size} item(s) â€” check Auto Ordering`);
+    toast.success(`Order created for ${selectedIds.size} item(s) — check Auto Ordering`);
     setSelectedIds(new Set());
   };
 
@@ -441,7 +441,7 @@ export default function Inventory() {
                 {pendingItems.slice(0, 5).map(item => (
                   <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-resend-yellow/10 text-resend-yellow border border-resend-yellow/20 font-medium">
                     {item.product_name} ({item.current_quantity} {item.current_unit || 'ea'})
-                    {item.pending_source_invoice ? ` â€¢ Inv: ${item.pending_source_invoice}` : ''}
+                    {item.pending_source_invoice ? ` • Inv: ${item.pending_source_invoice}` : ''}
                   </span>
                 ))}
                 {pendingItems.length > 5 && (
@@ -900,7 +900,7 @@ export default function Inventory() {
                         <div key={reason}>
                           <div className="flex justify-between text-sm mb-1">
                             <span className="font-medium capitalize">{reason.replace(/_/g, ' ')}</span>
-                            <span className="text-muted-foreground">{data.count} entries Â· ${data.value.toFixed(2)}</span>
+                            <span className="text-muted-foreground">{data.count} entries · ${data.value.toFixed(2)}</span>
                           </div>
                           <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div

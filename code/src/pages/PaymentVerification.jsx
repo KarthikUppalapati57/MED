@@ -47,20 +47,20 @@ async function markPaymentVerified(userId, userEmail) {
       throw error;
     }
 
-    // If data is returned, the update affected a row â€” success!
+    // If data is returned, the update affected a row — success!
     if (data?.id) {
       console.log('[PaymentVerification] Profile updated successfully on attempt', attempt + 1);
       return true;
     }
 
-    // No row was matched â€” profile may not exist yet. Wait and retry.
+    // No row was matched — profile may not exist yet. Wait and retry.
     console.warn(`[PaymentVerification] update matched 0 rows on attempt ${attempt + 1}, retrying...`);
     if (attempt < MAX_RETRIES - 1) {
       await new Promise(r => setTimeout(r, RETRY_DELAY));
     }
   }
 
-  // All UPDATE retries exhausted â€” fall back to UPSERT
+  // All UPDATE retries exhausted — fall back to UPSERT
   console.warn('[PaymentVerification] UPDATE retries exhausted, falling back to UPSERT');
   const { error: upsertError } = await supabase
     .from('profiles')
@@ -248,7 +248,7 @@ export default function PaymentVerification() {
       } else {
         // Instead of silently force-navigating (which causes a redirect loop),
         // show a clear error state with a retry button.
-        console.warn('[PaymentVerification] Polling exhausted â€” profile still not showing payment_verified');
+        console.warn('[PaymentVerification] Polling exhausted — profile still not showing payment_verified');
         setPollFailed(true);
       }
     };
@@ -274,7 +274,7 @@ export default function PaymentVerification() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // â”€â”€ Poll failure screen â€” profile update didn't propagate â”€â”€
+  // â”€â”€ Poll failure screen — profile update didn't propagate â”€â”€
   if (pollFailed) {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
@@ -341,7 +341,7 @@ export default function PaymentVerification() {
             <ShieldCheck className="w-8 h-8 text-primary" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">Payment Verified!</h2>
-          <p className="text-muted-foreground">Redirecting to organization setupâ€¦</p>
+          <p className="text-muted-foreground">Redirecting to organization setup…</p>
           <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
         </div>
       </div>

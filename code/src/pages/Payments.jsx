@@ -418,7 +418,7 @@ export default function Payments() {
                                 isOverdue && 'text-resend-red font-medium',
                                 isDueSoon && 'text-resend-orange font-medium'
                               )}>
-                                {dueDate ? format(dueDate, 'MMM d, yyyy') : 'â€”'}
+                                {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
                               </span>
                             </TableCell>
                             <TableCell className="font-semibold">
@@ -528,7 +528,7 @@ export default function Payments() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell>
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
                             </TableCell>
                             <TableCell className="font-medium">{p.vendor_name}</TableCell>
                             <TableCell>{p.invoice_number}</TableCell>
@@ -618,7 +618,7 @@ export default function Payments() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
                             </TableCell>
                             <TableCell>
                               <Badge className="bg-resend-green/10 text-resend-green">Paid</Badge>

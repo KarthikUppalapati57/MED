@@ -697,7 +697,7 @@ export default function Recipes() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-card/80 rounded-lg border border-purple-100">
                     <p className="text-sm font-medium text-purple-400">Add to Menu</p>
-                    <p className="text-xs text-muted-foreground mt-1">Based on current cost trends, consider adding more beverage recipes â€” beverage category has the highest margin potential at ~75% avg.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Based on current cost trends, consider adding more beverage recipes — beverage category has the highest margin potential at ~75% avg.</p>
                   </div>
                   <div className="p-4 bg-card/80 rounded-lg border border-amber-100">
                     <p className="text-sm font-medium text-resend-yellow">Margin Alerts</p>
@@ -736,7 +736,7 @@ export default function Recipes() {
                           <div key={cat}>
                             <div className="flex justify-between text-sm mb-1">
                               <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
-                              <span className="text-muted-foreground">{data.count} recipes Â· Avg ${data.avgPlateCost.toFixed(2)}/serving</span>
+                              <span className="text-muted-foreground">{data.count} recipes · Avg ${data.avgPlateCost.toFixed(2)}/serving</span>
                             </div>
                             <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
                               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(data.totalCost / maxCost) * 100}%` }} />
@@ -823,7 +823,7 @@ export default function Recipes() {
                       <TableBody>
                         {(viewingRecipe.ingredients || []).map((ing, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-medium">{ing.product_name || 'â€”'}</TableCell>
+                            <TableCell className="font-medium">{ing.product_name || '—'}</TableCell>
                             <TableCell>{ing.quantity}</TableCell>
                             <TableCell>{ing.unit}</TableCell>
                             <TableCell>${(ing.unit_cost || 0).toFixed(2)}</TableCell>

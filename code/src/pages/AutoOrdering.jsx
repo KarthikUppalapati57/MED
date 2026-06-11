@@ -381,7 +381,7 @@ export default function AutoOrdering() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'â€”'}
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
                           </TableCell>
                           <TableCell>
                             {order.status === 'pending_approval' && (

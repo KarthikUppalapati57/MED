@@ -17,7 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * ContextSwitcher â€” Cascading org/brand/location selector for the Layout header.
+ * ContextSwitcher — Cascading org/brand/location selector for the Layout header.
  *
  * Behavior per role:
  *   Platform Admin â†’ Dropdown of ALL organizations â†’ brands â†’ locations

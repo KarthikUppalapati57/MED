@@ -606,7 +606,7 @@ export default function Invoices() {
       }
       await syncInvoiceToProductsAndInventory(savedInvoice);
       posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
-      toast.success('Invoice approved â€” items staged for 24h review before finalizing in inventory');
+      toast.success('Invoice approved — items staged for 24h review before finalizing in inventory');
 
       // Email the original uploader that their invoice was approved
       if (savedInvoice?.created_by) {

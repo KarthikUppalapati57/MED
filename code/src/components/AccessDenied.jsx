@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * AccessDenied â€” Premium denial page shown when a user lacks permission.
+ * AccessDenied — Premium denial page shown when a user lacks permission.
  * 
  * Two modes:
  *   reason="role"   â†’ User's role is too low for this page

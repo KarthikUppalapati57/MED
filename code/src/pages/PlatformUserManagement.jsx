@@ -70,8 +70,8 @@ export default function PlatformUserManagement() {
         return (data || []).map(p => ({
           membership_id: p.id,
           user_id: p.id,
-          email: p.email || "â€”",
-          full_name: p.full_name || "â€”",
+          email: p.email || "—",
+          full_name: p.full_name || "—",
           role: p.role,
           created_at: p.created_at,
           last_sign_in_at: p.updated_at,
@@ -318,7 +318,7 @@ export default function PlatformUserManagement() {
                     <Badge className="bg-purple-500/50/10 text-purple-400 hover:bg-purple-500/50/10 border-none text-[10px]">Platform Admin</Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                   </TableCell>
                   <TableCell>
                     <Button 
@@ -368,10 +368,10 @@ export default function PlatformUserManagement() {
                     <TableRow key={invite.id}>
                       <TableCell className="text-sm font-medium">{invite.email}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </TableCell>
                       <TableCell>
                         <Badge className={isExpired ? 'bg-resend-red/10 text-resend-red text-[10px]' : 'bg-resend-yellow/10 text-resend-yellow text-[10px]'}>

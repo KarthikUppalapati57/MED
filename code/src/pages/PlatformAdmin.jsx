@@ -47,7 +47,7 @@ export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
 
-  // Tab State â€” persisted in URL search params so it survives navigation
+  // Tab State — persisted in URL search params so it survives navigation
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'requests';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
@@ -768,7 +768,7 @@ The Restops Platform Team
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base">{title}</CardTitle>
-          <p className="text-xs text-muted-foreground">{data.length} total Â· {pCount} pending</p>
+          <p className="text-xs text-muted-foreground">{data.length} total · {pCount} pending</p>
         </div>
         <div className="flex gap-2">
           <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-9 w-48 h-8 rounded-xl border-border" /></div>
@@ -796,9 +796,9 @@ The Restops Platform Team
                   <p className="text-sm font-semibold text-foreground">{r.full_name || r.name}</p>
                   <p className="text-[10px] text-muted-foreground">{r.email}</p>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.company_name || 'â€”'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{r.company_name || '—'}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px] capitalize bg-card">{r.plan || r.request_type || 'â€”'}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize bg-card">{r.plan || r.request_type || '—'}</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge className={cn(
@@ -1121,7 +1121,7 @@ The Restops Platform Team
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Global infrastructure & organization governance Â· v2.1.0</p>
+            <p className="text-sm text-muted-foreground mt-1">Global infrastructure & organization governance · v2.1.0</p>
           </div>
         </div>
         <div className="flex gap-3">

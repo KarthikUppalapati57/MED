@@ -494,12 +494,12 @@ export default function Vendors() {
                         ? (vendor.items || []).map((item, idx) => (
                             <TableRow key={`${vendor.id}-${idx}`}>
                               <TableCell className="font-medium">{vendor.name}</TableCell>
-                              <TableCell>{item.vendor_item_name || item.name || 'â€”'}</TableCell>
-                              <TableCell>{item.product_name || 'â€”'}</TableCell>
-                              <TableCell><Badge variant="secondary">{item.category || 'â€”'}</Badge></TableCell>
-                              <TableCell className="font-mono text-sm">{item.item_code || 'â€”'}</TableCell>
+                              <TableCell>{item.vendor_item_name || item.name || '—'}</TableCell>
+                              <TableCell>{item.product_name || '—'}</TableCell>
+                              <TableCell><Badge variant="secondary">{item.category || '—'}</Badge></TableCell>
+                              <TableCell className="font-mono text-sm">{item.item_code || '—'}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : 'â€”'}
+                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '—'}
                               </TableCell>
                               <TableCell className="font-semibold">${(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
                               <TableCell>

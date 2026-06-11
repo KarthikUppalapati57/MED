@@ -98,10 +98,10 @@ const ACCESS_LEVELS = {
 // â”€â”€â”€ Signing Authority Levels (Adapted for Restops) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SIGNING_LEVELS = [
   { value: 0, label: "None",         badgeClass: "bg-secondary text-muted-foreground border-border" },
-  { value: 1, label: "L1 â€“ Review",  badgeClass: "bg-sky-100 text-sky-700 border-sky-200" },
-  { value: 2, label: "L2 â€“ Approve", badgeClass: "bg-resend-blue/10 text-resend-blue border-resend-blue/20" },
-  { value: 3, label: "L3 â€“ Execute", badgeClass: "bg-violet-100 text-violet-700 border-violet-200" },
-  { value: 4, label: "L4 â€“ Final",   badgeClass: "bg-rose-100 text-rose-700 border-rose-200" },
+  { value: 1, label: "L1 – Review",  badgeClass: "bg-sky-100 text-sky-700 border-sky-200" },
+  { value: 2, label: "L2 – Approve", badgeClass: "bg-resend-blue/10 text-resend-blue border-resend-blue/20" },
+  { value: 3, label: "L3 – Execute", badgeClass: "bg-violet-100 text-violet-700 border-violet-200" },
+  { value: 4, label: "L4 – Final",   badgeClass: "bg-rose-100 text-rose-700 border-rose-200" },
 ];
 
 const DOCUMENT_TYPES = [
@@ -263,7 +263,7 @@ function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }
                       current === sl.value ? sl.badgeClass + ' ring-1 ring-offset-1' : 'bg-card border-border text-muted-foreground hover:border-border'
                     }`}
                   >
-                    {sl.value === 0 ? 'â€”' : `L${sl.value}`}
+                    {sl.value === 0 ? '—' : `L${sl.value}`}
                   </button>
                 ))}
               </div>

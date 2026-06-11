@@ -134,7 +134,7 @@ export default function PlatformAuditLogs() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Platform Audit Logs</h1>
-            <p className="text-sm text-muted-foreground">Platform-wide activity tracking Â· All organizations</p>
+            <p className="text-sm text-muted-foreground">Platform-wide activity tracking · All organizations</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => {
@@ -214,7 +214,7 @@ export default function PlatformAuditLogs() {
             <CardTitle className="text-base flex items-center gap-2">
               <FileText className="h-5 w-5" /> Audit Trail
             </CardTitle>
-            <p className="text-xs text-muted-foreground">{filteredLogs.length} entries Â· Filter by module or search</p>
+            <p className="text-xs text-muted-foreground">{filteredLogs.length} entries · Filter by module or search</p>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -264,7 +264,7 @@ export default function PlatformAuditLogs() {
                 {filteredLogs.map(log => (
                   <TableRow key={log.id} className="hover:bg-secondary/50">
                     <TableCell className="text-xs text-muted-foreground">
-                      {log.created_at ? new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }) : 'â€”'}
+                      {log.created_at ? new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -272,8 +272,8 @@ export default function PlatformAuditLogs() {
                           {(log.profiles?.full_name || log.profiles?.email || '?').substring(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <p className="text-xs font-medium truncate max-w-[120px]">{log.profiles?.full_name || 'â€”'}</p>
-                          <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{log.profiles?.email || log.user_id?.slice(0, 8) || 'â€”'}</p>
+                          <p className="text-xs font-medium truncate max-w-[120px]">{log.profiles?.full_name || '—'}</p>
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{log.profiles?.email || log.user_id?.slice(0, 8) || '—'}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -283,7 +283,7 @@ export default function PlatformAuditLogs() {
                     <TableCell>
                       <Badge variant="outline" className="text-[10px]">{log.table_name}</Badge>
                     </TableCell>
-                    <TableCell className="text-[10px] text-muted-foreground font-mono">{log.record_id?.slice(0, 8) || 'â€”'}</TableCell>
+                    <TableCell className="text-[10px] text-muted-foreground font-mono">{log.record_id?.slice(0, 8) || '—'}</TableCell>
                     <TableCell>
                       <Button
                         size="sm"
@@ -323,20 +323,20 @@ export default function PlatformAuditLogs() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">User</p>
-                  <p className="text-sm font-medium">{selectedLog.profiles?.full_name || 'â€”'}</p>
-                  <p className="text-xs text-muted-foreground">{selectedLog.profiles?.email || 'â€”'}</p>
+                  <p className="text-sm font-medium">{selectedLog.profiles?.full_name || '—'}</p>
+                  <p className="text-xs text-muted-foreground">{selectedLog.profiles?.email || '—'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Timestamp</p>
-                  <p className="text-sm">{selectedLog.created_at ? new Date(selectedLog.created_at).toLocaleString() : 'â€”'}</p>
+                  <p className="text-sm">{selectedLog.created_at ? new Date(selectedLog.created_at).toLocaleString() : '—'}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-muted-foreground mb-1">Record ID</p>
-                  <p className="text-sm font-mono bg-secondary p-2 rounded">{selectedLog.record_id || 'â€”'}</p>
+                  <p className="text-sm font-mono bg-secondary p-2 rounded">{selectedLog.record_id || '—'}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-muted-foreground mb-1">User ID</p>
-                  <p className="text-sm font-mono bg-secondary p-2 rounded">{selectedLog.user_id || 'â€”'}</p>
+                  <p className="text-sm font-mono bg-secondary p-2 rounded">{selectedLog.user_id || '—'}</p>
                 </div>
               </div>
               {(selectedLog.old_data || selectedLog.new_data) && (

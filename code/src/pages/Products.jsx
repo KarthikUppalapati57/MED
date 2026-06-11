@@ -452,7 +452,7 @@ export default function Products() {
                           <Badge variant="secondary">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{product.vendor_name || 'â€”'}</TableCell>
+                      <TableCell>{product.vendor_name || '—'}</TableCell>
                       <TableCell className="font-semibold">
                         ${product.latest_price?.toFixed(2) || '0.00'}
                       </TableCell>
@@ -529,12 +529,12 @@ export default function Products() {
                       newProducts.map(p => (
                         <TableRow key={p.id}>
                           <TableCell className="text-sm text-muted-foreground">
-                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                           </TableCell>
                           <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell>{p.vendor_name || 'â€”'}</TableCell>
+                          <TableCell>{p.vendor_name || '—'}</TableCell>
                           <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
-                          <TableCell>{p.category || 'â€”'}</TableCell>
+                          <TableCell>{p.category || '—'}</TableCell>
                           <TableCell>
                             {p.is_inventoried ? <Badge className="bg-resend-green/10 text-resend-green">Yes</Badge> : <Badge variant="secondary">No</Badge>}
                           </TableCell>
@@ -598,7 +598,7 @@ export default function Products() {
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.name}</TableCell>
                         <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
-                        <TableCell>{p.category || 'â€”'}</TableCell>
+                        <TableCell>{p.category || '—'}</TableCell>
                         <TableCell>{p.report_by_unit || 'ea'}</TableCell>
                         <TableCell className="font-medium">{p.item_count || 1}</TableCell>
                         <TableCell className="font-semibold">${(p.latest_price || 0).toFixed(2)}</TableCell>
