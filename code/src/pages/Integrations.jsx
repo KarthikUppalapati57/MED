@@ -28,7 +28,7 @@ const INTEGRATIONS = [
     description: 'Payment processing and billing engine MCP',
     icon: CreditCard,
     color: 'indigo',
-    connected: true, // Mock default
+    connected: false,
     fields: ['Secret Key', 'Publishable Key', 'Webhook Secret']
   },
   {
@@ -38,7 +38,7 @@ const INTEGRATIONS = [
     description: 'Database and edge functions provider MCP',
     icon: Database,
     color: 'emerald',
-    connected: true, // Mock default
+    connected: false,
     fields: ['Project URL', 'Service Role Key']
   },
   {

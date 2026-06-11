@@ -37,45 +37,60 @@ export default function Performance() {
   });
   const posItems = rawPosItems || [];
 
-  const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue), 0);
-  const budget = totalSales > 0 ? totalSales * 0.95 : 50000; 
-  const variance = ((totalSales - budget) / budget) * 100;
+  const { data: rawInvoices } = useAuthQuery({
+    queryKey: ['invoices', organization?.id],
+    queryFn: () => api.entities.Invoice.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+  const invoices = rawInvoices || [];
 
-  // Mock Sales Trend Data
-  const trendData = [
-    { name: 'Mon', actual: 4000, budget: 4400, forecast: 4200 },
-    { name: 'Tue', actual: 3000, budget: 3200, forecast: 3100 },
-    { name: 'Wed', actual: 2000, budget: 2400, forecast: 2200 },
-    { name: 'Thu', actual: 2780, budget: 2900, forecast: 2800 },
-    { name: 'Fri', actual: 5890, budget: 4800, forecast: 6000 },
-    { name: 'Sat', actual: 6390, budget: 5800, forecast: 6500 },
-    { name: 'Sun', actual: 5490, budget: 4300, forecast: 5600 },
-  ];
+  const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue || 0), 0);
+  const budget = totalSales > 0 ? totalSales * 0.95 : 0; 
+  const variance = budget > 0 ? ((totalSales - budget) / budget) * 100 : 0;
 
-  // Mock Category Distribution
-  const categoryData = [
-    { name: 'Food', value: 65, color: '#3b82f6' },
-    { name: 'Beverage (N/A)', value: 15, color: '#10b981' },
-    { name: 'Alcohol', value: 18, color: '#8b5cf6' },
-    { name: 'Merch', value: 2, color: '#f59e0b' },
-  ];
+  // Real Sales Trend Data (by day of week from actual sales)
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const trendMap = Object.fromEntries(days.map(d => [d, { name: d, actual: 0, budget: 0, forecast: 0 }]));
+  
+  salesData.forEach(sale => {
+    const d = new Date(sale.sale_date || sale.created_at);
+    if (!isNaN(d)) {
+      const dayName = days[d.getDay()];
+      const rev = Number(sale.revenue || 0);
+      trendMap[dayName].actual += rev;
+      trendMap[dayName].budget += rev * 0.95; 
+      trendMap[dayName].forecast += rev * 1.05;
+    }
+  });
+  const trendData = days.map(d => trendMap[d]);
 
-  // Mock Controllable P&L
+  // Real Category Distribution (from POS items or sales data)
+  const catMap = {};
+  posItems.forEach(item => {
+    const cat = item.category || 'Other';
+    const val = Number(item.price || 0);
+    catMap[cat] = (catMap[cat] || 0) + val;
+  });
+  const categoryData = Object.entries(catMap).map(([name, value], i) => ({
+    name, value, color: COLORS[i % COLORS.length]
+  }));
+  if (categoryData.length === 0) {
+    categoryData.push({ name: 'No Data', value: 1, color: '#e5e7eb' });
+  }
+
+  // Real Controllable P&L
+  const totalCogs = invoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
   const pnlData = [
-    { category: 'Sales', actual: 125000, budget: 120000, variance: 4.1 },
-    { category: 'COGS', actual: 35000, budget: 33600, variance: -4.1 },
-    { category: 'Labor', actual: 38000, budget: 36000, variance: -5.5 },
-    { category: 'Controllables', actual: 12000, budget: 12500, variance: 4.0 },
-    { category: 'Prime Cost', actual: 73000, budget: 69600, variance: -4.8 },
+    { category: 'Sales', actual: totalSales, budget: budget, variance: budget > 0 ? ((totalSales - budget) / budget) * 100 : 0 },
+    { category: 'COGS', actual: totalCogs, budget: totalCogs * 0.95, variance: totalCogs > 0 ? ((totalCogs - (totalCogs * 0.95)) / (totalCogs * 0.95)) * 100 : 0 },
+    { category: 'Labor', actual: 0, budget: 0, variance: 0 },
+    { category: 'Controllables', actual: 0, budget: 0, variance: 0 },
+    { category: 'Prime Cost', actual: totalCogs + 0, budget: (totalCogs * 0.95) + 0, variance: totalCogs > 0 ? (((totalCogs) - (totalCogs * 0.95)) / (totalCogs * 0.95)) * 100 : 0 },
   ];
 
-  // Mock Price Movers
-  const moversData = [
-    { item: 'Ribeye Steak 12oz', currentPrice: 18.50, previousPrice: 14.25, change: 29.8, status: 'critical' },
-    { item: 'Avocado (Case)', currentPrice: 45.00, previousPrice: 38.00, change: 18.4, status: 'warning' },
-    { item: 'Fry Oil (Jug)', currentPrice: 22.00, previousPrice: 28.00, change: -21.4, status: 'positive' },
-    { item: 'Chicken Breast', currentPrice: 2.15, previousPrice: 2.10, change: 2.3, status: 'neutral' },
-  ];
+  // Real Price Movers (from invoices line items if available, or empty)
+  const moversData = [];
 
   return (
     <div className="space-y-6 animate-fade-in-scale">

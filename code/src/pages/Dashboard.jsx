@@ -339,6 +339,11 @@ function OrgOwnerDashboard() {
     enabled: !!organization?.id,
   });
 
+  const { data: salesData = [] } = useAuthQuery({
+    queryKey: ['pos_sales_data'],
+    queryFn: () => api.entities.PosSalesData.list(),
+  });
+
   // -- Realtime subscription for org dashboard --
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -355,6 +360,9 @@ function OrgOwnerDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['pos_sales_data'] });
+      })
       .subscribe();
 
     return () => {
@@ -362,7 +370,7 @@ function OrgOwnerDashboard() {
     };
   }, [queryClient]);
 
-  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData, benchmarks } = React.useMemo(() => {
+  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData, benchmarks, forecastedSales, forecastedPayroll } = React.useMemo(() => {
     const pending = invoices.filter(i => i.status === 'pending_review').length;
     const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
     const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
@@ -377,6 +385,16 @@ function OrgOwnerDashboard() {
     }, {});
     const pie = Object.entries(spend).map(([name, value]) => ({ name, value }));
 
+    // Real Forecasted Sales based on last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentSales = salesData
+      .filter(s => new Date(s.sale_date || s.created_at) >= thirtyDaysAgo)
+      .reduce((sum, s) => sum + (Number(s.revenue) || 0), 0);
+    
+    // We don't have shifts/payroll data yet, so default to 0 to avoid hallucination
+    const projectedPayroll = 0;
+
     return {
       pendingInvoices: pending,
       totalUnpaid: unpaid,
@@ -384,9 +402,11 @@ function OrgOwnerDashboard() {
       activeModules: active,
       spendByCategory: spend,
       pieData: pie,
-      benchmarks: []
+      benchmarks: [],
+      forecastedSales: recentSales,
+      forecastedPayroll: projectedPayroll
     };
-  }, [invoices, inventory, organization]);
+  }, [invoices, inventory, organization, salesData]);
 
   return (
     <div className="space-y-6">
@@ -478,7 +498,7 @@ function OrgOwnerDashboard() {
                     <p className="text-sm text-muted-foreground">Based on historical POS volume</p>
                   </div>
                 </div>
-                <p className="text-xl font-bold text-resend-green">+$45,200</p>
+                <p className="text-xl font-bold text-resend-green">+${forecastedSales.toLocaleString()}</p>
               </div>
               
               <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
@@ -504,7 +524,7 @@ function OrgOwnerDashboard() {
                     <p className="text-sm text-muted-foreground">Based on scheduled shifts</p>
                   </div>
                 </div>
-                <p className="text-xl font-bold text-resend-orange">-$12,450</p>
+                <p className="text-xl font-bold text-resend-orange">-${forecastedPayroll.toLocaleString()}</p>
               </div>
 
               <div className="pt-4 border-t flex items-center justify-between">
@@ -512,8 +532,8 @@ function OrgOwnerDashboard() {
                   <p className="font-bold text-foreground text-lg">Projected Net Cash</p>
                   <p className="text-xs text-muted-foreground">Estimated position in 30 days</p>
                 </div>
-                <p className={`text-2xl font-black ${45200 - totalUnpaid - 12450 > 0 ? 'text-resend-green' : 'text-resend-red'}`}>
-                  ${(45200 - totalUnpaid - 12450).toLocaleString()}
+                <p className={`text-2xl font-black ${forecastedSales - totalUnpaid - forecastedPayroll > 0 ? 'text-resend-green' : 'text-resend-red'}`}>
+                  ${(forecastedSales - totalUnpaid - forecastedPayroll).toLocaleString()}
                 </p>
               </div>
             </div>
