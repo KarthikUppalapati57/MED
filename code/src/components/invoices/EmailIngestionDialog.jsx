@@ -12,7 +12,7 @@ import { Mail, Loader2, KeyRound, Server, Save } from "lucide-react";
 
 export default function EmailIngestionDialog({ open, onClose }) {
   const queryClient = useQueryClient();
-  const { userProfile } = useAuth();
+  const { userProfile, organization, brand, location } = useAuth();
   
   const [form, setForm] = useState({
     host: 'imap.gmail.com',
@@ -44,7 +44,13 @@ export default function EmailIngestionDialog({ open, onClose }) {
     mutationFn: async (data) => {
       const payload = {
         provider: 'email_imap',
-        metadata: data,
+        organization_id: organization?.id || userProfile?.organization_id,
+        metadata: {
+          ...data,
+          organization_id: organization?.id || userProfile?.organization_id,
+          brand_id: brand?.id || null,
+          location_id: location?.id || userProfile?.location_id || null,
+        },
         is_active: true
       };
       

@@ -118,6 +118,7 @@ export const api = {
     LocationGroup: createEntityClient('location_groups'),
     GlMapping: createEntityClient('gl_mappings'),
     VendorItemPrice: createEntityClient('vendor_item_prices'),
+    OperationalSetting: createEntityClient('operational_settings'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

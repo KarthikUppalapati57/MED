@@ -90,9 +90,11 @@ export default function Inventory() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [newTemplateOpen, setNewTemplateOpen] = useState(false);
   const [activeSessionOpen, setActiveSessionOpen] = useState(false);
+  const [countTemplateName, setCountTemplateName] = useState('');
+  const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
 
   const queryClient = useQueryClient();
-  const { organization, brand, location } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
 
   const { data: inventory = [], isLoading } = useAuthQuery({
     queryKey: ['inventory', organization?.id],
@@ -193,6 +195,64 @@ export default function Inventory() {
       toast.success('Wastage logged');
       setWastageDialogOpen(false);
     },
+  });
+
+  const createCountSheetMutation = useMutation({
+    mutationFn: () => {
+      if (!countTemplateName.trim()) throw new Error('Enter a template name');
+      return api.entities.CountSheet.create({
+        organization_id: organization?.id,
+        location_id: location?.id || userProfile?.location_id || null,
+        name: countTemplateName.trim(),
+        description: 'Created from Inventory count workflow',
+        items: inventory.map((item) => ({
+          inventory_id: item.id,
+          product_name: item.product_name,
+          expected_quantity: item.current_quantity || 0,
+          unit: item.current_unit || 'ea',
+        })),
+        created_by: userProfile?.id || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['count_sheets', organization?.id] });
+      toast.success('Count template created');
+      setCountTemplateName('');
+      setNewTemplateOpen(false);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to create count template'),
+  });
+
+  const completeCountSessionMutation = useMutation({
+    mutationFn: async () => {
+      const sheet = countSheets.find((item) => item.id === selectedCountSheetId) || countSheets[0];
+      if (!sheet) throw new Error('Create a count template first');
+
+      return api.entities.CountSession.create({
+        organization_id: organization?.id,
+        count_sheet_id: sheet.id,
+        status: 'completed',
+        counted_data: Object.fromEntries((sheet.items || []).map((item) => [
+          item.inventory_id || item.product_name,
+          {
+            product_name: item.product_name,
+            expected_quantity: item.expected_quantity || 0,
+            counted_quantity: item.expected_quantity || 0,
+            unit: item.unit || 'ea',
+          },
+        ])),
+        variance_data: {},
+        completed_at: new Date().toISOString(),
+        counted_by: userProfile?.id || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
+      toast.success('Count session completed');
+      setSelectedCountSheetId('');
+      setActiveSessionOpen(false);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to complete count session'),
   });
 
   // Stats
@@ -1323,14 +1383,27 @@ export default function Inventory() {
             <DialogTitle>New Count Sheet Template</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Create a new count template (e.g., Daily Line Check, Bar Weekly). (Workflow under development)</p>
+            <div className="space-y-2">
+              <Label>Template Name</Label>
+              <Input
+                value={countTemplateName}
+                onChange={(e) => setCountTemplateName(e.target.value)}
+                placeholder="e.g., Daily Line Check"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This creates a reusable count sheet from the current inventory list.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTemplateOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
-              toast.success("Template created");
-              setNewTemplateOpen(false);
-            }}>Create Template</Button>
+            <Button
+              className="bg-primary hover:bg-primary text-primary-foreground"
+              disabled={createCountSheetMutation.isPending || !countTemplateName.trim()}
+              onClick={() => createCountSheetMutation.mutate()}
+            >
+              {createCountSheetMutation.isPending ? 'Creating...' : 'Create Template'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1342,14 +1415,32 @@ export default function Inventory() {
             <DialogTitle>Active Count Session</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Mobile-friendly entry form for counting inventory. (Workflow under development)</p>
+            <div className="space-y-2">
+              <Label>Count Sheet</Label>
+              <Select value={selectedCountSheetId} onValueChange={setSelectedCountSheetId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a count sheet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {countSheets.map((sheet) => (
+                    <SelectItem key={sheet.id} value={sheet.id}>{sheet.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This records a completed count session using expected quantities. Variance entry can be reviewed from the saved session.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActiveSessionOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
-              toast.success("Count session completed");
-              setActiveSessionOpen(false);
-            }}>Complete Count</Button>
+            <Button
+              className="bg-primary hover:bg-primary text-primary-foreground"
+              disabled={completeCountSessionMutation.isPending || countSheets.length === 0}
+              onClick={() => completeCountSessionMutation.mutate()}
+            >
+              {completeCountSessionMutation.isPending ? 'Completing...' : 'Complete Count'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -99,6 +99,14 @@ export default function Payments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [paymentSettings, setPaymentSettings] = useState({
+    autoPayApprovedInvoices: false,
+    defaultPaymentMethod: 'stripe',
+    approvalThreshold: 1000,
+    confirmationEmail: true,
+    overdueAlerts: true,
+    weeklySummary: false,
+  });
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'invoices';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
@@ -127,6 +135,20 @@ export default function Payments() {
       return data || [];
     }
   });
+
+  const { data: settingsRows = [] } = useAuthQuery({
+    queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'payments'],
+    queryFn: () => api.entities.OperationalSetting.filter({ organization_id: organization?.id }),
+    enabled: !!organization?.id,
+  });
+
+  const paymentSettingsRow = settingsRows.find((row) => row.category === 'payments');
+
+  useEffect(() => {
+    if (paymentSettingsRow?.settings) {
+      setPaymentSettings((prev) => ({ ...prev, ...paymentSettingsRow.settings }));
+    }
+  }, [paymentSettingsRow]);
 
   const [portalLoading, setPortalLoading] = useState(false);
   const handleManageBilling = async () => {
@@ -170,6 +192,28 @@ export default function Payments() {
   const updateInvoice = useMutation({
     mutationFn: (params) => api.entities.Invoice.update(params.id, params.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] }),
+  });
+
+  const savePaymentSettings = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        organization_id: organization?.id,
+        brand_id: brand?.id || null,
+        location_id: location?.id || null,
+        scope: location?.id ? 'location' : brand?.id ? 'brand' : 'organization',
+        category: 'payments',
+        settings: paymentSettings,
+        created_by: userProfile?.id || null,
+        updated_by: userProfile?.id || null,
+      };
+      if (paymentSettingsRow) return api.entities.OperationalSetting.update(paymentSettingsRow.id, payload);
+      return api.entities.OperationalSetting.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'payments'] });
+      toast.success('Payment settings saved');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to save payment settings'),
   });
 
   const getVendorFileDestination = async (vendorId) => {
@@ -738,24 +782,48 @@ export default function Payments() {
                     <p className="font-medium">Auto-Pay Approved Invoices</p>
                     <p className="text-sm text-muted-foreground">Automatically process payment for approved invoices</p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={paymentSettings.autoPayApprovedInvoices}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, autoPayApprovedInvoices: checked })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Default Payment Method</p>
                     <p className="text-sm text-muted-foreground">Method used for automatic payments</p>
                   </div>
-                  <Badge className="bg-purple-500/50/10 text-purple-400">
-                    <CreditCard className="h-3 w-3 mr-1" /> Stripe
-                  </Badge>
+                  <Select
+                    value={paymentSettings.defaultPaymentMethod}
+                    onValueChange={(value) => setPaymentSettings({ ...paymentSettings, defaultPaymentMethod: value })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="paypal">PayPal</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Payment Approval Threshold</p>
                     <p className="text-sm text-muted-foreground">Auto-pay limit without manual approval</p>
                   </div>
-                  <Input className="w-28" type="number" step="100" defaultValue="1000" />
+                  <Input
+                    className="w-28"
+                    type="number"
+                    step="100"
+                    value={paymentSettings.approvalThreshold}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, approvalThreshold: Number(e.target.value) || 0 })}
+                  />
                 </div>
+                <Button onClick={() => savePaymentSettings.mutate()} disabled={savePaymentSettings.isPending} className="w-full bg-primary hover:bg-primary text-primary-foreground">
+                  {savePaymentSettings.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Save Payment Settings
+                </Button>
               </CardContent>
             </Card>
 
@@ -771,21 +839,30 @@ export default function Payments() {
                     <p className="font-medium">Payment Confirmation Email</p>
                     <p className="text-sm text-muted-foreground">Send email when payment is processed</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={paymentSettings.confirmationEmail}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, confirmationEmail: checked })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Overdue Invoice Alerts</p>
                     <p className="text-sm text-muted-foreground">Get notified when invoices become overdue</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={paymentSettings.overdueAlerts}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, overdueAlerts: checked })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Weekly Payment Summary</p>
                     <p className="text-sm text-muted-foreground">Receive a weekly digest of all payment activity</p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={paymentSettings.weeklySummary}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, weeklySummary: checked })}
+                  />
                 </div>
               </CardContent>
             </Card>

@@ -1,5 +1,9 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
+import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Building2, Users, Bell, MonitorPlay, Save } from "lucide-react";
@@ -16,6 +20,11 @@ export default function RestaurantSetup() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'pos';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const queryClient = useQueryClient();
+  const { organization, brand, location, userProfile } = useAuth();
+  const activeOrgId = organization?.id || userProfile?.organization_id;
+  const activeBrandId = brand?.id || null;
+  const activeLocationId = location?.id || userProfile?.location_id || null;
 
   const [posProvider, setPosProvider] = React.useState('');
   const [apiKey, setApiKey] = React.useState('');
@@ -40,19 +49,149 @@ export default function RestaurantSetup() {
     eodSummary: false,
     systemAlerts: true
   });
+  const [locationSettings, setLocationSettings] = React.useState({
+    storeConcept: '',
+    taxRate: '',
+    receivingAutoApproval: '',
+  });
 
-  const handleSave = () => {
-    toast.success("Settings saved successfully!");
+  const { data: settingsRows = [] } = useAuthQuery({
+    queryKey: ['operational_settings', activeOrgId, activeBrandId, activeLocationId],
+    queryFn: () => api.entities.OperationalSetting.filter({ organization_id: activeOrgId }),
+    enabled: !!activeOrgId,
+  });
+
+  const { data: integrations = [] } = useAuthQuery({
+    queryKey: ['integrations', activeOrgId],
+    queryFn: () => api.entities.Integration.filter({ organization_id: activeOrgId }),
+    enabled: !!activeOrgId,
+  });
+
+  const { data: locationGroups = [] } = useAuthQuery({
+    queryKey: ['location_groups', activeOrgId],
+    queryFn: () => api.entities.LocationGroup.filter({ organization_id: activeOrgId }),
+    enabled: !!activeOrgId,
+  });
+
+  const setupSettings = settingsRows.find((row) => row.category === 'restaurant_setup');
+  const locationConfig = settingsRows.find((row) => row.category === 'location_config');
+  const posIntegration = integrations.find((row) => row.provider === posProvider || row.metadata?.originalId === posProvider);
+
+  React.useEffect(() => {
+    if (setupSettings?.settings) {
+      setSyncInterval(String(setupSettings.settings.syncInterval || '15'));
+      setStoreGroup(setupSettings.settings.storeGroup || '');
+      setNotifications({
+        lowStock: setupSettings.settings.notifications?.lowStock ?? true,
+        largeOrders: setupSettings.settings.notifications?.largeOrders ?? true,
+        eodSummary: setupSettings.settings.notifications?.eodSummary ?? false,
+        systemAlerts: setupSettings.settings.notifications?.systemAlerts ?? true,
+      });
+      setDevices(setupSettings.settings.devices || []);
+    }
+  }, [setupSettings]);
+
+  React.useEffect(() => {
+    if (locationConfig?.settings) {
+      setLocationSettings({
+        storeConcept: locationConfig.settings.storeConcept || '',
+        taxRate: locationConfig.settings.taxRate || '',
+        receivingAutoApproval: locationConfig.settings.receivingAutoApproval || '',
+      });
+    }
+  }, [locationConfig]);
+
+  React.useEffect(() => {
+    const configuredPos = integrations.find((row) =>
+      ['toast', 'square', 'clover', 'lightspeed'].includes(row.provider) || row.metadata?.type === 'pos'
+    );
+    if (configuredPos) {
+      setPosProvider(configuredPos.metadata?.originalId || configuredPos.provider);
+      setApiKey(configuredPos.metadata?.apiKey ? '********' : '');
+    }
+  }, [integrations]);
+
+  const upsertSetting = async (category, settings) => {
+    const existing = settingsRows.find((row) => row.category === category);
+    const payload = {
+      organization_id: activeOrgId,
+      brand_id: activeBrandId,
+      location_id: activeLocationId,
+      scope: activeLocationId ? 'location' : activeBrandId ? 'brand' : 'organization',
+      category,
+      settings,
+      created_by: userProfile?.id || null,
+      updated_by: userProfile?.id || null,
+    };
+
+    if (existing) {
+      return api.entities.OperationalSetting.update(existing.id, payload);
+    }
+    return api.entities.OperationalSetting.create(payload);
   };
 
-  const handleTestConnection = () => {
+  const saveSettingsMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeOrgId) throw new Error('No active organization selected');
+      await Promise.all([
+        upsertSetting('restaurant_setup', {
+          syncInterval,
+          storeGroup,
+          notifications,
+          devices,
+        }),
+        upsertSetting('location_config', locationSettings),
+      ]);
+
+      if (posProvider && apiKey && apiKey !== '********') {
+        const providerPayload = {
+          organization_id: activeOrgId,
+          provider: posProvider,
+          metadata: {
+            type: 'pos',
+            originalId: posProvider,
+            apiKey,
+            syncInterval,
+            brand_id: activeBrandId,
+            location_id: activeLocationId,
+            validation_status: 'pending_provider_sync',
+          },
+          is_active: true,
+        };
+        const existing = integrations.find((row) => row.provider === posProvider || row.metadata?.originalId === posProvider);
+        if (existing) await api.entities.Integration.update(existing.id, providerPayload);
+        else await api.entities.Integration.create(providerPayload);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', activeOrgId, activeBrandId, activeLocationId] });
+      queryClient.invalidateQueries({ queryKey: ['integrations', activeOrgId] });
+      toast.success("Settings saved successfully");
+    },
+    onError: (error) => toast.error(error.message || 'Failed to save settings'),
+  });
+
+  const handleSave = () => {
+    saveSettingsMutation.mutate();
+  };
+
+  const handleTestConnection = async () => {
+    if (!posProvider || !apiKey || apiKey === '********') {
+      toast.error('Enter provider credentials before saving the connection');
+      return;
+    }
     setIsTesting(true);
     setTestStatus(null);
-    setTimeout(() => {
-      setIsTesting(false);
+    try {
+      await saveSettingsMutation.mutateAsync();
       setTestStatus('success');
-      toast.success("Successfully connected to POS system!");
-    }, 1500);
+      toast.success("POS configuration saved. Provider validation will run during the next sync.");
+    } catch (error) {
+      setTestStatus('error');
+      toast.error(error.message || 'Failed to save POS configuration');
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   return (
@@ -62,8 +201,9 @@ export default function RestaurantSetup() {
           <h1 className="text-2xl font-bold text-foreground">Restaurant Setup</h1>
           <p className="text-muted-foreground mt-1">Configure your location's operational settings.</p>
         </div>
-        <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={handleSave}>
-          <Save className="h-4 w-4 mr-2" /> Save Changes
+        <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={handleSave} disabled={saveSettingsMutation.isPending}>
+          {saveSettingsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Save Changes
         </Button>
       </div>
 
@@ -180,8 +320,15 @@ export default function RestaurantSetup() {
                     onChange={(e) => setNewGroup(e.target.value)}
                   />
                   <Button type="button" variant="secondary" onClick={() => {
-                    if (newGroup) {
-                      toast.success(`Group "${newGroup}" created`);
+                    if (newGroup && activeOrgId) {
+                      api.entities.LocationGroup.create({
+                        organization_id: activeOrgId,
+                        name: newGroup,
+                        description: 'Created from Restaurant Setup',
+                      }).then(() => {
+                        queryClient.invalidateQueries({ queryKey: ['location_groups', activeOrgId] });
+                        toast.success(`Group "${newGroup}" created`);
+                      }).catch((error) => toast.error(error.message || 'Failed to create group'));
                       setNewGroup('');
                     }
                   }}>
@@ -191,6 +338,18 @@ export default function RestaurantSetup() {
               </div>
             </CardContent>
           </Card>
+          {locationGroups.length > 0 && (
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Configured Groups</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {locationGroups.map((group) => (
+                  <Badge key={group.id} variant="secondary" className="mr-2">{group.name}</Badge>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="devices" className="space-y-6">
@@ -200,7 +359,11 @@ export default function RestaurantSetup() {
                 <CardTitle>Shared Devices</CardTitle>
                 <CardDescription>Manage terminals and tablets used by staff without individual logins.</CardDescription>
               </div>
-              <Button onClick={() => toast.success("New PIN: 8492-4192. Valid for 10 minutes.")}>
+              <Button onClick={() => {
+                const pin = Math.floor(100000 + Math.random() * 900000).toString();
+                setDevices([...devices, { id: crypto.randomUUID(), name: `Shared Device ${devices.length + 1}`, status: 'Pending', lastActive: 'Awaiting registration', pin }]);
+                toast.success(`Registration PIN: ${pin}. Save changes to persist this device.`);
+              }}>
                 <Plus className="h-4 w-4 mr-2" /> Register Device
               </Button>
             </CardHeader>
@@ -320,15 +483,28 @@ export default function RestaurantSetup() {
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
                 <Label>Store Concept/Brand</Label>
-                <Input placeholder="E.g., Flagship, Express" />
+                <Input
+                  placeholder="E.g., Flagship, Express"
+                  value={locationSettings.storeConcept}
+                  onChange={(e) => setLocationSettings({ ...locationSettings, storeConcept: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Tax Rate (%)</Label>
-                <Input type="number" placeholder="8.5" />
+                <Input
+                  type="number"
+                  placeholder="8.5"
+                  value={locationSettings.taxRate}
+                  onChange={(e) => setLocationSettings({ ...locationSettings, taxRate: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Default Receiving Auto-Approval</Label>
-                <Input placeholder="$500.00" />
+                <Input
+                  placeholder="$500.00"
+                  value={locationSettings.receivingAutoApproval}
+                  onChange={(e) => setLocationSettings({ ...locationSettings, receivingAutoApproval: e.target.value })}
+                />
               </div>
             </CardContent>
           </Card>

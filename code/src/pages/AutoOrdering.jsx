@@ -50,6 +50,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 import { toast } from "sonner";
@@ -75,9 +76,18 @@ export default function AutoOrdering() {
   const [sendMethod, setSendMethod] = useState('email');
   const [newTransferOpen, setNewTransferOpen] = useState(false);
   const [receiveOrderOpen, setReceiveOrderOpen] = useState(false);
+  const [receivingOrderId, setReceivingOrderId] = useState('');
+  const [orderSettings, setOrderSettings] = useState({
+    requireManagerApproval: true,
+    approvalThreshold: 500,
+    autoApproveBelowThreshold: false,
+    sendOrderConfirmation: true,
+    defaultSendMethod: 'email',
+    recurringOrdersEnabled: false,
+  });
 
   const queryClient = useQueryClient();
-  const { organization, brand, location } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
 
   const { data: orders = [], isLoading } = useAuthQuery({
     queryKey: ['auto-orders', organization?.id],
@@ -119,6 +129,35 @@ export default function AutoOrdering() {
     enabled: !!organization?.id,
   });
 
+  const { data: transfers = [] } = useAuthQuery({
+    queryKey: ['transfers', organization?.id],
+    queryFn: () => api.entities.Transfer.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: receivings = [] } = useAuthQuery({
+    queryKey: ['receivings', organization?.id],
+    queryFn: () => api.entities.Receiving.list('-received_date'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: settingsRows = [] } = useAuthQuery({
+    queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'],
+    queryFn: () => api.entities.OperationalSetting.filter({ organization_id: organization?.id }),
+    enabled: !!organization?.id,
+  });
+
+  const orderingSettingsRow = settingsRows.find((row) => row.category === 'ordering');
+
+  useEffect(() => {
+    if (orderingSettingsRow?.settings) {
+      setOrderSettings((prev) => ({ ...prev, ...orderingSettingsRow.settings }));
+      setSendMethod(orderingSettingsRow.settings.defaultSendMethod || 'email');
+    }
+  }, [orderingSettingsRow]);
+
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.AutoOrder.create(data),
     onSuccess: () => {
@@ -132,6 +171,70 @@ export default function AutoOrdering() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
     },
+  });
+
+  const saveOrderingSettings = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        organization_id: organization?.id,
+        brand_id: brand?.id || null,
+        location_id: location?.id || null,
+        scope: location?.id ? 'location' : brand?.id ? 'brand' : 'organization',
+        category: 'ordering',
+        settings: orderSettings,
+        created_by: userProfile?.id || null,
+        updated_by: userProfile?.id || null,
+      };
+      if (orderingSettingsRow) return api.entities.OperationalSetting.update(orderingSettingsRow.id, payload);
+      return api.entities.OperationalSetting.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'] });
+      toast.success('Ordering settings saved');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to save ordering settings'),
+  });
+
+  const createTransferMutation = useMutation({
+    mutationFn: () => api.entities.Transfer.create({
+      organization_id: organization?.id,
+      from_location_id: location?.id || null,
+      to_location_id: null,
+      status: 'pending',
+      items: [],
+      created_by: userProfile?.id || null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transfers', organization?.id] });
+      toast.success('Transfer record created');
+      setNewTransferOpen(false);
+    },
+    onError: (error) => toast.error(error.message || 'Failed to create transfer'),
+  });
+
+  const createReceivingMutation = useMutation({
+    mutationFn: async () => {
+      const order = orders.find((item) => item.id === receivingOrderId);
+      if (!order) throw new Error('Select an order to receive');
+      const vendor = vendors.find((item) => item.name === order.vendor_name);
+      await api.entities.Receiving.create({
+        organization_id: organization?.id,
+        order_id: order.id,
+        vendor_id: vendor?.id || null,
+        status: 'received',
+        items: order.items || [],
+        received_by: userProfile?.id || null,
+      });
+      await api.entities.AutoOrder.update(order.id, { status: 'received' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['receivings', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
+      toast.success('Receiving logged');
+      setReceiveOrderOpen(false);
+      setReceivingOrderId('');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to log receiving'),
   });
 
   // Generate order based on inventory levels
@@ -674,21 +777,33 @@ export default function AutoOrdering() {
                     <p className="font-medium">Require Manager Approval</p>
                     <p className="text-sm text-muted-foreground">Orders above threshold need manager sign-off</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={orderSettings.requireManagerApproval}
+                    onCheckedChange={(checked) => setOrderSettings({ ...orderSettings, requireManagerApproval: checked })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Approval Threshold</p>
                     <p className="text-sm text-muted-foreground">Orders above this amount need approval</p>
                   </div>
-                  <Input className="w-28" type="number" step="100" defaultValue="500" />
+                  <Input
+                    className="w-28"
+                    type="number"
+                    step="100"
+                    value={orderSettings.approvalThreshold}
+                    onChange={(e) => setOrderSettings({ ...orderSettings, approvalThreshold: Number(e.target.value) || 0 })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Auto-Approve Below Threshold</p>
                     <p className="text-sm text-muted-foreground">Automatically approve small orders</p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={orderSettings.autoApproveBelowThreshold}
+                    onCheckedChange={(checked) => setOrderSettings({ ...orderSettings, autoApproveBelowThreshold: checked })}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -705,22 +820,43 @@ export default function AutoOrdering() {
                     <p className="font-medium">Send Order Confirmation</p>
                     <p className="text-sm text-muted-foreground">Email order details to manager after approval</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={orderSettings.sendOrderConfirmation}
+                    onCheckedChange={(checked) => setOrderSettings({ ...orderSettings, sendOrderConfirmation: checked })}
+                  />
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Default Send Method</p>
                     <p className="text-sm text-muted-foreground">Default channel for vendor orders</p>
                   </div>
-                  <Badge className="bg-primary/10 text-primary">Email</Badge>
+                  <Select
+                    value={orderSettings.defaultSendMethod}
+                    onValueChange={(value) => setOrderSettings({ ...orderSettings, defaultSendMethod: value })}
+                  >
+                    <SelectTrigger className="w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Recurring Orders</p>
                     <p className="text-sm text-muted-foreground">Set up automatic recurring order schedules</p>
                   </div>
-                  <Badge variant="secondary">Not Configured</Badge>
+                  <Switch
+                    checked={orderSettings.recurringOrdersEnabled}
+                    onCheckedChange={(checked) => setOrderSettings({ ...orderSettings, recurringOrdersEnabled: checked })}
+                  />
                 </div>
+                <Button onClick={() => saveOrderingSettings.mutate()} disabled={saveOrderingSettings.isPending} className="w-full bg-primary hover:bg-primary text-primary-foreground">
+                  {saveOrderingSettings.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Save Ordering Settings
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -751,11 +887,22 @@ export default function AutoOrdering() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No active transfers.
-                    </TableCell>
-                  </TableRow>
+                  {transfers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No active transfers.
+                      </TableCell>
+                    </TableRow>
+                  ) : transfers.map((transfer) => (
+                    <TableRow key={transfer.id}>
+                      <TableCell className="font-mono text-xs">{transfer.id.slice(0, 8)}</TableCell>
+                      <TableCell>{transfer.from_location_id || 'Current location'}</TableCell>
+                      <TableCell>{transfer.to_location_id || 'Not assigned'}</TableCell>
+                      <TableCell>{transfer.items?.length || 0}</TableCell>
+                      <TableCell><Badge variant="secondary">{transfer.status}</Badge></TableCell>
+                      <TableCell>{transfer.created_at ? new Date(transfer.created_at).toLocaleDateString() : '—'}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -787,11 +934,25 @@ export default function AutoOrdering() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No receiving logs found.
-                    </TableCell>
-                  </TableRow>
+                  {receivings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No receiving logs found.
+                      </TableCell>
+                    </TableRow>
+                  ) : receivings.map((receiving) => {
+                    const order = orders.find((item) => item.id === receiving.order_id);
+                    return (
+                      <TableRow key={receiving.id}>
+                        <TableCell className="font-mono text-xs">{receiving.id.slice(0, 8)}</TableCell>
+                        <TableCell>{order?.order_number || receiving.order_id?.slice(0, 8) || 'Manual'}</TableCell>
+                        <TableCell>{order?.vendor_name || 'Vendor'}</TableCell>
+                        <TableCell>{receiving.items?.length || 0}</TableCell>
+                        <TableCell><Badge variant="secondary">{receiving.status}</Badge></TableCell>
+                        <TableCell>{receiving.received_date ? new Date(receiving.received_date).toLocaleDateString() : '—'}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -893,14 +1054,14 @@ export default function AutoOrdering() {
             <DialogTitle>New Internal Transfer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Select items and destination to transfer inventory. (Workflow under development)</p>
+            <p className="text-sm text-muted-foreground">Create a pending transfer record for this location. Add item-level routing from the transfer queue.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTransferOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
-              toast.success("Transfer initiated");
-              setNewTransferOpen(false);
-            }}>Initiate Transfer</Button>
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" disabled={createTransferMutation.isPending} onClick={() => createTransferMutation.mutate()}>
+              {createTransferMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Initiate Transfer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -912,14 +1073,26 @@ export default function AutoOrdering() {
             <DialogTitle>Receive Order</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Log physical delivery against a PO, handle partials and discrepancies. (Workflow under development)</p>
+            <p className="text-sm text-muted-foreground">Log physical delivery against a purchase order.</p>
+            <Select value={receivingOrderId} onValueChange={setReceivingOrderId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select purchase order" />
+              </SelectTrigger>
+              <SelectContent>
+                {orders.filter((order) => ['sent', 'approved'].includes(order.status)).map((order) => (
+                  <SelectItem key={order.id} value={order.id}>
+                    {order.order_number} - {order.vendor_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReceiveOrderOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
-              toast.success("Receiving logged");
-              setReceiveOrderOpen(false);
-            }}>Log Receiving</Button>
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" disabled={createReceivingMutation.isPending || !receivingOrderId} onClick={() => createReceivingMutation.mutate()}>
+              {createReceivingMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Log Receiving
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
