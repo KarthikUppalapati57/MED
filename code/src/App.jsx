@@ -38,13 +38,15 @@ const pageVariants = {
 };
 
 const LayoutWrapper = ({ children, currentPageName }) => {
+  const location = useLocation();
   const content = (
     <motion.div
+      key={location.pathname}
       initial="initial"
       animate="in"
       exit="out"
       variants={pageVariants}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="w-full h-full"
     >
       {children}

@@ -90,8 +90,16 @@ function VerificationForm({ onVerified }) {
   const { theme } = useTheme();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [isDark, setIsDark] = useState(false);
 
-  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const CARD_ELEMENT_OPTIONS = {
     style: {

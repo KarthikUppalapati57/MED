@@ -616,6 +616,21 @@ function InviteDialog({ open, onClose, orgId }) {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
 
+      // Optimistic update so it shows immediately
+      queryClient.setQueryData(['team-members', activeOrgId, activeBrandId, activeLocationId, false], (old) => {
+        if (!old) return old;
+        return [...old, {
+          id: 'inv_temp_' + Date.now(),
+          membership_id: 'inv_temp_' + Date.now(),
+          user_id: 'inv_temp_' + Date.now(),
+          email,
+          role,
+          status: 'invited',
+          profiles: { email, full_name: 'Pending Invite' },
+          created_at: new Date().toISOString()
+        }];
+      });
+
       if (token) {
         const link = `${window.location.origin}/signup/${token}`;
         setGeneratedLink(link);
@@ -1238,7 +1253,8 @@ export default function UserManagement() {
                     const StatusIcon = statusCfg.icon;
                     const pagePerms = member.page_permissions || member.permissions || {};
                     const signingPrivs = member.signing_privileges || member.capabilities?.signing_privileges || {};
-                    const highestSigning = Math.max(0, ...Object.values(signingPrivs).map(Number));
+                    const privValues = Object.values(signingPrivs).map(Number);
+                    const highestSigning = privValues.length > 0 ? Math.max(0, ...privValues) : 0;
                     const highestSlvl = SIGNING_LEVELS.find(s => s.value === highestSigning) || SIGNING_LEVELS[0];
 
                     return (
