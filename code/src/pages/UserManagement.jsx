@@ -50,6 +50,7 @@ const PAGE_PERMISSION_GROUPS = [
     pages: [
       { key: "Dashboard", label: "Main Dashboard" },
       { key: "AuditLogs", label: "Audit Logs" },
+      { key: "Performance", label: "Performance" },
     ],
   },
   {
@@ -58,6 +59,8 @@ const PAGE_PERMISSION_GROUPS = [
       { key: "Inventory", label: "Stock Management" },
       { key: "Products", label: "Product Master" },
       { key: "Recipes", label: "Recipe Costing" },
+      { key: "MenuEngineering", label: "Menu Engineering" },
+      { key: "AvTCosting", label: "AvT Costing" },
     ],
   },
   {
@@ -65,6 +68,7 @@ const PAGE_PERMISSION_GROUPS = [
     pages: [
       { key: "Invoices", label: "Invoice Processing" },
       { key: "Payments", label: "Vendor Payments" },
+      { key: "Accounting", label: "Accounting" },
     ],
   },
   {
@@ -78,7 +82,8 @@ const PAGE_PERMISSION_GROUPS = [
     key: "admin", label: "Administration", icon: <Settings className="w-4 h-4" />,
     pages: [
       { key: "UserManagement", label: "Team Management" },
-      { key: "Onboarding", label: "Onboarding Flow" },
+      { key: "Labor", label: "Labor & Scheduling" },
+      { key: "Integrations", label: "Integrations" },
       { key: "RestaurantSetup", label: "Restaurant Setup" },
     ],
   },

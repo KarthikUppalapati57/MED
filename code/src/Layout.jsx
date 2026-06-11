@@ -112,6 +112,7 @@ const navigation = [
   },
   { 
     name: 'Orders', 
+    pageKey: 'AutoOrdering',
     icon: ShoppingCart, 
     minRole: 'location_manager',
     subItems: [
@@ -125,6 +126,7 @@ const navigation = [
   },
   { 
     name: 'Recipes', 
+    pageKey: 'Recipes',
     icon: ChefHat, 
     minRole: 'location_manager',
     subItems: [
@@ -136,8 +138,9 @@ const navigation = [
   },
   { 
     name: 'Vendors', 
+    pageKey: 'Vendors',
     icon: Store, 
-    minRole: 'branch_manager',
+    minRole: 'location_manager',
     subItems: [
       { name: 'Vendors List', href: 'Vendors?tab=vendors', icon: Store },
       { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package }
@@ -145,6 +148,7 @@ const navigation = [
   },
   { 
     name: 'Labor', 
+    pageKey: 'Labor',
     icon: Users, 
     minRole: 'location_manager',
     subItems: [
@@ -156,6 +160,7 @@ const navigation = [
   },
   { 
     name: 'Accounting', 
+    pageKey: 'Accounting',
     icon: DollarSign, 
     minRole: 'manager',
     subItems: [
