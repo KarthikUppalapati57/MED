@@ -100,6 +100,7 @@ export default class ErrorBoundary extends React.Component {
                   sessionStorage.removeItem('chunk_failed_reload');
                   if (window.history.length > 2) {
                     window.history.back();
+                    setTimeout(() => window.location.reload(), 100);
                   } else {
                     window.location.href = '/';
                   }
