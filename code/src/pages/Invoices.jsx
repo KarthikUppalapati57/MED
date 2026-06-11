@@ -227,7 +227,7 @@ export default function Invoices() {
       return { ...invoice, line_items: lineItems };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       toast.success('Invoice saved successfully');
     },
   });
@@ -262,7 +262,7 @@ export default function Invoices() {
       return { ...invoice, line_items: lineItems };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       toast.success('Invoice updated');
     },
   });
@@ -270,21 +270,22 @@ export default function Invoices() {
   const deleteMutation = useMutation({
     mutationFn: (id) => api.entities.Invoice.delete(id),
     onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ['invoices'] });
-      const previousData = queryClient.getQueryData(['invoices']);
-      queryClient.setQueryData(['invoices'], (old) => 
+      await queryClient.cancelQueries({ queryKey: ['invoices-dashboard'] });
+      const qk = ['invoices-dashboard', organization?.id];
+      const previousData = queryClient.getQueryData(qk);
+      queryClient.setQueryData(qk, (old) => 
         old ? old.filter(item => item.id !== deletedId) : []
       );
-      return { previousData };
+      return { previousData, qk };
     },
     onError: (err, deletedId, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(['invoices'], context.previousData);
+        queryClient.setQueryData(context.qk, context.previousData);
       }
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
     },
     onSuccess: () => {
       toast.success('Invoice deleted');

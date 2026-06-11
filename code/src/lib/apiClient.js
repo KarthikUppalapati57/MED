@@ -3,6 +3,9 @@ import { supabase } from '@/lib/supabaseClient';
 const createEntityClient = (table, useSoftDelete = false) => ({
   list: async (orderBy, options = {}) => {
     let query = supabase.from(table).select('*');
+    if (useSoftDelete) {
+      query = query.is('deleted_at', null);
+    }
     if (orderBy) {
       const ascending = !orderBy.startsWith('-');
       const column = ascending ? orderBy : orderBy.slice(1);
@@ -17,6 +20,9 @@ const createEntityClient = (table, useSoftDelete = false) => ({
   },
   filter: async (conditions) => {
     let query = supabase.from(table).select('*');
+    if (useSoftDelete) {
+      query = query.is('deleted_at', null);
+    }
     Object.entries(conditions || {}).forEach(([key, value]) => {
       query = query.eq(key, value);
     });

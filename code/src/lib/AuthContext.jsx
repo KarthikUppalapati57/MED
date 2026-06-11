@@ -83,27 +83,6 @@ async function prefetchDashboardData(role) {
         },
         staleTime,
       });
-    } else if (role === 'org_owner') {
-      queryClientInstance.prefetchQuery({
-        queryKey: ['invoices'],
-        queryFn: () => api.entities.Invoice.list('-created_at'),
-        staleTime,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['payments'],
-        queryFn: () => api.entities.Payment.list('-created_at'),
-        staleTime,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['inventory'],
-        queryFn: () => api.entities.Inventory.list(),
-        staleTime,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['products'],
-        queryFn: () => api.entities.Product.list(),
-        staleTime,
-      });
     }
   } catch (err) {
     console.debug('[Prefetch] Dashboard prefetch error (non-fatal):', err);
