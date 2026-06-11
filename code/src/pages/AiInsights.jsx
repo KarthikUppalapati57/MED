@@ -101,11 +101,15 @@ export default function AiInsights() {
     try {
       // Step 1: Gather raw context data (limit size to prevent massive token payloads)
       // We fetch all records for the org, then rely on filterByContext to strictly narrow to Brand/Location
-      const [rawSales, rawInvoices, rawLabor] = await Promise.all([
+      const results = await Promise.allSettled([
         api.entities.PosSalesData.list('-date', { limit: 100 }),
         api.entities.Invoice.list('-created_at', { limit: 50 }),
-        api.entities.EmployeeShift.list('-start_time', { limit: 50 })
-      ]).catch(() => [[], [], []]); // Catch errors if tables are empty/missing
+        api.entities.EmployeeShift.list('-created_at', { limit: 50 })
+      ]);
+
+      const rawSales = results[0].status === 'fulfilled' ? results[0].value : [];
+      const rawInvoices = results[1].status === 'fulfilled' ? results[1].value : [];
+      const rawLabor = results[2].status === 'fulfilled' ? results[2].value : [];
 
       // Step 2: Strictly filter based on current context
       const contextObj = { organization, brand: activeBrand, location: activeLocation };
