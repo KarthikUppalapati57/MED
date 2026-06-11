@@ -10,11 +10,11 @@ import { useAuth } from '@/lib/AuthContext';
  * causing RLS to reject them (auth.uid() returns NULL).
  *
  * Performance optimizations:
- * - staleTime: 5 minutes — prevents unnecessary re-fetches on component re-mount
+ * - staleTime: 5 minutes prevents unnecessary re-fetches on component re-mount
  * - placeholderData: keeps previous data visible during background refetch
- * - gcTime: 10 minutes — keeps unused data in cache for faster re-navigation
+ * - gcTime: 10 minutes keeps unused data in cache for faster re-navigation
  *
- * Usage: Drop-in replacement for useQuery — same API, same options.
+ * Usage: Drop-in replacement for useQuery same API, same options.
  *
  * @example
  * const { data, isLoading } = useAuthQuery({
@@ -34,7 +34,7 @@ export function useAuthQuery(options) {
   return useQuery({
     ...options,
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
-    // Keep data in cache for 5 minutes — prevents re-fetching on every page
+ // Keep data in cache for 5 minutes prevents re-fetching on every page
     // navigation or component re-mount. Realtime subscriptions handle live updates.
     staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
     // Keep unused data in cache for 10 minutes so navigating back is instant

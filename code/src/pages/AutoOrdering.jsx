@@ -442,7 +442,7 @@ export default function AutoOrdering() {
           <TabsTrigger value="receiving">Receiving</TabsTrigger>
           <TabsTrigger value="order-setup">Settings</TabsTrigger>
         </TabsList>
-        {/* â”€â”€ All Orders Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* All Orders Tab */}
         <TabsContent value="all-orders">
           <Card className="border-0 shadow-sm">
             <CardHeader>
@@ -517,7 +517,7 @@ export default function AutoOrdering() {
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Place New Order Tab (existing content) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Place New Order Tab (existing content) */}
         <TabsContent value="place-order" className="space-y-6">
 
       {/* External Suggestions */}
@@ -718,7 +718,7 @@ export default function AutoOrdering() {
       </Card>
         </TabsContent>
 
-        {/* â”€â”€ Invoice Approval Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Invoice Approval Tab */}
         <TabsContent value="invoice-approval">
           <Card className="border-0 shadow-sm">
             <CardHeader>
@@ -766,7 +766,7 @@ export default function AutoOrdering() {
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Order Setup Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Order Setup Tab */}
         <TabsContent value="order-setup">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">
@@ -866,7 +866,7 @@ export default function AutoOrdering() {
           </div>
         </TabsContent>
 
-        {/* ── Transfers Tab ────────────────────────────────────────────────────────── */}
+ {/* Transfers Tab */}
         <TabsContent value="transfers">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -913,7 +913,7 @@ export default function AutoOrdering() {
           </Card>
         </TabsContent>
 
-        {/* ── Receiving Tab ────────────────────────────────────────────────────────── */}
+ {/* Receiving Tab */}
         <TabsContent value="receiving">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">

@@ -391,7 +391,7 @@ export default function Layout({ children, currentPageName }) {
         />
       )}
 
-      {/* ═══ Sidebar ═══ */}
+ {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -511,9 +511,9 @@ export default function Layout({ children, currentPageName }) {
         </div>
       </aside>
 
-      {/* ═══ Main content ═══ */}
+ {/* Main content */}
       <div className="lg:pl-64">
-        {/* Top header — glass effect */}
+ {/* Top header glass effect */}
         <header className="sticky top-0 z-30 h-16 glass-header border-b border-border flex items-center justify-between px-4 lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}

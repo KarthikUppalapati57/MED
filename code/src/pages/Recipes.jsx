@@ -647,7 +647,7 @@ export default function Recipes() {
       </div>
         </TabsContent>
 
-        {/* — Prepared Items Tab ——————————————————————————— */}
+ {/* Prepared Items Tab */}
         <TabsContent value="prepared-items">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -715,7 +715,7 @@ export default function Recipes() {
           </Card>
         </TabsContent>
 
-        {/* — Menu Analysis Tab (AI/ML + Analytics Dashboard) ———— */}
+ {/* Menu Analysis Tab (AI/ML + Analytics Dashboard) */}
         <TabsContent value="menu-analysis">
           <div className="space-y-6">
             {/* AI Insights Card */}
@@ -835,7 +835,7 @@ export default function Recipes() {
           </div>
         </TabsContent>
 
-        {/* â”€â”€ Recipe Viewer Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Recipe Viewer Tab */}
         <TabsContent value="recipe-viewer">
           {viewingRecipe ? (
             <div className="space-y-6">
@@ -938,7 +938,7 @@ export default function Recipes() {
           )}
         </TabsContent>
 
-        {/* â”€â”€ Setup Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Setup Tab */}
         <TabsContent value="setup">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">

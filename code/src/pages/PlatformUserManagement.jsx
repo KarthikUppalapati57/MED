@@ -52,7 +52,7 @@ export default function PlatformUserManagement() {
     };
   }, [queryClient]);
 
-  // â”€â”€ Platform Admins Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Platform Admins Query 
   const { data: platformAdmins = [], isLoading: isLoadingAdmins, error: adminQueryError } = useAuthQuery({
     queryKey: ['platform-admins'],
     queryFn: async () => {
@@ -90,7 +90,7 @@ export default function PlatformUserManagement() {
     }
   }, [adminQueryError]);
 
-  // ── Pending Invitations Query ─────────────────────────
+ // Pending Invitations Query 
   const { data: pendingInvitesRaw = [], isLoading: isLoadingInvites } = useAuthQuery({
     queryKey: ['platform-admin-invites'],
     queryFn: async () => {
@@ -112,7 +112,7 @@ export default function PlatformUserManagement() {
     );
   }, [pendingInvitesRaw, platformAdmins]);
 
-  // ── Invite Platform Admin ──────────────────────────────────────────
+ // Invite Platform Admin 
   const handleInvitePlatformAdmin = async () => {
     if (!platformInviteEmail) return;
     setPlatformInviting(true);
@@ -185,7 +185,7 @@ export default function PlatformUserManagement() {
     });
   }, [platformAdmins, searchQuery]);
 
-  // â”€â”€ Guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Guards 
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center h-96">

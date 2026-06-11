@@ -1,5 +1,5 @@
 /**
- * EmailJS Service – Reusable email utility for the Restops platform.
+ * EmailJS Service Reusable email utility for the Restops platform.
  *
  * Sends transactional emails via EmailJS (client-side, no backend needed).
  * Used for: invitations, invoice notifications, approval alerts, and requests.
@@ -52,7 +52,7 @@ export async function sendEmail({ to_email, to_name, subject, message, from_name
   }
 }
 
-// ── Pre-built email templates ────────────────────────────────────────────────
+// Pre-built email templates 
 
 /**
  * Send an invitation email to a new team member.

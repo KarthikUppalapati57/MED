@@ -47,7 +47,7 @@ export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
 
-  // Tab State — persisted in URL search params so it survives navigation
+ // Tab State persisted in URL search params so it survives navigation
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'requests';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
@@ -97,7 +97,7 @@ export default function PlatformAdmin() {
 
   const authChecked = !!user;
 
-  // â”€â”€ Real-Time Subscriptions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Real-Time Subscriptions 
   React.useEffect(() => {
     if (!authChecked || userRole !== 'platform_admin') return;
 
@@ -276,7 +276,7 @@ export default function PlatformAdmin() {
     });
   }, [allClientInvites, allProfiles]);
 
-  // â”€â”€ Mutators & Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Mutators & Handlers 
   const handleInviteClient = async () => {
     if (!inviteEmail) { toast.error("Email is required"); return; }
     if (inviteSelectedModules.length === 0) { toast.error("Select at least one module"); return; }
@@ -514,7 +514,7 @@ The Restops Platform Team
     }
   };
 
-  // â”€â”€ Resend email for an already-processed demo request â”€â”€â”€â”€â”€â”€â”€
+ // Resend email for an already-processed demo request 
   const updateContactRequestStatus = async (request, status) => {
     const toastId = toast.loading(`${status === 'accepted' ? 'Accepting' : 'Rejecting'} inquiry from ${request.full_name || request.name || request.email}...`);
     setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
@@ -795,7 +795,7 @@ The Restops Platform Team
   const getBrandUsers = React.useCallback((brandId) => brandUsersMap.get(brandId) || [], [brandUsersMap]);
   const getLocationUsers = React.useCallback((locId) => locationUsersMap.get(locId) || [], [locationUsersMap]);
 
-  // â”€â”€ Computed Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Computed Stats 
   const {
     accessReqs,
     contactReqs,
@@ -820,7 +820,7 @@ The Restops Platform Team
     };
   }, [requests, contactRequests, orgs]);
 
-  // â”€â”€ Tab Renderers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Tab Renderers 
   const renderRequestTable = (data, title, pCount, type) => (
     <Card className="border-0 shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">

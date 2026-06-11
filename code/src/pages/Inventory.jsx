@@ -843,7 +843,7 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Inventory Counts Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Inventory Counts Tab */}
         <TabsContent value="counts">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -900,7 +900,7 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {/* ── Count Sheets Tab ──────────────────────────────────────────────────────── */}
+ {/* Count Sheets Tab */}
         <TabsContent value="count-sheets">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -949,7 +949,7 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        {/* ── Waste Summary Tab ─────────────────────────────────────────────────────── */}
+ {/* Waste Summary Tab */}
         <TabsContent value="waste-summary">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Top Waste Reasons */}
@@ -1065,7 +1065,7 @@ export default function Inventory() {
           </div>
         </TabsContent>
 
-        {/* â”€â”€ Count Sheets Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Count Sheets Tab */}
         <TabsContent value="daily-snapshot">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Items Added Today (new inventory received) */}

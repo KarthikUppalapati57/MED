@@ -2,10 +2,10 @@ import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabaseClient';
 
 /**
- * Payment Service — unified abstraction for Stripe, PayPal, bank transfer.
+ * Payment Service unified abstraction for Stripe, PayPal, bank transfer.
  */
 
-// ── Stripe ──────────────────────────────────────────────────
+// Stripe 
 let stripePromise = null;
 
 export function getStripe() {
@@ -56,12 +56,12 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
   }
 }
 
-// ── PayPal ──────────────────────────────────────────────────
+// PayPal 
 export function getPayPalClientId() {
   return import.meta.env.VITE_PAYPAL_CLIENT_ID || null;
 }
 
-// ── Bank Transfer ───────────────────────────────────────────
+// Bank Transfer 
 export const BANK_DETAILS = {
   bank_name: 'Restops Business Account',
   account_name: 'Restops Restaurant Solutions Inc.',
@@ -72,7 +72,7 @@ export const BANK_DETAILS = {
   instructions: 'Please include your invoice number as the payment reference.',
 };
 
-// ── Payment Records ─────────────────────────────────────────
+// Payment Records 
 export async function createPaymentRecord(paymentData) {
   const { data, error } = await supabase
     .from('payments')

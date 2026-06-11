@@ -39,7 +39,7 @@ function StripeCheckoutForm({ amount, vendorName, invoiceNumber, onSuccess, onEr
       });
 
       if (isMock) {
-        // Development mock — simulate success
+ // Development mock simulate success
         await new Promise(r => setTimeout(r, 1500));
         onSuccess({
           payment_method: 'stripe',

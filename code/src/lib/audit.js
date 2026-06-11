@@ -3,7 +3,7 @@
  *
  * Provides a centralised helper for recording audit trail entries.
  * Adapted from CRE Financial Suite for Restops.
- * Never crashes the caller — audit failures are logged to console.
+ * Never crashes the caller audit failures are logged to console.
  *
  * Supports per-module filtering via the `module` field.
  * Valid modules: 'users', 'organizations', 'inventory', 'orders',

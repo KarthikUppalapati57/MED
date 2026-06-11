@@ -1,5 +1,5 @@
 /**
- * moduleConfig.js — Central module registry for RBAC & multi-tenant access control
+ * moduleConfig.js Central module registry for RBAC & multi-tenant access control
  * 
  * Each module defines:
  *   - label: Display name for sidebar & UI
@@ -60,9 +60,9 @@ export function getEnabledPages(enabledModules) {
  * Checks if a specific page is enabled given the org's enabled module list.
  * 
  * FAIL-CLOSED (secure-by-default):
- *   - Ungated pages (not in any module, e.g. Onboarding) → allowed
- *   - Core modules (dashboard, admin) → always allowed
- *   - Operational modules → ONLY allowed if explicitly in enabledModules
+ * - Ungated pages (not in any module, e.g. Onboarding) allowed
+ * - Core modules (dashboard, admin) always allowed
+ * - Operational modules ONLY allowed if explicitly in enabledModules
  */
 export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);

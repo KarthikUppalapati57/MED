@@ -488,7 +488,7 @@ export default function Products() {
       </Card>
         </TabsContent>
 
-        {/* â”€â”€ New Item Review Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* New Item Review Tab */}
         <TabsContent value="new-review">
           <Card className="border-0 shadow-sm">
             <CardHeader>
@@ -559,7 +559,7 @@ export default function Products() {
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Purchase Report Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Purchase Report Tab */}
         <TabsContent value="purchase-report">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">

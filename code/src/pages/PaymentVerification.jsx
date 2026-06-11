@@ -47,20 +47,20 @@ async function markPaymentVerified(userId, userEmail) {
       throw error;
     }
 
-    // If data is returned, the update affected a row — success!
+ // If data is returned, the update affected a row success!
     if (data?.id) {
       console.log('[PaymentVerification] Profile updated successfully on attempt', attempt + 1);
       return true;
     }
 
-    // No row was matched — profile may not exist yet. Wait and retry.
+ // No row was matched profile may not exist yet. Wait and retry.
     console.warn(`[PaymentVerification] update matched 0 rows on attempt ${attempt + 1}, retrying...`);
     if (attempt < MAX_RETRIES - 1) {
       await new Promise(r => setTimeout(r, RETRY_DELAY));
     }
   }
 
-  // All UPDATE retries exhausted — fall back to UPSERT
+ // All UPDATE retries exhausted fall back to UPSERT
   console.warn('[PaymentVerification] UPDATE retries exhausted, falling back to UPSERT');
   const { error: upsertError } = await supabase
     .from('profiles')
@@ -214,7 +214,7 @@ export default function PaymentVerification() {
   const [completed, setCompleted] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
 
-  // â”€â”€ After verification completes, poll refreshProfile until payment_verified is confirmed â”€â”€
+ // After verification completes, poll refreshProfile until payment_verified is confirmed 
   useEffect(() => {
     if (!completed) return;
     let cancelled = false;
@@ -257,7 +257,7 @@ export default function PaymentVerification() {
     return () => { cancelled = true; };
   }, [completed, refreshProfile, navigate]);
 
-  // â”€â”€ Once profile state confirms payment_verified, navigate cleanly â”€â”€
+ // Once profile state confirms payment_verified, navigate cleanly 
   useEffect(() => {
     if (completed && userProfile?.payment_verified) {
       navigate('/onboarding', { replace: true });
@@ -274,7 +274,7 @@ export default function PaymentVerification() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  // â”€â”€ Poll failure screen — profile update didn't propagate â”€â”€
+ // Poll failure screen profile update didn't propagate 
   if (pollFailed) {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
@@ -332,7 +332,7 @@ export default function PaymentVerification() {
     );
   }
 
-  // â”€â”€ Success screen while waiting for profile to update â”€â”€
+ // Success screen while waiting for profile to update 
   if (completed) {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">

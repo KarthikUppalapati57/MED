@@ -38,7 +38,7 @@ export default function PlatformAuditLogs() {
     };
   }, [queryClient]);
 
-  // â”€â”€ Audit Logs Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Audit Logs Query 
   const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
     queryKey: ['platform-wide-audit-logs', logModuleFilter],
     queryFn: async () => {
@@ -103,7 +103,7 @@ export default function PlatformAuditLogs() {
 
   const moduleFilters = ['All', 'organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations'];
 
-  // â”€â”€ Guards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Guards 
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center h-96">

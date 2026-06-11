@@ -25,7 +25,7 @@ import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// â”€â”€â”€ Restops Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Restops Roles 
 const Restops_ROLES = {
   org_owner:        { label: "Organization Owner", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
   branch_manager:   { label: "Branch Manager",     color: "purple", description: "Manages multiple locations and local team members", icon: Building2 },
@@ -43,7 +43,7 @@ const ROLE_COLOR_CLASSES = {
   slate:  { badge: "bg-secondary text-muted-foreground border-border",    dot: "bg-slate-400" },
 };
 
-// â”€â”€â”€ Restops Permission Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Restops Permission Groups 
 const PAGE_PERMISSION_GROUPS = [
   {
     key: "core", label: "General", icon: <LayoutDashboard className="w-4 h-4" />,
@@ -95,7 +95,7 @@ const ACCESS_LEVELS = {
   none: { label: "None", chipClass: "bg-secondary text-muted-foreground border-border",       btnActive: "bg-secondary text-muted-foreground border-transparent" },
 };
 
-// â”€â”€â”€ Signing Authority Levels (Adapted for Restops) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Signing Authority Levels (Adapted for Restops) 
 const SIGNING_LEVELS = [
   { value: 0, label: "None",         badgeClass: "bg-secondary text-muted-foreground border-border" },
   { value: 1, label: "L1 – Review",  badgeClass: "bg-sky-100 text-sky-700 border-sky-200" },
@@ -120,7 +120,7 @@ const STATUS_CONFIG = {
   no_access:{ label: "No Access",badgeClass: "bg-secondary text-muted-foreground",     icon: AlertCircle },
 };
 
-// â”€â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Utilities 
 const avatarColorCache = new Map();
 function avatarColor(email = "") {
   if (avatarColorCache.has(email)) return avatarColorCache.get(email);
@@ -144,7 +144,7 @@ function formatLastActive(dateStr) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// â”€â”€â”€ PagePermissionMatrix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PagePermissionMatrix 
 function PagePermissionMatrix({ permissions, onChange, readonly = false }) {
   const [expanded, setExpanded] = useState({ core: true, inventory: true, finance: true });
 
@@ -238,7 +238,7 @@ function PagePermissionMatrix({ permissions, onChange, readonly = false }) {
   );
 }
 
-// â”€â”€â”€ SigningPrivilegesMatrix â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SigningPrivilegesMatrix 
 function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }) {
   return (
     <div className="space-y-2">
@@ -275,7 +275,7 @@ function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }
   );
 }
 
-// â”€â”€â”€ RoleBadges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// RoleBadges 
 function RoleBadges({ member, maxVisible = 2 }) {
   const role = member.role || member.capabilities?.role || 'ground_staff';
   const roleDef = Restops_ROLES[role] || Restops_ROLES.ground_staff;
@@ -289,7 +289,7 @@ function RoleBadges({ member, maxVisible = 2 }) {
   );
 }
 
-// â”€â”€â”€ PageAccessChips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PageAccessChips 
 function PageAccessChips({ pagePerms = {}, maxVisible = 3 }) {
   const entries = Object.entries(pagePerms).filter(([, v]) => v !== 'none');
   if (entries.length === 0) return <span className="text-[10px] text-muted-foreground italic">Default</span>;
@@ -307,7 +307,7 @@ function PageAccessChips({ pagePerms = {}, maxVisible = 3 }) {
   );
 }
 
-// â”€â”€â”€ UserDetailDrawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// UserDetailDrawer 
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
   const { role: currentUserRole, userProfile } = useAuth();
@@ -558,7 +558,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   );
 }
 
-// â”€â”€â”€ InviteDialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// InviteDialog 
 function InviteDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
   const { user: currentUser, role: currentUserRole, userProfile } = useAuth();
@@ -793,7 +793,7 @@ function InviteDialog({ open, onClose, orgId }) {
   );
 }
 
-// â”€â”€â”€ CSVUploadDialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CSVUploadDialog 
 function CSVUploadDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
   const [file, setFile] = useState(null);
@@ -914,7 +914,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
   );
 }
 
-// â”€â”€â”€ Main UserManagement Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Main UserManagement Component 
 export default function UserManagement() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -956,7 +956,7 @@ export default function UserManagement() {
     };
   }, [queryClient]);
 
-  // —— Fetch custom roles —————————————————————————————————
+ // Fetch custom roles 
   useAuthQuery({
     queryKey: ['custom-roles', activeOrgId],
     queryFn: async () => {
@@ -990,7 +990,7 @@ export default function UserManagement() {
     return merged;
   }, [customRoles]);
 
-  // â”€â”€ Fetch team members â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Fetch team members 
   const { data: members = [], isLoading } = useAuthQuery({
     queryKey: ['team-members', activeOrgId, activeBrandId, activeLocationId, showArchived],
     queryFn: async () => {
@@ -1075,7 +1075,7 @@ export default function UserManagement() {
     });
   }, [members, isPlatformAdmin, userRole, isBranchManager, isLocationManager, activeBrandId, activeLocationId]);
 
-  // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Filtering 
   const filteredMembers = useMemo(() => {
     return scopedMembers.filter(m => {
       const name = (m.profiles?.full_name || m.full_name || '').toLowerCase();
@@ -1087,7 +1087,7 @@ export default function UserManagement() {
     });
   }, [scopedMembers, search, roleFilter]);
 
-  // â”€â”€ Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Stats 
   const stats = useMemo(() => {
     const total = scopedMembers.length;
     const active = scopedMembers.filter(m => m.status === 'active').length;

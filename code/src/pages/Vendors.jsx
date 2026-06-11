@@ -106,7 +106,7 @@ export default function Vendors() {
   });
   const vendors = data || [];
 
-  // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Realtime subscription 
   useEffect(() => {
     const channel = supabase.channel('vendors-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
@@ -463,7 +463,7 @@ export default function Vendors() {
       </Card>
         </TabsContent>
 
-        {/* â”€â”€ Vendor Items Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+ {/* Vendor Items Tab */}
         <TabsContent value="vendor-items">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">

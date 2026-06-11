@@ -55,7 +55,7 @@ const LayoutWrapper = ({ children, currentPageName }) => {
   return Layout ? <Layout currentPageName={currentPageName}>{content}</Layout> : content;
 };
 
-// ── Signup Page for Invited Users ──────────────────────────
+// Signup Page for Invited Users 
 function SignupPage() {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -240,7 +240,7 @@ function SignupPage() {
   );
 }
 
-// ── Login Page ──────────────────────────────────────────────
+// Login Page 
 function LoginPage() {
   const { loginWithEmail, resetPassword, authError } = useAuth();
   const [email, setEmail] = useState('');
@@ -434,7 +434,7 @@ function LoginPage() {
   );
 }
 
-// ── Pending Assignment Page for Invited Non-Owners ─────────
+// Pending Assignment Page for Invited Non-Owners 
 function PendingAssignmentPage() {
   const { userProfile, refreshProfile, logout } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
@@ -497,7 +497,7 @@ function PendingAssignmentPage() {
   );
 }
 
-// ── Update Password Page ───────────────────────────────────
+// Update Password Page 
 function UpdatePasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -632,7 +632,7 @@ function UpdatePasswordPage() {
   );
 }
 
-// ── Authenticated App ──────────────────────────────────────
+// Authenticated App 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   const location = useLocation();
@@ -676,14 +676,14 @@ const AuthenticatedApp = () => {
   
   const isUnassignedUser = !userProfile?.organization_id;
   
-  // ── CRITICAL FIX: Don't make setup flow decisions until MFA status is known ──
+ // CRITICAL FIX: Don't make setup flow decisions until MFA status is known 
   // isMfaReady takes ~1.5s to resolve after login. During that gap, needsMFASetup
   // is false (because isMfaReady is false), which causes needsSetupFlow to be true,
   // prematurely routing new users to /verify-payment BEFORE MFA setup is evaluated.
   // Then when isMfaReady resolves, the user gets yanked to MFA setup, creating a loop.
   //
   // Fix: For unassigned users (new signups), require isMfaReady before entering setup flow.
-  // Already-assigned users (existing accounts) skip this gate — they already have MFA set up.
+ // Already-assigned users (existing accounts) skip this gate they already have MFA set up.
   const mfaStatusKnown = isMfaReady || !isUnassignedUser;
   
   // Setup is required for any non-platform-admin without an organization
@@ -742,7 +742,7 @@ const AuthenticatedApp = () => {
       <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
       <Route path="/update-password" element={<UpdatePasswordPage />} />
 
-      {/* Conditional route blocks — each state gets ONLY its relevant routes */}
+ {/* Conditional route blocks each state gets ONLY its relevant routes */}
       {!user ? (
         <>
           <Route path="/" element={<LandingPage />} />

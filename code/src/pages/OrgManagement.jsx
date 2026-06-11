@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import {
   Building2, Store, MapPin, Plus, Trash2, Pencil, ChevronDown, ChevronRight,
   Loader2, ShieldAlert, KeyRound, Smartphone
@@ -38,6 +39,12 @@ export default function OrgManagement() {
   const [newLocationName, setNewLocationName] = useState('');
   const [newLocationAddress, setNewLocationAddress] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+
+  // Add Location Group state
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [savingGroup, setSavingGroup] = useState(false);
 
   // Edit states
   const [editBrand, setEditBrand] = useState(null);
@@ -192,6 +199,33 @@ export default function OrgManagement() {
       toast.error(e.message || 'Failed to create location');
     }
     setSavingLocation(false);
+  };
+
+  const handleAddGroup = async () => {
+    if (!newGroupName.trim()) return;
+    const organizationId = userProfile?.organization_id || orgs[0]?.id;
+    if (!organizationId) {
+      toast.error('No organization found for this group.');
+      return;
+    }
+
+    setSavingGroup(true);
+    try {
+      await api.entities.LocationGroup.create({
+        organization_id: organizationId,
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim() || null,
+      });
+      queryClient.invalidateQueries({ queryKey: ['location-groups'] });
+      toast.success(`Location group "${newGroupName.trim()}" created.`);
+      setGroupDialogOpen(false);
+      setNewGroupName('');
+      setNewGroupDescription('');
+    } catch (e) {
+      toast.error(e.message || 'Failed to create location group');
+    } finally {
+      setSavingGroup(false);
+    }
   };
 
   const handleDeleteBrand = async (brand) => {
@@ -529,7 +563,7 @@ export default function OrgManagement() {
           <Card className="border-border">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Location Groups</CardTitle>
-              <Button size="sm" onClick={() => toast.info('Creating groups will be supported in the next update.')}>
+              <Button size="sm" onClick={() => setGroupDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" /> Create Group
               </Button>
             </CardHeader>
@@ -671,6 +705,42 @@ export default function OrgManagement() {
             <Button onClick={handleAddBrand} disabled={savingBrand || !newBrandName.trim()} className="bg-violet-600 hover:bg-violet-700">
               {savingBrand ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
               Add Brand
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Location Group Dialog */}
+      <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Location Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Group Name</Label>
+              <Input
+                placeholder="e.g. North Region"
+                value={newGroupName}
+                onChange={e => setNewGroupName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold text-foreground">Description</Label>
+              <Input
+                placeholder="Optional reporting or operating notes"
+                value={newGroupDescription}
+                onChange={e => setNewGroupDescription(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddGroup} disabled={savingGroup || !newGroupName.trim()}>
+              {savingGroup ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Create Group
             </Button>
           </DialogFooter>
         </DialogContent>

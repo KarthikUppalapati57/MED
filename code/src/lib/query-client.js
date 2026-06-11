@@ -13,7 +13,7 @@ export const queryClientInstance = new QueryClient({
 	},
 });
 
-// ── Query key prefixes that are platform-level (NOT org-scoped) ──
+// Query key prefixes that are platform-level (NOT org-scoped) 
 // These should NOT be invalidated when the user switches org/brand/location context.
 const PLATFORM_QUERY_PREFIXES = new Set([
 	'dash-orgs', 'dash-profiles', 'dash-plans', 'dash-recent-logs',
@@ -46,7 +46,7 @@ export function clearAllQueries() {
 }
 
 /**
- * Legacy alias — invalidate all queries.
+ * Legacy alias invalidate all queries.
  * @deprecated Use invalidateOrgScopedQueries() or clearAllQueries() instead.
  */
 export function resetQueryCache() {

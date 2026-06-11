@@ -5,7 +5,7 @@ import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
 import AccessDenied from '@/components/AccessDenied';
 
 /**
- * ProtectedModule — Route-level guard component.
+ * ProtectedModule Route-level guard component.
  * 
  * Wraps every page in App.jsx to enforce:
  *   1. Role check: user.role >= module.minRole
@@ -61,13 +61,13 @@ export default function ProtectedModule({ pageName, children }) {
   // Check 2: Module enabled for the user's organization (FAIL-CLOSED)
   // Core modules (dashboard, admin) always pass. Operational modules require
   // explicit inclusion in org.enabled_modules. If enabled_modules is empty/null,
-  // only core modules are accessible — this is secure-by-default.
+ // only core modules are accessible this is secure-by-default.
   const enabledModules = organization?.enabled_modules;
   const userRole = userProfile?.role;
   if (!isPageInEnabledModules(pageName, enabledModules, userRole)) {
     return <AccessDenied reason="module" moduleName={moduleInfo.label} />;
   }
 
-  // All checks passed — render the page
+ // All checks passed render the page
   return <>{children}</>;
 }

@@ -5,13 +5,13 @@ import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/
 import { queryClientInstance } from '@/lib/query-client';
 import posthog from '@/lib/posthog';
 
-// Canonical app URL — use VITE_APP_URL if set, otherwise fall back to current origin.
+// Canonical app URL use VITE_APP_URL if set, otherwise fall back to current origin.
 // This prevents the password reset redirecting to Vercel's default login page.
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
 
 const AuthContext = createContext(null);
 
-// ── Session cache helpers ────────────────────────────────────
+// Session cache helpers 
 // Cache the user profile in sessionStorage so that on page reload
 // the role is available IMMEDIATELY (no flash of 'ground_staff').
 const PROFILE_CACHE_KEY = 'restops_profile_cache';
@@ -51,7 +51,7 @@ function clearCachedProfile() {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
 }
 
-// ── Dashboard data prefetch ──────────────────────────────────
+// Dashboard data prefetch 
 // Fires common dashboard queries while auth is still finalizing,
 // so the React Query cache is pre-warmed by the time Dashboard mounts.
 async function prefetchDashboardData(role) {
@@ -354,10 +354,10 @@ export const AuthProvider = ({ children }) => {
       return null;
     };
 
-    // Deferred MFA refresh — called OUTSIDE the onAuthStateChange callback
+ // Deferred MFA refresh called OUTSIDE the onAuthStateChange callback
     // to avoid the browser lock deadlock. Uses setTimeout(0) to yield the lock.
     const deferredMFARefresh = () => {
-      // Set MFA ready immediately — JWT was already decoded synchronously above
+ // Set MFA ready immediately JWT was already decoded synchronously above
       if (isMounted) setIsMfaReady(true);
 
       setTimeout(async () => {  // 500ms background MFA correction (reduced from 1.5s)
@@ -453,12 +453,12 @@ export const AuthProvider = ({ children }) => {
               // 3. Kick off accurate MFA refresh outside the lock (will correct if needed)
               deferredMFARefresh();
               
-              // 4. Load profile & process invitation in PARALLEL — defer via setTimeout(0)
+ // 4. Load profile & process invitation in PARALLEL defer via setTimeout(0)
               // to release GoTrue's auth lock and prevent deadlocks.
               setTimeout(async () => {
                 if (!isMounted) return;
 
-                // Fire dashboard data prefetch immediately — queries load in the
+ // Fire dashboard data prefetch immediately queries load in the
                 // background while invitation + profile resolve. By the time the
                 // Dashboard component mounts, React Query cache is pre-warmed.
                 const cachedRole = currentUser.app_metadata?.role || getCachedProfile()?.role;
@@ -478,14 +478,14 @@ export const AuthProvider = ({ children }) => {
                 ]);
 
                 // If an invitation was just accepted, the profile loaded in parallel
-                // may be stale — reload to pick up the new org/role assignment.
+ // may be stale reload to pick up the new org/role assignment.
                 if (inviteResult.status === 'fulfilled' && inviteResult.value === true) {
                   try { await loadProfile(currentUser); } catch (e) {
                     console.warn('Post-invitation profile reload error:', e);
                   }
                 }
 
-                // Loading complete — user, auth state, and profile are ready for routing
+ // Loading complete user, auth state, and profile are ready for routing
                 if (isMounted) setIsLoadingAuth(false);
               }, 0);
             } else {
@@ -584,7 +584,7 @@ export const AuthProvider = ({ children }) => {
     // Safety net: if INITIAL_SESSION + profile loading hasn't completed
     // within 3s, force loading to complete so the UI isn't stuck.
     // The cached profile (sessionStorage) makes the UI usable immediately
-    // even when this safety net fires — the fresh profile will arrive shortly after.
+ // even when this safety net fires the fresh profile will arrive shortly after.
     const safetyTimeout = setTimeout(() => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
@@ -603,7 +603,7 @@ export const AuthProvider = ({ children }) => {
       clearTimeout(safetyTimeout);
       subscription?.subscription?.unsubscribe?.();
     };
-  // Empty dependency array — runs exactly once. Uses refs for latest function versions.
+ // Empty dependency array runs exactly once. Uses refs for latest function versions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -689,7 +689,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Robust role detection — NEVER default to 'ground_staff'
+ // Robust role detection NEVER default to 'ground_staff'
   // 1. Database profile role (most accurate)
   // 2. Cached session storage role (persists through refresh)
   // 3. User metadata role (from auth token)
@@ -697,7 +697,7 @@ export const AuthProvider = ({ children }) => {
   const role = userProfile?.role || cachedProfile?.role || user?.app_metadata?.role || null;
   const isAuthenticated = !!user;
 
-  // Permission helpers — new role hierarchy with backward-compatible aliases
+ // Permission helpers new role hierarchy with backward-compatible aliases
   const hasPermission = useCallback((action) => {
     const permissions = {
       ground_staff:     ['view', 'upload'],
@@ -763,7 +763,7 @@ export const AuthProvider = ({ children }) => {
         setCachedProfile(currentCache);
       }
 
-      // Invalidate only org-scoped queries — platform-level data is untouched
+ // Invalidate only org-scoped queries platform-level data is untouched
       invalidateOrgScopedQueries();
     } catch (err) {
       console.error('Failed to switch context:', err);

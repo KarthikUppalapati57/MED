@@ -3,11 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Link2, AlertCircle, CheckCircle2, ArrowRightLeft, Lock, FileText, Calendar } from 'lucide-react';
 import { toast } from "sonner";
@@ -16,6 +19,7 @@ import { format } from 'date-fns';
 export default function Accounting() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { organization, userProfile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: logs = [], isLoading: loadingLogs } = useAuthQuery({
@@ -36,6 +40,26 @@ export default function Accounting() {
   const { data: glMappings = [], isLoading: loadingGlMappings, refetch: refetchGlMappings } = useAuthQuery({
     queryKey: ['gl_mappings'],
     queryFn: () => api.entities.GlMapping.list('category'),
+  });
+
+  const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
+    queryKey: ['accounting-invoices'],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
+  });
+
+  const { data: payments = [], isLoading: loadingPayments } = useAuthQuery({
+    queryKey: ['accounting-payments'],
+    queryFn: () => api.entities.Payment.list('-payment_date'),
+  });
+
+  const { data: vendors = [], isLoading: loadingVendors } = useAuthQuery({
+    queryKey: ['accounting-vendors'],
+    queryFn: () => api.entities.Vendor.list('name'),
+  });
+
+  const { data: salesData = [], isLoading: loadingSalesData } = useAuthQuery({
+    queryKey: ['accounting-pos-sales-data'],
+    queryFn: () => api.entities.PosSalesData.list('-sale_date'),
   });
 
   useEffect(() => {
@@ -63,6 +87,9 @@ export default function Accounting() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
+  const [editingGlMapping, setEditingGlMapping] = React.useState(null);
+  const [glForm, setGlForm] = React.useState({ gl_code: '', gl_name: '', description: '' });
+  const [isSavingGlMapping, setIsSavingGlMapping] = React.useState(false);
 
   const activeIntegrations = integrations.filter(i => i.is_active).length;
   const recentErrors = logs.filter(l => l.sync_status === 'failed').length;
@@ -70,15 +97,86 @@ export default function Accounting() {
     ? ((logs.filter(l => l.sync_status === 'success').length / logs.length) * 100).toFixed(1) 
     : 100;
 
+  const formatCurrency = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatDate = (value) => value ? format(new Date(value), 'MMM dd, yyyy') : '-';
+  const exportRows = (filename, rows) => {
+    if (!rows.length) {
+      toast.info('No rows available to export.');
+      return;
+    }
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => headers.map(key => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const invoiceExportRows = invoices.map(invoice => ({
+    invoice_number: invoice.invoice_number,
+    vendor_name: invoice.vendor_name,
+    invoice_date: invoice.invoice_date,
+    due_date: invoice.due_date,
+    status: invoice.status,
+    total_amount: invoice.total_amount,
+  }));
+
+  const reconciliationRows = payments.map(payment => {
+    const invoice = invoices.find(item => item.id === payment.invoice_id);
+    return {
+      id: payment.id,
+      payment_date: payment.payment_date || payment.created_at,
+      vendor_name: payment.vendor_name || invoice?.vendor_name || '-',
+      invoice_number: payment.invoice_number || invoice?.invoice_number || '-',
+      method: payment.payment_method || payment.method || '-',
+      amount: payment.amount,
+      status: payment.status || 'recorded',
+    };
+  });
+
+  const salesMappingRows = salesData.slice(0, 25).map(item => ({
+    source: item.pos_provider || item.source || 'POS',
+    category: item.category || item.menu_category || item.item_category || 'Unmapped',
+    revenue: item.net_sales || item.sales_amount || item.total_sales || 0,
+    gl_code: glMappings.find(mapping => mapping.category === (item.category || item.menu_category || item.item_category))?.gl_code || 'Unmapped',
+  }));
+
+  const vendorMappingRows = vendors.map(vendor => ({
+    vendor_name: vendor.name || vendor.vendor_name,
+    accounting_name: vendor.accounting_name || vendor.external_name || vendor.name || vendor.vendor_name,
+    accounting_id: vendor.accounting_vendor_id || vendor.external_id || vendor.qbo_vendor_id || '-',
+    status: vendor.status || 'active',
+  }));
+
+  const pmixRows = salesData.slice(0, 25).map(item => ({
+    item_name: item.item_name || item.menu_item_name || item.product_name || 'Unmapped item',
+    category: item.category || item.menu_category || 'Unmapped',
+    quantity: item.quantity || item.units_sold || 0,
+    revenue: item.net_sales || item.sales_amount || item.total_sales || 0,
+  }));
+
   const handleClosePeriod = async () => {
+    const organizationId = organization?.id || userProfile?.organization_id;
+    if (!organizationId) {
+      toast.error('No organization found for this accounting period.');
+      return;
+    }
     setIsClosing(true);
     try {
       const now = new Date();
       const month = now.toLocaleString('default', { month: 'long' });
       await api.entities.ClosedPeriod.create({
+        organization_id: organizationId,
         period_name: `${month} ${now.getFullYear()} (Current)`,
         start_date: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
         end_date: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
+        closed_by: userProfile?.id,
         notes: 'Manually closed by user'
       });
       toast.success("Accounting period successfully locked.");
@@ -88,6 +186,34 @@ export default function Accounting() {
       toast.error("Failed to close period.");
     } finally {
       setIsClosing(false);
+    }
+  };
+
+  const openGlMappingEditor = (mapping) => {
+    setEditingGlMapping(mapping);
+    setGlForm({
+      gl_code: mapping.gl_code || '',
+      gl_name: mapping.gl_name || '',
+      description: mapping.description || '',
+    });
+  };
+
+  const handleSaveGlMapping = async () => {
+    if (!editingGlMapping || !glForm.gl_code.trim() || !glForm.gl_name.trim()) return;
+    setIsSavingGlMapping(true);
+    try {
+      await api.entities.GlMapping.update(editingGlMapping.id, {
+        gl_code: glForm.gl_code.trim(),
+        gl_name: glForm.gl_name.trim(),
+        description: glForm.description.trim() || null,
+      });
+      toast.success(`${editingGlMapping.category} mapping updated.`);
+      setEditingGlMapping(null);
+      refetchGlMappings();
+    } catch (e) {
+      toast.error(e.message || 'Failed to update GL mapping.');
+    } finally {
+      setIsSavingGlMapping(false);
     }
   };
 
@@ -304,15 +430,90 @@ export default function Accounting() {
 
         <TabsContent value="export" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader><CardTitle>Accounting Export</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">Export module is currently under development. Here you will be able to export entries to QuickBooks and Sage.</p></CardContent>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Accounting Export</CardTitle>
+                <CardDescription>Export approved invoice data for accounting import or reconciliation review.</CardDescription>
+              </div>
+              <Button variant="outline" onClick={() => exportRows('accounting-invoice-export.csv', invoiceExportRows)}>
+                Export CSV
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loadingInvoices ? (
+                <p className="text-sm text-muted-foreground">Loading export rows...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Due</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoiceExportRows.slice(0, 20).map(row => (
+                      <TableRow key={`${row.invoice_number}-${row.vendor_name}`}>
+                        <TableCell className="font-medium">{row.invoice_number || '-'}</TableCell>
+                        <TableCell>{row.vendor_name || '-'}</TableCell>
+                        <TableCell>{formatDate(row.invoice_date)}</TableCell>
+                        <TableCell>{formatDate(row.due_date)}</TableCell>
+                        <TableCell className="capitalize">{row.status?.replace('_', ' ') || '-'}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.total_amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {invoiceExportRows.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No invoices available for export.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="reconciliation" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader><CardTitle>Reconciliation</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">Reconciliation module is currently under development.</p></CardContent>
+            <CardHeader>
+              <CardTitle>Reconciliation</CardTitle>
+              <CardDescription>Compare recorded payments against their source invoices.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingPayments || loadingInvoices ? (
+                <p className="text-sm text-muted-foreground">Loading reconciliation records...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reconciliationRows.slice(0, 20).map(row => (
+                      <TableRow key={row.id}>
+                        <TableCell>{formatDate(row.payment_date)}</TableCell>
+                        <TableCell>{row.vendor_name}</TableCell>
+                        <TableCell>{row.invoice_number}</TableCell>
+                        <TableCell className="capitalize">{row.method}</TableCell>
+                        <TableCell className="capitalize">{row.status?.replace('_', ' ')}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {reconciliationRows.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No payment records available for reconciliation.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -347,7 +548,7 @@ export default function Accounting() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => toast.info(`Editing ${mapping.category} mapping will be available from Accounting Settings.`)}
+                            onClick={() => openGlMappingEditor(mapping)}
                           >
                             Edit
                           </Button>
@@ -368,22 +569,115 @@ export default function Accounting() {
 
         <TabsContent value="sales-mapping" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader><CardTitle>Sales Mapping</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">Sales Mapping module is currently under development. Map POS categories to your general ledger accounts here.</p></CardContent>
+            <CardHeader>
+              <CardTitle>Sales Mapping</CardTitle>
+              <CardDescription>Review POS sales categories and their current GL mapping status.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSalesData || loadingGlMappings ? (
+                <p className="text-sm text-muted-foreground">Loading sales mapping...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>GL Code</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {salesMappingRows.map((row, index) => (
+                      <TableRow key={`${row.source}-${row.category}-${index}`}>
+                        <TableCell>{row.source}</TableCell>
+                        <TableCell>{row.category}</TableCell>
+                        <TableCell className={row.gl_code === 'Unmapped' ? 'text-resend-orange' : 'font-mono text-brand'}>{row.gl_code}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.revenue)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {salesMappingRows.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No POS sales data available yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="vendor-mapping" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader><CardTitle>Vendor Mapping</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">Vendor Mapping module is currently under development. Map Restops vendors to your accounting platform vendor IDs.</p></CardContent>
+            <CardHeader>
+              <CardTitle>Vendor Mapping</CardTitle>
+              <CardDescription>Track vendor names and accounting system identifiers used during sync.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingVendors ? (
+                <p className="text-sm text-muted-foreground">Loading vendor mappings...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Accounting Name</TableHead>
+                      <TableHead>Accounting ID</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendorMappingRows.map((row, index) => (
+                      <TableRow key={`${row.vendor_name}-${index}`}>
+                        <TableCell className="font-medium">{row.vendor_name || '-'}</TableCell>
+                        <TableCell>{row.accounting_name || '-'}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.accounting_id}</TableCell>
+                        <TableCell className="capitalize">{row.status}</TableCell>
+                      </TableRow>
+                    ))}
+                    {vendorMappingRows.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No vendors available for mapping.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="pmix-mapping" className="space-y-6">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader><CardTitle>PMIX Mapping</CardTitle></CardHeader>
-            <CardContent><p className="text-muted-foreground text-sm">PMIX Mapping module is currently under development.</p></CardContent>
+            <CardHeader>
+              <CardTitle>PMIX Mapping</CardTitle>
+              <CardDescription>Review product mix records imported from POS sales feeds.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSalesData ? (
+                <p className="text-sm text-muted-foreground">Loading PMIX records...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Menu Item</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pmixRows.map((row, index) => (
+                      <TableRow key={`${row.item_name}-${index}`}>
+                        <TableCell className="font-medium">{row.item_name}</TableCell>
+                        <TableCell>{row.category}</TableCell>
+                        <TableCell className="text-right">{Number(row.quantity || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.revenue)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {pmixRows.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">No PMIX data available yet.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -404,6 +698,56 @@ export default function Accounting() {
             <Button variant="ghost" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
             <Button disabled={isClosing} onClick={handleClosePeriod} className="bg-rose-600 hover:bg-rose-700 text-white">
               {isClosing ? 'Closing...' : 'Confirm Close Books'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingGlMapping} onOpenChange={(open) => !open && setEditingGlMapping(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit GL Mapping</DialogTitle>
+            <DialogDescription>
+              Update the accounting code used when syncing this inventory category.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Category</Label>
+              <Input value={editingGlMapping?.category || ''} disabled className="mt-1 capitalize" />
+            </div>
+            <div>
+              <Label>GL Code</Label>
+              <Input
+                value={glForm.gl_code}
+                onChange={(e) => setGlForm(prev => ({ ...prev, gl_code: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>GL Name</Label>
+              <Input
+                value={glForm.gl_name}
+                onChange={(e) => setGlForm(prev => ({ ...prev, gl_name: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input
+                value={glForm.description}
+                onChange={(e) => setGlForm(prev => ({ ...prev, description: e.target.value }))}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingGlMapping(null)}>Cancel</Button>
+            <Button
+              onClick={handleSaveGlMapping}
+              disabled={isSavingGlMapping || !glForm.gl_code.trim() || !glForm.gl_name.trim()}
+            >
+              {isSavingGlMapping ? 'Saving...' : 'Save Mapping'}
             </Button>
           </DialogFooter>
         </DialogContent>

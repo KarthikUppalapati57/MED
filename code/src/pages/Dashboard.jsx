@@ -55,12 +55,12 @@ import {
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444'];
 
-// ── Stat Card Component ──────────────────────────────────────────
+// Stat Card Component 
 // Custom premium hook to count up numeric values organically
 function useCountUp(targetValue, duration = 1200) {
   const [count, setCount] = React.useState(0);
   React.useEffect(() => {
-    // If targetValue is not numeric (e.g. "—"), set it directly
+ // If targetValue is not numeric (e.g. ""), set it directly
     const cleanStr = String(targetValue).replace(/[$,]/g, '');
     const num = parseFloat(cleanStr);
     if (isNaN(num)) {
@@ -162,9 +162,9 @@ function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkTex
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Platform Admin Dashboard — Global platform-wide metrics
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Platform Admin Dashboard Global platform-wide metrics
+// 
 function PlatformDashboard() {
   const { data: allOrgs = [] } = useAuthQuery({
     queryKey: ['dash-orgs'],
@@ -307,9 +307,9 @@ function PlatformDashboard() {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Org Owner Dashboard — Org-level metrics
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Org Owner Dashboard Org-level metrics
+// 
 function OrgOwnerDashboard() {
   const { organization } = useAuth();
 
@@ -597,9 +597,9 @@ function OrgOwnerDashboard() {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Branch Manager Dashboard — Branch-level metrics
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Branch Manager Dashboard Branch-level metrics
+// 
 function BranchManagerDashboard() {
   const { brand, location } = useAuth();
 
@@ -737,9 +737,9 @@ function BranchManagerDashboard() {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Location Manager Dashboard — Location-level metrics
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Location Manager Dashboard Location-level metrics
+// 
 function LocationManagerDashboard() {
   const { location } = useAuth();
 
@@ -892,9 +892,9 @@ function LocationManagerDashboard() {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Ground Level Dashboard — Minimal view
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Ground Level Dashboard Minimal view
+// 
 function GroundLevelDashboard() {
   const { location } = useAuth();
 
@@ -1004,9 +1004,9 @@ function GroundLevelDashboard() {
   );
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// Main Dashboard — Routes to the correct role-specific view
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// 
+// Main Dashboard Routes to the correct role-specific view
+// 
 export default function Dashboard() {
   const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 

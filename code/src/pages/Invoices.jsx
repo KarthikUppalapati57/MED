@@ -579,7 +579,7 @@ export default function Invoices() {
       posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
       toast.success('Invoice saved for later');
 
-      // â”€â”€ Notify managers (in-app + email) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ // Notify managers (in-app + email) 
       const orgId = savedInvoice?.organization_id || userProfile?.organization_id;
       const uploaderName = userProfile?.full_name || userProfile?.email || 'A team member';
       const invNum = savedInvoice?.invoice_number || 'New Invoice';
