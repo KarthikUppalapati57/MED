@@ -273,11 +273,15 @@ export default function Documentation() {
             <Button size="lg" className="h-14 px-12 bg-black text-white hover:bg-[#ff5c35] font-bold text-xs tracking-[4px] rounded-sm transition-all shadow-xl uppercase" onClick={() => setIsDemoModalOpen(true)}>
               <Calendar className="mr-3 h-4 w-4" /> BOOK A DEMO
             </Button>
-            <a href="mailto:support@restops.com">
-              <Button size="lg" variant="outline" className="h-14 px-12 border-2 border-black text-black hover:bg-black hover:text-white font-bold text-xs tracking-[4px] rounded-sm transition-all uppercase bg-transparent">
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={() => setIsDemoModalOpen(true)}
+              className="h-14 px-12 border-2 border-black text-black hover:bg-black hover:text-white font-bold text-xs tracking-[4px] rounded-sm transition-all uppercase bg-transparent"
+            >
                 <MessageSquare className="mr-3 h-4 w-4" /> CONTACT SUPPORT
-              </Button>
-            </a>
+            </Button>
           </div>
 
           <div className="pt-12 border-t border-black/5 flex flex-col md:flex-row justify-between items-center gap-6">

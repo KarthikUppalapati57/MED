@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -14,6 +15,7 @@ import { format } from 'date-fns';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: logs = [], isLoading: loadingLogs } = useAuthQuery({
     queryKey: ['accounting_sync_logs'],
@@ -56,7 +58,8 @@ export default function Accounting() {
     };
   }, [queryClient]);
 
-  const [activeTab, setActiveTab] = React.useState('dashboard');
+  const activeTab = searchParams.get('tab') || 'dashboard';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
 

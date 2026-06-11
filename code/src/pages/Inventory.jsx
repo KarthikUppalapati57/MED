@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -73,6 +73,7 @@ import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'inventory';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
@@ -411,16 +412,21 @@ export default function Inventory() {
       unit_price: item.unit_cost || 0,
       total_price: Math.max(0, (item.par_level || 10) - (item.current_quantity || 0)) * (item.unit_cost || 0),
     }));
-    await api.entities.AutoOrder.create({
+    const order = await api.entities.AutoOrder.create({
+      organization_id: organization?.id,
+      brand_id: brand?.id || null,
+      location_id: location?.id || null,
       order_number: `ORD-${Date.now()}`,
       vendor_name: 'Multiple Vendors',
       status: 'pending_approval',
       items: orderItems,
       total_amount: orderItems.reduce((s, i) => s + i.total_price, 0),
       chat_history: [],
+      created_by: userProfile?.id || null,
     });
     toast.success(`Order created for ${selectedIds.size} item(s) — check Auto Ordering`);
     setSelectedIds(new Set());
+    navigate(`/AutoOrdering?tab=all-orders&order=${order.id}`);
   };
 
   const handleExport = () => {

@@ -313,13 +313,17 @@ export default function AutoOrdering() {
       // Create an order for each vendor
       const orderPromises = Object.entries(vendorOrdersMap).map(([vendorName, items]) => {
         const order = {
+          organization_id: organization?.id,
+          brand_id: brand?.id || null,
+          location_id: location?.id || null,
           order_number: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           vendor_name: vendorName,
           status: 'pending_approval',
           items: items,
           total_amount: items.reduce((sum, i) => sum + i.total_price, 0),
           external_suggestions: generatedSuggestions,
-          chat_history: []
+          chat_history: [],
+          created_by: userProfile?.id || null,
         };
         return createMutation.mutateAsync(order);
       });

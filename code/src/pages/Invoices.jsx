@@ -156,6 +156,11 @@ export default function Invoices() {
   }, [invoices, loadingInvoices, searchParams, setSearchParams]);
 
   useEffect(() => {
+    const status = searchParams.get('status');
+    if (status) setStatusFilter(status);
+  }, [searchParams]);
+
+  useEffect(() => {
     const channel = supabase.channel('invoices-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
@@ -171,7 +176,7 @@ export default function Invoices() {
   const sanitizeInvoiceData = (invoiceData) => {
     const cleaned = {
       ...invoiceData,
-      status: 'pending',
+      status: invoiceData.status || 'pending_review',
       line_items: invoiceData.line_items || [],
       validation_results: {},
       organization_id: organization?.id || userProfile?.organization_id,

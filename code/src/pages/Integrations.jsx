@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,6 +135,7 @@ const INTEGRATIONS = [
 ];
 
 export default function Integrations() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(INTEGRATION_TYPES.MCP);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -299,7 +301,9 @@ export default function Integrations() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="bg-white hover:bg-emerald-50">View Sync Logs</Button>
+              <Button variant="outline" className="bg-white hover:bg-emerald-50" onClick={() => navigate('/Accounting?tab=dashboard')}>
+                View Sync Logs
+              </Button>
             </div>
           </div>
         </CardContent>

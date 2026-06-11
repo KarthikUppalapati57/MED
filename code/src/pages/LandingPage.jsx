@@ -264,10 +264,10 @@ export default function LandingPage() {
               >
                 REQUEST ACCESS <ChevronRight className="ml-2 h-4 w-4" />
               </MagneticButton>
-              <Link to="/docs" className="text-muted-foreground font-bold text-xs tracking-[3px] uppercase hover:text-foreground transition-colors flex items-center group">
+              <button type="button" onClick={() => navigate('/docs')} className="text-muted-foreground font-bold text-xs tracking-[3px] uppercase hover:text-foreground transition-colors flex items-center group">
                 VIEW DOCUMENTATION 
                 <span className="block ml-2 w-0 h-[1px] bg-foreground group-hover:w-4 transition-all duration-300" />
-              </Link>
+              </button>
             </motion.div>
           </motion.div>
         </div>

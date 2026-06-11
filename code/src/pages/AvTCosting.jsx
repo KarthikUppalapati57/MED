@@ -10,6 +10,7 @@ import { api } from '@/lib/apiClient';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { format, subDays } from 'date-fns';
 
@@ -25,6 +26,7 @@ const trendData = [
 
 export default function AvTCosting() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { organization } = useAuth();
 
   const startDate = format(subDays(new Date(), 7), 'yyyy-MM-dd');
   const endDate = format(new Date(), 'yyyy-MM-dd');
@@ -50,7 +52,12 @@ export default function AvTCosting() {
 
   const handleExplainVariance = async () => {
     try {
+      if (!organization?.id) {
+        toast.error("Select an organization before generating AI explanations");
+        return;
+      }
       await api.entities.AiInsight.create({
+        organization_id: organization.id,
         insight_type: 'variance_analysis',
         severity: 'high',
         title: 'AvT Variance Detected in Ground Beef (80/20)',

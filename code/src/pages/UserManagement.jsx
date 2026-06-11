@@ -1403,7 +1403,10 @@ export default function UserManagement() {
                 <h3 className="text-xl font-bold text-foreground">Custom Roles</h3>
                 <p className="text-sm text-muted-foreground mt-1">Create granular roles tailored to your organization's workflows.</p>
               </div>
-              <Button className="bg-primary hover:bg-primary text-primary-foreground rounded-xl">
+              <Button
+                className="bg-primary hover:bg-primary text-primary-foreground rounded-xl"
+                onClick={() => toast.info('Custom role creation is available from Platform Admin role templates.')}
+              >
                 <PlusCircle className="w-4 h-4 mr-2" /> New Role
               </Button>
             </div>
