@@ -315,12 +315,13 @@ export default function PlatformAdmin() {
       setIsInviteLinkDialogOpen(true);
 
       // Emit Real-Time Domain Event for the architecture
-      await supabase.rpc('log_frontend_event', {
+      const { error: eventErr } = await supabase.rpc('log_frontend_event', {
         p_event_name: 'user.invitation.sent',
         p_entity_type: 'invitation',
         p_entity_id: null,
         p_payload: { email: inviteEmail, role: 'owner' }
-      }).catch(err => console.warn('Failed to emit domain event:', err));
+      });
+      if (eventErr) console.warn('Failed to emit domain event:', eventErr);
 
       setInviteEmail("");
       queryClient.invalidateQueries({ queryKey: ['client-invites'] });
