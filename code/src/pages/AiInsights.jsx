@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { filterByContext } from '@/lib/contextUtils';
+import { sendGeminiMessage } from '@/lib/geminiService';
 import {
   Sparkles,
   AlertTriangle,
@@ -47,7 +49,7 @@ const severityIcons = {
 };
 
 export default function AiInsights() {
-  const { userProfile, organization } = useAuth();
+  const { userProfile, organization, activeBrand, activeLocation } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -91,22 +93,45 @@ export default function AiInsights() {
     if (!chatInput.trim()) return;
 
     const userMsg = { role: 'user', content: chatInput };
-    setChatHistory(prev => [...prev, userMsg]);
+    const currentHistory = [...chatHistory, userMsg];
+    setChatHistory(currentHistory);
     setChatInput('');
     setIsTyping(true);
 
     try {
-      const { data, error } = await supabase.rpc('ai_chat_response', {
-        p_org_id: organization?.id,
-        p_query: userMsg.content
-      });
+      // Step 1: Gather raw context data (limit size to prevent massive token payloads)
+      // We fetch all records for the org, then rely on filterByContext to strictly narrow to Brand/Location
+      const [rawSales, rawInvoices, rawLabor] = await Promise.all([
+        api.entities.PosSalesData.list('-date', { limit: 100 }),
+        api.entities.Invoice.list('-created_at', { limit: 50 }),
+        api.entities.EmployeeShift.list('-start_time', { limit: 50 })
+      ]).catch(() => [[], [], []]); // Catch errors if tables are empty/missing
 
-      if (error) throw error;
+      // Step 2: Strictly filter based on current context
+      const contextObj = { organization, brand: activeBrand, location: activeLocation };
+      const scopeType = activeLocation ? 'Location' : activeBrand ? 'Brand' : 'Organization';
+      const scopeName = activeLocation?.name || activeBrand?.name || organization?.name || 'Unknown';
+
+      const metrics = {
+        posSales: filterByContext(rawSales, contextObj),
+        recentInvoices: filterByContext(rawInvoices, contextObj),
+        laborShifts: filterByContext(rawLabor, contextObj),
+      };
+
+      const contextData = {
+        scopeType,
+        scopeName,
+        metrics
+      };
+
+      // Step 3: Send to Gemini
+      const aiResponse = await sendGeminiMessage(currentHistory, chatInput, contextData);
       
-      setChatHistory(prev => [...prev, { role: 'assistant', content: data || "I couldn't process that request." }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }]);
     } catch (err) {
       console.error(err);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error connecting to the AI engine." }]);
+      const errMessage = err.message || "Sorry, I encountered an error connecting to the AI engine.";
+      setChatHistory(prev => [...prev, { role: 'assistant', content: errMessage }]);
     } finally {
       setIsTyping(false);
     }
