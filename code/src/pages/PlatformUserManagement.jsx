@@ -459,7 +459,7 @@ export default function PlatformUserManagement() {
             </div>
             <Button
               size="sm"
-              className="px-3 bg-primary hover:bg-primary text-white"
+              className="px-3 bg-primary hover:bg-primary text-primary-foreground"
               onClick={() => {
                 navigator.clipboard.writeText(generatedInviteLink);
                 toast.success('Link copied to clipboard');

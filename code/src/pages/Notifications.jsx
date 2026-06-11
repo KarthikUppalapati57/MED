@@ -107,7 +107,7 @@ export default function Notifications() {
           <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
             Inbox
             {unreadCount > 0 && (
-              <Badge className="bg-brand text-white border-0 px-2 py-0.5 text-sm rounded-full">
+              <Badge className="bg-brand text-primary-foreground border-0 px-2 py-0.5 text-sm rounded-full">
                 {unreadCount} new
               </Badge>
             )}

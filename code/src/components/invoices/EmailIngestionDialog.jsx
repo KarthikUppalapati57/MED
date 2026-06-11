@@ -153,7 +153,7 @@ export default function EmailIngestionDialog({ open, onClose }) {
             Cancel
           </Button>
           <Button 
-            className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary text-white shadow-lg shadow-primary/10" 
+            className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/10" 
             onClick={handleSave}
             disabled={saveMutation.isLoading || isLoading}
           >

@@ -497,7 +497,7 @@ export default function Layout({ children, currentPageName }) {
         <div className="p-4 border-t border-border shrink-0 mt-auto bg-secondary/10 hover:bg-secondary/20 transition-colors duration-300">
           <div className="flex items-center gap-3 px-3 py-2.5 glass-card rounded-lg border border-border/40 hover:border-brand/30 shadow-sm transition-all duration-300 hover:shadow-glow-sm">
             <div className="h-8 w-8 rounded-full bg-brand flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(20,198,203,0.2)]">
-              <span className="text-black text-xs font-bold">
+              <span className="text-primary-foreground text-xs font-bold">
                 {displayName.charAt(0).toUpperCase()}
               </span>
             </div>

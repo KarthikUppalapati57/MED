@@ -122,7 +122,7 @@ export default function PlatformPlans() {
             <p className="text-sm text-muted-foreground mt-1">Manage global SaaS subscriptions and service tiers</p>
           </div>
         </div>
-        <Button onClick={openNewPlan} className="bg-brand hover:bg-brand/90 text-black font-bold rounded-xl h-10 px-6">
+        <Button onClick={openNewPlan} className="bg-brand hover:bg-brand/90 text-primary-foreground font-bold rounded-xl h-10 px-6">
           <Plus className="w-4 h-4 mr-2" />
           Create Plan
         </Button>
@@ -309,7 +309,7 @@ export default function PlatformPlans() {
                         checked ? "bg-brand/10 border-brand/50 shadow-sm" : "bg-card border-border hover:border-brand/30"
                       )}
                     >
-                      <Checkbox checked={checked} className={cn("border-border", checked && "border-brand bg-brand text-black")} />
+                      <Checkbox checked={checked} className={cn("border-border", checked && "border-brand bg-brand text-primary-foreground")} />
                       <span className={cn("text-xs font-bold", checked ? "text-foreground" : "text-muted-foreground")}>{mod?.label || key}</span>
                     </div>
                   )

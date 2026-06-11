@@ -160,7 +160,7 @@ export default function Accounting() {
                   ) : integrations.length === 0 ? (
                     <div className="text-center p-6 border border-dashed border-border/50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-4">No integrations connected.</p>
-                      <button className="px-4 py-2 bg-brand text-black font-semibold rounded-lg hover:opacity-90 transition-opacity">
+                      <button className="px-4 py-2 bg-brand text-primary-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity">
                         Connect Quickbooks
                       </button>
                     </div>

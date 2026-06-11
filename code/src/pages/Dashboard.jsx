@@ -435,7 +435,7 @@ function OrgOwnerDashboard() {
             </div>
             <div className="flex gap-2">
               <Link to={createPageUrl('RestaurantSetup') + "?tab=pos"}>
-                <Button className="bg-brand text-black hover:opacity-90">Complete Onboarding</Button>
+                <Button className="bg-brand text-primary-foreground hover:opacity-90">Complete Onboarding</Button>
               </Link>
             </div>
           </div>

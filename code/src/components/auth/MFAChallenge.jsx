@@ -136,7 +136,7 @@ export function MFAChallenge() {
 
           <div className="flex flex-col gap-3 mt-8">
             <Button 
-              className="w-full bg-brand text-white hover:opacity-95 shadow-glow-brand font-bold py-6 shimmer-sweep"
+              className="w-full bg-brand text-primary-foreground hover:opacity-95 shadow-glow-brand font-bold py-6 shimmer-sweep"
               onClick={() => onSubmit()}
               disabled={isLoading || code.length < 6}
             >

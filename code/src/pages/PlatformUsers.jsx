@@ -160,7 +160,7 @@ export default function PlatformUsers() {
             <p className="text-sm text-muted-foreground">View all users across the entire platform</p>
           </div>
         </div>
-        <Button onClick={() => navigate('/PlatformAdmin?tab=invite')} className="bg-brand hover:bg-brand/90 text-white">
+        <Button onClick={() => navigate('/PlatformAdmin?tab=invite')} className="bg-brand hover:bg-brand/90 text-primary-foreground">
           <UserPlus className="w-4 h-4 mr-2" />
           Invite Client
         </Button>

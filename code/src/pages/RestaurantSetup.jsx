@@ -62,7 +62,7 @@ export default function RestaurantSetup() {
           <h1 className="text-2xl font-bold text-foreground">Restaurant Setup</h1>
           <p className="text-muted-foreground mt-1">Configure your location's operational settings.</p>
         </div>
-        <Button className="bg-primary hover:bg-primary text-black" onClick={handleSave}>
+        <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={handleSave}>
           <Save className="h-4 w-4 mr-2" /> Save Changes
         </Button>
       </div>

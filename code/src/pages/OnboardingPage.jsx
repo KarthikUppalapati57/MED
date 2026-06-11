@@ -656,7 +656,7 @@ export default function OnboardingPage() {
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-2">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  step >= i ? 'bg-primary border-primary text-white shadow-lg shadow-primary/10' : 'bg-card border-border text-muted-foreground'
+                  step >= i ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/10' : 'bg-card border-border text-muted-foreground'
                 }`}>
                   {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
                 </div>
@@ -882,7 +882,7 @@ export default function OnboardingPage() {
                             <p className="text-sm text-muted-foreground line-clamp-2">{plan.description}</p>
                           </div>
                           {selectedPlan?.id === plan.id && (
-                            <div className="bg-primary text-white p-1 rounded-full shrink-0 animate-in zoom-in-50">
+                            <div className="bg-primary text-primary-foreground p-1 rounded-full shrink-0 animate-in zoom-in-50">
                               <Check className="w-3 h-3" />
                             </div>
                           )}
@@ -919,7 +919,7 @@ export default function OnboardingPage() {
             {step < 3 ? (
               <Button 
                 onClick={nextStep} 
-                className="bg-primary hover:bg-primary text-white min-w-[120px]"
+                className="bg-primary hover:bg-primary text-primary-foreground min-w-[120px]"
                 disabled={
                   (step === 1 && !hasValidOrgs) || 
                   (step === 2 && !hasValidBrands)
@@ -930,7 +930,7 @@ export default function OnboardingPage() {
             ) : step === 3 ? (
               <Button 
                 onClick={handleManualSubmit} 
-                className="bg-primary hover:bg-primary text-white min-w-[140px]"
+                className="bg-primary hover:bg-primary text-primary-foreground min-w-[140px]"
                 disabled={loading || !hasValidLocations}
               >
                 {loading ? (
@@ -942,7 +942,7 @@ export default function OnboardingPage() {
             ) : (
               <Button 
                 onClick={handleSubscribe} 
-                className="bg-primary hover:bg-primary text-white min-w-[140px]"
+                className="bg-primary hover:bg-primary text-primary-foreground min-w-[140px]"
                 disabled={checkoutLoading || !selectedPlan}
               >
                 {checkoutLoading ? (

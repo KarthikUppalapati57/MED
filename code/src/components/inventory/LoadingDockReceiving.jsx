@@ -164,7 +164,7 @@ export default function LoadingDockReceiving() {
             </div>
             <div className="p-6 bg-secondary/30 mt-4 border-t border-border">
               <Button 
-                className="w-full h-14 text-lg font-bold rounded-2xl bg-primary hover:bg-primary text-white shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
+                className="w-full h-14 text-lg font-bold rounded-2xl bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
                 onClick={handleReceive}
                 disabled={receiveMutation.isPending}
               >

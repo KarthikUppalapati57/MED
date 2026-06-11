@@ -611,7 +611,7 @@ export default function OrgManagement() {
                           You haven't set up Multi-Factor Authentication yet. We highly recommend enabling it.
                         </p>
                       </div>
-                      <Button className="bg-primary hover:bg-primary text-white" onClick={() => setShowEnrolling(true)}>
+                      <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => setShowEnrolling(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Enable MFA
                       </Button>

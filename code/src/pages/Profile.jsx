@@ -253,7 +253,7 @@ export default function Profile() {
                 <Button
                   type="submit"
                   disabled={isSavingProfile}
-                  className="bg-primary hover:bg-primary text-white font-semibold rounded-lg px-6 h-10 shadow-lg shadow-teal-600/15"
+                  className="bg-primary hover:bg-primary text-primary-foreground font-semibold rounded-lg px-6 h-10 shadow-lg shadow-teal-600/15"
                 >
                   {isSavingProfile ? (
                     <>

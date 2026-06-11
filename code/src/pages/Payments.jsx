@@ -753,7 +753,7 @@ export default function Payments() {
                   <Button 
                     onClick={handleManageBilling} 
                     disabled={portalLoading}
-                    className="bg-primary hover:bg-primary text-white min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
+                    className="bg-primary hover:bg-primary text-primary-foreground min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
                   >
                     {portalLoading ? (
                       <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Loading Portal...</>

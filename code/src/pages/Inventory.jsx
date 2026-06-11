@@ -1327,7 +1327,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTemplateOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
               toast.success("Template created");
               setNewTemplateOpen(false);
             }}>Create Template</Button>
@@ -1346,7 +1346,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setActiveSessionOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
               toast.success("Count session completed");
               setActiveSessionOpen(false);
             }}>Complete Count</Button>

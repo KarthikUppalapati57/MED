@@ -136,7 +136,7 @@ export default function PlatformInvoices() {
                         size="sm" 
                         onClick={() => handleGenerateInvoice(org)}
                         disabled={!plan || generating.has(org.id)}
-                        className="bg-brand text-black hover:bg-brand/90 font-bold h-8 px-4 text-xs rounded-lg shadow-sm"
+                        className="bg-brand text-primary-foreground hover:bg-brand/90 font-bold h-8 px-4 text-xs rounded-lg shadow-sm"
                        >
                          {generating.has(org.id) ? (
                            <Loader2 className="w-3.5 h-3.5 animate-spin" />

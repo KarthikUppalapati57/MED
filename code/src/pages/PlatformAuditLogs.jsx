@@ -233,7 +233,7 @@ export default function PlatformAuditLogs() {
               <Badge
                 key={mod}
                 variant={logModuleFilter === mod ? 'default' : 'secondary'}
-                className={`cursor-pointer transition-colors text-xs ${logModuleFilter === mod ? 'bg-primary text-white' : 'hover:bg-primary/10 hover:text-primary'}`}
+                className={`cursor-pointer transition-colors text-xs ${logModuleFilter === mod ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/10 hover:text-primary'}`}
                 onClick={() => setLogModuleFilter(mod)}
               >
                 {mod === 'All' ? mod : mod.replace('_', ' ')}

@@ -195,7 +195,7 @@ function VerificationForm({ onVerified }) {
       <Button
         type="submit"
         disabled={!stripe || processing}
-        className="w-full h-12 bg-primary hover:bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+        className="w-full h-12 bg-primary hover:bg-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
       >
         {processing ? (
           <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying...</>
@@ -291,7 +291,7 @@ export default function PaymentVerification() {
           </div>
           <div className="flex flex-col gap-3">
             <Button
-              className="w-full h-12 bg-primary hover:bg-primary text-white font-bold rounded-xl shadow-lg"
+              className="w-full h-12 bg-primary hover:bg-primary text-primary-foreground font-bold rounded-xl shadow-lg"
               onClick={async () => {
                 setPollFailed(false);
                 // Try the profile update one more time directly

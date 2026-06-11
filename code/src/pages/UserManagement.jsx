@@ -450,7 +450,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
                             : "bg-card border-border hover:border-border hover:bg-secondary"
                         )}
                       >
-                        <div className={cn("p-1.5 rounded-lg mb-2 transition-colors", isSelected ? "bg-primary text-white" : "bg-secondary text-muted-foreground group-hover:bg-card")}>
+                        <div className={cn("p-1.5 rounded-lg mb-2 transition-colors", isSelected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground group-hover:bg-card")}>
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className={cn("text-xs font-bold", isSelected ? "text-teal-900" : "text-foreground")}>{def.label}</span>
@@ -544,7 +544,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               Discard Changes
             </Button>
             <Button 
-              className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary text-white shadow-lg shadow-primary/10" 
+              className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/10" 
               onClick={handleSave}
               disabled={saving}
             >
@@ -689,7 +689,7 @@ function InviteDialog({ open, onClose, orgId }) {
               <div className="flex items-center gap-2">
                 <Input value={generatedLink} readOnly className="bg-card rounded-xl h-11 border-primary/20 text-muted-foreground" />
                 <Button 
-                  className="bg-primary hover:bg-primary text-white rounded-xl h-11 px-4"
+                  className="bg-primary hover:bg-primary text-primary-foreground rounded-xl h-11 px-4"
                   onClick={() => {
                     navigator.clipboard.writeText(generatedLink);
                     toast.success("Link copied to clipboard!");
@@ -778,7 +778,7 @@ function InviteDialog({ open, onClose, orgId }) {
         <div className="flex gap-3 pt-4">
           <Button variant="outline" className="flex-1 rounded-2xl h-12" onClick={onClose}>Cancel</Button>
           <Button
-            className="flex-1 rounded-2xl h-12 bg-primary hover:bg-primary text-white shadow-lg shadow-primary/10"
+            className="flex-1 rounded-2xl h-12 bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/10"
             onClick={handleSubmit}
             disabled={sending || !email}
           >
@@ -904,7 +904,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleUpload} disabled={uploading || parsed.length === 0} className="bg-primary hover:bg-primary text-white">
+          <Button onClick={handleUpload} disabled={uploading || parsed.length === 0} className="bg-primary hover:bg-primary text-primary-foreground">
             {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Invite {parsed.length} Users
           </Button>
@@ -1133,7 +1133,7 @@ export default function UserManagement() {
           </Button>
           <Button 
             onClick={() => setShowInvite(true)} 
-            className="bg-primary hover:bg-primary text-white shadow-lg shadow-primary/10 px-6 h-12 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/10 px-6 h-12 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <PlusCircle className="h-5 w-5 mr-2" />
             Add New Member
@@ -1403,7 +1403,7 @@ export default function UserManagement() {
                 <h3 className="text-xl font-bold text-foreground">Custom Roles</h3>
                 <p className="text-sm text-muted-foreground mt-1">Create granular roles tailored to your organization's workflows.</p>
               </div>
-              <Button className="bg-primary hover:bg-primary text-white rounded-xl">
+              <Button className="bg-primary hover:bg-primary text-primary-foreground rounded-xl">
                 <PlusCircle className="w-4 h-4 mr-2" /> New Role
               </Button>
             </div>

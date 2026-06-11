@@ -897,7 +897,7 @@ export default function AutoOrdering() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTransferOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
               toast.success("Transfer initiated");
               setNewTransferOpen(false);
             }}>Initiate Transfer</Button>
@@ -916,7 +916,7 @@ export default function AutoOrdering() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReceiveOrderOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-black" onClick={() => {
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" onClick={() => {
               toast.success("Receiving logged");
               setReceiveOrderOpen(false);
             }}>Log Receiving</Button>
