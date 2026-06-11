@@ -97,12 +97,13 @@ export default function Vendors() {
   const queryClient = useQueryClient();
   const { organization, brand, location } = useAuth();
 
-  const { data: vendors = [], isLoading } = useAuthQuery({
+  const { data, isLoading } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('-created_at'),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
+  const vendors = data || [];
 
   // â”€â”€ Realtime subscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {

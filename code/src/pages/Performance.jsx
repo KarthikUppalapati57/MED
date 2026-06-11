@@ -21,19 +21,21 @@ export default function Performance() {
 
   const { organization, brand, location } = useAuth();
 
-  const { data: salesData = [] } = useAuthQuery({
+  const { data: rawSalesData } = useAuthQuery({
     queryKey: ['pos_sales_data', organization?.id],
     queryFn: () => api.entities.PosSalesData.list(),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
+  const salesData = rawSalesData || [];
 
-  const { data: posItems = [] } = useAuthQuery({
+  const { data: rawPosItems } = useAuthQuery({
     queryKey: ['pos_items', organization?.id],
     queryFn: () => api.entities.PosItem.list(),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
+  const posItems = rawPosItems || [];
 
   const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue), 0);
   const budget = totalSales > 0 ? totalSales * 0.95 : 50000; 
