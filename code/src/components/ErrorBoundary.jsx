@@ -42,6 +42,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   handleReset = () => {
+    sessionStorage.removeItem('chunk_failed_reload');
     this.setState({ hasError: false, error: null });
   };
 
@@ -96,6 +97,7 @@ export default class ErrorBoundary extends React.Component {
               </button>
               <button
                 onClick={() => {
+                  sessionStorage.removeItem('chunk_failed_reload');
                   if (window.history.length > 2) {
                     window.history.back();
                   } else {
@@ -107,7 +109,10 @@ export default class ErrorBoundary extends React.Component {
                 Go Back
               </button>
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  sessionStorage.removeItem('chunk_failed_reload');
+                  window.location.reload();
+                }}
                 className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 Reload
