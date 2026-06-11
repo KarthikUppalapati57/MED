@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   AreaChart,
   Area,
@@ -239,7 +240,13 @@ export default function Labor() {
                       <Badge variant="outline">{factor.active ? 'Active' : 'Inactive'}</Badge>
                     </div>
                   ))}
-                  <Button className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground">
+                  <Button
+                    className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground"
+                    onClick={() => {
+                      setActiveTab('shifts');
+                      toast.info('Forecast opened in scheduling for review before applying.');
+                    }}
+                  >
                     Apply Forecast to Schedule
                   </Button>
                 </CardContent>

@@ -848,7 +848,17 @@ export default function Inventory() {
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Inventory Counts</CardTitle>
-              <Button className="bg-primary hover:bg-primary" size="sm">
+              <Button
+                className="bg-primary hover:bg-primary"
+                size="sm"
+                onClick={() => {
+                  if (countSheets.length > 0) {
+                    setActiveSessionOpen(true);
+                  } else {
+                    setNewTemplateOpen(true);
+                  }
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" /> New Count
               </Button>
             </CardHeader>

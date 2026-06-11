@@ -603,11 +603,11 @@ export default function Layout({ children, currentPageName }) {
                   <User className="h-4 w-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem onClick={() => navigate('/Profile?tab=settings')} className="cursor-pointer">
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem disabled className="cursor-default">
                   <Shield className="h-4 w-4 mr-2" />
                   <span className="capitalize">{(displayRole || '').replace('_', ' ')}</span>
                 </DropdownMenuItem>

@@ -515,6 +515,64 @@ The Restops Platform Team
   };
 
   // â”€â”€ Resend email for an already-processed demo request â”€â”€â”€â”€â”€â”€â”€
+  const updateContactRequestStatus = async (request, status) => {
+    const toastId = toast.loading(`${status === 'accepted' ? 'Accepting' : 'Rejecting'} inquiry from ${request.full_name || request.name || request.email}...`);
+    setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
+
+    try {
+      const { error } = await supabase
+        .from('contact_requests')
+        .update({ status })
+        .eq('id', request.id);
+      if (error) throw error;
+
+      toast.success(`Inquiry ${status}.`, { id: toastId });
+      queryClient.invalidateQueries({ queryKey: ['contact-requests'] });
+    } catch (err) {
+      toast.error(err.message || 'Failed to update inquiry', { id: toastId });
+    } finally {
+      setProcessingRequests(prev => { const n = new Set(prev); n.delete(request.id); return n; });
+    }
+  };
+
+  const handleRequestAccept = (request, type) => {
+    if (type === 'contact') {
+      updateContactRequestStatus(request, 'accepted');
+      return;
+    }
+    handleAcceptDemo(request);
+  };
+
+  const handleRequestReject = (request, type) => {
+    if (type === 'contact') {
+      updateContactRequestStatus(request, 'rejected');
+      return;
+    }
+    handleRejectDemo(request);
+  };
+
+  const exportRequestData = (data, title) => {
+    const headers = ['Name', 'Email', 'Company', 'Plan Or Type', 'Status', 'Submitted'];
+    const rows = data.map((request) => [
+      request.full_name || request.name || '',
+      request.email || '',
+      request.company_name || '',
+      request.plan || request.request_type || '',
+      request.status || 'pending',
+      request.created_at ? new Date(request.created_at).toISOString() : '',
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleResendDemoEmail = async (request) => {
     const toastId = toast.loading(`Resending email to ${request.full_name}...`);
     setResendingDemos(prev => { const n = new Set(prev); n.add(request.id); return n; });
@@ -768,11 +826,11 @@ The Restops Platform Team
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base">{title}</CardTitle>
-          <p className="text-xs text-muted-foreground">{data.length} total · {pCount} pending</p>
+          <p className="text-xs text-muted-foreground">{data.length} total / {pCount} pending</p>
         </div>
         <div className="flex gap-2">
           <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-9 w-48 h-8 rounded-xl border-border" /></div>
-          <Button variant="outline" size="sm" className="rounded-xl border-border"><Download className="w-4 h-4 mr-1" />Export</Button>
+          <Button variant="outline" size="sm" className="rounded-xl border-border" onClick={() => exportRequestData(data, title)}><Download className="w-4 h-4 mr-1" />Export</Button>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -812,8 +870,8 @@ The Restops Platform Team
                 <TableCell className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-green"><CheckCircle2 className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-red"><X className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-green" disabled={processingRequests.has(r.id)} onClick={() => handleRequestAccept(r, type)}><CheckCircle2 className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-red" disabled={processingRequests.has(r.id)} onClick={() => handleRequestReject(r, type)}><X className="w-4 h-4" /></Button>
                   </div>
                 </TableCell>
               </TableRow>

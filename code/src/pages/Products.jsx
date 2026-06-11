@@ -452,7 +452,7 @@ export default function Products() {
                           <Badge variant="secondary">No</Badge>
                         )}
                       </TableCell>
-                      <TableCell>{product.vendor_name || '—'}</TableCell>
+                      <TableCell>{product.vendor_name || '-'}</TableCell>
                       <TableCell className="font-semibold">
                         ${product.latest_price?.toFixed(2) || '0.00'}
                       </TableCell>

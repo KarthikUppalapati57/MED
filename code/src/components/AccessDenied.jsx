@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
  * AccessDenied — Premium denial page shown when a user lacks permission.
  * 
  * Two modes:
- *   reason="role"   â†’ User's role is too low for this page
- *   reason="module" â†’ The org's plan doesn't include this module
+ *   reason="role"   -> User's role is too low for this page
+ *   reason="module" -> The org's plan doesn't include this module
  */
 export default function AccessDenied({ reason = 'role', requiredRole, moduleName }) {
   const navigate = useNavigate();

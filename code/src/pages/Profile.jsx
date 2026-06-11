@@ -288,7 +288,7 @@ export default function Profile() {
                     <Input
                       id="currentPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
+                      placeholder="********"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"
@@ -304,7 +304,7 @@ export default function Profile() {
                     <Input
                       id="newPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
+                      placeholder="********"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"
@@ -327,7 +327,7 @@ export default function Profile() {
                     <Input
                       id="confirmPassword"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
+                      placeholder="********"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="pl-9 pr-10 h-10 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"

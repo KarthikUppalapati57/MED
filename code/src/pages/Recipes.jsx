@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
+import { generateRecipeInsights } from '@/lib/geminiService';
 import {
   Plus,
   Search,
@@ -84,6 +85,8 @@ export default function Recipes() {
   const [viewingRecipe, setViewingRecipe] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [calculatingCost, setCalculatingCost] = useState(false);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -212,7 +215,7 @@ export default function Recipes() {
     };
   }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity]);
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Realtime subscription Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase.channel('recipes-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
@@ -434,6 +437,27 @@ export default function Recipes() {
     }
   };
 
+  const handleGenerateInsights = async () => {
+    if (recipes.length === 0) {
+      toast.error("No recipes available to analyze.");
+      return;
+    }
+    setIsGeneratingInsights(true);
+    try {
+      const insights = await generateRecipeInsights(recipes);
+      if (insights) {
+        setAiInsights(insights);
+        toast.success("AI Insights generated successfully!");
+      } else {
+        toast.error("Failed to parse AI insights.");
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to generate insights.");
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
   const handleSubmit = () => {
     if (!formData.name) {
       toast.error('Recipe name is required');
@@ -623,7 +647,7 @@ export default function Recipes() {
       </div>
         </TabsContent>
 
-        {/* â”€â”€ Prepared Items Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* — Prepared Items Tab ——————————————————————————— */}
         <TabsContent value="prepared-items">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -631,7 +655,15 @@ export default function Recipes() {
                 <CardTitle className="text-base">Prepared Items</CardTitle>
                 <p className="text-xs text-muted-foreground">Items that are prepared from recipes (batch-cooked/prepped items)</p>
               </div>
-              <Button className="bg-primary hover:bg-primary" size="sm">
+              <Button
+                className="bg-primary hover:bg-primary"
+                size="sm"
+                onClick={() => {
+                  resetForm();
+                  setFormData((prev) => ({ ...prev, category: 'prepared_item' }));
+                  setDialogOpen(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" /> Add Prepared Item
               </Button>
             </CardHeader>
@@ -641,7 +673,6 @@ export default function Recipes() {
                   <TableRow>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Recipe</TableHead>
                     <TableHead>Batch Yield</TableHead>
                     <TableHead>Batch Cost</TableHead>
                     <TableHead>Plate Cost</TableHead>
@@ -650,28 +681,27 @@ export default function Recipes() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recipes.length === 0 ? (
+                  {recipes.filter(r => r.category === 'prepared_item').length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No prepared items yet. Add recipes first, then define prepared items.
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No prepared items yet. Add a prepared item to start tracking batch costs.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    recipes.map(recipe => {
-                      const plateCost = recipe.cost_per_serving || 0;
-                      const sellingPrice = plateCost > 0 ? plateCost * 3.5 : 0; // typical 3.5x markup
-                      const margin = sellingPrice > 0 ? ((sellingPrice - plateCost) / sellingPrice * 100) : 0;
+                    recipes.filter(r => r.category === 'prepared_item').map((recipe) => {
+                      const margin = recipe.selling_price
+                        ? ((recipe.selling_price - (recipe.cost_per_serving || 0)) / recipe.selling_price) * 100
+                        : 0;
                       return (
                         <TableRow key={recipe.id}>
                           <TableCell className="font-medium">{recipe.name}</TableCell>
                           <TableCell><Badge variant="secondary">{recipe.category?.replace('_', ' ')}</Badge></TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{recipe.name}</TableCell>
-                          <TableCell>{recipe.yield_quantity} {recipe.yield_unit}</TableCell>
-                          <TableCell className="font-semibold">${(recipe.total_cost || 0).toFixed(2)}</TableCell>
-                          <TableCell className="font-semibold text-primary">${plateCost.toFixed(2)}</TableCell>
-                          <TableCell>${sellingPrice.toFixed(2)}</TableCell>
+                          <TableCell>{recipe.yield_quantity || 0} {recipe.yield_unit || 'servings'}</TableCell>
+                          <TableCell>${(recipe.total_cost || 0).toFixed(2)}</TableCell>
+                          <TableCell>${(recipe.cost_per_serving || 0).toFixed(2)}</TableCell>
+                          <TableCell>${(recipe.selling_price || 0).toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge className={margin >= 70 ? 'bg-resend-green/10 text-resend-green' : margin >= 50 ? 'bg-resend-yellow/10 text-resend-yellow' : 'bg-resend-red/10 text-resend-red'}>
+                            <Badge className={margin >= 70 ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/10 text-resend-yellow'}>
                               {margin.toFixed(0)}%
                             </Badge>
                           </TableCell>
@@ -685,36 +715,49 @@ export default function Recipes() {
           </Card>
         </TabsContent>
 
-        {/* â”€â”€ Menu Analysis Tab (AI/ML + Analytics Dashboard) â”€â”€â”€â”€ */}
+        {/* — Menu Analysis Tab (AI/ML + Analytics Dashboard) ———— */}
         <TabsContent value="menu-analysis">
           <div className="space-y-6">
             {/* AI Insights Card */}
             <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-indigo-50">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-purple-500" /> AI Menu Insights
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">Powered by AI analysis of your menu data, costs, and sales trends</p>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-purple-500" /> AI Menu Insights
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">Powered by AI analysis of your menu data, costs, and sales trends</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={handleGenerateInsights} 
+                  disabled={isGeneratingInsights}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {isGeneratingInsights ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                  Generate AI Insights
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-card/80 rounded-lg border border-purple-100">
-                    <p className="text-sm font-medium text-purple-400">Add to Menu</p>
-                    <p className="text-xs text-muted-foreground mt-1">Based on current cost trends, consider adding more beverage recipes — beverage category has the highest margin potential at ~75% avg.</p>
+                {aiInsights ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-card/80 rounded-lg border border-purple-100">
+                      <p className="text-sm font-medium text-purple-600">{aiInsights.addToMenu?.title || 'Add to Menu'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{aiInsights.addToMenu?.description}</p>
+                    </div>
+                    <div className="p-4 bg-card/80 rounded-lg border border-amber-100">
+                      <p className="text-sm font-medium text-resend-yellow">{aiInsights.marginAlerts?.title || 'Margin Alerts'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{aiInsights.marginAlerts?.description}</p>
+                    </div>
+                    <div className="p-4 bg-card/80 rounded-lg border border-resend-red/20">
+                      <p className="text-sm font-medium text-resend-red">{aiInsights.remove?.title || 'Remove or Audit'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{aiInsights.remove?.description}</p>
+                    </div>
                   </div>
-                  <div className="p-4 bg-card/80 rounded-lg border border-amber-100">
-                    <p className="text-sm font-medium text-resend-yellow">Margin Alerts</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {menuAnalysis.lowMarginRecipesCount > 0
-                        ? `${menuAnalysis.lowMarginRecipesCount} recipes have dropped below their target margin. Review ingredient costs or adjust selling prices.`
-                        : 'All recipes are currently meeting their target margins. Great job!'}
-                    </p>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground mb-4">Click "Generate AI Insights" to have Gemini analyze your recipe margins and performance.</p>
                   </div>
-                  <div className="p-4 bg-card/80 rounded-lg border border-green-100">
-                    <p className="text-sm font-medium text-resend-green">Remove</p>
-                    <p className="text-xs text-muted-foreground mt-1">No recipes currently flagged for removal. Consider auditing recipes with ingredients that frequently go to waste.</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 

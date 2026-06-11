@@ -83,3 +83,63 @@ If the context data is empty arrays or objects, it means the user has not synced
     throw error;
   }
 }
+
+/**
+ * Analyzes recipe data using Gemini and returns structured insights.
+ * 
+ * @param {Array} recipes - The list of recipes
+ * @returns {Promise<Object>} JSON containing { addToMenu, marginAlerts, remove }
+ */
+export async function generateRecipeInsights(recipes) {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key is not configured.');
+
+  // Extract relevant simplified data so we don't blow up the token limit
+  const recipeData = recipes.map(r => ({
+    name: r.name,
+    category: r.category,
+    cost_per_serving: r.cost_per_serving,
+    selling_price: r.selling_price,
+    target_margin: r.target_margin_percent,
+    current_margin: r.selling_price ? ((r.selling_price - (r.cost_per_serving || 0)) / r.selling_price) * 100 : 0
+  }));
+
+  const systemInstruction = `You are an expert restaurant Menu Engineer and Food Cost Controller.
+I will provide you with a list of recipes and their financial metrics. 
+You must analyze this data and return your insights as a pure, valid JSON object (without markdown code blocks like \`\`\`json) with exactly the following structure:
+{
+  "addToMenu": { "title": "Add to Menu", "description": "Your analysis on which categories/profiles to expand based on high margins." },
+  "marginAlerts": { "title": "Margin Alerts", "description": "Identify specific recipes dropping below their target margins." },
+  "remove": { "title": "Remove or Audit", "description": "Suggest specific underperforming or low-margin recipes to remove or audit." }
+}
+Be concise, analytical, and specific to the data provided. Do not invent recipes.`;
+
+  const payload = {
+    system_instruction: { parts: [{ text: systemInstruction }] },
+    contents: [{ role: 'user', parts: [{ text: JSON.stringify(recipeData, null, 2) }] }],
+    generationConfig: {
+      temperature: 0.1,
+      response_mime_type: "application/json",
+    }
+  };
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error?.message || 'Failed to generate recipe insights');
+  }
+
+  const data = await response.json();
+  const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  try {
+    return JSON.parse(textContent);
+  } catch (e) {
+    console.error("Failed to parse Gemini response as JSON", textContent);
+    return null;
+  }
+}

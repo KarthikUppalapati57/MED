@@ -321,7 +321,7 @@ export default function PaymentVerification() {
                 navigate('/onboarding', { replace: true });
               }}
             >
-              Continue to Setup â†’
+              Continue to Setup
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">

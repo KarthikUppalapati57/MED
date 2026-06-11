@@ -413,7 +413,7 @@ export default function OrgManagement() {
                           <Badge className="bg-resend-green/10 text-resend-green border-none text-[9px]">{org.status || 'active'}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} · {staffCount} staff · Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '—'}
+                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} / {staffCount} staff / Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}
                         </p>
                       </div>
                       {canManage && (
@@ -431,7 +431,7 @@ export default function OrgManagement() {
                     {isExpanded && (
                       <div className="border-t border-border bg-secondary/50">
                         {orgBrands.length === 0 ? (
-                          <div className="p-4 pl-20 text-xs text-muted-foreground italic">No brands yet — add your first brand</div>
+                          <div className="p-4 pl-20 text-xs text-muted-foreground italic">No brands yet - add your first brand</div>
                         ) : (
                           orgBrands.map(brand => {
                             const brandLocations = getBrandLocations(brand.id);
@@ -454,7 +454,7 @@ export default function OrgManagement() {
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-foreground truncate">{brand.name}</p>
                                     <p className="text-[10px] text-muted-foreground">
-                                      {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} · {brandStaff} staff
+                                      {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} / {brandStaff} staff
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
@@ -492,7 +492,7 @@ export default function OrgManagement() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                               <p className="text-xs font-medium text-foreground truncate">{loc.name}</p>
-                                              <p className="text-[10px] text-muted-foreground truncate">{loc.address || 'No address'} · {locStaff} staff</p>
+                                              <p className="text-[10px] text-muted-foreground truncate">{loc.address || 'No address'} / {locStaff} staff</p>
                                             </div>
                                             {canManage && (
                                               <div className="flex items-center gap-1 shrink-0">

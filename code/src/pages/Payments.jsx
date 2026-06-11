@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -95,6 +95,7 @@ const invoiceStatusColors = {
 };
 
 export default function Payments() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -638,7 +639,7 @@ export default function Payments() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell>
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '-'}
                             </TableCell>
                             <TableCell className="font-medium">{p.vendor_name}</TableCell>
                             <TableCell>{p.invoice_number}</TableCell>
@@ -734,7 +735,12 @@ export default function Payments() {
                               <Badge className="bg-resend-green/10 text-resend-green">Paid</Badge>
                             </TableCell>
                             <TableCell>
-                              <Button size="sm" variant="outline" className="h-7 text-xs">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => navigate('/Accounting?tab=reconciliation')}
+                              >
                                 <CheckCircle2 className="h-3 w-3 mr-1" /> Reconcile
                               </Button>
                             </TableCell>

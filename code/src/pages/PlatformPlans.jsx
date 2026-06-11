@@ -206,7 +206,12 @@ export default function PlatformPlans() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                       <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-lg border-border hover:bg-secondary">
+                       <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-bold rounded-lg border-border hover:bg-secondary"
+                        onClick={() => toast.info(`Plan assignment for ${org.name} will be managed from Organization Management.`)}
+                       >
                          Change Plan
                        </Button>
                     </TableCell>

@@ -20,10 +20,10 @@ import { cn } from '@/lib/utils';
  * ContextSwitcher — Cascading org/brand/location selector for the Layout header.
  *
  * Behavior per role:
- *   Platform Admin â†’ Dropdown of ALL organizations â†’ brands â†’ locations
- *   Org Owner      â†’ Dropdown of their org's brands â†’ locations
- *   Branch Manager  â†’ Dropdown of their assigned branches â†’ locations
- *   Ground Level    â†’ Static text showing assigned location (no dropdown)
+ *   Platform Admin -> Dropdown of ALL organizations -> brands -> locations
+ *   Org Owner      -> Dropdown of their org's brands -> locations
+ *   Branch Manager -> Dropdown of their assigned branches -> locations
+ *   Ground Level   -> Static text showing assigned location (no dropdown)
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();

@@ -944,7 +944,7 @@ function GroundLevelDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Pending Invoices" value={pendingInvoices.length} icon={Clock} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" />
         <StatCard label="My Uploads" value={myUploads} icon={Upload} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="Invoices" linkText="Upload invoice" />
-        <StatCard label="Products" value="—" icon={Eye} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
+        <StatCard label="Products" value="-" icon={Eye} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
       </div>
 
       {/* Quick Actions */}
