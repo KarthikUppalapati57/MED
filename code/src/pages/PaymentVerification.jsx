@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useTheme } from '@/components/ThemeProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,18 +10,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { getStripe } from '@/lib/paymentService';
 import { toast } from 'sonner';
 
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      '::placeholder': { color: '#a1a1aa' },
-    },
-    invalid: { color: '#ef4444' },
-  },
-  hidePostalCode: true,
-};
+
 
 /**
  * Robustly set payment_verified = true on the user's profile.
@@ -97,8 +87,24 @@ function VerificationForm({ onVerified }) {
   const stripe = useStripe();
   const elements = useElements();
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const CARD_ELEMENT_OPTIONS = {
+    style: {
+      base: {
+        fontSize: '16px',
+        color: isDark ? '#ffffff' : '#0f172a',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        '::placeholder': { color: isDark ? '#a1a1aa' : '#64748b' },
+      },
+      invalid: { color: '#ef4444' },
+    },
+    hidePostalCode: true,
+  };
 
   const handleVerify = async (e) => {
     e.preventDefault();
