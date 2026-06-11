@@ -324,6 +324,16 @@ export default function Invoices() {
         toast.success('Invoice approved & products/inventory updated');
       } else {
         posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
+        
+        // Notify managers that a new invoice requires approval
+        await notifyManagers({
+          organization_id: organization?.id,
+          title: 'Invoice Requires Approval',
+          message: `Invoice ${savedInvoice.invoice_number || 'Pending'} from ${savedInvoice.vendor_name || 'Vendor'} was uploaded and requires your review.`,
+          type: 'approval',
+          metadata: { invoice_id: savedInvoice.id },
+          exclude_user_id: userProfile?.id,
+        }).catch(e => console.error('Failed to notify managers:', e));
       }
       
       setEditorOpen(false);
