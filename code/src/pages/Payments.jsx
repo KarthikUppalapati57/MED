@@ -26,7 +26,8 @@ import {
   FileText,
   Mail,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
+import { confirmBankTransfer } from '@/lib/paymentService';
 
 const paymentMethodIcons = {
   stripe: CreditCard,
@@ -102,7 +104,7 @@ export default function Payments() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
   const queryClient = useQueryClient();
-  const { organization, brand, location } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
 
   const { data: invoices = [], isLoading: invoicesLoading } = useAuthQuery({
     queryKey: ['invoices-payments', organization?.id],
@@ -162,13 +164,83 @@ export default function Payments() {
 
   const createPayment = useMutation({
     mutationFn: (data) => api.entities.Payment.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payments'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] }),
   });
 
   const updateInvoice = useMutation({
     mutationFn: (params) => api.entities.Invoice.update(params.id, params.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] }),
   });
+
+  const getVendorFileDestination = async (vendorId) => {
+    if (!vendorId) return 'storage';
+    try {
+      const vendor = await api.entities.Vendor.get(vendorId);
+      return vendor?.file_routing_preference || 'storage';
+    } catch (e) {
+      console.warn('Failed to fetch vendor for file routing:', e);
+      return 'storage';
+    }
+  };
+
+  const ensureLedgerBill = async (invoice) => {
+    const existing = await api.entities.LedgerBill.filter({ invoice_id: invoice.id });
+    if (existing?.length) return existing[0];
+    return api.entities.LedgerBill.create({
+      organization_id: invoice.organization_id || organization?.id,
+      vendor_id: invoice.vendor_id || null,
+      invoice_id: invoice.id,
+      subtotal: invoice.subtotal || 0,
+      tax: invoice.tax_amount || 0,
+      total: invoice.total_amount || 0,
+      due_date: invoice.due_date || null,
+      status: 'pending',
+    });
+  };
+
+  const recordLedgerPayment = async ({ invoice, paymentRecord }) => {
+    const orgId = invoice.organization_id || organization?.id;
+    if (!orgId || !paymentRecord || paymentRecord.status !== 'completed') return;
+
+    try {
+      const bill = await ensureLedgerBill(invoice);
+      const existingLedgerPayments = await api.entities.LedgerPayment.filter({ source_payment_id: paymentRecord.id });
+      if (existingLedgerPayments?.length) return;
+
+      await api.entities.LedgerPayment.create({
+        organization_id: orgId,
+        bill_id: bill.id,
+        source_payment_id: paymentRecord.id,
+        payment_method: paymentRecord.payment_method,
+        amount: paymentRecord.amount || invoice.total_amount || 0,
+        payment_date: paymentRecord.payment_date || new Date().toISOString(),
+        status: 'completed',
+        created_by: userProfile?.id || null,
+      });
+
+      const amount = paymentRecord.amount || invoice.total_amount || 0;
+      await Promise.all([
+        api.entities.LedgerEntry.create({
+          organization_id: orgId,
+          account_code: '2000',
+          debit: amount,
+          credit: 0,
+          reference_type: 'payment',
+          reference_id: paymentRecord.id,
+        }),
+        api.entities.LedgerEntry.create({
+          organization_id: orgId,
+          account_code: '1000',
+          debit: 0,
+          credit: amount,
+          reference_type: 'payment',
+          reference_id: paymentRecord.id,
+        }),
+      ]);
+    } catch (ledgerErr) {
+      console.warn('Could not record ledger payment entries:', ledgerErr);
+    }
+  };
 
   const handleApprove = async (invoice) => {
     await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'approved' } });
@@ -207,24 +279,18 @@ export default function Payments() {
       await confirmBankTransfer(payment.id);
       // Also update invoice to paid
       if (payment.invoice_id) {
-        let fileDestination = 'storage';
-        if (payment.vendor_id) {
-          try {
-            const vendor = await api.entities.Vendor.get(payment.vendor_id);
-            if (vendor && vendor.file_routing_preference) {
-              fileDestination = vendor.file_routing_preference;
-            }
-          } catch (e) {
-            console.warn('Failed to fetch vendor for file routing:', e);
-          }
-        }
+        const fileDestination = await getVendorFileDestination(payment.vendor_id);
 
         await updateInvoice.mutateAsync({
           id: payment.invoice_id,
           data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
         });
+        const invoice = invoices.find(i => i.id === payment.invoice_id);
+        if (invoice) {
+          await recordLedgerPayment({ invoice, paymentRecord: { ...payment, status: 'completed' } });
+        }
       }
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
       toast.success('Bank transfer confirmed!');
     } catch (err) {
       toast.error('Failed to confirm: ' + err.message);
@@ -791,32 +857,25 @@ export default function Payments() {
           due_date: selectedInvoice.due_date,
         } : null}
         onPaymentComplete={async (paymentData) => {
-          await createPayment.mutateAsync({
+          const paymentRecord = await createPayment.mutateAsync({
             invoice_id: selectedInvoice.id,
             vendor_id: selectedInvoice.vendor_id,
             vendor_name: selectedInvoice.vendor_name,
             invoice_number: selectedInvoice.invoice_number,
             amount: selectedInvoice.total_amount,
+            organization_id: selectedInvoice.organization_id || organization?.id,
+            created_by: userProfile?.id || null,
             ...paymentData,
           });
           // Only mark as paid if payment is completed (not pending bank transfer)
           if (paymentData.status === 'completed') {
-            let fileDestination = 'storage';
-            if (selectedInvoice.vendor_id) {
-              try {
-                const vendor = await api.entities.Vendor.get(selectedInvoice.vendor_id);
-                if (vendor && vendor.file_routing_preference) {
-                  fileDestination = vendor.file_routing_preference;
-                }
-              } catch (e) {
-                console.warn('Failed to fetch vendor for file routing:', e);
-              }
-            }
+            const fileDestination = await getVendorFileDestination(selectedInvoice.vendor_id);
 
             await updateInvoice.mutateAsync({
               id: selectedInvoice.id,
               data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
             });
+            await recordLedgerPayment({ invoice: selectedInvoice, paymentRecord });
           } else if (paymentData.status === 'pending') {
             await updateInvoice.mutateAsync({
               id: selectedInvoice.id,

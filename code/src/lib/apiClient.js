@@ -1,6 +1,15 @@
 import { supabase } from '@/lib/supabaseClient';
 
 const createEntityClient = (table, useSoftDelete = false) => ({
+  get: async (id) => {
+    let query = supabase.from(table).select('*').eq('id', id);
+    if (useSoftDelete) {
+      query = query.is('deleted_at', null);
+    }
+    const { data, error } = await query.single();
+    if (error) throw error;
+    return data;
+  },
   list: async (orderBy, options = {}) => {
     let query = supabase.from(table).select('*');
     if (useSoftDelete) {

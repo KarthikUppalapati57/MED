@@ -291,7 +291,7 @@ export default function Layout({ children, currentPageName }) {
   const markAsRead = async (notifId) => {
     await supabase
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true, read: true })
       .eq('id', notifId);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
@@ -299,7 +299,7 @@ export default function Layout({ children, currentPageName }) {
   const markAllAsRead = async () => {
     await supabase
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true, read: true })
       .eq('user_id', user?.id)
       .eq('is_read', false);
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });

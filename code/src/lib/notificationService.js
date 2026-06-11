@@ -16,15 +16,18 @@ import { supabase } from '@/lib/supabaseClient';
  * @param {Object} [params.metadata]    - Any extra JSON metadata (e.g. invoice_id)
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function createNotification({ user_id, title, message, type = 'system', metadata = {} }) {
+export async function createNotification({ user_id, organization_id, title, message, type = 'system', metadata = {} }) {
   try {
     const { error } = await supabase.from('notifications').insert({
       user_id,
+      organization_id,
       title,
       message,
+      body: message,
       type,
       metadata,
       is_read: false,
+      read: false,
     });
     if (error) {
       console.warn('[NotificationService] Insert failed:', error.message);
@@ -78,13 +81,17 @@ export async function notifyManagers({ organization_id, title, message, type = '
     }
 
     // Batch insert notifications for all managers
+    const normalizedType = type === 'approval' ? 'invoice' : type;
     const notifications = targets.map(m => ({
+      organization_id,
       user_id: m.id,
       title,
       message,
-      type,
+      body: message,
+      type: normalizedType,
       metadata,
       is_read: false,
+      read: false,
     }));
 
     const { error: insertError } = await supabase.from('notifications').insert(notifications);

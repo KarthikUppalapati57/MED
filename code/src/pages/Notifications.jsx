@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 export default function Notifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications_page', user?.id],
@@ -36,7 +38,7 @@ export default function Notifications() {
     mutationFn: async (id) => {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ is_read: true, read: true })
         .eq('id', id);
       if (error) throw error;
     },
@@ -50,7 +52,7 @@ export default function Notifications() {
     mutationFn: async () => {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true })
+        .update({ is_read: true, read: true })
         .eq('user_id', user?.id)
         .eq('is_read', false);
       if (error) throw error;
@@ -99,6 +101,38 @@ export default function Notifications() {
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const getNotificationAction = (notif) => {
+    const invoiceId = notif.metadata?.invoice_id || notif.reference_id;
+    if (invoiceId && (notif.type === 'invoice' || notif.type === 'approval' || notif.type === 'invoice_approved')) {
+      return {
+        label: 'Review Invoice',
+        path: `/Invoices?invoice=${invoiceId}`,
+      };
+    }
+    if (notif.type === 'payment' || notif.type === 'payment_failed') {
+      return {
+        label: 'Open Payments',
+        path: '/Payments?tab=invoices',
+      };
+    }
+    if (notif.type === 'inventory' || notif.type === 'low_inventory') {
+      return {
+        label: 'Open Inventory',
+        path: '/Inventory',
+      };
+    }
+    return null;
+  };
+
+  const handleOpenAction = async (notif) => {
+    const action = getNotificationAction(notif);
+    if (!action) return;
+    if (!notif.is_read) {
+      await markAsReadMutation.mutateAsync(notif.id);
+    }
+    navigate(action.path);
+  };
 
   return (
     <div className="p-8 w-full max-w-[2400px] mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-300">
@@ -205,11 +239,14 @@ export default function Notifications() {
                       {notif.message || notif.body}
                     </p>
                     
-                    {/* Action buttons based on type - for future extensibility */}
-                    {notif.type === 'approval' && !notif.is_read && (
+                    {getNotificationAction(notif) && (
                       <div className="mt-4 flex items-center gap-3">
-                        <Button size="sm" className="bg-resend-green hover:bg-resend-green/90 text-white shadow-glow-sm font-bold text-xs h-8">
-                          Review Request
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenAction(notif)}
+                          className="bg-resend-green hover:bg-resend-green/90 text-white shadow-glow-sm font-bold text-xs h-8"
+                        >
+                          {getNotificationAction(notif).label}
                         </Button>
                       </div>
                     )}

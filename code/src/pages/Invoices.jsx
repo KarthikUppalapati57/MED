@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -80,6 +81,7 @@ export default function Invoices() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
@@ -136,6 +138,22 @@ export default function Invoices() {
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
   });
+
+  useEffect(() => {
+    const invoiceId = searchParams.get('invoice');
+    if (!invoiceId || loadingInvoices || invoices.length === 0) return;
+
+    const invoice = invoices.find((item) => item.id === invoiceId);
+    if (!invoice) return;
+
+    setEditingInvoice(invoice);
+    setEditorOpen(true);
+    setSearchParams((params) => {
+      const next = new URLSearchParams(params);
+      next.delete('invoice');
+      return next;
+    }, { replace: true });
+  }, [invoices, loadingInvoices, searchParams, setSearchParams]);
 
   useEffect(() => {
     const channel = supabase.channel('invoices-realtime')
