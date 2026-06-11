@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: logs = [], isLoading: loadingLogs } = useAuthQuery({
@@ -163,8 +164,12 @@ export default function Accounting() {
                   ) : integrations.length === 0 ? (
                     <div className="text-center p-6 border border-dashed border-border/50 rounded-lg">
                       <p className="text-sm text-muted-foreground mb-4">No integrations connected.</p>
-                      <button className="px-4 py-2 bg-brand text-primary-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity">
-                        Connect Quickbooks
+                      <button
+                        type="button"
+                        onClick={() => navigate('/Integrations')}
+                        className="px-4 py-2 bg-brand text-primary-foreground font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                      >
+                        Connect QuickBooks
                       </button>
                     </div>
                   ) : (
@@ -339,7 +344,13 @@ export default function Accounting() {
                         <TableCell>{mapping.gl_name}</TableCell>
                         <TableCell className="text-muted-foreground">{mapping.description}</TableCell>
                         <TableCell>
-                          <Button variant="outline" size="sm">Edit</Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toast.info(`Editing ${mapping.category} mapping will be available from Accounting Settings.`)}
+                          >
+                            Edit
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
