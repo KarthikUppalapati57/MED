@@ -212,7 +212,12 @@ export default function Vendors() {
     if (editingVendor) {
       updateMutation.mutate({ id: editingVendor.id, data: formData });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({
+        ...formData,
+        organization_id: organization?.id,
+        brand_id: brand?.id || null,
+        location_id: location?.id || null,
+      });
     }
   };
 
@@ -221,7 +226,7 @@ export default function Vendors() {
     setSuggestionsOpen(true);
 
     try {
-      const categories = [...new Set(vendors.flatMap(v => v.categories || []))];
+      const categories = [...new Set(vendors.flatMap(v => Array.isArray(v.categories) ? v.categories : []))];
 
       const localSuggestions = (categories.length ? categories : ['general']).slice(0, 3).map((cat, idx) => ({
         name: `Suggested ${cat} vendor ${idx + 1}`,
@@ -417,7 +422,7 @@ export default function Vendors() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-medium">{vendor.rating?.toFixed(1) || 'N/A'}</span>
+                          <span className="font-medium">{vendor.rating != null ? Number(vendor.rating).toFixed(1) : 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">
@@ -501,7 +506,7 @@ export default function Vendors() {
                               <TableCell className="text-sm text-muted-foreground">
                                 {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '—'}
                               </TableCell>
-                              <TableCell className="font-semibold">${(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
+                              <TableCell className="font-semibold">${Number(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
                               <TableCell>
                                 <Badge className={item.on_order_guide ? 'bg-resend-green/10 text-resend-green' : 'bg-secondary text-muted-foreground'}>
                                   {item.on_order_guide ? 'Active' : 'Inactive'}

@@ -442,6 +442,9 @@ export default function Recipes() {
 
     const data = {
       ...formData,
+      organization_id: organization?.id,
+      brand_id: brand?.id || null,
+      location_id: location?.id || null,
       total_ingredient_cost: costs.ingredientCost,
       total_packaging_cost: costs.packagingCost,
       labor_cost: costs.laborCost,
