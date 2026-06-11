@@ -776,7 +776,16 @@ const AuthenticatedApp = () => {
             element={
               <LayoutWrapper currentPageName={mainPageKey}>
                 <ProtectedModule pageName={mainPageKey}>
-                  <MainPage />
+                  <React.Suspense fallback={
+                    <div className="flex-1 flex items-center justify-center p-12 min-h-[60vh]">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="w-8 h-8 text-foreground animate-spin" />
+                        <p className="text-xs text-muted-foreground font-medium">Loading...</p>
+                      </div>
+                    </div>
+                  }>
+                    <MainPage />
+                  </React.Suspense>
                 </ProtectedModule>
               </LayoutWrapper>
             }
