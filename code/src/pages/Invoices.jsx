@@ -154,8 +154,8 @@ export default function Invoices() {
     const cleaned = {
       ...invoiceData,
       status: 'pending',
-      line_items: JSON.stringify(invoiceData.line_items || []),
-      validation_results: JSON.stringify({}),
+      line_items: invoiceData.line_items || [],
+      validation_results: {},
       organization_id: organization?.id || userProfile?.organization_id,
     };
 
