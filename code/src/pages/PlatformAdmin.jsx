@@ -124,8 +124,22 @@ export default function PlatformAdmin() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['client-invites'] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          queryClient.setQueryData(['client-invites'], (old) => {
+            if (!old) return [payload.new];
+            // Prevent duplicates if already added by optimistic update
+            if (old.some(i => i.id === payload.new.id)) return old;
+            return [payload.new, ...old];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          queryClient.setQueryData(['client-invites'], (old) => {
+            if (!old) return old;
+            return old.map(i => i.id === payload.new.id ? payload.new : i);
+          });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['client-invites'] });
+        }
       })
       .subscribe();
 
@@ -296,9 +310,16 @@ export default function PlatformAdmin() {
             modules: inviteSelectedModules,
             access: inviteAccessLevels 
           }
-        }]);
+        }]).select().single();
 
       if (insertErr) throw insertErr;
+      
+      // Update cache instantly
+      queryClient.setQueryData(['client-invites'], (old) => {
+        if (!old) return [newInvite];
+        if (old.some(i => i.id === newInvite.id)) return old;
+        return [newInvite, ...old];
+      });
 
       const link = `${window.location.origin}/signup/${token}`;
 
@@ -366,9 +387,16 @@ export default function PlatformAdmin() {
             access: { read: true, write: true, update: true },
             demo_request_id: request.id
           }
-        }]);
+        }]).select().single();
 
       if (inviteErr) throw inviteErr;
+      
+      // Update cache instantly
+      queryClient.setQueryData(['client-invites'], (old) => {
+        if (!old) return [newInvite];
+        if (old.some(i => i.id === newInvite.id)) return old;
+        return [newInvite, ...old];
+      });
 
       const signupLink = `${window.location.origin}/signup/${token}`;
 
