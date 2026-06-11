@@ -215,6 +215,56 @@ export default function Integrations() {
     }
   };
 
+  const renderIntegrationCard = (integration) => {
+    const connected = isConnected(integration.id);
+    return (
+      <Card key={integration.id} className="relative overflow-hidden group border-0 shadow-sm hover:shadow-md transition-all">
+        <div className={cn("absolute top-0 left-0 w-1 h-full", connected ? "bg-resend-green" : "bg-border")} />
+        <CardContent className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <div className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center",
+              connected ? `bg-${integration.color}-100 text-${integration.color}-600` : "bg-secondary text-muted-foreground"
+            )}>
+              <integration.icon className="w-5 h-5" />
+            </div>
+            {connected ? (
+              <span className="flex items-center text-xs font-bold text-resend-green bg-resend-green/10 px-2.5 py-1 rounded-full">
+                <div className="w-1.5 h-1.5 rounded-full bg-resend-green mr-1.5 animate-pulse" />
+                Active
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
+                Disconnected
+              </span>
+            )}
+          </div>
+          <h3 className="font-bold text-foreground">{integration.name}</h3>
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{integration.description}</p>
+          
+          <div className="mt-6">
+            {connected ? (
+              <Button 
+                variant="outline" 
+                className="w-full text-resend-red hover:text-resend-red hover:bg-resend-red/10"
+                onClick={() => handleDisconnect(integration.id, integration.name)}
+              >
+                Disconnect
+              </Button>
+            ) : (
+              <Button 
+                className="w-full bg-primary hover:bg-primary"
+                onClick={() => openConnectDialog(integration)}
+              >
+                Connect {integration.name}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="p-6 space-y-8 min-h-screen bg-secondary/30">
       <div className="flex items-center justify-between">
@@ -285,56 +335,6 @@ export default function Integrations() {
             Accounting Systems (Back-Office)
           </button>
         </div>
-
-  const renderIntegrationCard = (integration) => {
-    const connected = isConnected(integration.id);
-    return (
-      <Card key={integration.id} className="relative overflow-hidden group border-0 shadow-sm hover:shadow-md transition-all">
-        <div className={cn("absolute top-0 left-0 w-1 h-full", connected ? "bg-resend-green" : "bg-border")} />
-        <CardContent className="p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center",
-              connected ? `bg-${integration.color}-100 text-${integration.color}-600` : "bg-secondary text-muted-foreground"
-            )}>
-              <integration.icon className="w-5 h-5" />
-            </div>
-            {connected ? (
-              <span className="flex items-center text-xs font-bold text-resend-green bg-resend-green/10 px-2.5 py-1 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-resend-green mr-1.5 animate-pulse" />
-                Active
-              </span>
-            ) : (
-              <span className="text-xs font-medium text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">
-                Disconnected
-              </span>
-            )}
-          </div>
-          <h3 className="font-bold text-foreground">{integration.name}</h3>
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{integration.description}</p>
-          
-          <div className="mt-6">
-            {connected ? (
-              <Button 
-                variant="outline" 
-                className="w-full text-resend-red hover:text-resend-red hover:bg-resend-red/10"
-                onClick={() => handleDisconnect(integration.id, integration.name)}
-              >
-                Disconnect
-              </Button>
-            ) : (
-              <Button 
-                className="w-full bg-primary hover:bg-primary"
-                onClick={() => openConnectDialog(integration)}
-              >
-                Connect {integration.name}
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
         <TabsContent value={INTEGRATION_TYPES.MCP} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
