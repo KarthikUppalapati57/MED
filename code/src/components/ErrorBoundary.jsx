@@ -87,7 +87,7 @@ export default class ErrorBoundary extends React.Component {
               </div>
             )}
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-wrap gap-3 justify-center">
               <button
                 onClick={this.handleReset}
                 className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-colors"
@@ -95,10 +95,22 @@ export default class ErrorBoundary extends React.Component {
                 Try Again
               </button>
               <button
+                onClick={() => {
+                  if (window.history.length > 2) {
+                    window.history.back();
+                  } else {
+                    window.location.href = '/';
+                  }
+                }}
+                className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+              >
+                Go Back
+              </button>
+              <button
                 onClick={() => window.location.reload()}
                 className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
               >
-                Reload Page
+                Reload
               </button>
             </div>
           </div>
