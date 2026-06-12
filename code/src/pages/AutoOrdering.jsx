@@ -55,6 +55,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { receiveOrderWorkflow } from '@/lib/workflowService';
 
 const STATUS_COLORS = {
   pending_approval: 'bg-resend-orange/10 text-resend-orange',
@@ -216,21 +217,24 @@ export default function AutoOrdering() {
     mutationFn: async () => {
       const order = orders.find((item) => item.id === receivingOrderId);
       if (!order) throw new Error('Select an order to receive');
-      const vendor = vendors.find((item) => item.name === order.vendor_name);
-      await api.entities.Receiving.create({
-        organization_id: organization?.id,
-        order_id: order.id,
-        vendor_id: vendor?.id || null,
-        status: 'received',
-        items: order.items || [],
-        received_by: userProfile?.id || null,
+      const receivedQuantities = Object.fromEntries((order.items || []).map((item) => [
+        item.product_id || item.inventory_id || item.product_name,
+        item.approved_quantity ?? item.suggested_quantity ?? item.quantity ?? 0,
+      ]));
+      return receiveOrderWorkflow({
+        order,
+        receivedQuantities,
+        organizationId: organization?.id,
+        locationId: location?.id || userProfile?.location_id || null,
+        userId: userProfile?.id || null,
       });
-      await api.entities.AutoOrder.update(order.id, { status: 'received' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['receivings', organization?.id] });
       queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
-      toast.success('Receiving logged');
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
+      toast.success('Receiving logged and inventory updated');
       setReceiveOrderOpen(false);
       setReceivingOrderId('');
     },

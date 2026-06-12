@@ -59,6 +59,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
 import { confirmBankTransfer } from '@/lib/paymentService';
+import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 
 const paymentMethodIcons = {
   stripe: CreditCard,
@@ -228,67 +229,9 @@ export default function Payments() {
     }
   };
 
-  const ensureLedgerBill = async (invoice) => {
-    const existing = await api.entities.LedgerBill.filter({ invoice_id: invoice.id });
-    if (existing?.length) return existing[0];
-    return api.entities.LedgerBill.create({
-      organization_id: invoice.organization_id || organization?.id,
-      vendor_id: invoice.vendor_id || null,
-      invoice_id: invoice.id,
-      subtotal: invoice.subtotal || 0,
-      tax: invoice.tax_amount || 0,
-      total: invoice.total_amount || 0,
-      due_date: invoice.due_date || null,
-      status: 'pending',
-    });
-  };
-
-  const recordLedgerPayment = async ({ invoice, paymentRecord }) => {
-    const orgId = invoice.organization_id || organization?.id;
-    if (!orgId || !paymentRecord || paymentRecord.status !== 'completed') return;
-
-    try {
-      const bill = await ensureLedgerBill(invoice);
-      const existingLedgerPayments = await api.entities.LedgerPayment.filter({ source_payment_id: paymentRecord.id });
-      if (existingLedgerPayments?.length) return;
-
-      await api.entities.LedgerPayment.create({
-        organization_id: orgId,
-        bill_id: bill.id,
-        source_payment_id: paymentRecord.id,
-        payment_method: paymentRecord.payment_method,
-        amount: paymentRecord.amount || invoice.total_amount || 0,
-        payment_date: paymentRecord.payment_date || new Date().toISOString(),
-        status: 'completed',
-        created_by: userProfile?.id || null,
-      });
-
-      const amount = paymentRecord.amount || invoice.total_amount || 0;
-      await Promise.all([
-        api.entities.LedgerEntry.create({
-          organization_id: orgId,
-          account_code: '2000',
-          debit: amount,
-          credit: 0,
-          reference_type: 'payment',
-          reference_id: paymentRecord.id,
-        }),
-        api.entities.LedgerEntry.create({
-          organization_id: orgId,
-          account_code: '1000',
-          debit: 0,
-          credit: amount,
-          reference_type: 'payment',
-          reference_id: paymentRecord.id,
-        }),
-      ]);
-    } catch (ledgerErr) {
-      console.warn('Could not record ledger payment entries:', ledgerErr);
-    }
-  };
-
   const handleApprove = async (invoice) => {
     await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'approved' } });
+    await ensureLedgerBill({ ...invoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
     toast.success('Invoice approved');
   };
 
@@ -332,7 +275,11 @@ export default function Payments() {
         });
         const invoice = invoices.find(i => i.id === payment.invoice_id);
         if (invoice) {
-          await recordLedgerPayment({ invoice, paymentRecord: { ...payment, status: 'completed' } });
+          await recordPaymentLedger({
+            invoice: { ...invoice, organization_id: invoice.organization_id || organization?.id },
+            paymentRecord: { ...payment, status: 'completed' },
+            userId: userProfile?.id,
+          });
         }
       }
       queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
@@ -958,7 +905,11 @@ export default function Payments() {
               id: selectedInvoice.id,
               data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
             });
-            await recordLedgerPayment({ invoice: selectedInvoice, paymentRecord });
+            await recordPaymentLedger({
+              invoice: { ...selectedInvoice, organization_id: selectedInvoice.organization_id || organization?.id },
+              paymentRecord,
+              userId: userProfile?.id,
+            });
           } else if (paymentData.status === 'pending') {
             await updateInvoice.mutateAsync({
               id: selectedInvoice.id,

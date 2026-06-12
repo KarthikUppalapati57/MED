@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { useAuth } from '@/lib/AuthContext';
+import { receiveOrderWorkflow } from '@/lib/workflowService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,7 @@ import { Package, Truck, CheckCircle2, AlertTriangle, ChevronLeft } from 'lucide
 
 export default function LoadingDockReceiving() {
   const queryClient = useQueryClient();
+  const { organization, location, userProfile } = useAuth();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [receivedQtys, setReceivedQtys] = useState({});
 
@@ -25,44 +28,27 @@ export default function LoadingDockReceiving() {
 
   const receiveMutation = useMutation({
     mutationFn: async ({ order, qtys, isPartial }) => {
-      // 1. Update order status
-      const newStatus = isPartial ? 'partially_received' : 'received';
-      await api.entities.AutoOrder.update(order.id, {
-        status: newStatus,
-        updated_at: new Date().toISOString()
+      const result = await receiveOrderWorkflow({
+        order,
+        receivedQuantities: qtys,
+        organizationId: organization?.id,
+        locationId: location?.id || userProfile?.location_id || null,
+        userId: userProfile?.id || null,
       });
 
-      // 2. Create receiving record
-      const receivingItems = order.items.map(item => ({
-        ...item,
-        received_quantity: qtys[item.product_id] || 0,
-        discrepancy: item.approved_quantity - (qtys[item.product_id] || 0)
-      }));
-
-      // NOTE: We wrap the api call in a try/catch in case the receivings table is not perfectly matched to the API client yet.
-      try {
-        await api.entities.Receiving.create({
-          order_id: order.id,
-          vendor_id: order.vendor_id,
-          status: isPartial ? 'partial' : 'received',
-          items: receivingItems
-        });
-      } catch (err) {
-        console.error("Receiving table might not exist yet or failed:", err);
-      }
-
-      // 3. (Optional) Auto-generate credit memo requests for discrepancies
       if (isPartial) {
-        const shortItems = receivingItems.filter(i => i.discrepancy > 0);
+        const shortItems = result.receiving.items.filter(i => Number(i.discrepancy || 0) > 0);
         if (shortItems.length > 0) {
            toast.warning(`${shortItems.length} items short-shipped. Credit memo requested.`);
         }
       }
 
-      return newStatus;
+      return result.orderStatus;
     },
     onSuccess: (newStatus) => {
       queryClient.invalidateQueries({ queryKey: ['pending-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
       toast.success(`Order marked as ${newStatus.replace('_', ' ')}!`);
       setSelectedOrder(null);
     }

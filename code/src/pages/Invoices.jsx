@@ -61,6 +61,7 @@ import InvoiceUploader from '../components/invoices/InvoiceUploader';
 import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
+import { ensureLedgerBill } from '@/lib/workflowService';
 
 const statusColors = {
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
@@ -344,6 +345,7 @@ export default function Invoices() {
       
       if (savedInvoice.status === 'approved') {
         await syncInvoiceToProductsAndInventory(savedInvoice);
+        await ensureLedgerBill(savedInvoice, { status: 'pending' });
         posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
         toast.success('Invoice approved & products/inventory updated');
       } else {
@@ -477,6 +479,7 @@ export default function Invoices() {
       // O(1) Inventory Lookup
       const existingInv = inventoryByNameMap.get(name.toLowerCase());
       if (existingInv) {
+        const previousQuantity = Number(existingInv.current_quantity || 0);
         const newQty = (existingInv.current_quantity || 0) + qty;
         try {
           await api.entities.Inventory.update(existingInv.id, {
@@ -486,12 +489,24 @@ export default function Invoices() {
             pending_until: pendingUntil,
             pending_source_invoice: invoice.invoice_number || invoice.id,
           });
+          await api.entities.InventoryMovement.create({
+            organization_id: invoice.organization_id,
+            location_id: invoice.location_id || existingInv.location_id || null,
+            inventory_id: existingInv.id,
+            movement_type: 'invoice_received',
+            quantity: qty,
+            source_type: 'invoice',
+            source_id: invoice.id,
+            previous_quantity: previousQuantity,
+            new_quantity: newQty,
+            created_by: userProfile?.id || null,
+          });
         } catch (e) {
           console.warn('Could not update inventory (likely ground_staff RLS):', e);
         }
       } else {
         try {
-          await api.entities.Inventory.create({
+          const createdInventory = await api.entities.Inventory.create({
             product_id: productId,
             product_name: name,
             current_quantity: qty,
@@ -508,6 +523,18 @@ export default function Invoices() {
             location_id: invoice.location_id,
             pending_until: pendingUntil,
             pending_source_invoice: invoice.invoice_number || invoice.id,
+          });
+          await api.entities.InventoryMovement.create({
+            organization_id: invoice.organization_id,
+            location_id: invoice.location_id || null,
+            inventory_id: createdInventory.id,
+            movement_type: 'invoice_received',
+            quantity: qty,
+            source_type: 'invoice',
+            source_id: invoice.id,
+            previous_quantity: 0,
+            new_quantity: qty,
+            created_by: userProfile?.id || null,
           });
         } catch (e) {
           console.warn('Could not create inventory:', e);
@@ -528,22 +555,7 @@ export default function Invoices() {
         data: { status: 'approved', line_items: invoice.line_items }
       });
       await syncInvoiceToProductsAndInventory(invoice);
-      
-      // Generate a LedgerBill to satisfy double-entry accounting
-      try {
-        await api.entities.LedgerBill.create({
-          organization_id: invoice.organization_id,
-          vendor_id: invoice.vendor_id || null,
-          invoice_id: invoice.id,
-          subtotal: invoice.subtotal || 0,
-          tax: invoice.tax_amount || 0,
-          total: invoice.total_amount || 0,
-          due_date: invoice.due_date,
-          status: 'pending' // pending payment
-        });
-      } catch (billErr) {
-        console.warn('Could not create LedgerBill:', billErr);
-      }
+      await ensureLedgerBill(invoice, { status: 'pending' });
       
       posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
       toast.success('Invoice approved & products/inventory updated');
@@ -629,6 +641,7 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       await syncInvoiceToProductsAndInventory(savedInvoice);
+      await ensureLedgerBill(savedInvoice, { status: 'pending' });
       posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
       toast.success('Invoice approved — items staged for 24h review before finalizing in inventory');
 
