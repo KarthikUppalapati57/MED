@@ -1,8 +1,8 @@
-const CACHE_NAME = 'edgeops-cache-v2';
+const CACHE_NAME = 'restops-cache-v3';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/favicon.svg'
+  '/favicon.png'
 ];
 
 self.addEventListener('install', event => {
