@@ -81,7 +81,7 @@ const navigation = [
   { 
     name: 'Payments', 
     icon: CreditCard, 
-    minRole: 'branch_manager',
+    minRole: 'location_manager',
     subItems: [
       { name: 'Invoices', href: 'Payments?tab=invoices', icon: FileText },
       { name: 'Payment History', href: 'Payments?tab=history', icon: History },
