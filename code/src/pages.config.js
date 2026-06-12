@@ -12,6 +12,7 @@ import __Layout from './Layout.jsx';
 
 // Dynamically import pages using React.lazy for code-splitting
 const AutoOrdering = React.lazy(() => import('./pages/AutoOrdering'));
+const AskTom = React.lazy(() => import('./pages/AskTom'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const Invoices = React.lazy(() => import('./pages/Invoices'));
@@ -39,12 +40,15 @@ const Integrations = React.lazy(() => import('./pages/Integrations'));
 const Notifications = React.lazy(() => import('./pages/Notifications'));
 const AvTCosting = React.lazy(() => import('./pages/AvTCosting'));
 const Performance = React.lazy(() => import('./pages/Performance'));
+const PurchaseCard = React.lazy(() => import('./pages/PurchaseCard'));
 const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
 const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
 const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
+const SmartPrep = React.lazy(() => import('./pages/SmartPrep'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
+    "AskTom": AskTom,
     "Dashboard": Dashboard,
     "Inventory": Inventory,
     "Invoices": Invoices,
@@ -72,9 +76,11 @@ export const PAGES = {
     "Notifications": Notifications,
     "AvTCosting": AvTCosting,
     "Performance": Performance,
+    "PurchaseCard": PurchaseCard,
     "MenuEngineering": MenuEngineering,
     "RestaurantSetup": RestaurantSetup,
     "DeveloperPortal": DeveloperPortal,
+    "SmartPrep": SmartPrep,
 }
 
 export const pagesConfig = {

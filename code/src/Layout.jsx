@@ -33,7 +33,8 @@ import {
   Trash2,
   Plus,
   Receipt,
-  ArrowLeft
+  ArrowLeft,
+  Bot
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +60,7 @@ const navigation = [
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
+  { name: 'Ask Tom', href: 'AskTom', icon: Bot, minRole: 'manager' },
   { 
     name: 'Platform Admin', 
     icon: Shield, 
@@ -87,6 +89,7 @@ const navigation = [
       { name: 'Gateway Setup', href: 'Payments?tab=setup', icon: Settings }
     ]
   },
+  { name: 'Purchase Card', href: 'PurchaseCard', icon: CreditCard, minRole: 'branch_manager' },
   { 
     name: 'Products', 
     icon: Package, 
@@ -124,6 +127,7 @@ const navigation = [
       { name: 'Order Setup', href: 'AutoOrdering?tab=order-setup', icon: Settings }
     ]
   },
+  { name: 'SmartPrep', href: 'SmartPrep', icon: ChefHat, minRole: 'location_manager' },
   { 
     name: 'Recipes', 
     pageKey: 'Recipes',

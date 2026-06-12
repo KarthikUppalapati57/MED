@@ -121,6 +121,11 @@ export const api = {
     VendorItemPrice: createEntityClient('vendor_item_prices'),
     OperationalSetting: createEntityClient('operational_settings'),
     BudgetTarget: createEntityClient('budget_targets'),
+    SmartPrepPlan: createEntityClient('smart_prep_plans'),
+    PurchaseCard: createEntityClient('purchase_cards'),
+    PurchaseCardTransaction: createEntityClient('purchase_card_transactions'),
+    AskTomThread: createEntityClient('ask_tom_threads'),
+    AskTomMessage: createEntityClient('ask_tom_messages'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
