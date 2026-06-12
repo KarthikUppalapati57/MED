@@ -23,6 +23,8 @@ export default function WebhooksTab() {
   const [endpoints, setEndpoints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newUrl, setNewUrl] = useState('');
+  const [generatedSecret, setGeneratedSecret] = useState(null);
+  const [copied, setCopied] = useState(false);
   
   useEffect(() => {
     if (organizationId) fetchEndpoints();
@@ -32,7 +34,7 @@ export default function WebhooksTab() {
     setLoading(true);
     const { data, error } = await supabase
       .from('webhook_endpoints')
-      .select(`*, webhook_subscriptions(event_type)`)
+      .select(`id, organization_id, url, status, secret_prefix, created_at, webhook_subscriptions(event_type)`)
       .eq('organization_id', organizationId);
     
     if (error) toast.error("Failed to load webhooks");
@@ -43,24 +45,20 @@ export default function WebhooksTab() {
   async function handleAddEndpoint() {
     if (!newUrl.trim() || !newUrl.startsWith('http')) return toast.error("Please enter a valid URL starting with http/https");
 
-    // Generate random whsec_ secret
-    const secret = `whsec_${crypto.randomUUID().replace(/-/g, '')}`;
+    const { data, error } = await supabase.functions.invoke('create-webhook-endpoint', {
+      body: {
+        organization_id: organizationId,
+        url: newUrl,
+        events: AVAILABLE_EVENTS.map(evt => evt.id),
+      },
+    });
 
-    const { data, error } = await supabase.from('webhook_endpoints').insert({
-      organization_id: organizationId,
-      url: newUrl,
-      secret
-    }).select().single();
-
-    if (error) {
-      toast.error("Failed to add webhook");
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Failed to add webhook");
       return;
     }
 
-    // Auto-subscribe to all events for demo purposes
-    const subs = AVAILABLE_EVENTS.map(evt => ({ endpoint_id: data.id, event_type: evt.id }));
-    await supabase.from('webhook_subscriptions').insert(subs);
-
+    setGeneratedSecret(data.signingSecret);
     setNewUrl('');
     toast.success("Webhook endpoint added");
     fetchEndpoints();
@@ -74,7 +72,7 @@ export default function WebhooksTab() {
   }
 
   async function handleDelete(id) {
-    const { error } = await supabase.from('webhook_endpoints').delete().eq('id', id);
+    const { error } = await supabase.from('webhook_endpoints').delete().eq('id', id).eq('organization_id', organizationId);
     if (error) toast.error("Failed to delete webhook");
     else {
       toast.success("Webhook deleted");
@@ -96,12 +94,35 @@ export default function WebhooksTab() {
     else toast.success("Test event queued for delivery!");
   }
 
+  function copySecretToClipboard() {
+    if (generatedSecret) {
+      navigator.clipboard.writeText(generatedSecret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("Signing secret copied");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-medium">Webhook Endpoints</h2>
         <p className="text-sm text-muted-foreground">Receive real-time notifications when events occur in your organization.</p>
       </div>
+
+      {generatedSecret && (
+        <div className="p-4 border border-green-500 bg-green-500/10 rounded-md">
+          <p className="text-sm font-semibold text-green-700 dark:text-green-400 mb-2">Webhook Signing Secret Generated</p>
+          <p className="text-xs mb-3 text-muted-foreground">Copy this secret now. It will not be shown again.</p>
+          <div className="flex gap-2">
+            <Input readOnly value={generatedSecret} className="font-mono" />
+            <Button variant="outline" onClick={copySecretToClipboard}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <Button className="mt-4" variant="secondary" onClick={() => setGeneratedSecret(null)}>I have copied it</Button>
+        </div>
+      )}
 
       <div className="flex gap-4 items-end">
         <div className="grid gap-1.5 flex-1 max-w-md">
@@ -130,7 +151,7 @@ export default function WebhooksTab() {
               <TableRow key={endpoint.id}>
                 <TableCell className="font-medium">{endpoint.url}</TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
-                  {endpoint.secret.substring(0, 15)}...
+                  {endpoint.secret_prefix ? `${endpoint.secret_prefix}...` : 'Hidden'}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">

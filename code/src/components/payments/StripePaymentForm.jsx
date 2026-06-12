@@ -18,7 +18,7 @@ const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
 };
 
-function StripeCheckoutForm({ amount, vendorName, invoiceNumber, onSuccess, onError }) {
+function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -34,6 +34,7 @@ function StripeCheckoutForm({ amount, vendorName, invoiceNumber, onSuccess, onEr
     try {
       // 1. Create PaymentIntent (via edge function or mock)
       const { clientSecret, isMock } = await createPaymentIntent(amount, 'usd', {
+        invoice_id: invoiceId,
         vendor_name: vendorName,
         invoice_number: invoiceNumber,
       });
@@ -108,7 +109,7 @@ function StripeCheckoutForm({ amount, vendorName, invoiceNumber, onSuccess, onEr
   );
 }
 
-export default function StripePaymentForm({ amount, vendorName, invoiceNumber, onSuccess, onError }) {
+export default function StripePaymentForm({ amount, invoiceId, vendorName, invoiceNumber, onSuccess, onError }) {
   const stripePromise = getStripe();
 
   if (!stripePromise) {
@@ -127,6 +128,7 @@ export default function StripePaymentForm({ amount, vendorName, invoiceNumber, o
     <Elements stripe={stripePromise}>
       <StripeCheckoutForm
         amount={amount}
+        invoiceId={invoiceId}
         vendorName={vendorName}
         invoiceNumber={invoiceNumber}
         onSuccess={onSuccess}

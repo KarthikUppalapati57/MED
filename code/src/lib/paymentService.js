@@ -22,7 +22,7 @@ export function getStripe() {
 
 /**
  * Create a PaymentIntent via Supabase Edge Function.
- * Falls back to mock for development if no edge function exists.
+ * Local development can opt into a mock fallback, but production must fail loudly.
  */
 export async function createPaymentIntent(amount, currency = 'usd', metadata = {}) {
   try {
@@ -43,15 +43,16 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
 
     return data; // { clientSecret }
   } catch (err) {
-    // Only mock if the edge function is completely unreachable (e.g. local dev without Supabase)
-    if (err.message?.includes('FunctionsFetchError') || err.message?.includes('Failed to fetch')) {
+    const allowDevMock = !import.meta.env.PROD && import.meta.env.VITE_ALLOW_MOCK_PAYMENTS === 'true';
+    // Only mock in explicitly opted-in local development.
+    if (allowDevMock && (err.message?.includes('FunctionsFetchError') || err.message?.includes('Failed to fetch'))) {
       console.warn('[PaymentService] Edge function unreachable, using mock for dev:', err.message);
       return {
         clientSecret: `pi_mock_${Date.now()}_secret_mock`,
         isMock: true,
       };
     }
-    // Re-throw real Stripe errors so the UI can display them
+    // Re-throw real Stripe/function errors so the UI can display them.
     throw err;
   }
 }

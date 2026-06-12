@@ -164,6 +164,7 @@ export default function PaymentGatewayModal({
               <TabsContent value="stripe" className="mt-4">
                 <StripePaymentForm
                   amount={payment.amount}
+                  invoiceId={payment.invoice_id}
                   vendorName={payment.vendor_name}
                   invoiceNumber={payment.invoice_number}
                   onSuccess={handlePaymentSuccess}

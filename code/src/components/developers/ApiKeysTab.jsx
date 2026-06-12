@@ -25,7 +25,7 @@ export default function ApiKeysTab() {
     setLoading(true);
     const { data, error } = await supabase
       .from('api_keys')
-      .select('*')
+      .select('id, organization_id, name, prefix, last_used_at, created_at')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
     
@@ -37,41 +37,28 @@ export default function ApiKeysTab() {
     setLoading(false);
   }
 
-  // NOTE: In a real app, API key generation should be done server-side 
-  // via an Edge Function so the secret key isn't hashed on the client. 
-  // For this V1 implementation demo, we simulate it.
   async function handleGenerateKey() {
     if (!newKeyName.trim()) return toast.error("Please enter a key name");
 
-    const rawKey = `sk_live_${crypto.randomUUID().replace(/-/g, '')}`;
-    const prefix = rawKey.substring(0, 12);
-    
-    // Hash key using Web Crypto API
-    const encoder = new TextEncoder();
-    const data = encoder.encode(rawKey);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const keyHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    const { error } = await supabase.from('api_keys').insert({
-      organization_id: organizationId,
-      name: newKeyName,
-      prefix,
-      key_hash: keyHash
+    const { data, error } = await supabase.functions.invoke('create-api-key', {
+      body: {
+        name: newKeyName,
+        organization_id: organizationId,
+      },
     });
 
-    if (error) {
-      toast.error("Failed to create API key");
+    if (error || data?.error) {
+      toast.error(data?.error || error?.message || "Failed to create API key");
       return;
     }
 
-    setGeneratedKey(rawKey);
+    setGeneratedKey(data.apiKey);
     setNewKeyName('');
     fetchKeys();
   }
 
   async function handleRevoke(id) {
-    const { error } = await supabase.from('api_keys').delete().eq('id', id);
+    const { error } = await supabase.from('api_keys').delete().eq('id', id).eq('organization_id', organizationId);
     if (error) toast.error("Failed to revoke key");
     else {
       toast.success("API key revoked");
