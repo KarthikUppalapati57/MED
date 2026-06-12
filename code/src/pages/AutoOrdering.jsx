@@ -55,7 +55,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { receiveOrderWorkflow } from '@/lib/workflowService';
+import {
+  approveInvoiceWorkflow,
+  completeTransferWorkflow,
+  createTransferWorkflow,
+  receiveOrderWorkflow,
+  sendOrderWorkflow,
+} from '@/lib/workflowService';
 
 const STATUS_COLORS = {
   pending_approval: 'bg-resend-orange/10 text-resend-orange',
@@ -78,6 +84,11 @@ export default function AutoOrdering() {
   const [newTransferOpen, setNewTransferOpen] = useState(false);
   const [receiveOrderOpen, setReceiveOrderOpen] = useState(false);
   const [receivingOrderId, setReceivingOrderId] = useState('');
+  const [transferForm, setTransferForm] = useState({
+    inventoryId: '',
+    toLocationId: '',
+    quantity: 1,
+  });
   const [orderSettings, setOrderSettings] = useState({
     requireManagerApproval: true,
     approvalThreshold: 500,
@@ -119,6 +130,20 @@ export default function AutoOrdering() {
   const { data: vendors = [] } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: locations = [] } = useAuthQuery({
+    queryKey: ['locations', organization?.id],
+    queryFn: () => api.entities.Location.list('name'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location: null }), [organization, brand]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: invoices = [] } = useAuthQuery({
+    queryKey: ['order-invoice-approval', organization?.id],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
@@ -197,20 +222,40 @@ export default function AutoOrdering() {
   });
 
   const createTransferMutation = useMutation({
-    mutationFn: () => api.entities.Transfer.create({
-      organization_id: organization?.id,
-      from_location_id: location?.id || null,
-      to_location_id: null,
-      status: 'pending',
-      items: [],
-      created_by: userProfile?.id || null,
+    mutationFn: () => {
+      const inventoryItem = inventory.find((item) => item.id === transferForm.inventoryId);
+      return createTransferWorkflow({
+        organizationId: organization?.id,
+        fromLocationId: location?.id || inventoryItem?.location_id || null,
+        toLocationId: transferForm.toLocationId,
+        inventoryItem,
+        quantity: transferForm.quantity,
+        userId: userProfile?.id || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transfers', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      toast.success('Transfer record created');
+      setNewTransferOpen(false);
+      setTransferForm({ inventoryId: '', toLocationId: '', quantity: 1 });
+    },
+    onError: (error) => toast.error(error.message || 'Failed to create transfer'),
+  });
+
+  const completeTransferMutation = useMutation({
+    mutationFn: (transfer) => completeTransferWorkflow({
+      transfer,
+      inventoryRecords: inventory,
+      userId: userProfile?.id || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transfers', organization?.id] });
-      toast.success('Transfer record created');
-      setNewTransferOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
+      toast.success('Transfer completed and inventory moved');
     },
-    onError: (error) => toast.error(error.message || 'Failed to create transfer'),
+    onError: (error) => toast.error(error.message || 'Failed to complete transfer'),
   });
 
   const createReceivingMutation = useMutation({
@@ -346,7 +391,9 @@ export default function AutoOrdering() {
       id: order.id,
       data: { 
         status: 'approved',
-        approved_date: new Date().toISOString()
+        approved_date: new Date().toISOString(),
+        last_workflow_step: 'approved',
+        invoice_status: 'not_matched',
       }
     });
     toast.success('Order approved');
@@ -363,16 +410,14 @@ export default function AutoOrdering() {
   const handleSendOrder = async () => {
     if (!selectedOrder) return;
 
-    await updateMutation.mutateAsync({
-      id: selectedOrder.id,
-      data: { 
-        status: 'sent',
-        sent_via: sendMethod
-      }
+    await sendOrderWorkflow({
+      order: selectedOrder,
+      sendMethod,
+      userId: userProfile?.id || null,
     });
+    queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
 
-    // In real app, would send email/WhatsApp to vendor
-    toast.success(`Order sent via ${sendMethod}`);
+    toast.success(`Order queued for vendor via ${sendMethod}`);
     setSendDialogOpen(false);
     setSelectedOrder(null);
   };
@@ -414,6 +459,50 @@ export default function AutoOrdering() {
 
   const pendingOrders = React.useMemo(() => orders.filter(o => o.status === 'pending_approval'), [orders]);
   const approvedOrders = React.useMemo(() => orders.filter(o => o.status === 'approved'), [orders]);
+  const invoiceApprovalRows = React.useMemo(() => {
+    const candidateInvoices = invoices.filter((invoice) =>
+      ['pending_review', 'validated', 'flagged'].includes(invoice.status || 'pending_review')
+    );
+
+    return candidateInvoices.map((invoice) => {
+      const vendorName = (invoice.vendor_name || '').toLowerCase();
+      const order = orders.find((item) =>
+        item.id === invoice.purchase_order_id ||
+        item.id === invoice.matched_order_id ||
+        item.order_number === invoice.po_number ||
+        (
+          vendorName &&
+          item.vendor_name?.toLowerCase() === vendorName &&
+          ['sent', 'received', 'partially_received'].includes(item.status)
+        )
+      );
+      const poTotal = Number(order?.total_amount || 0);
+      const invoiceTotal = Number(invoice.total_amount || 0);
+      const variance = order ? invoiceTotal - poTotal : null;
+      const receipt = order ? receivings.find((item) => item.order_id === order.id) : null;
+      const matchStatus = !order
+        ? 'unmatched'
+        : receipt
+          ? Math.abs(variance || 0) <= Math.max(5, poTotal * 0.05) ? 'matched' : 'variance'
+          : 'missing_receipt';
+      return { invoice, order, receipt, variance, matchStatus };
+    });
+  }, [invoices, orders, receivings]);
+
+  const approveInvoiceMutation = useMutation({
+    mutationFn: ({ invoice, order }) => approveInvoiceWorkflow({
+      invoice,
+      order,
+      userId: userProfile?.id || null,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order-invoice-approval', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      toast.success('Invoice approved and ledger bill created');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to approve invoice'),
+  });
 
   return (
     <div className="space-y-6">
@@ -461,6 +550,7 @@ export default function AutoOrdering() {
                     <TableHead>Items</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -745,22 +835,49 @@ export default function AutoOrdering() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.filter(o => o.status === 'sent' || o.status === 'received').length === 0 ? (
+                  {invoiceApprovalRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        No invoices pending approval. Invoices will appear here once orders are sent and invoices received.
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        No invoices pending approval. Uploaded invoices will appear here when they are ready to match against purchase orders and receiving logs.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    orders.filter(o => o.status === 'sent' || o.status === 'received').map(order => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-mono text-sm">INV-{order.order_number?.replace('ORD-', '')}</TableCell>
-                        <TableCell className="font-medium">{order.vendor_name}</TableCell>
-                        <TableCell className="font-mono text-sm">{order.order_number}</TableCell>
-                        <TableCell className="font-semibold">${order.total_amount?.toFixed(2)}</TableCell>
-                        <TableCell>${order.total_amount?.toFixed(2)}</TableCell>
-                        <TableCell><Badge className="bg-resend-green/10 text-resend-green">$0.00</Badge></TableCell>
-                        <TableCell><Badge className="bg-resend-yellow/10 text-resend-yellow">Pending Review</Badge></TableCell>
+                    invoiceApprovalRows.map(({ invoice, order, receipt, variance, matchStatus }) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-mono text-sm">{invoice.invoice_number || invoice.id.slice(0, 8)}</TableCell>
+                        <TableCell className="font-medium">{invoice.vendor_name || order?.vendor_name || 'Vendor'}</TableCell>
+                        <TableCell className="font-mono text-sm">{order?.order_number || 'Unmatched'}</TableCell>
+                        <TableCell className="font-semibold">${Number(invoice.total_amount || 0).toFixed(2)}</TableCell>
+                        <TableCell>{order ? `$${Number(order.total_amount || 0).toFixed(2)}` : '-'}</TableCell>
+                        <TableCell>
+                          {variance == null ? (
+                            <Badge variant="secondary">No PO</Badge>
+                          ) : (
+                            <Badge className={Math.abs(variance) <= Math.max(5, Number(order?.total_amount || 0) * 0.05) ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-orange/10 text-resend-orange'}>
+                              ${variance.toFixed(2)}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={
+                            matchStatus === 'matched' ? 'bg-resend-green/10 text-resend-green' :
+                            matchStatus === 'variance' ? 'bg-resend-orange/10 text-resend-orange' :
+                            'bg-resend-yellow/10 text-resend-yellow'
+                          }>
+                            {matchStatus.replace(/_/g, ' ')}
+                          </Badge>
+                          {receipt && <span className="ml-2 text-xs text-muted-foreground">Receipt logged</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant={matchStatus === 'matched' ? 'default' : 'outline'}
+                            disabled={approveInvoiceMutation.isPending || matchStatus === 'unmatched'}
+                            onClick={() => approveInvoiceMutation.mutate({ invoice, order })}
+                          >
+                            Approve
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -892,23 +1009,36 @@ export default function AutoOrdering() {
                     <TableHead>Items</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {transfers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No active transfers.
                       </TableCell>
                     </TableRow>
                   ) : transfers.map((transfer) => (
                     <TableRow key={transfer.id}>
                       <TableCell className="font-mono text-xs">{transfer.id.slice(0, 8)}</TableCell>
-                      <TableCell>{transfer.from_location_id || 'Current location'}</TableCell>
-                      <TableCell>{transfer.to_location_id || 'Not assigned'}</TableCell>
-                      <TableCell>{transfer.items?.length || 0}</TableCell>
+                      <TableCell>{locations.find((item) => item.id === transfer.from_location_id)?.name || transfer.from_location_id || 'Current location'}</TableCell>
+                      <TableCell>{locations.find((item) => item.id === transfer.to_location_id)?.name || transfer.to_location_id || 'Not assigned'}</TableCell>
+                      <TableCell>{(transfer.items || []).map((item) => `${item.product_name || 'Item'} x ${item.quantity}`).join(', ') || 'No items'}</TableCell>
                       <TableCell><Badge variant="secondary">{transfer.status}</Badge></TableCell>
-                      <TableCell>{transfer.created_at ? new Date(transfer.created_at).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell>{transfer.created_at ? new Date(transfer.created_at).toLocaleDateString() : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        {transfer.status !== 'completed' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={completeTransferMutation.isPending}
+                            onClick={() => completeTransferMutation.mutate(transfer)}
+                          >
+                            Complete
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1062,11 +1192,53 @@ export default function AutoOrdering() {
             <DialogTitle>New Internal Transfer</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Create a pending transfer record for this location. Add item-level routing from the transfer queue.</p>
+            <p className="text-sm text-muted-foreground">Select the item, quantity, and destination location. Completing the transfer will write inventory movements at both locations.</p>
+            <Select
+              value={transferForm.inventoryId}
+              onValueChange={(value) => setTransferForm((prev) => ({ ...prev, inventoryId: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select inventory item" />
+              </SelectTrigger>
+              <SelectContent>
+                {inventory.filter((item) => Number(item.current_quantity || 0) > 0).map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.product_name} - {Number(item.current_quantity || 0)} {item.current_unit || 'ea'} available
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={transferForm.quantity}
+              onChange={(event) => setTransferForm((prev) => ({ ...prev, quantity: Number(event.target.value) || 0 }))}
+              placeholder="Quantity"
+            />
+            <Select
+              value={transferForm.toLocationId}
+              onValueChange={(value) => setTransferForm((prev) => ({ ...prev, toLocationId: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Destination location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.filter((item) => item.id !== location?.id).map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTransferOpen(false)}>Cancel</Button>
-            <Button className="bg-primary hover:bg-primary text-primary-foreground" disabled={createTransferMutation.isPending} onClick={() => createTransferMutation.mutate()}>
+            <Button
+              className="bg-primary hover:bg-primary text-primary-foreground"
+              disabled={createTransferMutation.isPending || !transferForm.inventoryId || !transferForm.toLocationId || Number(transferForm.quantity || 0) <= 0}
+              onClick={() => createTransferMutation.mutate()}
+            >
               {createTransferMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Initiate Transfer
             </Button>

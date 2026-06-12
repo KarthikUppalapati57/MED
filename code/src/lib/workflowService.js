@@ -1,4 +1,5 @@
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 
 const itemKey = (item) => (
   item.product_id ||
@@ -54,6 +55,69 @@ export async function ensureLedgerBill(invoice, { status = 'pending' } = {}) {
   }
 
   return api.entities.LedgerBill.create(payload);
+}
+
+export async function emitWorkflowEvent(eventName, entityType, entityId, payload = {}) {
+  try {
+    await supabase.rpc('log_frontend_event', {
+      p_event_name: eventName,
+      p_entity_type: entityType,
+      p_entity_id: entityId || null,
+      p_payload: payload,
+    });
+  } catch (error) {
+    console.warn('Workflow event logging skipped:', error);
+  }
+}
+
+export async function sendOrderWorkflow({ order, sendMethod = 'email', userId }) {
+  if (!order?.id) throw new Error('Select an order to send.');
+
+  const sentAt = new Date().toISOString();
+  const payload = {
+    status: 'sent',
+    sent_via: sendMethod,
+    sent_at: sentAt,
+    delivery_status: 'queued',
+    last_workflow_step: 'sent_to_vendor',
+  };
+
+  const updatedOrder = await api.entities.AutoOrder.update(order.id, payload);
+
+  await Promise.allSettled([
+    api.entities.ProcessingJob.create({
+      organization_id: order.organization_id,
+      job_type: 'send_purchase_order',
+      status: 'pending',
+      source_type: 'auto_order',
+      source_id: order.id,
+      payload: {
+        order_number: order.order_number,
+        vendor_name: order.vendor_name,
+        send_method: sendMethod,
+        total_amount: order.total_amount,
+      },
+      created_by: userId || null,
+    }),
+    api.entities.Notification.create({
+      organization_id: order.organization_id,
+      user_id: userId || null,
+      title: 'Purchase order sent',
+      message: `${order.order_number || 'Order'} was queued for ${order.vendor_name || 'the vendor'} via ${sendMethod}.`,
+      body: `${order.order_number || 'Order'} was queued for ${order.vendor_name || 'the vendor'} via ${sendMethod}.`,
+      type: 'order',
+      metadata: { order_id: order.id, send_method: sendMethod },
+      is_read: false,
+      read: false,
+    }),
+    emitWorkflowEvent('order.sent', 'auto_order', order.id, {
+      order_number: order.order_number,
+      vendor_name: order.vendor_name,
+      send_method: sendMethod,
+    }),
+  ]);
+
+  return updatedOrder;
 }
 
 export async function recordPaymentLedger({ invoice, paymentRecord, userId }) {
@@ -136,6 +200,8 @@ export async function receiveOrderWorkflow({
 
   await api.entities.AutoOrder.update(order.id, {
     status: orderStatus,
+    received_at: new Date().toISOString(),
+    last_workflow_step: hasDiscrepancy ? 'receiving_discrepancy' : 'received',
   });
 
   const inventory = await api.entities.Inventory.list();
@@ -214,5 +280,205 @@ export async function receiveOrderWorkflow({
     });
   }));
 
+  await Promise.allSettled([
+    api.entities.Notification.create({
+      organization_id: orgId,
+      user_id: userId || null,
+      title: hasDiscrepancy ? 'Receiving discrepancy' : 'Order received',
+      message: `${order.order_number || 'Order'} was ${hasDiscrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
+      body: `${order.order_number || 'Order'} was ${hasDiscrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
+      type: 'inventory',
+      metadata: { order_id: order.id, receiving_id: receiving.id, has_discrepancy: hasDiscrepancy },
+      is_read: false,
+      read: false,
+    }),
+    emitWorkflowEvent(hasDiscrepancy ? 'order.receiving_discrepancy' : 'order.received', 'receiving', receiving.id, {
+      order_id: order.id,
+      order_number: order.order_number,
+      has_discrepancy: hasDiscrepancy,
+    }),
+  ]);
+
   return { receiving, orderStatus, receivingStatus, hasDiscrepancy };
+}
+
+export async function createTransferWorkflow({
+  organizationId,
+  fromLocationId,
+  toLocationId,
+  inventoryItem,
+  quantity,
+  userId,
+}) {
+  if (!organizationId) throw new Error('Organization is required.');
+  if (!inventoryItem?.id) throw new Error('Select an inventory item.');
+  if (!toLocationId) throw new Error('Select a destination location.');
+  const transferQuantity = Number(quantity || 0);
+  if (transferQuantity <= 0) throw new Error('Transfer quantity must be greater than zero.');
+  if (Number(inventoryItem.current_quantity || 0) < transferQuantity) {
+    throw new Error('Transfer quantity exceeds available stock.');
+  }
+
+  const transfer = await api.entities.Transfer.create({
+    organization_id: organizationId,
+    from_location_id: fromLocationId || inventoryItem.location_id || null,
+    to_location_id: toLocationId,
+    status: 'pending',
+    items: [{
+      inventory_id: inventoryItem.id,
+      product_id: inventoryItem.product_id || null,
+      product_name: inventoryItem.product_name,
+      quantity: transferQuantity,
+      unit: inventoryItem.current_unit || 'ea',
+      unit_cost: Number(inventoryItem.unit_cost || 0),
+    }],
+    created_by: userId || null,
+  });
+
+  await emitWorkflowEvent('transfer.created', 'transfer', transfer.id, {
+    from_location_id: fromLocationId || inventoryItem.location_id || null,
+    to_location_id: toLocationId,
+    items: transfer.items,
+  });
+
+  return transfer;
+}
+
+export async function completeTransferWorkflow({ transfer, inventoryRecords = [], userId }) {
+  if (!transfer?.id) throw new Error('Select a transfer to complete.');
+  if (!['pending', 'in_transit'].includes(transfer.status)) return transfer;
+
+  const items = transfer.items || [];
+  await Promise.all(items.map(async (item) => {
+    const source = inventoryRecords.find((record) => record.id === item.inventory_id);
+    if (!source) return;
+
+    const quantity = Number(item.quantity || 0);
+    const previousSourceQty = Number(source.current_quantity || 0);
+    const newSourceQty = Math.max(0, previousSourceQty - quantity);
+
+    await api.entities.Inventory.update(source.id, {
+      current_quantity: newSourceQty,
+      current_value: newSourceQty * Number(source.unit_cost || item.unit_cost || 0),
+      previous_quantity: previousSourceQty,
+      previous_value: source.current_value || 0,
+    });
+
+    await api.entities.InventoryMovement.create({
+      organization_id: transfer.organization_id,
+      location_id: transfer.from_location_id || source.location_id || null,
+      inventory_id: source.id,
+      movement_type: 'transfer_out',
+      quantity: -quantity,
+      source_type: 'transfer',
+      source_id: transfer.id,
+      previous_quantity: previousSourceQty,
+      new_quantity: newSourceQty,
+      created_by: userId || null,
+    });
+
+    const destination = inventoryRecords.find((record) =>
+      record.location_id === transfer.to_location_id &&
+      ((record.product_id && record.product_id === source.product_id) ||
+       record.product_name?.toLowerCase() === source.product_name?.toLowerCase())
+    );
+
+    if (destination) {
+      const previousDestinationQty = Number(destination.current_quantity || 0);
+      const newDestinationQty = previousDestinationQty + quantity;
+      await api.entities.Inventory.update(destination.id, {
+        current_quantity: newDestinationQty,
+        current_unit: destination.current_unit || source.current_unit || item.unit || 'ea',
+        unit_cost: Number(source.unit_cost || item.unit_cost || destination.unit_cost || 0),
+        current_value: newDestinationQty * Number(source.unit_cost || item.unit_cost || destination.unit_cost || 0),
+        previous_quantity: previousDestinationQty,
+        previous_value: destination.current_value || 0,
+      });
+      await api.entities.InventoryMovement.create({
+        organization_id: transfer.organization_id,
+        location_id: transfer.to_location_id,
+        inventory_id: destination.id,
+        movement_type: 'transfer_in',
+        quantity,
+        source_type: 'transfer',
+        source_id: transfer.id,
+        previous_quantity: previousDestinationQty,
+        new_quantity: newDestinationQty,
+        created_by: userId || null,
+      });
+      return;
+    }
+
+    const created = await api.entities.Inventory.create({
+      organization_id: transfer.organization_id,
+      location_id: transfer.to_location_id,
+      product_id: source.product_id || item.product_id || `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      product_name: source.product_name || item.product_name,
+      current_quantity: quantity,
+      current_unit: source.current_unit || item.unit || 'ea',
+      unit_cost: Number(source.unit_cost || item.unit_cost || 0),
+      current_value: quantity * Number(source.unit_cost || item.unit_cost || 0),
+      accounting_category: source.accounting_category || 'food',
+      par_level: source.par_level || 0,
+      reorder_point: source.reorder_point || 0,
+      previous_quantity: 0,
+      previous_value: 0,
+      location: '',
+    });
+
+    await api.entities.InventoryMovement.create({
+      organization_id: transfer.organization_id,
+      location_id: transfer.to_location_id,
+      inventory_id: created.id,
+      movement_type: 'transfer_in',
+      quantity,
+      source_type: 'transfer',
+      source_id: transfer.id,
+      previous_quantity: 0,
+      new_quantity: quantity,
+      created_by: userId || null,
+    });
+  }));
+
+  const updatedTransfer = await api.entities.Transfer.update(transfer.id, {
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+    completed_by: userId || null,
+  });
+
+  await emitWorkflowEvent('transfer.completed', 'transfer', transfer.id, {
+    from_location_id: transfer.from_location_id,
+    to_location_id: transfer.to_location_id,
+    items,
+  });
+
+  return updatedTransfer;
+}
+
+export async function approveInvoiceWorkflow({ invoice, order, userId }) {
+  if (!invoice?.id) throw new Error('Select an invoice to approve.');
+  const approvedInvoice = await api.entities.Invoice.update(invoice.id, {
+    status: 'approved',
+    approved_by: userId || null,
+    approved_date: new Date().toISOString(),
+    purchase_order_id: order?.id || invoice.purchase_order_id || null,
+    matched_order_id: order?.id || invoice.matched_order_id || null,
+    match_status: order ? 'matched' : invoice.match_status || 'manual_approval',
+  });
+
+  await ensureLedgerBill(approvedInvoice, { status: 'pending' });
+
+  await Promise.allSettled([
+    order?.id ? api.entities.AutoOrder.update(order.id, {
+      invoice_status: 'approved',
+      last_workflow_step: 'invoice_approved',
+    }) : Promise.resolve(),
+    emitWorkflowEvent('invoice.approved', 'invoice', invoice.id, {
+      invoice_number: invoice.invoice_number,
+      order_id: order?.id || null,
+      match_status: order ? 'matched' : 'manual_approval',
+    }),
+  ]);
+
+  return approvedInvoice;
 }

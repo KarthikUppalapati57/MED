@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ArrowUpRight, ArrowDownRight, DollarSign, TrendingUp, TrendingDown, AlertTriangle, ArrowRight, Package, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
+import { toast } from "sonner";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell, LineChart, Line
@@ -18,8 +22,13 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function Performance() {
   const [activeTab, setActiveTab] = useState('sales');
+  const [budgetDrafts, setBudgetDrafts] = useState({});
+  const queryClient = useQueryClient();
 
-  const { organization, brand, location } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
   const { data: rawSalesData } = useAuthQuery({
     queryKey: ['pos_sales_data', organization?.id],
@@ -45,8 +54,50 @@ export default function Performance() {
   });
   const invoices = rawInvoices || [];
 
+  const { data: rawBudgetTargets } = useAuthQuery({
+    queryKey: ['budget_targets', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
+    queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
+      .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
+    enabled: !!organization?.id,
+  });
+  const budgetTargets = rawBudgetTargets || [];
+  const budgetByCategory = React.useMemo(() => {
+    const map = {};
+    budgetTargets.forEach((target) => {
+      map[target.category] = target;
+    });
+    return map;
+  }, [budgetTargets]);
+
+  const saveBudgetTarget = useMutation({
+    mutationFn: async ({ category, targetAmount, targetPercent = null }) => {
+      const existing = budgetByCategory[category];
+      const payload = {
+        organization_id: organization?.id,
+        brand_id: brand?.id || null,
+        location_id: location?.id || null,
+        period_start: periodStart,
+        period_end: periodEnd,
+        category,
+        target_amount: Number(targetAmount || 0),
+        target_percent: targetPercent == null ? null : Number(targetPercent),
+        created_by: userProfile?.id || null,
+        updated_by: userProfile?.id || null,
+      };
+      if (existing) return api.entities.BudgetTarget.update(existing.id, payload);
+      return api.entities.BudgetTarget.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget_targets'] });
+      toast.success('Budget target saved');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to save budget target'),
+  });
+
   const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue || 0), 0);
-  const budget = totalSales > 0 ? totalSales * 0.95 : 0; 
+  const salesBudgetTarget = Number(budgetByCategory.Sales?.target_amount || 0);
+  const budget = salesBudgetTarget > 0 ? salesBudgetTarget : (totalSales > 0 ? totalSales * 0.95 : 0);
   const variance = budget > 0 ? ((totalSales - budget) / budget) * 100 : 0;
 
   // Real Sales Trend Data (by day of week from actual sales)
@@ -59,7 +110,7 @@ export default function Performance() {
       const dayName = days[d.getDay()];
       const rev = Number(sale.revenue || 0);
       trendMap[dayName].actual += rev;
-      trendMap[dayName].budget += rev * 0.95; 
+      trendMap[dayName].budget += budget > 0 ? budget / 7 : rev * 0.95; 
       trendMap[dayName].forecast += rev * 1.05;
     }
   });
@@ -81,13 +132,17 @@ export default function Performance() {
 
   // Real Controllable P&L
   const totalCogs = invoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+  const getTarget = (category, fallback) => Number(budgetByCategory[category]?.target_amount || fallback || 0);
   const pnlData = [
-    { category: 'Sales', actual: totalSales, budget: budget, variance: budget > 0 ? ((totalSales - budget) / budget) * 100 : 0 },
-    { category: 'COGS', actual: totalCogs, budget: totalCogs * 0.95, variance: totalCogs > 0 ? ((totalCogs - (totalCogs * 0.95)) / (totalCogs * 0.95)) * 100 : 0 },
-    { category: 'Labor', actual: 0, budget: 0, variance: 0 },
-    { category: 'Controllables', actual: 0, budget: 0, variance: 0 },
-    { category: 'Prime Cost', actual: totalCogs + 0, budget: (totalCogs * 0.95) + 0, variance: totalCogs > 0 ? (((totalCogs) - (totalCogs * 0.95)) / (totalCogs * 0.95)) * 100 : 0 },
-  ];
+    { category: 'Sales', actual: totalSales, budget: getTarget('Sales', budget) },
+    { category: 'COGS', actual: totalCogs, budget: getTarget('COGS', totalCogs * 0.95) },
+    { category: 'Labor', actual: 0, budget: getTarget('Labor', 0) },
+    { category: 'Controllables', actual: 0, budget: getTarget('Controllables', 0) },
+    { category: 'Prime Cost', actual: totalCogs + 0, budget: getTarget('Prime Cost', totalCogs * 0.95) },
+  ].map((row) => ({
+    ...row,
+    variance: row.budget > 0 ? ((row.actual - row.budget) / row.budget) * 100 : 0,
+  }));
 
   // Real Price Movers (from invoices line items if available, or empty)
   const moversData = [];
@@ -209,6 +264,56 @@ export default function Performance() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="glass-card shadow-sm border-border/50">
+            <CardHeader>
+              <CardTitle>Budget Setup</CardTitle>
+              <CardDescription>Set current-period targets used by sales pacing and controllable P&L.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Current Target</TableHead>
+                    <TableHead>New Target</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['Sales', 'COGS', 'Labor', 'Controllables', 'Prime Cost'].map((category) => (
+                    <TableRow key={category}>
+                      <TableCell className="font-medium">{category}</TableCell>
+                      <TableCell>${Number(budgetByCategory[category]?.target_amount || 0).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="100"
+                          value={budgetDrafts[category] ?? budgetByCategory[category]?.target_amount ?? ''}
+                          onChange={(event) => setBudgetDrafts((prev) => ({ ...prev, [category]: event.target.value }))}
+                          className="max-w-40"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={saveBudgetTarget.isPending}
+                          onClick={() => saveBudgetTarget.mutate({
+                            category,
+                            targetAmount: budgetDrafts[category] ?? budgetByCategory[category]?.target_amount ?? 0,
+                          })}
+                        >
+                          Save
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="pnl" className="space-y-6">

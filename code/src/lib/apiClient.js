@@ -101,6 +101,7 @@ export const api = {
     LedgerPayment: createEntityClient('ledger_payments', true),
     LedgerEntry: createEntityClient('ledger_entries'),
     AiInsight: createEntityClient('ai_insights'),
+    EventLog: createEntityClient('event_logs'),
     DomainEvent: createEntityClient('domain_events'),
     ProcessingJob: createEntityClient('processing_jobs'),
     Role: createEntityClient('roles'),
@@ -119,6 +120,7 @@ export const api = {
     GlMapping: createEntityClient('gl_mappings'),
     VendorItemPrice: createEntityClient('vendor_item_prices'),
     OperationalSetting: createEntityClient('operational_settings'),
+    BudgetTarget: createEntityClient('budget_targets'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
