@@ -1,7 +1,8 @@
-const CACHE_NAME = 'restops-cache-v3';
+const CACHE_NAME = 'restops-cache-v4';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/favicon.ico',
   '/favicon.png'
 ];
 
