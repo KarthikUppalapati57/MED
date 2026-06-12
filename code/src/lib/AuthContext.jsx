@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
-import { resetQueryCache, invalidateOrgScopedQueries, clearAllQueries } from '@/lib/query-client';
+import { clearAllQueries, removeOrgScopedQueries } from '@/lib/query-client';
 import { queryClientInstance } from '@/lib/query-client';
 import posthog from '@/lib/posthog';
 
@@ -763,8 +763,7 @@ export const AuthProvider = ({ children }) => {
         setCachedProfile(currentCache);
       }
 
- // Invalidate only org-scoped queries platform-level data is untouched
-      invalidateOrgScopedQueries();
+      removeOrgScopedQueries();
     } catch (err) {
       console.error('Failed to switch context:', err);
     }
@@ -778,7 +777,7 @@ export const AuthProvider = ({ children }) => {
       currentCache.organization_id = org?.id || null;
       setCachedProfile(currentCache);
     }
-    invalidateOrgScopedQueries();
+    removeOrgScopedQueries();
   }, []);
 
   const handleSetActiveBrand = useCallback((brand) => {
@@ -789,7 +788,7 @@ export const AuthProvider = ({ children }) => {
       currentCache.brand_id = brand?.id || null;
       setCachedProfile(currentCache);
     }
-    invalidateOrgScopedQueries();
+    removeOrgScopedQueries();
   }, []);
 
   const handleSetActiveLocation = useCallback((loc) => {
@@ -800,7 +799,7 @@ export const AuthProvider = ({ children }) => {
       currentCache.location_id = loc?.id || null;
       setCachedProfile(currentCache);
     }
-    invalidateOrgScopedQueries();
+    removeOrgScopedQueries();
   }, []);
 
   const unenrollMFA = useCallback(async (factorId) => {
@@ -815,6 +814,11 @@ export const AuthProvider = ({ children }) => {
     organization: activeOrg,
     brand: activeBrand,
     location: activeLocation,
+    contextScope: {
+      organizationId: activeOrg?.id || null,
+      brandId: activeBrand?.id || null,
+      locationId: activeLocation?.id || null,
+    },
     role,
     isAuthenticated,
     isLoadingAuth,

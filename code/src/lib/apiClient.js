@@ -1,5 +1,78 @@
 import { supabase } from '@/lib/supabaseClient';
 
+const TABLE_SCOPE_COLUMNS = {
+  accounting_sync_logs: ['organization_id'],
+  ai_insights: ['organization_id'],
+  auto_orders: ['organization_id', 'brand_id', 'location_id'],
+  budget_targets: ['organization_id', 'brand_id', 'location_id'],
+  closed_periods: ['organization_id'],
+  count_sessions: ['organization_id', 'location_id'],
+  count_sheets: ['organization_id', 'location_id'],
+  employees: ['organization_id', 'location_id'],
+  employee_shifts: ['organization_id', 'location_id'],
+  gl_mappings: ['organization_id'],
+  integrations: ['organization_id'],
+  inventory: ['organization_id', 'brand_id', 'location_id'],
+  inventory_movements: ['organization_id', 'location_id'],
+  invoices: ['organization_id', 'brand_id', 'location_id'],
+  invoice_line_items: ['organization_id'],
+  ledger_bills: ['organization_id'],
+  ledger_entries: ['organization_id'],
+  ledger_payments: ['organization_id'],
+  operational_settings: ['organization_id', 'brand_id', 'location_id'],
+  payments: ['organization_id', 'brand_id', 'location_id'],
+  pos_items: ['organization_id', 'location_id'],
+  pos_menu_mapping: ['organization_id'],
+  pos_sales_data: ['organization_id', 'location_id'],
+  products: ['organization_id', 'brand_id', 'location_id'],
+  purchase_cards: ['organization_id', 'brand_id', 'location_id'],
+  purchase_card_transactions: ['organization_id', 'brand_id', 'location_id'],
+  purchase_orders: ['organization_id', 'location_id'],
+  receivings: ['organization_id'],
+  recipes: ['organization_id', 'brand_id', 'location_id'],
+  recipe_ingredients: ['organization_id'],
+  smart_prep_plans: ['organization_id', 'brand_id', 'location_id'],
+  vendors: ['organization_id', 'brand_id', 'location_id'],
+  vendor_item_prices: ['organization_id'],
+  wastage_logs: ['organization_id', 'brand_id', 'location_id'],
+};
+
+function getCachedContextScope() {
+  if (typeof sessionStorage === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem('restops_profile_cache');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return {
+      organization_id: parsed.organization_id || parsed.organization?.id || null,
+      brand_id: parsed.brand_id || parsed.brand?.id || null,
+      location_id: parsed.location_id || parsed.location?.id || null,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function withActiveScope(table, conditions = {}) {
+  const allowedScopeColumns = TABLE_SCOPE_COLUMNS[table];
+  if (!allowedScopeColumns) return conditions || {};
+
+  const scoped = { ...(conditions || {}) };
+  const currentScope = getCachedContextScope();
+
+  if (allowedScopeColumns.includes('organization_id') && !('organization_id' in scoped) && currentScope.organization_id) {
+    scoped.organization_id = currentScope.organization_id;
+  }
+  if (allowedScopeColumns.includes('brand_id') && !('brand_id' in scoped) && currentScope.brand_id) {
+    scoped.brand_id = currentScope.brand_id;
+  }
+  if (allowedScopeColumns.includes('location_id') && !('location_id' in scoped) && currentScope.location_id) {
+    scoped.location_id = currentScope.location_id;
+  }
+
+  return scoped;
+}
+
 const createEntityClient = (table, useSoftDelete = false) => ({
   get: async (id) => {
     let query = supabase.from(table).select('*').eq('id', id);
@@ -32,7 +105,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
-    Object.entries(conditions || {}).forEach(([key, value]) => {
+    Object.entries(withActiveScope(table, conditions)).forEach(([key, value]) => {
       query = query.eq(key, value);
     });
     const { data, error } = await query;

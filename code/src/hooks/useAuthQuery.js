@@ -23,7 +23,7 @@ import { useAuth } from '@/lib/AuthContext';
  * });
  */
 export function useAuthQuery(options) {
-  const { user, isLoadingAuth } = useAuth();
+  const { user, isLoadingAuth, contextScope } = useAuth();
 
   // Only enable the query when:
   // 1. Auth initialization is complete (isLoadingAuth === false)
@@ -31,16 +31,32 @@ export function useAuthQuery(options) {
   // This ensures the Supabase client has a valid JWT before any DB query fires.
   const authReady = !isLoadingAuth && !!user;
 
+  const scopeAware = options.scopeAware !== false;
+  const scopedQueryKey = scopeAware
+    ? [
+        ...options.queryKey,
+        {
+          scope: {
+            organizationId: contextScope?.organizationId || null,
+            brandId: contextScope?.brandId || null,
+            locationId: contextScope?.locationId || null,
+          },
+        },
+      ]
+    : options.queryKey;
+
+  const queryOptions = { ...options };
+  delete queryOptions.scopeAware;
+
   return useQuery({
-    ...options,
+    ...queryOptions,
+    queryKey: scopedQueryKey,
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
  // Keep data in cache for 5 minutes prevents re-fetching on every page
     // navigation or component re-mount. Realtime subscriptions handle live updates.
     staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
     // Keep unused data in cache for 10 minutes so navigating back is instant
     gcTime: options.gcTime ?? 10 * 60 * 1000, // 10 minutes
-    // Ensure that when data is refetching in the background (e.g. via realtime),
-    // we keep the previous data on screen instead of flashing a loader.
-    placeholderData: options.placeholderData ?? ((prev) => prev),
+    placeholderData: options.placeholderData,
   });
 }

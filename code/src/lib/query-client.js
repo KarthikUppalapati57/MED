@@ -38,6 +38,19 @@ export function invalidateOrgScopedQueries() {
 }
 
 /**
+ * Remove org-scoped cached data entirely.
+ * Used on org/brand/location switches so old tenant/scope data cannot remain visible.
+ */
+export function removeOrgScopedQueries() {
+	queryClientInstance.removeQueries({
+		predicate: (query) => {
+			const key = query.queryKey[0];
+			return typeof key === 'string' && !PLATFORM_QUERY_PREFIXES.has(key);
+		},
+	});
+}
+
+/**
  * Completely clear all cached data and force re-fetch everything.
  * Only use on logout / sign-out to prevent data leaks.
  */
