@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,10 @@ import {
 export default function InvoiceEditor({ invoice, onChange }) {
 
 
+  const paidDetection = invoice.validation_results?.paid_status_detection;
+  const hasPaidDetection = paidDetection?.detected;
+  const isHighConfidencePaid = paidDetection?.should_mark_paid;
+
   const recalculateTotals = (items, currentInvoice) => {
     const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.extended_price) || 0), 0);
     const totalAmount = subtotal +
@@ -35,7 +39,20 @@ export default function InvoiceEditor({ invoice, onChange }) {
   };
 
   const handleFieldChange = (field, value) => {
-    const updated = { ...invoice, [field]: value };
+    let updated = { ...invoice, [field]: value };
+    if (field === 'payment_status' && invoice.validation_results?.paid_status_detection) {
+      updated = {
+        ...updated,
+        validation_results: {
+          ...invoice.validation_results,
+          paid_status_detection: {
+            ...invoice.validation_results.paid_status_detection,
+            reviewed_by_user: true,
+            user_selected_status: value,
+          },
+        },
+      };
+    }
     // Recalculate total when fee fields change
     if (['tax_amount', 'fuel_surcharge', 'delivery_fee', 'other_charges'].includes(field)) {
       const totals = recalculateTotals(updated.line_items || [], updated);
@@ -94,6 +111,34 @@ export default function InvoiceEditor({ invoice, onChange }) {
           <CardTitle className="text-lg">Invoice Details</CardTitle>
         </CardHeader>
         <CardContent>
+          {hasPaidDetection && (
+            <div className={`mb-4 rounded-lg border p-3 text-sm ${
+              isHighConfidencePaid
+                ? 'border-green-200 bg-green-50 text-green-800'
+                : 'border-yellow-200 bg-yellow-50 text-yellow-800'
+            }`}>
+              <div className="flex items-start gap-2">
+                {isHighConfidencePaid ? (
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                )}
+                <div>
+                  <p className="font-semibold">
+                    {isHighConfidencePaid ? 'Paid stamp detected' : 'Possible paid invoice detected'}
+                  </p>
+                  <p className="mt-1">
+                    {isHighConfidencePaid
+                      ? 'Payment Status was set to Paid. Confirm this before approving.'
+                      : 'Review the invoice image/text before marking this paid.'}
+                  </p>
+                  {paidDetection.reviewed_by_user && (
+                    <p className="mt-1 text-xs font-medium">Reviewer confirmed payment status: {paidDetection.user_selected_status}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Vendor Name</Label>

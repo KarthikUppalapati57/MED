@@ -264,7 +264,7 @@ export default function Payments() {
 
   const handleConfirmBankTransfer = async (payment) => {
     try {
-      await confirmBankTransfer(payment.id);
+      const confirmedPayment = await confirmBankTransfer(payment.id);
       // Also update invoice to paid
       if (payment.invoice_id) {
         const fileDestination = await getVendorFileDestination(payment.vendor_id);
@@ -277,7 +277,7 @@ export default function Payments() {
         if (invoice) {
           await recordPaymentLedger({
             invoice: { ...invoice, organization_id: invoice.organization_id || organization?.id },
-            paymentRecord: { ...payment, status: 'completed' },
+            paymentRecord: confirmedPayment || { ...payment, status: 'completed' },
             userId: userProfile?.id,
           });
         }

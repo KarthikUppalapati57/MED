@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -61,7 +61,7 @@ import InvoiceUploader from '../components/invoices/InvoiceUploader';
 import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
-import { ensureLedgerBill } from '@/lib/workflowService';
+import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 
 const statusColors = {
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
@@ -86,6 +86,7 @@ export default function Invoices() {
 
   const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const isHigherRole = ['org_owner', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
 
   // Resizing state
@@ -179,7 +180,7 @@ export default function Invoices() {
       ...invoiceData,
       status: invoiceData.status || 'pending_review',
       line_items: invoiceData.line_items || [],
-      validation_results: {},
+      validation_results: invoiceData.validation_results || {},
       organization_id: organization?.id || userProfile?.organization_id,
     };
 
@@ -322,6 +323,57 @@ export default function Invoices() {
     }
   };
 
+  const isPaidInvoice = (invoice) => ['paid', 'auto_pay'].includes(invoice?.payment_status) || invoice?.status === 'paid';
+
+  const finalizeApprovedInvoiceWorkflow = async (invoice) => {
+    await syncInvoiceToProductsAndInventory(invoice);
+
+    if (!isPaidInvoice(invoice)) {
+      await ensureLedgerBill(invoice, { status: 'pending' });
+      return { redirectedToPayments: false };
+    }
+
+    const paidInvoice = await api.entities.Invoice.update(invoice.id, {
+      status: 'paid',
+      payment_status: 'paid',
+    });
+
+    const existingPayments = await api.entities.Payment.filter({ invoice_id: invoice.id });
+    let paymentRecord = existingPayments.find((payment) => payment.status === 'completed');
+
+    if (!paymentRecord) {
+      paymentRecord = await api.entities.Payment.create({
+        invoice_id: invoice.id,
+        vendor_id: invoice.vendor_id || null,
+        vendor_name: invoice.vendor_name,
+        invoice_number: invoice.invoice_number,
+        amount: Number(invoice.total_amount || 0),
+        due_date: invoice.due_date || null,
+        organization_id: invoice.organization_id || organization?.id,
+        created_by: userProfile?.id || null,
+        status: 'completed',
+        payment_method: 'manual',
+        payment_date: invoice.payment_date || invoice.invoice_date || new Date().toISOString().slice(0, 10),
+        transaction_id: `paid-invoice-${invoice.id}`,
+        notes: 'Recorded from an uploaded invoice that was already paid before approval.',
+      });
+    }
+
+    await recordPaymentLedger({
+      invoice: {
+        ...invoice,
+        ...paidInvoice,
+        organization_id: invoice.organization_id || organization?.id,
+      },
+      paymentRecord,
+      userId: userProfile?.id,
+    });
+
+    queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
+    navigate(`/Payments?tab=history&invoice=${invoice.id}`);
+    return { redirectedToPayments: true };
+  };
+
   const handleInvoiceExtracted = (data) => {
     console.log('Invoices Page received extraction data:', data);
     setEditingInvoice(data);
@@ -344,10 +396,13 @@ export default function Invoices() {
       }
       
       if (savedInvoice.status === 'approved') {
-        await syncInvoiceToProductsAndInventory(savedInvoice);
-        await ensureLedgerBill(savedInvoice, { status: 'pending' });
+        const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice);
         posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
-        toast.success('Invoice approved & products/inventory updated');
+        toast.success(
+          approvalResult.redirectedToPayments
+            ? 'Paid invoice approved and sent to Bill Pay'
+            : 'Invoice approved & products/inventory updated'
+        );
       } else {
         posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
         
@@ -554,11 +609,14 @@ export default function Invoices() {
         id: invoice.id, 
         data: { status: 'approved', line_items: invoice.line_items }
       });
-      await syncInvoiceToProductsAndInventory(invoice);
-      await ensureLedgerBill(invoice, { status: 'pending' });
+      const approvalResult = await finalizeApprovedInvoiceWorkflow({ ...invoice, status: 'approved' });
       
       posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
-      toast.success('Invoice approved & products/inventory updated');
+      toast.success(
+        approvalResult.redirectedToPayments
+          ? 'Paid invoice approved and sent to Bill Pay'
+          : 'Invoice approved & products/inventory updated'
+      );
     } catch (err) {
       console.error('Approve failed:', err);
       toast.error(`Failed to approve invoice: ${err.message}`);
@@ -640,10 +698,13 @@ export default function Invoices() {
         savedInvoice = await createMutation.mutateAsync(data);
         setEditingInvoice(savedInvoice);
       }
-      await syncInvoiceToProductsAndInventory(savedInvoice);
-      await ensureLedgerBill(savedInvoice, { status: 'pending' });
+      const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice);
       posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
-      toast.success('Invoice approved — items staged for 24h review before finalizing in inventory');
+      toast.success(
+        approvalResult.redirectedToPayments
+          ? 'Paid invoice approved and sent to Bill Pay'
+          : 'Invoice approved - items staged for 24h review before finalizing in inventory'
+      );
 
       // Email the original uploader that their invoice was approved
       if (savedInvoice?.created_by) {

@@ -209,6 +209,7 @@ export default function ValidationDialog({
   const hasFailures = Object.values(results).some(r => r === 'fail');
   const hasWarnings = Object.values(results).some(r => r === 'warning');
   const allPassed = !hasFailures && !hasWarnings && !validating;
+  const paidDetection = invoice?.validation_results?.paid_status_detection;
 
   const handleApprove = () => {
     onSave({
@@ -262,6 +263,12 @@ export default function ValidationDialog({
               <ValidationCheck label="Fraud Detection" status={results.fraud_detection} />
               <ValidationCheck label="Price Deviation" status={results.price_deviation} />
               <ValidationCheck label="Delivery Match" status={results.delivery_match} />
+              {paidDetection?.detected && (
+                <ValidationCheck
+                  label={paidDetection.should_mark_paid ? 'Paid Stamp Detected' : 'Possible Paid Stamp'}
+                  status={paidDetection.should_mark_paid ? 'pass' : 'warning'}
+                />
+              )}
             </div>
 
             {!validating && (
@@ -308,6 +315,17 @@ export default function ValidationDialog({
                 <span className="text-slate-500">Total Amount</span>
                 <span className="font-bold text-slate-900">${invoice?.total_amount?.toLocaleString()}</span>
               </div>
+              {paidDetection?.detected && (
+                <div className={`rounded-lg border p-3 text-sm ${
+                  paidDetection.should_mark_paid
+                    ? 'bg-green-50 border-green-100 text-green-800'
+                    : 'bg-yellow-50 border-yellow-100 text-yellow-800'
+                }`}>
+                  {paidDetection.should_mark_paid
+                    ? 'Paid stamp detected. This invoice will be treated as paid after approval.'
+                    : 'Possible paid signal detected. Confirm Payment Status before approving.'}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -144,7 +144,11 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
         file_url: newFileUrl,
         source,
         status: 'pending_review',
+        payment_status: extractedData.payment_status || 'unpaid',
         extraction_method: extractedData.extraction_method || 'manual',
+        validation_results: {
+          paid_status_detection: extractedData.paid_status_detection || null,
+        },
         raw_text: extractedData.raw_text || '',
       };
 
