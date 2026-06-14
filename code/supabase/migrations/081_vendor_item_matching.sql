@@ -3,7 +3,8 @@
 
 BEGIN;
 
-CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS fuzzystrmatch WITH SCHEMA extensions;
 
 -- Vendor Aliases
 CREATE TABLE IF NOT EXISTS public.vendor_aliases (
@@ -50,23 +51,32 @@ ALTER TABLE public.vendor_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_item_mappings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Vendor aliases read" ON public.vendor_aliases;
 CREATE POLICY "Vendor aliases read" ON public.vendor_aliases FOR SELECT USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
+
+DROP POLICY IF EXISTS "Vendor aliases write" ON public.vendor_aliases;
 CREATE POLICY "Vendor aliases write" ON public.vendor_aliases FOR ALL USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
 
+DROP POLICY IF EXISTS "Vendor items read" ON public.vendor_items;
 CREATE POLICY "Vendor items read" ON public.vendor_items FOR SELECT USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
+
+DROP POLICY IF EXISTS "Vendor items write" ON public.vendor_items;
 CREATE POLICY "Vendor items write" ON public.vendor_items FOR ALL USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
 
+DROP POLICY IF EXISTS "Vendor item mappings read" ON public.vendor_item_mappings;
 CREATE POLICY "Vendor item mappings read" ON public.vendor_item_mappings FOR SELECT USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
+
+DROP POLICY IF EXISTS "Vendor item mappings write" ON public.vendor_item_mappings;
 CREATE POLICY "Vendor item mappings write" ON public.vendor_item_mappings FOR ALL USING (
   public.is_platform_admin() OR organization_id = public.get_my_org() OR organization_id IN (SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid())
 );
@@ -75,6 +85,7 @@ CREATE OR REPLACE FUNCTION public.match_vendor(p_org_id UUID, p_vendor_name TEXT
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_vendor_id UUID;
@@ -103,8 +114,8 @@ BEGIN
   -- 3. Fuzzy match using Levenshtein distance
   -- Only consider if distance <= 3 (e.g. slight typo)
   SELECT id INTO v_fuzzy_match FROM public.vendors
-  WHERE organization_id = p_org_id AND levenshtein(LOWER(name), LOWER(p_vendor_name)) <= 3
-  ORDER BY levenshtein(LOWER(name), LOWER(p_vendor_name)) ASC
+  WHERE organization_id = p_org_id AND extensions.levenshtein(LOWER(name), LOWER(p_vendor_name)) <= 3
+  ORDER BY extensions.levenshtein(LOWER(name), LOWER(p_vendor_name)) ASC
   LIMIT 1;
   
   RETURN v_fuzzy_match;
