@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BarChart3,
   Building2,
+  CalendarDays,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -17,13 +18,16 @@ import {
   Download,
   DollarSign,
   FileText,
+  History,
   ListFilter,
   Package,
   RotateCcw,
+  Save,
   Shield,
   ShoppingCart,
   Target,
   TrendingUp,
+  Trash2,
   Upload,
   UserCheck,
   Users,
@@ -1341,7 +1345,7 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
   return (
     <SectionCard
       title="Daily Handoff"
-      description="Copy or download a manager-ready summary of today’s operating state."
+      description="Copy or download a manager-ready summary of today's operating state."
       action={(
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={copyHandoff}>
@@ -1363,7 +1367,7 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
         </div>
         <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operating Summary</p>
-          <p className="mt-2 text-sm font-semibold text-foreground">Prime {plainPercent(metrics.primeCostPercent)} · Data {dataHealthScore}%</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">Prime {plainPercent(metrics.primeCostPercent)} / Data {dataHealthScore}%</p>
           <p className="mt-1 text-xs text-muted-foreground">{currency(metrics.weekSales)} WTD sales</p>
         </div>
         <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
@@ -1383,6 +1387,143 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
           className="mt-2 min-h-28 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
           placeholder="Add shift context, vendor issues, staffing notes, or what the next manager should check first."
         />
+      </div>
+    </SectionCard>
+  );
+}
+
+function ManagerReviewLogPanel({ metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true }) {
+  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
+  const historyKey = `dashboard-review-log:${scope}`;
+  const noteKey = `dashboard-handoff-note:${scope}:${todayKey()}`;
+  const [reviews, setReviews] = React.useState([]);
+
+  React.useEffect(() => {
+    try {
+      setReviews(JSON.parse(window.localStorage.getItem(historyKey) || '[]'));
+    } catch {
+      setReviews([]);
+    }
+  }, [historyKey]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(historyKey, JSON.stringify(reviews));
+  }, [historyKey, reviews]);
+
+  const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
+  const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+  const latestPriorReview = reviews.find((review) => review.date !== todayKey());
+  const carryoverItems = latestPriorReview?.openActions || [];
+
+  const saveReview = () => {
+    const managerNote = window.localStorage.getItem(noteKey) || '';
+    const snapshot = {
+      id: `${scope}-${Date.now()}`,
+      date: todayKey(),
+      savedAt: new Date().toISOString(),
+      completedCount: completed.length,
+      totalCount: actions.length,
+      dataHealthScore,
+      weekSales: metrics.weekSales,
+      primeCostPercent: metrics.primeCostPercent,
+      unpaid: metrics.unpaid,
+      lowStockCount: metrics.lowStock.length,
+      pendingInvoiceCount: metrics.pendingInvoices.length,
+      openActions: open.map((item) => ({ title: item.title, priority: item.priority, owner: item.owner, due: item.due })),
+      note: managerNote.trim(),
+    };
+
+    setReviews((current) => [snapshot, ...current.filter((review) => review.date !== todayKey())].slice(0, 7));
+    toast.success('Manager review saved');
+  };
+
+  const clearReviews = () => {
+    setReviews([]);
+    toast.success('Review log cleared');
+  };
+
+  return (
+    <SectionCard
+      title="Manager Review Log"
+      description="Save daily review snapshots and keep prior open items visible for follow-up."
+      action={(
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={saveReview}>
+            <Save className="h-4 w-4" />
+            Save Review
+          </Button>
+          {!!reviews.length && (
+            <Button variant="ghost" size="sm" className="gap-2" onClick={clearReviews}>
+              <Trash2 className="h-4 w-4" />
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <CalendarDays className="h-4 w-4" />
+            Today's Review
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{completed.length}/{actions.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{open.length} open actions before save</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <History className="h-4 w-4" />
+            Carryover
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{carryoverItems.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{latestPriorReview ? `From ${latestPriorReview.date}` : 'No prior review saved'}</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <Target className="h-4 w-4" />
+            Review Health
+          </div>
+          <p className="mt-2 text-2xl font-bold text-foreground">{dataHealthScore}%</p>
+          <p className="mt-1 text-xs text-muted-foreground">Data health at save time</p>
+        </div>
+      </div>
+
+      {!!carryoverItems.length && (
+        <div className="mt-4 rounded-lg border border-border/60 bg-secondary/20 p-4">
+          <p className="text-sm font-semibold text-foreground">Carryover From Last Review</p>
+          <div className="mt-3 space-y-2">
+            {carryoverItems.slice(0, 4).map((item) => (
+              <div key={`${item.title}-${item.priority}`} className="flex flex-col gap-1 rounded-md bg-background/70 p-3 md:flex-row md:items-center md:justify-between">
+                <span className="text-sm text-foreground">{item.title}</span>
+                <span className="text-xs text-muted-foreground">{item.priority} / {item.owner} / {item.due}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {reviews.slice(0, 5).map((review) => (
+          <div key={review.id} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{review.date}</p>
+                <p className="text-xs text-muted-foreground">
+                  {review.completedCount}/{review.totalCount} complete / {currency(review.weekSales)} WTD / Prime {plainPercent(review.primeCostPercent)}
+                </p>
+              </div>
+              <Badge variant="secondary">{review.openActions.length} open</Badge>
+            </div>
+            {review.note && <p className="mt-3 text-xs text-muted-foreground">{review.note}</p>}
+          </div>
+        ))}
+        {!reviews.length && (
+          <EmptyState
+            icon={History}
+            title="No manager reviews saved yet"
+            description="Save today's review after checking the action plan and handoff note."
+          />
+        )}
       </div>
     </SectionCard>
   );
@@ -1512,6 +1653,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DecisionBriefPanel metrics={metrics} scope={scope} />
       <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} statusMap={actionStatusMap} setStatusMap={setActionStatusMap} />
       <HandoffBriefPanel metrics={metrics} scope={scope} statusMap={actionStatusMap} dataHealthScore={dataHealthScore} canAccessPage={canAccessPage} />
+      <ManagerReviewLogPanel metrics={metrics} scope={scope} statusMap={actionStatusMap} dataHealthScore={dataHealthScore} canAccessPage={canAccessPage} />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
