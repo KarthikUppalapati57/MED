@@ -22,6 +22,7 @@ import {
 import ItemMappingSelect from './ItemMappingSelect';
 import ReconciliationVarianceTable from './ReconciliationVarianceTable';
 import CategorySummaryTable from './CategorySummaryTable';
+import ApprovalWorkflowEngine from './ApprovalWorkflowEngine';
 
 export default function InvoiceEditor({ invoice, onChange }) {
 
@@ -106,6 +107,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
 
   return (
     <div className="space-y-6">
+      {/* Approval Workflow Engine */}
+      {invoice.id && invoice.status === 'pending_approval' && (
+        <ApprovalWorkflowEngine invoice={invoice} />
+      )}
+
       {/* Invoice Details */}
       <Card>
         <CardHeader>

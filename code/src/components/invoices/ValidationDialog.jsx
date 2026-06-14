@@ -177,9 +177,9 @@ export default function ValidationDialog({
     onSave({
       ...invoice,
       validation_results: results,
-      status: 'approved',
+      status: 'pending_approval',
       validation_notes: approvalNotes,
-      approved_date: new Date().toISOString(),
+      // Date will be set by the policy engine when fully approved
     });
     onOpenChange(false);
   };

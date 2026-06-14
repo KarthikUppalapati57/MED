@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
+import ApprovalPolicySettings from '@/components/invoices/ApprovalPolicySettings';
 
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
@@ -405,6 +406,7 @@ export default function OrgManagement() {
           <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
           <TabsTrigger value="groups">Location Groups</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="approvals">Approvals</TabsTrigger>
         </TabsList>
 
         <TabsContent value="hierarchy" className="space-y-6 mt-6">
@@ -684,6 +686,10 @@ export default function OrgManagement() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="approvals" className="mt-6">
+          <ApprovalPolicySettings />
         </TabsContent>
       </Tabs>
 

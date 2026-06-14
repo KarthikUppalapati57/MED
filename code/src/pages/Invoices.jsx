@@ -455,7 +455,25 @@ export default function Invoices() {
         setEditingInvoice(savedInvoice);
       }
       
-      if (savedInvoice.status === 'approved') {
+      // If the intent is to approve, evaluate policies first
+      let finalStatus = savedInvoice.status;
+      let policyResult = null;
+      if (finalStatus === 'pending_approval') {
+        const res = await api.client.rpc('evaluate_invoice_approval_policy', { p_invoice_id: savedInvoice.id });
+        if (!res.error && res.data) {
+          policyResult = res.data;
+          finalStatus = policyResult.status === 'auto_approved' ? 'approved' : 'pending_approval';
+          savedInvoice.status = finalStatus;
+          
+          if (finalStatus === 'approved') {
+            // Update the record with approved_date
+            await api.client.from('invoices').update({ approved_date: new Date().toISOString() }).eq('id', savedInvoice.id);
+            savedInvoice.approved_date = new Date().toISOString();
+          }
+        }
+      }
+
+      if (finalStatus === 'approved') {
         const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice);
         posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
         toast.success(
@@ -463,18 +481,24 @@ export default function Invoices() {
             ? 'Paid invoice approved and sent to Bill Pay'
             : 'Invoice approved & products/inventory updated'
         );
-      } else {
-        posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
+      } else if (finalStatus === 'pending_approval') {
+        posthog.capture('invoice_pending_approval', { invoiceId: savedInvoice.id });
+        
+        toast.success(`Invoice sent for approval. ${policyResult?.steps || 0} required steps.`);
         
         // Notify managers that a new invoice requires approval
         await notifyManagers({
           organization_id: organization?.id,
           title: 'Invoice Requires Approval',
-          message: `Invoice ${savedInvoice.invoice_number || 'Pending'} from ${savedInvoice.vendor_name || 'Vendor'} was uploaded and requires your review.`,
+          message: `Invoice ${savedInvoice.invoice_number || 'Pending'} from ${savedInvoice.vendor_name || 'Vendor'} was uploaded and requires your review via the Approval Workflow.`,
           type: 'approval',
           metadata: { invoice_id: savedInvoice.id },
           exclude_user_id: userProfile?.id,
         }).catch(e => console.error('Failed to notify managers:', e));
+      } else {
+        // e.g. Rejected or Action Required
+        posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: finalStatus });
+        toast.success(`Invoice marked as ${finalStatus.replace('_', ' ')}.`);
       }
       
       setEditorOpen(false);
