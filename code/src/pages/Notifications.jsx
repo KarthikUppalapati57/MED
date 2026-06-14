@@ -38,7 +38,7 @@ export default function Notifications() {
     mutationFn: async (id) => {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true, read: true })
+        .update({ is_read: true })
         .eq('id', id);
       if (error) throw error;
     },
@@ -52,7 +52,7 @@ export default function Notifications() {
     mutationFn: async () => {
       const { error } = await supabase
         .from('notifications')
-        .update({ is_read: true, read: true })
+        .update({ is_read: true })
         .eq('user_id', user?.id)
         .eq('is_read', false);
       if (error) throw error;

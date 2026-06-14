@@ -23,11 +23,9 @@ export async function createNotification({ user_id, organization_id, title, mess
       organization_id,
       title,
       message,
-      body: message,
       type,
       metadata,
       is_read: false,
-      read: false,
     });
     if (error) {
       console.warn('[NotificationService] Insert failed:', error.message);
@@ -87,11 +85,9 @@ export async function notifyManagers({ organization_id, title, message, type = '
       user_id: m.id,
       title,
       message,
-      body: message,
       type: normalizedType,
       metadata,
       is_read: false,
-      read: false,
     }));
 
     const { error: insertError } = await supabase.from('notifications').insert(notifications);

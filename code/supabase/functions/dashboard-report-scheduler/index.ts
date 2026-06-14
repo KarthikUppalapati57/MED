@@ -205,7 +205,6 @@ serve(async (req) => {
           const { data: notifications, error: notificationError } = await supabase
             .from('notifications')
             .insert(recipients.map((recipient) => ({
-              body: reportText.slice(0, 950),
               is_read: false,
               message: reportText.slice(0, 950),
               metadata: {
@@ -216,7 +215,6 @@ serve(async (req) => {
                 source: 'dashboard_report_scheduler',
               },
               organization_id: preference.organization_id,
-              read: false,
               title: reportType === 'daily' ? 'Daily dashboard handoff ready' : 'Weekly executive dashboard report ready',
               type: 'system',
               user_id: recipient.id,

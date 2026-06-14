@@ -2589,7 +2589,7 @@ async function sendDashboardReportNotifications({ brand, location, organization,
       return true;
     });
 
-  await Promise.all(targets.map((profile) => createNotification({
+  const notificationResults = await Promise.all(targets.map((profile) => createNotification({
     organization_id: organization.id,
     user_id: profile.id,
     title: reportType === 'daily' ? 'Daily dashboard handoff ready' : 'Weekly executive dashboard report ready',
@@ -2602,7 +2602,7 @@ async function sendDashboardReportNotifications({ brand, location, organization,
     },
   })));
 
-  return { notified: targets.length };
+  return { notified: notificationResults.filter((result) => result?.success).length };
 }
 
 function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, organization, rules, scope, statusMap = {}, userProfile }) {
