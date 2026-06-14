@@ -52,6 +52,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -807,198 +833,6 @@ export default function Invoices() {
   const handleEditorReject = async () => {
     try {
       const data = { ...editingInvoice, status: 'rejected', ap_status: 'rejected' };
-      let savedInvoice;
-      if (editingInvoice.id) {
-        savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });
-      } else {
-        savedInvoice = await createMutation.mutateAsync(data);
-      }
-      posthog.capture('invoice_failed', { invoiceId: savedInvoice.id, reason: 'rejected' });
-
-      // Email the original uploader that their invoice was rejected
-      const createdBy = savedInvoice?.created_by || editingInvoice?.created_by;
-      if (createdBy) {
-        try {
-          const { data: uploaderProfile } = await supabase
-            .from('profiles')
-            .select('email, full_name')
-            .eq('id', createdBy)
-            .single();
-          if (uploaderProfile?.email) {
-            sendInvoiceStatusEmail({
-              to_email: uploaderProfile.email,
-              to_name: uploaderProfile.full_name,
-              invoice_number: savedInvoice?.invoice_number || editingInvoice?.invoice_number,
-              status: 'rejected',
-              reviewer_name: userProfile?.full_name || 'Manager',
-            }).catch(e => console.warn('Rejection email failed:', e));
-          }
-        } catch { /* non-critical */ }
-      }
-
-      setEditorOpen(false);
-      setEditingInvoice(null);
-    } catch (err) {
-      console.error('Editor reject failed:', err);
-      toast.error(`Failed to reject invoice: ${err.message}`);
-    }
-  };
-
-  const filteredInvoices = React.useMemo(() => {
-    return invoices.filter(inv => {
-      const matchesSearch = !search || 
-        inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
-        inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [invoices, search, statusFilter]);
-
-  const stats = React.useMemo(() => {
-    let validatedCount = 0;
-    let approvedCount = 0;
-    let totalApprovedAmount = 0;
-    for (const inv of invoices) {
-      if (inv.status === 'validated') {
-        validatedCount++;
-      } else if (inv.status === 'approved') {
-        approvedCount++;
-        totalApprovedAmount += (inv.total_amount || 0);
-      }
-    }
-    return { validatedCount, approvedCount, totalApprovedAmount };
-  }, [invoices]);
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setEmailConfigOpen(true)}>
-            <Mail className="h-4 w-4 mr-2 text-brand" />
-            Email Settings
-          </Button>
-          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Invoice
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Validated</p>
-            <p className="text-2xl font-bold text-resend-blue">
-              {stats.validatedCount}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-resend-green">
-              {stats.approvedCount}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Approved</p>
-            <p className="text-2xl font-bold text-foreground">
-              ${stats.totalApprovedAmount.toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search invoices..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="validated">Validated</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingInvoices ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredInvoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No invoices found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
-                      <TableCell className="font-medium">{invoice.vendor_name}</TableCell>
-                      <TableCell>{invoice.invoice_number}</TableCell>
-                      <TableCell>
-                        {invoice.invoice_date && format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        {invoice.due_date && format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        ${invoice.total_amount?.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[invoice.status]}>
-                          {invoice.status?.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={invoice.file_destination === 'payments' ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
-                          {invoice.file_destination === 'payments' ? 'Payments' : 'Storage'}
-                        </Badge>
-                      </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
