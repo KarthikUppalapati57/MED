@@ -41,7 +41,7 @@ import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { createPageUrl } from '@/utils';
 import { filterByContext } from '@/lib/contextUtils';
-import { isPageInEnabledModules } from '@/lib/moduleConfig';
+import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,6 +86,25 @@ function mergeRecommendations(primary, secondary) {
     seen.add(item.title);
     return true;
   });
+}
+
+function pageKeyFromHref(href = '') {
+  return href.split('?')[0];
+}
+
+function createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }) {
+  return (pageName) => {
+    if (!pageName) return true;
+    if (isPlatformAdmin) return true;
+
+    const explicit = userProfile?.permissions?.[pageName];
+    if (explicit === 'none') return false;
+    if (explicit === 'read' || explicit === 'full') return true;
+
+    const moduleInfo = getModuleForPage(pageName);
+    const roleAllowed = !moduleInfo || hasMinRole(moduleInfo.minRole);
+    return roleAllowed && isPageInEnabledModules(pageName, organization?.enabled_modules, userProfile?.role);
+  };
 }
 
 function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
@@ -162,6 +181,23 @@ function SectionCard({ title, description, action, children, className }) {
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+function EmptyState({ icon: Icon = AlertTriangle, title, description, actionHref, actionLabel }) {
+  return (
+    <div className="flex min-h-40 flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-secondary/20 p-6 text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background text-muted-foreground">
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 max-w-md text-xs text-muted-foreground">{description}</p>
+      {actionHref && actionLabel && (
+        <Link to={createPageUrl(actionHref)} className="mt-3 text-xs font-semibold text-brand hover:opacity-80">
+          {actionLabel}
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -575,7 +611,7 @@ function DataHealthBanner({ score = 80 }) {
   );
 }
 
-function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org' }) {
+function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org', canAccessPage = () => true }) {
   if (mode === 'platform') {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -591,23 +627,29 @@ function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org' }) 
     org: [
       { label: 'Period Sales', value: currency(metrics.monthSales), icon: TrendingUp, tone: 'green', subtext: `${currency(metrics.weekSales)} week-to-date` },
       { label: 'Gross Margin', value: plainPercent(metrics.grossMarginPercent), icon: BarChart3, tone: metrics.grossMarginPercent >= 68 ? 'green' : 'orange', subtext: `COGS ${plainPercent(metrics.cogsPercent)}` },
-      { label: 'Unpaid AP', value: currency(metrics.unpaid), icon: CreditCard, tone: metrics.unpaid > 0 ? 'yellow' : 'green', linkTo: 'Payments', linkText: 'Review' },
+      { label: 'Unpaid AP', value: currency(metrics.unpaid), icon: CreditCard, tone: metrics.unpaid > 0 ? 'yellow' : 'green', linkTo: 'Payments', linkText: 'Review', requiredPage: 'Payments' },
       { label: 'Needs Attention', value: metrics.recommendations.length, icon: AlertTriangle, tone: metrics.recommendations.length ? 'red' : 'green', subtext: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock` },
     ],
     brand: [
       { label: 'Brand WTD Sales', value: currency(metrics.weekSales), icon: TrendingUp, tone: 'green', subtext: `${percent(metrics.weekVsLastWeek)} vs last week` },
       { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), icon: Activity, tone: metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent ? 'red' : 'green', subtext: `Target ${plainPercent(OPERATING_TARGETS.primeCostPercent)}` },
-      { label: 'Open Orders', value: metrics.openOrders.length, icon: ShoppingCart, tone: metrics.openOrders.length ? 'blue' : 'green', linkTo: 'AutoOrdering', linkText: 'Open' },
-      { label: 'Low Stock', value: metrics.lowStock.length, icon: Warehouse, tone: metrics.lowStock.length ? 'orange' : 'green', linkTo: 'Inventory', linkText: 'Review' },
+      { label: 'Open Orders', value: metrics.openOrders.length, icon: ShoppingCart, tone: metrics.openOrders.length ? 'blue' : 'green', linkTo: 'AutoOrdering', linkText: 'Open', requiredPage: 'AutoOrdering' },
+      { label: 'Low Stock', value: metrics.lowStock.length, icon: Warehouse, tone: metrics.lowStock.length ? 'orange' : 'green', linkTo: 'Inventory', linkText: 'Review', requiredPage: 'Inventory' },
     ],
     location: [
       { label: "Today's Sales", value: currency(metrics.today), icon: DollarSign, tone: 'green', subtext: `${currency(metrics.weekSales)} week-to-date` },
       { label: 'COGS', value: plainPercent(metrics.cogsPercent), icon: Package, tone: metrics.cogsPercent > OPERATING_TARGETS.cogsPercent ? 'red' : 'blue', subtext: `Target ${plainPercent(OPERATING_TARGETS.cogsPercent)}` },
-      { label: 'Labor', value: plainPercent(metrics.laborPercent), icon: Users, tone: metrics.laborPercent > OPERATING_TARGETS.laborPercent ? 'orange' : 'purple', subtext: `Target ${plainPercent(OPERATING_TARGETS.laborPercent)}` },
+      { label: 'Labor', value: plainPercent(metrics.laborPercent), icon: Users, tone: metrics.laborPercent > OPERATING_TARGETS.laborPercent ? 'orange' : 'purple', subtext: `Target ${plainPercent(OPERATING_TARGETS.laborPercent)}`, requiredPage: 'Labor' },
       { label: 'Action Items', value: metrics.recommendations.length, icon: AlertTriangle, tone: metrics.recommendations.length ? 'red' : 'green', subtext: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock` },
     ],
   };
-  const cards = cardsByScope[scope] || cardsByScope.org;
+  const cards = (cardsByScope[scope] || cardsByScope.org)
+    .filter((card) => !card.requiredPage || canAccessPage(card.requiredPage))
+    .map((card) => ({
+      ...card,
+      linkTo: card.linkTo && canAccessPage(pageKeyFromHref(card.linkTo)) ? card.linkTo : undefined,
+      linkText: card.linkTo && canAccessPage(pageKeyFromHref(card.linkTo)) ? card.linkText : undefined,
+    }));
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -618,8 +660,14 @@ function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org' }) 
   );
 }
 
-function NeedsAttentionPanel({ items }) {
-  const visible = items.length ? items : [{ tone: 'green', title: 'No urgent dashboard alerts', body: 'Core workflows look clear based on the data currently available.' }];
+function NeedsAttentionPanel({ items, canAccessPage = () => true }) {
+  const visibleItems = items
+    .filter((item) => !item.href || canAccessPage(pageKeyFromHref(item.href)))
+    .map((item) => ({
+      ...item,
+      href: item.href && canAccessPage(pageKeyFromHref(item.href)) ? item.href : undefined,
+    }));
+  const visible = visibleItems.length ? visibleItems : [{ tone: 'green', title: 'No urgent dashboard alerts', body: 'Core workflows look clear based on the data currently available.' }];
   return (
     <SectionCard title="Today Needs Attention" description="Prioritized operator actions from sales, budget, inventory, labor, and AP.">
       <div className="space-y-3">
@@ -651,8 +699,20 @@ function NeedsAttentionPanel({ items }) {
 }
 
 function SalesPerformanceTable({ metrics }) {
+  const hasSalesData = metrics.weekSales > 0 || metrics.lastWeekSales > 0 || metrics.lastYearSales > 0 || metrics.dailyRows.some((row) => row.actual > 0 || row.lastWeek > 0 || row.lastYear > 0);
+
   return (
     <SectionCard title="Sales Performance" description="MarginEdge-style current week comparison against last week and last year.">
+      {!hasSalesData && (
+        <EmptyState
+          icon={TrendingUp}
+          title="No POS sales data for this comparison yet"
+          description="Connect POS sales or complete menu mapping to unlock daily sales, week-over-week, and year-over-year comparisons."
+          actionHref="RestaurantSetup?tab=pos"
+          actionLabel="Open POS setup"
+        />
+      )}
+      {hasSalesData && (
       <div className="overflow-x-auto">
         <table className="w-full min-w-[680px] text-sm">
           <thead>
@@ -687,13 +747,26 @@ function SalesPerformanceTable({ metrics }) {
           </tbody>
         </table>
       </div>
+      )}
     </SectionCard>
   );
 }
 
 function BudgetPacingPanel({ metrics }) {
+  const hasBudgetData = metrics.budgetPacing.some((item) => Number(item.actual || 0) > 0 || Number(item.target || 0) > 0);
+
   return (
     <SectionCard title="Budget Pacing" description="Targets, actual spend, remaining budget, and over/under signal for this period.">
+      {!hasBudgetData && (
+        <EmptyState
+          icon={BarChart3}
+          title="No budget targets or actuals yet"
+          description="Set period targets in Performance so this panel can show pacing by Sales, COGS, Labor, and Prime Cost."
+          actionHref="Performance"
+          actionLabel="Set budget targets"
+        />
+      )}
+      {hasBudgetData && (
       <div className="space-y-4">
         {metrics.budgetPacing.slice(0, 8).map((item) => {
           const progress = item.target ? Math.min((item.actual / item.target) * 100, 140) : 0;
@@ -718,6 +791,7 @@ function BudgetPacingPanel({ metrics }) {
           );
         })}
       </div>
+      )}
     </SectionCard>
   );
 }
@@ -747,7 +821,7 @@ function OperatingSnapshot({ metrics, scope }) {
   );
 }
 
-function GuardrailPanel({ metrics }) {
+function GuardrailPanel({ metrics, canAccessPage = () => true }) {
   const guardrails = [
     { label: 'COGS', actual: metrics.cogsPercent, target: OPERATING_TARGETS.cogsPercent, href: 'Performance' },
     { label: 'Labor', actual: metrics.laborPercent, target: OPERATING_TARGETS.laborPercent, href: 'Labor' },
@@ -770,11 +844,17 @@ function GuardrailPanel({ metrics }) {
                     Actual {plainPercent(item.actual)} / Target {plainPercent(item.target)}
                   </p>
                 </div>
-                <Link to={createPageUrl(item.href)}>
+                {canAccessPage(pageKeyFromHref(item.href)) ? (
+                  <Link to={createPageUrl(item.href)}>
+                    <Badge className={isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
+                      {isGood ? 'Inside target' : `${plainPercent(over)} over`}
+                    </Badge>
+                  </Link>
+                ) : (
                   <Badge className={isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
                     {isGood ? 'Inside target' : `${plainPercent(over)} over`}
                   </Badge>
-                </Link>
+                )}
               </div>
               <Progress value={progress} className="h-2" />
             </div>
@@ -785,8 +865,9 @@ function GuardrailPanel({ metrics }) {
   );
 }
 
-function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
-  const pieData = metrics.spendByCategory.length ? metrics.spendByCategory : [{ name: 'No spend coded', value: 1, color: '#e5e7eb' }];
+function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true, canAccessPage = () => true }) {
+  const hasSpendData = metrics.spendByCategory.some((item) => Number(item.value || 0) > 0);
+  const pieData = hasSpendData ? metrics.spendByCategory : [{ name: 'No spend coded', value: 1, color: '#e5e7eb' }];
   const workflowCounts = metrics.workflowCounts || {};
   const workflows = [
     { label: 'Invoices', value: workflowCounts.invoices ?? data.invoices.length, href: 'Invoices', icon: FileText },
@@ -795,11 +876,21 @@ function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
     { label: 'Low Stock', value: workflowCounts.lowStock ?? metrics.lowStock.length, href: 'Inventory', icon: Warehouse },
     { label: 'Products', value: workflowCounts.products ?? data.products.length, href: 'Products', icon: Package },
     { label: 'Waste Cost', value: currency(workflowCounts.wasteCost ?? metrics.wastageCost), href: 'Inventory?tab=wastage', icon: AlertTriangle },
-  ];
+  ].filter((item) => canAccessPage(pageKeyFromHref(item.href)));
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
       <SectionCard title="Spend by Category" description="Invoice spend grouped by coded category." className="xl:col-span-1">
+        {!hasSpendData && (
+          <EmptyState
+            icon={FileText}
+            title="No coded spend yet"
+            description="Upload and code invoices to see category-level COGS and controllable spend here."
+            actionHref={canAccessPage('Invoices') ? 'Invoices' : undefined}
+            actionLabel={canAccessPage('Invoices') ? 'Open invoices' : undefined}
+          />
+        )}
+        {hasSpendData && (
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -811,10 +902,19 @@ function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        )}
       </SectionCard>
 
       {showWorkflow && (
         <SectionCard title="Operational Workflows" description="Live platform work that supports the performance dashboard." className="xl:col-span-2">
+          {!workflows.length && (
+            <EmptyState
+              icon={Shield}
+              title="No workflow modules available"
+              description="This role does not currently have access to invoice, payment, ordering, inventory, product, or waste workflows."
+            />
+          )}
+          {!!workflows.length && (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {workflows.map((item) => (
               <Link key={item.label} to={createPageUrl(item.href)} className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/60">
@@ -828,6 +928,7 @@ function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
               </Link>
             ))}
           </div>
+          )}
         </SectionCard>
       )}
     </div>
@@ -861,19 +962,52 @@ function BenchmarkPanel({ metrics, title = 'Scope Benchmarking' }) {
   );
 }
 
+function DataCoveragePanel({ metrics, data, canAccessPage = () => true }) {
+  const workflowCounts = metrics.workflowCounts || {};
+  const sources = [
+    { label: 'POS Sales', page: 'Performance', count: metrics.monthSales > 0 ? 1 : 0, status: metrics.monthSales > 0 ? 'Connected' : 'Needs setup' },
+    { label: 'Invoices/AP', page: 'Invoices', count: workflowCounts.invoices ?? data.invoices.length, status: (workflowCounts.invoices ?? data.invoices.length) > 0 ? 'Flowing' : 'No records' },
+    { label: 'Inventory', page: 'Inventory', count: workflowCounts.inventoryItems ?? data.inventory.length, status: (workflowCounts.inventoryItems ?? data.inventory.length) > 0 ? 'Flowing' : 'No records' },
+    { label: 'Labor', page: 'Labor', count: metrics.laborCost > 0 ? 1 : 0, status: metrics.laborCost > 0 ? 'Flowing' : 'No shifts' },
+    { label: 'Budget Targets', page: 'Performance', count: metrics.budgetPacing.filter((item) => item.target > 0).length, status: metrics.budgetPacing.some((item) => item.target > 0) ? 'Configured' : 'Needs targets' },
+  ].filter((source) => canAccessPage(source.page));
+
+  if (!sources.length) return null;
+
+  return (
+    <SectionCard title="Data Coverage" description="Source modules currently feeding this dashboard. Use these links to audit the numbers.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {sources.map((source) => (
+          <Link key={source.label} to={createPageUrl(source.page)} className="rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/60">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{source.label}</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">{source.status}</p>
+            <p className="mt-1 text-xs text-brand">Open source</p>
+          </Link>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
+  const { organization, userProfile } = useAuth();
+  const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData(scope);
   const metrics = useDashboardMetrics(data);
+  const canAccessPage = React.useMemo(
+    () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
+    [hasMinRole, isPlatformAdmin, organization, userProfile]
+  );
 
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
       <DataHealthBanner />
-      <KpiStrip metrics={metrics} scope={scope} />
+      <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
-          <NeedsAttentionPanel items={metrics.recommendations} />
+          <NeedsAttentionPanel items={metrics.recommendations} canAccessPage={canAccessPage} />
         </div>
         <div className="xl:col-span-2">
           <SalesPerformanceTable metrics={metrics} />
@@ -881,26 +1015,33 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <BudgetPacingPanel metrics={metrics} />
-        <GuardrailPanel metrics={metrics} />
+        <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} />
       </div>
       <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
-      <SpendAndWorkflowGrid metrics={metrics} data={data} />
+      <SpendAndWorkflowGrid metrics={metrics} data={data} canAccessPage={canAccessPage} />
+      <DataCoveragePanel metrics={metrics} data={data} canAccessPage={canAccessPage} />
     </div>
   );
 }
 
 function GroundStaffDashboard() {
   const { organization, location, userProfile } = useAuth();
+  const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData('staff');
   const metrics = useDashboardMetrics(data);
   const enabledModules = organization?.enabled_modules || [];
   const permissions = userProfile?.permissions || {};
+  const canAccessPage = React.useMemo(
+    () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
+    [hasMinRole, isPlatformAdmin, organization, userProfile]
+  );
+  const workflowCounts = metrics.workflowCounts || {};
 
   const tasks = [
-    { module: 'Invoices', href: 'Invoices', label: 'Upload or review invoices', value: data.invoices.length, icon: Upload },
-    { module: 'Inventory', href: 'Inventory', label: 'Check inventory and counts', value: metrics.lowStock.length, icon: Warehouse },
-    { module: 'Products', href: 'Products', label: 'Review products', value: data.products.length, icon: Package },
-    { module: 'AutoOrdering', href: 'AutoOrdering', label: 'Receive or place orders', value: metrics.openOrders.length, icon: ShoppingCart },
+    { module: 'Invoices', href: 'Invoices', label: 'Upload or review invoices', value: workflowCounts.invoices ?? data.invoices.length, icon: Upload },
+    { module: 'Inventory', href: 'Inventory', label: 'Check inventory and counts', value: workflowCounts.lowStock ?? metrics.lowStock.length, icon: Warehouse },
+    { module: 'Products', href: 'Products', label: 'Review products', value: workflowCounts.products ?? data.products.length, icon: Package },
+    { module: 'AutoOrdering', href: 'AutoOrdering', label: 'Receive or place orders', value: workflowCounts.openOrders ?? metrics.openOrders.length, icon: ShoppingCart },
   ].filter((task) => {
     const explicit = permissions[task.module];
     if (explicit === 'none') return false;
@@ -934,7 +1075,10 @@ function GroundStaffDashboard() {
           {!tasks.length && <p className="text-sm text-muted-foreground">No module tasks are assigned yet.</p>}
         </div>
       </SectionCard>
-      <NeedsAttentionPanel items={metrics.recommendations.filter((item) => ['Invoices', 'Inventory', 'Products', 'AutoOrdering'].some((page) => item.href?.startsWith(page)))} />
+      <NeedsAttentionPanel
+        items={metrics.recommendations.filter((item) => ['Invoices', 'Inventory', 'Products', 'AutoOrdering'].some((page) => item.href?.startsWith(page)))}
+        canAccessPage={canAccessPage}
+      />
     </div>
   );
 }
