@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Landmark, Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 
-export default function BillPayWidget({ invoice }) {
+export function BillPayWidget({ invoice }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
 
@@ -38,7 +38,7 @@ export default function BillPayWidget({ invoice }) {
   const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
     queryKey: ['payment-accounts', organization?.id],
     queryFn: async () => {
-      const { data, error } = await api.client
+      const { data, error } = await supabase
         .from('payment_accounts')
         .select('*')
         .eq('organization_id', organization.id)
@@ -52,7 +52,7 @@ export default function BillPayWidget({ invoice }) {
 
   const scheduleMutation = useMutation({
     mutationFn: async (data) => {
-      const { error } = await api.client.rpc('schedule_invoice_payment', {
+      const { error } = await supabase.rpc('schedule_invoice_payment', {
         p_invoice_id: invoice.id,
         p_payment_account_id: data.payment_account_id,
         p_date: data.date
@@ -70,7 +70,7 @@ export default function BillPayWidget({ invoice }) {
 
   const recordMutation = useMutation({
     mutationFn: async (data) => {
-      const { error } = await api.client.rpc('record_invoice_payment', {
+      const { error } = await supabase.rpc('record_invoice_payment', {
         p_invoice_id: invoice.id,
         p_amount: parseFloat(data.amount),
         p_reference: data.reference,

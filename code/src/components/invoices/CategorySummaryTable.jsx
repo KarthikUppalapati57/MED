@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import {
   Table,
   TableBody,
@@ -12,9 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calculator, SplitSquareHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import SplitCodingDialog from './SplitCodingDialog';
+import { SplitCodingDialog } from './SplitCodingDialog';
 
-export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
+export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
   const queryClient = useQueryClient();
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
@@ -24,7 +25,7 @@ export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
     queryKey: ['invoice-allocations', invoiceId],
     queryFn: async () => {
       if (!invoiceId) return [];
-      const res = await api.client.from('invoice_allocations')
+      const res = await supabase.from('invoice_allocations')
         .select('*')
         .eq('invoice_id', invoiceId)
         .order('allocation_type', { ascending: true });
@@ -38,7 +39,7 @@ export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
   const { data: glMappings = [] } = useQuery({
     queryKey: ['gl-mappings'],
     queryFn: async () => {
-      const res = await api.client.from('gl_mappings').select('*');
+      const res = await supabase.from('gl_mappings').select('*');
       if (res.error) throw res.error;
       return res.data;
     }
@@ -46,7 +47,7 @@ export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
 
   const calculateMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.client.rpc('calculate_invoice_allocations', { p_invoice_id: invoiceId });
+      const res = await supabase.rpc('calculate_invoice_allocations', { p_invoice_id: invoiceId });
       if (res.error) throw res.error;
       return res.data;
     },
@@ -62,7 +63,7 @@ export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
   const saveSplitsMutation = useMutation({
     mutationFn: async ({ originalAllocation, newSplits }) => {
       // Delete original
-      const delRes = await api.client.from('invoice_allocations').delete().eq('id', originalAllocation.id);
+      const delRes = await supabase.from('invoice_allocations').delete().eq('id', originalAllocation.id);
       if (delRes.error) throw delRes.error;
 
       // Insert new ones
@@ -75,7 +76,7 @@ export default function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
         amount: s.amount,
         percentage: s.percentage
       }));
-      const insRes = await api.client.from('invoice_allocations').insert(toInsert);
+      const insRes = await supabase.from('invoice_allocations').insert(toInsert);
       if (insRes.error) throw insRes.error;
     },
     onSuccess: () => {

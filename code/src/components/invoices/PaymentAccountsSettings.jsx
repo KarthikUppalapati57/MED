@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ export default function PaymentAccountsSettings() {
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['payment-accounts', organization?.id],
     queryFn: async () => {
-      const { data, error } = await api.client
+      const { data, error } = await supabase
         .from('payment_accounts')
         .select('*')
         .eq('organization_id', organization.id)
@@ -44,7 +45,7 @@ export default function PaymentAccountsSettings() {
 
   const createAccountMutation = useMutation({
     mutationFn: async (account) => {
-      const { data, error } = await api.client.from('payment_accounts').insert({
+      const { data, error } = await supabase.from('payment_accounts').insert({
         organization_id: organization.id,
         name: account.name,
         account_type: account.account_type,
@@ -65,7 +66,7 @@ export default function PaymentAccountsSettings() {
 
   const deleteAccountMutation = useMutation({
     mutationFn: async (id) => {
-      const { error } = await api.client.from('payment_accounts').update({ is_active: false }).eq('id', id);
+      const { error } = await supabase.from('payment_accounts').update({ is_active: false }).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

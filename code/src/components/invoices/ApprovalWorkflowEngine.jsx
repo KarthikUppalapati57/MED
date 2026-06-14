@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShieldCheck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function ApprovalWorkflowEngine({ invoice }) {
+export function ApprovalWorkflowEngine({ invoice }) {
   const { user, userProfile } = useAuth();
   const currentRole = userProfile?.role || 'user';
   const queryClient = useQueryClient();
@@ -18,7 +18,7 @@ export default function ApprovalWorkflowEngine({ invoice }) {
   const { data: instanceData, isLoading } = useQuery({
     queryKey: ['approval-workflow', invoice.id],
     queryFn: async () => {
-      const { data: instances, error: instErr } = await api.client
+      const { data: instances, error: instErr } = await supabase
         .from('approval_instances')
         .select('*')
         .eq('invoice_id', invoice.id)
@@ -30,7 +30,7 @@ export default function ApprovalWorkflowEngine({ invoice }) {
       
       const instance = instances[0];
       
-      const { data: steps, error: stepErr } = await api.client
+      const { data: steps, error: stepErr } = await supabase
         .from('approval_steps')
         .select(`
           *,
@@ -51,7 +51,7 @@ export default function ApprovalWorkflowEngine({ invoice }) {
 
   const executeStepMutation = useMutation({
     mutationFn: async ({ stepId, status }) => {
-      const { data, error } = await api.client.rpc('execute_approval_step', {
+      const { data, error } = await supabase.rpc('execute_approval_step', {
         p_step_id: stepId,
         p_status: status,
         p_comments: comments

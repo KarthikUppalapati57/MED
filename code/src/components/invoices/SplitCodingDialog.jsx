@@ -19,7 +19,7 @@ import {
 import { Plus, Trash2, SplitSquareHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function SplitCodingDialog({ open, onOpenChange, allocation, onSave, glMappings = [] }) {
+export function SplitCodingDialog({ open, onOpenChange, allocation, onSave, glMappings = [] }) {
   const [splits, setSplits] = useState([]);
   const [splitMethod, setSplitMethod] = useState('amount'); // 'amount' or 'percentage'
 

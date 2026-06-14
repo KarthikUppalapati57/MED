@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export default function ApprovalPolicySettings() {
   const { data: policies = [], isLoading } = useQuery({
     queryKey: ['approval-policies', organization?.id],
     queryFn: async () => {
-      const { data, error } = await api.client
+      const { data, error } = await supabase
         .from('approval_policies')
         .select('*')
         .eq('organization_id', organization.id)
@@ -43,7 +44,7 @@ export default function ApprovalPolicySettings() {
 
   const createPolicyMutation = useMutation({
     mutationFn: async (policy) => {
-      const { data, error } = await api.client.from('approval_policies').insert({
+      const { data, error } = await supabase.from('approval_policies').insert({
         organization_id: organization.id,
         min_amount: policy.min_amount ? parseFloat(policy.min_amount) : 0,
         max_amount: policy.max_amount ? parseFloat(policy.max_amount) : null,
@@ -63,7 +64,7 @@ export default function ApprovalPolicySettings() {
 
   const deletePolicyMutation = useMutation({
     mutationFn: async (id) => {
-      const { error } = await api.client.from('approval_policies').delete().eq('id', id);
+      const { error } = await supabase.from('approval_policies').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
 import {
@@ -26,7 +27,7 @@ export default function ReconciliationVarianceTable({ invoiceId, isEditable = fa
     queryKey: ['invoice-variances', invoiceId],
     queryFn: async () => {
       if (!invoiceId) return [];
-      const res = await api.client.from('reconciliation_variances')
+      const res = await supabase.from('reconciliation_variances')
         .select('*')
         .eq('invoice_id', invoiceId);
       if (res.error) throw res.error;
@@ -38,7 +39,7 @@ export default function ReconciliationVarianceTable({ invoiceId, isEditable = fa
   const resolveMutation = useMutation({
     mutationFn: async ({ id, resolution_notes }) => {
       // Stub for updating the variance resolution in DB
-      const result = await api.client.from('reconciliation_variances')
+      const result = await supabase.from('reconciliation_variances')
         .update({ is_resolved: true, resolution_notes, resolved_by: (await api.auth.getUser()).data.user?.id })
         .eq('id', id)
         .select()

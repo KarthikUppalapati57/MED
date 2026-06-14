@@ -2,14 +2,14 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { History, Activity, AlertCircle } from 'lucide-react';
-import { api } from '../../lib/api';
+import { supabase } from '@/lib/supabaseClient';
 
 export function InvoiceAuditLog({ invoiceId }) {
   const { data: events, isLoading } = useQuery({
     queryKey: ['invoice-audit-events', invoiceId],
     queryFn: async () => {
       if (!invoiceId) return [];
-      return await api.client
+      return await supabase
         .from('invoice_audit_events')
         .select(`
           *,
