@@ -1,1018 +1,860 @@
 import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { format, startOfWeek, subWeeks, subYears, isSameDay, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  Clock,
+  CreditCard,
+  DollarSign,
+  FileText,
+  Package,
+  Shield,
+  ShoppingCart,
+  TrendingUp,
+  Upload,
+  Users,
+  Warehouse,
+} from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
-import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { format } from 'date-fns';
-import {
-  FileText,
-  CreditCard,
-  Warehouse,
-  TrendingUp,
-  ArrowRight,
-  DollarSign,
-  Users,
-  Building2,
-  Package,
-  ShoppingCart,
-  ChefHat,
-  Activity,
-  Upload,
-  Eye,
-  Shield,
-  AlertTriangle,
-  Clock,
-  Mail
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend
-} from 'recharts';
+import { filterByContext } from '@/lib/contextUtils';
+import { isPageInEnabledModules } from '@/lib/moduleConfig';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
-const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444'];
+const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444', '#84cc16'];
+const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Stat Card Component 
-// Custom premium hook to count up numeric values organically
-function useCountUp(targetValue, duration = 1200) {
-  const [count, setCount] = React.useState(0);
-  React.useEffect(() => {
- // If targetValue is not numeric (e.g. ""), set it directly
-    const cleanStr = String(targetValue).replace(/[$,]/g, '');
-    const num = parseFloat(cleanStr);
-    if (isNaN(num)) {
-      setCount(targetValue);
-      return;
-    }
-
-    let start = 0;
-    const end = num;
-    if (start === end) {
-      setCount(targetValue);
-      return;
-    }
-
-    const startTime = performance.now();
-
-    const updateCount = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease out cubic
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      const currentVal = Math.floor(easeProgress * (end - start) + start);
-      
-      // format back appropriately
-      if (String(targetValue).startsWith('$')) {
-        setCount(`$${currentVal.toLocaleString()}`);
-      } else {
-        setCount(currentVal.toLocaleString());
-      }
-
-      if (progress < 1) {
-        requestAnimationFrame(updateCount);
-      } else {
-        setCount(targetValue);
-      }
-    };
-
-    requestAnimationFrame(updateCount);
-  }, [targetValue, duration]);
-
-  return count;
+function currency(value) {
+  return `$${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: Math.abs(Number(value || 0)) < 1000 ? 2 : 0,
+    maximumFractionDigits: Math.abs(Number(value || 0)) < 1000 ? 2 : 0,
+  })}`;
 }
 
-function StatCard({ label, value, icon: Icon, iconBg, iconColor, linkTo, linkText, subtext, delayClass = 'stagger-1' }) {
-  const displayValue = useCountUp(value);
-  
-  // Extract pure color for ambient halo glows behind card
-  const glowColorClass = 
-    iconColor.includes('resend-blue') ? 'rgba(0, 117, 255, 0.08)' :
-    iconColor.includes('purple') ? 'rgba(147, 51, 234, 0.08)' :
-    iconColor.includes('resend-green') ? 'rgba(34, 255, 153, 0.08)' :
-    iconColor.includes('resend-orange') ? 'rgba(255, 89, 0, 0.08)' :
-    iconColor.includes('resend-red') ? 'rgba(255, 32, 71, 0.08)' :
-    iconColor.includes('resend-yellow') ? 'rgba(255, 197, 61, 0.08)' :
-    'rgba(20, 198, 203, 0.08)';
+function percent(value) {
+  if (!Number.isFinite(Number(value))) return '0%';
+  return `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(1)}%`;
+}
+
+function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
+  const raw = candidates.map((key) => record?.[key]).find(Boolean);
+  const parsed = raw ? new Date(raw) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+}
+
+function sumBy(items, reader) {
+  return items.reduce((sum, item) => sum + Number(reader(item) || 0), 0);
+}
+
+function variance(current, comparison) {
+  if (!comparison) return 0;
+  return ((Number(current || 0) - Number(comparison || 0)) / Number(comparison)) * 100;
+}
+
+function getInvoiceAmount(invoice) {
+  return Number(invoice?.total_amount || invoice?.amount || invoice?.total || 0);
+}
+
+function getLineItems(invoice) {
+  if (Array.isArray(invoice?.line_items)) return invoice.line_items;
+  return [];
+}
+
+function getLineAmount(line) {
+  return Number(line?.extended_price || line?.total_price || line?.amount || line?.price || 0);
+}
+
+function StatCard({ label, value, icon: Icon, tone = 'brand', linkTo, linkText, subtext }) {
+  const toneClass = {
+    brand: 'bg-brand/10 text-brand',
+    green: 'bg-resend-green/10 text-resend-green',
+    orange: 'bg-resend-orange/10 text-resend-orange',
+    red: 'bg-resend-red/10 text-resend-red',
+    yellow: 'bg-resend-yellow/10 text-resend-yellow',
+    blue: 'bg-resend-blue/10 text-resend-blue',
+    purple: 'bg-purple-500/10 text-purple-400',
+  }[tone] || 'bg-brand/10 text-brand';
 
   return (
-    <Card 
-      className={cn(
-        "relative overflow-hidden border border-border/50 bg-card hover:border-brand/35 hover-lift shadow-sm hover:shadow-glow-sm animate-fade-in-up",
-        delayClass
-      )}
-      style={{
-        background: `radial-gradient(circle at 100% 0%, ${glowColorClass} 0%, transparent 60%), hsl(var(--card))`
-      }}
-    >
-      {/* Decorative top border gradient line */}
-      <div 
-        className="absolute top-0 left-0 right-0 h-[2px] opacity-75"
-        style={{
-          background: `linear-gradient(90deg, transparent, ${glowColorClass.replace('0.08', '0.6')}, transparent)`
-        }}
-      />
-      <CardContent className="p-6 relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground tracking-wider uppercase">{label}</p>
-            <p className="text-3xl font-extrabold text-foreground mt-2 tracking-tight">{displayValue}</p>
+    <Card className="border-border/70 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
           </div>
-          <div className={cn(
-            "h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110",
-            iconBg
-          )}>
-            <Icon className={cn("h-6 w-6 transition-transform duration-300", iconColor)} />
+          <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneClass)}>
+            <Icon className="h-5 w-5" />
           </div>
         </div>
+        {subtext && <div className="mt-3 text-xs text-muted-foreground">{subtext}</div>}
         {linkTo && (
-          <Link to={createPageUrl(linkTo)} className="text-xs font-semibold text-brand hover:opacity-85 mt-4 inline-flex items-center gap-1 group/link transition-opacity">
-            {linkText} <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/link:translate-x-1" />
+          <Link to={createPageUrl(linkTo)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:opacity-80">
+            {linkText || 'Open'} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-        )}
-        {subtext && (
-          <div className="text-xs text-muted-foreground mt-4 flex items-center gap-1">
-            {subtext}
-          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-// 
-// Platform Admin Dashboard Global platform-wide metrics
-// 
-function PlatformDashboard() {
-  const { data: allOrgs = [] } = useAuthQuery({
-    queryKey: ['dash-orgs'],
+function SectionCard({ title, description, action, children, className }) {
+  return (
+    <Card className={cn('border-border/70 shadow-sm', className)}>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle className="text-base">{title}</CardTitle>
+          {description && <CardDescription className="mt-1">{description}</CardDescription>}
+        </div>
+        {action}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function useDashboardData(scope) {
+  const { organization, brand, location } = useAuth();
+  const queryClient = useQueryClient();
+  const enabled = !!organization?.id;
+  const context = React.useMemo(() => {
+    if (scope === 'org') return { organization, brand: null, location: null };
+    if (scope === 'brand') return { organization, brand, location: null };
+    return { organization, brand, location };
+  }, [brand, location, organization, scope]);
+
+  const selectByScope = React.useCallback((data) => {
+    const scoped = filterByContext(data || [], context);
+    if (scope === 'org') return scoped;
+    if (scope === 'brand') return brand?.id ? scoped.filter((item) => !item.brand_id || item.brand_id === brand.id) : scoped;
+    if (scope === 'location' || scope === 'staff') {
+      return location?.id ? scoped.filter((item) => !item.location_id || item.location_id === location.id) : scoped;
+    }
+    return scoped;
+  }, [brand?.id, context, location?.id, scope]);
+
+  const { data: invoices = [] } = useAuthQuery({
+    queryKey: ['dashboard-invoices', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: payments = [] } = useAuthQuery({
+    queryKey: ['dashboard-payments', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Payment.list('-created_at'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: inventory = [] } = useAuthQuery({
+    queryKey: ['dashboard-inventory', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Inventory.list(),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: products = [] } = useAuthQuery({
+    queryKey: ['dashboard-products', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Product.list(),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: salesData = [] } = useAuthQuery({
+    queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.PosSalesData.list('-sale_date'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: shifts = [] } = useAuthQuery({
+    queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: orders = [] } = useAuthQuery({
+    queryKey: ['dashboard-orders', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.AutoOrder.list('-created_at'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const { data: wastageLogs = [] } = useAuthQuery({
+    queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.WastageLog.list('-created_at'),
+    select: selectByScope,
+    enabled,
+  });
+
+  const now = new Date();
+  const periodStart = startOfMonth(now).toISOString().split('T')[0];
+  const periodEnd = endOfMonth(now).toISOString().split('T')[0];
+
+  const { data: budgetTargets = [] } = useAuthQuery({
+    queryKey: ['dashboard-budget-targets', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
+    queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
+    select: React.useCallback((data) => selectByScope(data).filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [periodEnd, periodStart, selectByScope]),
+    enabled,
+  });
+
+  const { data: orgUsers = [] } = useAuthQuery({
+    queryKey: ['dashboard-org-users', organization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('organizations').select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
+      const { data, error } = await supabase.from('profiles').select('id, role, organization_id, brand_id, location_id').eq('organization_id', organization.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled,
+  });
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const channel = supabase.channel(`dashboard-${scope}-realtime`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-invoices'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-inventory'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-budget-targets'] }))
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [enabled, queryClient, scope]);
+
+  return {
+    budgetTargets,
+    invoices,
+    inventory,
+    orders,
+    orgUsers,
+    payments,
+    products,
+    salesData,
+    shifts,
+    wastageLogs,
+  };
+}
+
+function useDashboardMetrics(data) {
+  return React.useMemo(() => {
+    const now = new Date();
+    const today = sumBy(data.salesData.filter((sale) => {
+      const date = getDate(sale);
+      return date && isSameDay(date, now);
+    }), (sale) => sale.revenue);
+
+    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const lastWeekStart = subWeeks(thisWeekStart, 1);
+    const lastYearWeekStart = subYears(thisWeekStart, 1);
+    const weekEnd = new Date(thisWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const lastWeekEnd = new Date(lastWeekStart);
+    lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
+    const lastYearWeekEnd = new Date(lastYearWeekStart);
+    lastYearWeekEnd.setDate(lastYearWeekEnd.getDate() + 6);
+
+    const salesInRange = (start, end) => sumBy(data.salesData.filter((sale) => {
+      const date = getDate(sale);
+      return date && isWithinInterval(date, { start, end });
+    }), (sale) => sale.revenue);
+
+    const weekSales = salesInRange(thisWeekStart, weekEnd);
+    const lastWeekSales = salesInRange(lastWeekStart, lastWeekEnd);
+    const lastYearSales = salesInRange(lastYearWeekStart, lastYearWeekEnd);
+    const monthSales = salesInRange(startOfMonth(now), endOfMonth(now));
+    const unpaid = sumBy(data.invoices.filter((invoice) => invoice.payment_status === 'unpaid' || invoice.status === 'approved'), getInvoiceAmount);
+    const pendingInvoices = data.invoices.filter((invoice) => invoice.status === 'pending_review');
+    const lowStock = data.inventory.filter((item) => Number(item.current_quantity || 0) <= Number(item.reorder_point || 5));
+    const openOrders = data.orders.filter((order) => !['completed', 'received', 'cancelled'].includes(order.status));
+    const laborCost = sumBy(data.shifts, (shift) => shift.labor_cost);
+    const invoiceSpend = sumBy(data.invoices, getInvoiceAmount);
+    const wastageCost = sumBy(data.wastageLogs, (log) => log.value || log.total_value);
+    const cogsPercent = monthSales ? (invoiceSpend / monthSales) * 100 : 0;
+    const laborPercent = monthSales ? (laborCost / monthSales) * 100 : 0;
+    const primeCostPercent = cogsPercent + laborPercent;
+
+    const spendByCategoryMap = data.invoices.reduce((acc, invoice) => {
+      getLineItems(invoice).forEach((line) => {
+        const category = line.category || line.accounting_category || 'Other';
+        acc[category] = (acc[category] || 0) + getLineAmount(line);
+      });
+      if (!getLineItems(invoice).length) {
+        acc.Other = (acc.Other || 0) + getInvoiceAmount(invoice);
+      }
+      return acc;
+    }, {});
+
+    const spendByCategory = Object.entries(spendByCategoryMap)
+      .map(([name, value], index) => ({ name, value, color: COLORS[index % COLORS.length] }))
+      .sort((a, b) => b.value - a.value);
+
+    const budgetByCategory = Object.fromEntries(data.budgetTargets.map((target) => [target.category, target]));
+    const budgetPacing = ['Sales', 'COGS', 'Labor', 'Prime Cost', ...spendByCategory.slice(0, 5).map((item) => item.name)]
+      .filter((category, index, arr) => arr.indexOf(category) === index)
+      .map((category) => {
+        const target = Number(budgetByCategory[category]?.target_amount || 0);
+        const actual = category === 'Sales'
+          ? monthSales
+          : category === 'Labor'
+            ? laborCost
+            : category === 'Prime Cost'
+              ? invoiceSpend + laborCost
+              : spendByCategoryMap[category] || (category === 'COGS' ? invoiceSpend : 0);
+        const fallbackTarget = target || (category === 'Sales' ? monthSales * 1.05 : actual * 0.95);
+        return {
+          category,
+          actual,
+          target: fallbackTarget,
+          remaining: fallbackTarget - actual,
+          pacing: fallbackTarget ? ((actual - fallbackTarget) / fallbackTarget) * 100 : 0,
+          isGood: category === 'Sales' ? actual >= fallbackTarget : actual <= fallbackTarget,
+        };
+      });
+
+    const dailyRows = WEEK_DAYS.map((name, index) => {
+      const currentDate = new Date(thisWeekStart);
+      currentDate.setDate(thisWeekStart.getDate() + index);
+      const previousDate = new Date(lastWeekStart);
+      previousDate.setDate(lastWeekStart.getDate() + index);
+      const yearDate = new Date(lastYearWeekStart);
+      yearDate.setDate(lastYearWeekStart.getDate() + index);
+      const actual = sumBy(data.salesData.filter((sale) => {
+        const date = getDate(sale);
+        return date && isSameDay(date, currentDate);
+      }), (sale) => sale.revenue);
+      const lastWeek = sumBy(data.salesData.filter((sale) => {
+        const date = getDate(sale);
+        return date && isSameDay(date, previousDate);
+      }), (sale) => sale.revenue);
+      const lastYear = sumBy(data.salesData.filter((sale) => {
+        const date = getDate(sale);
+        return date && isSameDay(date, yearDate);
+      }), (sale) => sale.revenue);
+      return {
+        name,
+        actual,
+        lastWeek,
+        lastYear,
+        vsLastWeek: variance(actual, lastWeek),
+        vsLastYear: variance(actual, lastYear),
+      };
+    });
+
+    const recommendations = [];
+    if (lowStock.length) recommendations.push({ tone: 'red', title: `${lowStock.length} low stock items`, body: 'Review reorder points and place replenishment orders.', href: 'Inventory' });
+    if (pendingInvoices.length) recommendations.push({ tone: 'orange', title: `${pendingInvoices.length} invoices pending`, body: 'Clear pending review so AP and inventory stay current.', href: 'Invoices' });
+    const overBudget = budgetPacing.filter((item) => !item.isGood && Math.abs(item.pacing) >= 1);
+    if (overBudget.length) recommendations.push({ tone: 'yellow', title: `${overBudget[0].category} pacing ${percent(overBudget[0].pacing)}`, body: 'Open budget pacing and inspect category drivers.', href: 'Performance' });
+    if (laborPercent > 28) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
+    if (!monthSales) recommendations.push({ tone: 'blue', title: 'POS sales not flowing yet', body: 'Connect or map POS data to unlock daily sales benchmarking.', href: 'RestaurantSetup?tab=pos' });
+
+    return {
+      budgetPacing,
+      cogsPercent,
+      dailyRows,
+      invoiceSpend,
+      laborCost,
+      laborPercent,
+      lastWeekSales,
+      lastYearSales,
+      lowStock,
+      monthSales,
+      openOrders,
+      pendingInvoices,
+      primeCostPercent,
+      recommendations,
+      spendByCategory,
+      today,
+      unpaid,
+      wastageCost,
+      weekSales,
+      weekVsLastWeek: variance(weekSales, lastWeekSales),
+      weekVsLastYear: variance(weekSales, lastYearSales),
+    };
+  }, [data]);
+}
+
+function DashboardHeader({ title, subtitle, scopeLabel }) {
+  return (
+    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
+          {scopeLabel && <Badge variant="secondary" className="capitalize">{scopeLabel}</Badge>}
+        </div>
+        <p className="mt-1 text-muted-foreground">{subtitle}</p>
+      </div>
+      <Link to={createPageUrl('Performance')}>
+        <Button variant="outline" className="gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Open Performance
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+function DataHealthBanner({ score = 80 }) {
+  return (
+    <Card className="border-brand/30 bg-brand/5 shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-background">
+              <svg className="h-16 w-16 -rotate-90">
+                <circle cx="32" cy="32" r="27" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-brand/15" />
+                <circle cx="32" cy="32" r="27" stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray="170" strokeDashoffset={170 - (score / 100) * 170} className="text-brand" />
+              </svg>
+              <span className="absolute text-sm font-bold text-brand">{score}%</span>
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Data Health Score</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                POS sales, invoice coding, inventory counts, and labor data feed the operating dashboard. Complete setup to unlock stronger AvT and benchmark recommendations.
+              </p>
+            </div>
+          </div>
+          <Link to={createPageUrl('RestaurantSetup') + '?tab=pos'}>
+            <Button className="bg-brand text-primary-foreground hover:opacity-90">Complete Onboarding</Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function KpiStrip({ metrics, platformStats, mode = 'operator' }) {
+  if (mode === 'platform') {
+    return (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Organizations" value={platformStats.totalOrgs} icon={Building2} tone="blue" linkTo="PlatformOrganizations" linkText="Manage" />
+        <StatCard label="Active Users" value={platformStats.totalUsers} icon={Users} tone="purple" linkTo="PlatformUsers" linkText="View users" />
+        <StatCard label="Monthly Revenue" value={currency(platformStats.mrr)} icon={DollarSign} tone="green" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" />
+        <StatCard label="Active Subscriptions" value={platformStats.activeSubscriptions} icon={Activity} tone="brand" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <StatCard label="Week-To-Date Sales" value={currency(metrics.weekSales)} icon={TrendingUp} tone="green" subtext={`${percent(metrics.weekVsLastWeek)} vs last week`} />
+      <StatCard label="COGS" value={`${metrics.cogsPercent.toFixed(1)}%`} icon={Package} tone={metrics.cogsPercent > 32 ? 'red' : 'blue'} subtext={`${currency(metrics.invoiceSpend)} period spend`} />
+      <StatCard label="Labor" value={`${metrics.laborPercent.toFixed(1)}%`} icon={Users} tone={metrics.laborPercent > 28 ? 'orange' : 'purple'} subtext={`${currency(metrics.laborCost)} scheduled/logged`} />
+      <StatCard label="Needs Attention" value={metrics.recommendations.length} icon={AlertTriangle} tone={metrics.recommendations.length ? 'red' : 'green'} subtext={`${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock`} />
+    </div>
+  );
+}
+
+function NeedsAttentionPanel({ items }) {
+  const visible = items.length ? items : [{ tone: 'green', title: 'No urgent dashboard alerts', body: 'Core workflows look clear based on the data currently available.' }];
+  return (
+    <SectionCard title="Today Needs Attention" description="Prioritized operator actions from sales, budget, inventory, labor, and AP.">
+      <div className="space-y-3">
+        {visible.slice(0, 5).map((item) => (
+          <div key={item.title} className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-secondary/40 p-3">
+            <div className="flex items-start gap-3">
+              <div className={cn('mt-0.5 h-2.5 w-2.5 rounded-full', {
+                'bg-resend-red': item.tone === 'red',
+                'bg-resend-orange': item.tone === 'orange',
+                'bg-resend-yellow': item.tone === 'yellow',
+                'bg-resend-blue': item.tone === 'blue',
+                'bg-resend-green': item.tone === 'green',
+              })} />
+              <div>
+                <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{item.body}</p>
+              </div>
+            </div>
+            {item.href && (
+              <Link to={createPageUrl(item.href)} className="shrink-0 text-xs font-semibold text-brand hover:opacity-80">
+                Open
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function SalesPerformanceTable({ metrics }) {
+  return (
+    <SectionCard title="Sales Performance" description="MarginEdge-style current week comparison against last week and last year.">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-sm">
+          <thead>
+            <tr className="border-b text-muted-foreground">
+              <th className="py-2 text-left font-medium">Day</th>
+              <th className="py-2 text-right font-medium">This Week</th>
+              <th className="py-2 text-right font-medium">Last Week</th>
+              <th className="py-2 text-right font-medium">Vs. Last Week</th>
+              <th className="py-2 text-right font-medium">Last Year</th>
+              <th className="py-2 text-right font-medium">Vs. Last Year</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b bg-secondary/40 font-semibold">
+              <td className="py-2">Total</td>
+              <td className="py-2 text-right">{currency(metrics.weekSales)}</td>
+              <td className="py-2 text-right">{currency(metrics.lastWeekSales)}</td>
+              <td className={cn('py-2 text-right', metrics.weekVsLastWeek >= 0 ? 'text-resend-green' : 'text-resend-red')}>{percent(metrics.weekVsLastWeek)}</td>
+              <td className="py-2 text-right">{currency(metrics.lastYearSales)}</td>
+              <td className={cn('py-2 text-right', metrics.weekVsLastYear >= 0 ? 'text-resend-green' : 'text-resend-red')}>{percent(metrics.weekVsLastYear)}</td>
+            </tr>
+            {metrics.dailyRows.map((row) => (
+              <tr key={row.name} className="border-b last:border-0">
+                <td className="py-2 font-medium">{row.name}</td>
+                <td className="py-2 text-right">{currency(row.actual)}</td>
+                <td className="py-2 text-right">{currency(row.lastWeek)}</td>
+                <td className={cn('py-2 text-right', row.vsLastWeek >= 0 ? 'text-resend-green' : 'text-resend-red')}>{percent(row.vsLastWeek)}</td>
+                <td className="py-2 text-right">{currency(row.lastYear)}</td>
+                <td className={cn('py-2 text-right', row.vsLastYear >= 0 ? 'text-resend-green' : 'text-resend-red')}>{percent(row.vsLastYear)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+function BudgetPacingPanel({ metrics }) {
+  return (
+    <SectionCard title="Budget Pacing" description="Targets, actual spend, remaining budget, and over/under signal for this period.">
+      <div className="space-y-4">
+        {metrics.budgetPacing.slice(0, 8).map((item) => {
+          const progress = item.target ? Math.min((item.actual / item.target) * 100, 140) : 0;
+          return (
+            <div key={item.category} className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{item.category}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Actual {currency(item.actual)} / Target {currency(item.target)}
+                  </p>
+                </div>
+                <Badge className={item.isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
+                  {item.isGood ? 'On track' : 'Needs review'}
+                </Badge>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className={cn('text-xs', item.remaining >= 0 ? 'text-muted-foreground' : 'text-resend-red')}>
+                {item.remaining >= 0 ? `${currency(item.remaining)} remaining` : `${currency(Math.abs(item.remaining))} over`} ({percent(item.pacing)})
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
+function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
+  const pieData = metrics.spendByCategory.length ? metrics.spendByCategory : [{ name: 'No spend coded', value: 1, color: '#e5e7eb' }];
+  const workflows = [
+    { label: 'Invoices', value: data.invoices.length, href: 'Invoices', icon: FileText },
+    { label: 'Payments', value: data.payments.length, href: 'Payments', icon: CreditCard },
+    { label: 'Open Orders', value: metrics.openOrders.length, href: 'AutoOrdering', icon: ShoppingCart },
+    { label: 'Low Stock', value: metrics.lowStock.length, href: 'Inventory', icon: Warehouse },
+    { label: 'Products', value: data.products.length, href: 'Products', icon: Package },
+    { label: 'Waste Cost', value: currency(metrics.wastageCost), href: 'Inventory?tab=wastage', icon: AlertTriangle },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <SectionCard title="Spend by Category" description="Invoice spend grouped by coded category." className="xl:col-span-1">
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={82} paddingAngle={2} dataKey="value">
+                {pieData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+              </Pie>
+              <Tooltip formatter={(value) => currency(value)} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </SectionCard>
+
+      {showWorkflow && (
+        <SectionCard title="Operational Workflows" description="Live platform work that supports the performance dashboard." className="xl:col-span-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {workflows.map((item) => (
+              <Link key={item.label} to={createPageUrl(item.href)} className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/60">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-background">
+                    <item.icon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">{item.label}</span>
+                </div>
+                <span className="text-sm font-bold text-foreground">{item.value}</span>
+              </Link>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
+function BenchmarkPanel({ metrics, title = 'Scope Benchmarking' }) {
+  const data = [
+    { name: 'Sales', actual: metrics.weekSales, benchmark: metrics.lastWeekSales || metrics.weekSales },
+    { name: 'COGS', actual: metrics.cogsPercent, benchmark: 32 },
+    { name: 'Labor', actual: metrics.laborPercent, benchmark: 28 },
+    { name: 'Prime', actual: metrics.primeCostPercent, benchmark: 60 },
+  ];
+
+  return (
+    <SectionCard title={title} description="Benchmarks use last-week sales and common restaurant operating targets until richer peer data is available.">
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="actual" name="Actual" fill="#0d9488" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="benchmark" name="Benchmark" fill="#6366f1" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </SectionCard>
+  );
+}
+
+function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
+  const data = useDashboardData(scope);
+  const metrics = useDashboardMetrics(data);
+
+  return (
+    <div className="space-y-6">
+      <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
+      <DataHealthBanner />
+      <KpiStrip metrics={metrics} />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-1">
+          <NeedsAttentionPanel items={metrics.recommendations} />
+        </div>
+        <div className="xl:col-span-2">
+          <SalesPerformanceTable metrics={metrics} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <BudgetPacingPanel metrics={metrics} />
+        <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
+      </div>
+      <SpendAndWorkflowGrid metrics={metrics} data={data} />
+    </div>
+  );
+}
+
+function GroundStaffDashboard() {
+  const { organization, location, userProfile } = useAuth();
+  const data = useDashboardData('staff');
+  const metrics = useDashboardMetrics(data);
+  const enabledModules = organization?.enabled_modules || [];
+  const permissions = userProfile?.permissions || {};
+
+  const tasks = [
+    { module: 'Invoices', href: 'Invoices', label: 'Upload or review invoices', value: data.invoices.length, icon: Upload },
+    { module: 'Inventory', href: 'Inventory', label: 'Check inventory and counts', value: metrics.lowStock.length, icon: Warehouse },
+    { module: 'Products', href: 'Products', label: 'Review products', value: data.products.length, icon: Package },
+    { module: 'AutoOrdering', href: 'AutoOrdering', label: 'Receive or place orders', value: metrics.openOrders.length, icon: ShoppingCart },
+  ].filter((task) => {
+    const explicit = permissions[task.module];
+    if (explicit === 'none') return false;
+    if (explicit === 'read' || explicit === 'full') return true;
+    return isPageInEnabledModules(task.module, enabledModules, userProfile?.role);
+  });
+
+  return (
+    <div className="space-y-6">
+      <DashboardHeader
+        title="My Dashboard"
+        subtitle={location?.name ? `Assigned to ${location.name}. Tasks are filtered to your module access.` : 'Tasks are filtered to your module access.'}
+        scopeLabel="Ground Staff"
+      />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard label="My Uploads" value={data.invoices.length} icon={Upload} tone="blue" linkTo="Invoices" linkText="Upload invoice" />
+        <StatCard label="Pending Invoices" value={metrics.pendingInvoices.length} icon={Clock} tone="orange" linkTo="Invoices" linkText="View invoices" />
+        <StatCard label="Assigned Modules" value={tasks.length} icon={Shield} tone="brand" />
+      </div>
+      <SectionCard title="My Module Tasks" description="Only actions available to your role and permissions are shown here.">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {tasks.map((task) => (
+            <Link key={task.href} to={createPageUrl(task.href)} className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/60">
+              <div className="flex items-center gap-3">
+                <task.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">{task.label}</span>
+              </div>
+              <Badge variant="secondary">{task.value}</Badge>
+            </Link>
+          ))}
+          {!tasks.length && <p className="text-sm text-muted-foreground">No module tasks are assigned yet.</p>}
+        </div>
+      </SectionCard>
+      <NeedsAttentionPanel items={metrics.recommendations.filter((item) => ['Invoices', 'Inventory', 'Products', 'AutoOrdering'].some((page) => item.href?.startsWith(page)))} />
+    </div>
+  );
+}
+
+function PlatformDashboard() {
+  const queryClient = useQueryClient();
+  const { data: allOrgs = [] } = useAuthQuery({
+    queryKey: ['platform-dashboard-orgs'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('organizations').select('id, name, subscription_status, plan_id, enabled_modules');
       if (error) throw error;
       return data || [];
     },
   });
-
   const { data: allProfiles = [] } = useAuthQuery({
-    queryKey: ['dash-profiles'],
+    queryKey: ['platform-dashboard-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase.from('profiles').select('id, role, organization_id');
       if (error) throw error;
       return data || [];
     },
   });
-
   const { data: allPlans = [] } = useAuthQuery({
-    queryKey: ['dash-plans'],
+    queryKey: ['platform-dashboard-plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*');
+      const { data, error } = await supabase.from('plans').select('id, price_monthly');
       if (error) throw error;
       return data || [];
     },
   });
-
   const { data: recentLogs = [] } = useAuthQuery({
-    queryKey: ['dash-recent-logs'],
+    queryKey: ['platform-dashboard-logs'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('audit_logs').select('id, action, table_name, created_at, user_id').order('created_at', { ascending: false }).limit(8);
+      const { data, error } = await supabase.from('audit_logs').select('id, action, table_name, created_at').order('created_at', { ascending: false }).limit(8);
       if (error) throw error;
       return data || [];
     },
   });
 
-  // Removed tenant invoices query to enforce data siloing
-
-  // -- Realtime subscription for platform dashboard --
-  const queryClient = useQueryClient();
   useEffect(() => {
-    const channel = supabase.channel('platform-dash-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['dash-orgs'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['dash-profiles'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['dash-recent-logs'] });
-      })
+    const channel = supabase.channel('platform-dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => queryClient.invalidateQueries({ queryKey: ['platform-dashboard-orgs'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => queryClient.invalidateQueries({ queryKey: ['platform-dashboard-profiles'] }))
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [queryClient]);
 
-  const { activeOrgs, trialOrgs, mrr } = React.useMemo(() => {
-    const active = allOrgs.filter(o => o.subscription_status === 'active');
-    const trial = allOrgs.filter(o => !o.subscription_status || o.subscription_status === 'trialing' || o.subscription_status === 'trial');
-    const planPriceMap = {};
-    allPlans.forEach(p => { planPriceMap[p.id] = p.price_monthly || 0; });
-    const calculatedMrr = allOrgs.reduce((sum, org) => sum + (planPriceMap[org.plan_id] || 0), 0);
-    return { activeOrgs: active, trialOrgs: trial, mrr: calculatedMrr };
-  }, [allOrgs, allPlans]);
+  const planPriceMap = Object.fromEntries(allPlans.map((plan) => [plan.id, Number(plan.price_monthly || 0)]));
+  const platformStats = {
+    totalOrgs: allOrgs.length,
+    totalUsers: allProfiles.length,
+    activeSubscriptions: allOrgs.filter((org) => org.subscription_status === 'active').length,
+    mrr: allOrgs.reduce((sum, org) => sum + (planPriceMap[org.plan_id] || 0), 0),
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-indigo-400" />
-          <h1 className="text-2xl font-bold text-foreground">Platform Overview</h1>
-        </div>
-        <p className="text-muted-foreground mt-1">Global platform metrics across all organizations</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Organizations" value={allOrgs.length} icon={Building2} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="PlatformAdmin?tab=orgs" linkText="Manage" delayClass="stagger-1" />
-        <StatCard label="Active Users" value={allProfiles.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="PlatformUsers" linkText="View users" delayClass="stagger-2" />
-        <StatCard label="Monthly Revenue" value={`$${mrr.toLocaleString()}`} icon={DollarSign} iconBg="bg-resend-green/10" iconColor="text-resend-green" linkTo="PlatformAdmin?tab=accounting" linkText="Accounting" delayClass="stagger-3" />
-        <StatCard label="Active Subscriptions" value={activeOrgs.length} icon={Activity} iconBg="bg-primary/10" iconColor="text-primary" linkTo="PlatformAdmin?tab=subscriptions" linkText="Manage" subtext={<><span className="text-resend-yellow font-medium">{trialOrgs.length}</span> trials</>} delayClass="stagger-4" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Org Distribution */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Organization Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                { label: 'Active', count: activeOrgs.length, color: 'bg-resend-green' },
-                { label: 'Trial', count: trialOrgs.length, color: 'bg-resend-yellow' },
-                { label: 'Total', count: allOrgs.length, color: 'bg-blue-500' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                    <span className="text-sm text-muted-foreground">{item.label}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-foreground">{item.count}</span>
+      <DashboardHeader title="Platform Overview" subtitle="Global SaaS health, customer activity, and revenue operations." scopeLabel="Platform Admin" />
+      <KpiStrip mode="platform" platformStats={platformStats} />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard title="Organization Status" description="Current platform tenant mix.">
+          <div className="space-y-3">
+            {[
+              { label: 'Active', count: platformStats.activeSubscriptions, color: 'bg-resend-green' },
+              { label: 'Trial or Pending', count: allOrgs.filter((org) => org.subscription_status !== 'active').length, color: 'bg-resend-yellow' },
+              { label: 'Total', count: allOrgs.length, color: 'bg-resend-blue' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between rounded-lg bg-secondary/40 p-3">
+                <div className="flex items-center gap-2">
+                  <span className={cn('h-2.5 w-2.5 rounded-full', item.color)} />
+                  <span className="text-sm text-muted-foreground">{item.label}</span>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Audit Logs */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
-            <Link to={createPageUrl('PlatformAuditLogs')}>
-              <Button variant="ghost" size="sm" className="text-primary">View All</Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentLogs.length > 0 ? (
-              <div className="space-y-2">
-                {recentLogs.map(log => (
-                  <div key={log.id} className="flex items-center justify-between p-2 bg-secondary rounded-lg text-sm">
-                    <div className="flex items-center gap-2">
-                      <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="font-medium text-foreground capitalize">{log.action}</span>
-                      <Badge variant="secondary" className="text-[10px]">{log.table_name}</Badge>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">{log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}</span>
-                  </div>
-                ))}
+                <span className="text-sm font-semibold text-foreground">{item.count}</span>
               </div>
-            ) : (
-              <div className="py-6 text-center text-muted-foreground text-sm">No recent activity</div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// 
-// Org Owner Dashboard Org-level metrics
-// 
-function OrgOwnerDashboard() {
-  const { organization } = useAuth();
-
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
-  });
-  const { data: payments = [] } = useAuthQuery({
-    queryKey: ['payments'],
-    queryFn: () => api.entities.Payment.list('-created_at'),
-  });
-  const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['inventory'],
-    queryFn: () => api.entities.Inventory.list(),
-  });
-  const { data: products = [] } = useAuthQuery({
-    queryKey: ['products'],
-    queryFn: () => api.entities.Product.list(),
-  });
-  const { data: orgUsers = [] } = useAuthQuery({
-    queryKey: ['org-users', organization?.id],
-    queryFn: async () => {
-      if (!organization?.id) return [];
-      const { data } = await supabase.from('profiles').select('id, role').eq('organization_id', organization.id);
-      return data || [];
-    },
-    enabled: !!organization?.id,
-  });
-
-  const { data: salesData = [] } = useAuthQuery({
-    queryKey: ['pos_sales_data'],
-    queryFn: () => api.entities.PosSalesData.list(),
-  });
-
-  // -- Realtime subscription for org dashboard --
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    const channel = supabase.channel('org-dash-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['pos_sales_data'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { pendingInvoices, totalUnpaid, lowStockItems, activeModules, spendByCategory, pieData, benchmarks, forecastedSales, forecastedPayroll } = React.useMemo(() => {
-    const pending = invoices.filter(i => i.status === 'pending_review').length;
-    const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
-    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-    const active = organization?.enabled_modules?.length || 0;
-
-    const spend = invoices.reduce((acc, inv) => {
-      inv.line_items?.forEach(item => {
-        const cat = item.category || 'Other';
-        acc[cat] = (acc[cat] || 0) + (item.extended_price || 0);
-      });
-      return acc;
-    }, {});
-    const pie = Object.entries(spend).map(([name, value]) => ({ name, value }));
-
-    // Real Forecasted Sales based on last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentSales = salesData
-      .filter(s => new Date(s.sale_date || s.created_at) >= thirtyDaysAgo)
-      .reduce((sum, s) => sum + (Number(s.revenue) || 0), 0);
-    
-    // We don't have shifts/payroll data yet, so default to 0 to avoid hallucination
-    const projectedPayroll = 0;
-
-    return {
-      pendingInvoices: pending,
-      totalUnpaid: unpaid,
-      lowStockItems: lowStock,
-      activeModules: active,
-      spendByCategory: spend,
-      pieData: pie,
-      benchmarks: [],
-      forecastedSales: recentSales,
-      forecastedPayroll: projectedPayroll
-    };
-  }, [invoices, inventory, organization, salesData]);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{organization?.name || 'Organization'} Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your organization's operations</p>
-      </div>
-
-      <Card className="border-brand/30 bg-brand/5 shadow-sm">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex items-center justify-center">
-                <svg className="w-16 h-16 transform -rotate-90">
-                  <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-brand/20" />
-                  <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray="175" strokeDashoffset="35" className="text-brand" />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-sm font-bold text-brand">80%</span>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-md font-bold text-foreground">Data Health Score</h3>
-                <p className="text-sm text-muted-foreground max-w-lg">Your organization is almost fully set up. Complete your POS menu mapping to unlock automated Actual vs. Theoretical reporting and full margin protection.</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Link to={createPageUrl('RestaurantSetup') + "?tab=pos"}>
-                <Button className="bg-brand text-primary-foreground hover:opacity-90">Complete Onboarding</Button>
-              </Link>
-            </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Active Users" value={orgUsers.length} icon={Users} iconBg="bg-purple-500/10" iconColor="text-purple-400" linkTo="UserManagement" linkText="Manage users" delayClass="stagger-1" />
-        <StatCard label="Active Modules" value={activeModules || 'All'} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="OrgManagement" linkText="View plan" delayClass="stagger-2" />
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" delayClass="stagger-3" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" delayClass="stagger-4" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Spend by Category */}
-        <Card className="border-0 shadow-sm lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Spend by Category</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground">No data yet</div>
-            )}
-            <div className="flex flex-wrap gap-3 mt-4 justify-center">
-              {pieData.slice(0, 4).map((item, idx) => (
-                <div key={item.name} className="flex items-center gap-1.5 text-xs">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
-                  <span className="text-muted-foreground">{item.name}</span>
+        </SectionCard>
+        <SectionCard title="Recent Platform Activity" description="Latest audit events across the platform.">
+          <div className="space-y-2">
+            {recentLogs.map((log) => (
+              <div key={log.id} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/40 p-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium capitalize text-foreground">{log.action}</span>
+                  <Badge variant="secondary" className="text-[10px]">{log.table_name}</Badge>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Predictive Cash Flow */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Predictive Cash Flow</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-resend-green/10 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-resend-green" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">Forecasted Sales (30 Days)</p>
-                    <p className="text-sm text-muted-foreground">Based on historical POS volume</p>
-                  </div>
-                </div>
-                <p className="text-xl font-bold text-resend-green">+${forecastedSales.toLocaleString()}</p>
+                <span className="text-xs text-muted-foreground">{log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}</span>
               </div>
-              
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-resend-red/10 flex items-center justify-center">
-                    <FileText className="h-5 w-5 text-resend-red" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">Accounts Payable</p>
-                    <p className="text-sm text-muted-foreground">Pending unpaid invoices</p>
-                  </div>
-                </div>
-                <p className="text-xl font-bold text-resend-red">-${totalUnpaid.toLocaleString()}</p>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-resend-orange/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-resend-orange" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground">Forecasted Payroll</p>
-                    <p className="text-sm text-muted-foreground">Based on scheduled shifts</p>
-                  </div>
-                </div>
-                <p className="text-xl font-bold text-resend-orange">-${forecastedPayroll.toLocaleString()}</p>
-              </div>
-
-              <div className="pt-4 border-t flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-foreground text-lg">Projected Net Cash</p>
-                  <p className="text-xs text-muted-foreground">Estimated position in 30 days</p>
-                </div>
-                <p className={`text-2xl font-black ${forecastedSales - totalUnpaid - forecastedPayroll > 0 ? 'text-resend-green' : 'text-resend-red'}`}>
-                  ${(forecastedSales - totalUnpaid - forecastedPayroll).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Cross-Location Benchmarking */}
-        <Card className="border-0 shadow-sm lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Cross-Location Benchmarking</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart
-                data={benchmarks.length > 0 ? benchmarks : [
-                  { name: 'Loading...', sales: 0, laborCost: 0, cogs: 0 }
-                ]}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => `$${value.toLocaleString()}`} cursor={{fill: 'hsl(var(--secondary))'}} />
-                <Legend />
-                <Bar dataKey="sales" name="Gross Sales" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="cogs" name="COGS" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="laborCost" name="Labor Cost" fill="#6366f1" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card className="border-0 shadow-sm lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Operations Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Total Invoices', value: invoices.length, icon: FileText },
-                { label: 'Total Payments', value: payments.length, icon: CreditCard },
-                { label: 'Products', value: products.length, icon: Package },
-                { label: 'Inventory Items', value: inventory.length, icon: Warehouse },
-                { label: 'Low Stock Alerts', value: lowStockItems, icon: AlertTriangle },
-                { label: 'Team Members', value: orgUsers.length, icon: Users },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
-                  <item.icon className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <p className="text-lg font-bold text-foreground">{item.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// 
-// Branch Manager Dashboard Branch-level metrics
-// 
-function BranchManagerDashboard() {
-  const { brand, location } = useAuth();
-
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices', 'brand', brand?.id],
-    queryFn: async () => {
-      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
-      if (brand?.id) q = q.eq('brand_id', brand.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!brand?.id
-  });
-  const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['inventory', 'brand', brand?.id],
-    queryFn: async () => {
-      let q = supabase.from('inventory').select('*');
-      if (brand?.id) q = q.eq('brand_id', brand.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!brand?.id
-  });
-  const { data: products = [] } = useAuthQuery({
-    queryKey: ['products', 'brand', brand?.id],
-    queryFn: async () => {
-      let q = supabase.from('products').select('*');
-      if (brand?.id) q = q.eq('brand_id', brand.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!brand?.id
-  });
-
-  // -- Realtime subscription for branch dashboard --
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    const channel = supabase.channel('branch-dash-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { pendingInvoices, totalUnpaid, lowStockItems, thisMonthSpend, recentInvoices } = React.useMemo(() => {
-    const pending = invoices.filter(i => i.status === 'pending_review').length;
-    const unpaid = invoices.filter(i => i.payment_status === 'unpaid').reduce((sum, i) => sum + (i.total_amount || 0), 0);
-    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-    
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const thisMonth = invoices
-      .filter(i => new Date(i.invoice_date) >= startOfMonth)
-      .reduce((sum, i) => sum + (i.total_amount || 0), 0);
-
-    const recent = invoices.slice(0, 5);
-
-    return {
-      pendingInvoices: pending,
-      totalUnpaid: unpaid,
-      lowStockItems: lowStock,
-      thisMonthSpend: thisMonth,
-      recentInvoices: recent
-    };
-  }, [invoices, inventory]);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {brand?.name || location?.name || 'Branch'} Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">Branch-level operations overview</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View all" delayClass="stagger-1" />
-        <StatCard label="Unpaid Amount" value={`$${totalUnpaid.toLocaleString()}`} icon={CreditCard} iconBg="bg-resend-red/10" iconColor="text-resend-red" linkTo="Payments" linkText="View payments" delayClass="stagger-2" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" delayClass="stagger-3" />
-        <StatCard label="This Month Spend" value={`$${thisMonthSpend.toLocaleString()}`} icon={DollarSign} iconBg="bg-primary/10" iconColor="text-primary" subtext={<><TrendingUp className="h-4 w-4 text-resend-green" /><span>{products.length} products tracked</span></>} delayClass="stagger-4" />
-      </div>
-
-      {/* Recent Invoices */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base font-semibold">Recent Invoices</CardTitle>
-          <Link to={createPageUrl('Invoices')}>
-            <Button variant="ghost" size="sm" className="text-primary">View All</Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {recentInvoices.length > 0 ? (
-            <div className="space-y-3">
-              {recentInvoices.map(invoice => (
-                <div key={invoice.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-white flex items-center justify-center border">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{invoice.vendor_name}</p>
-                      <p className="text-sm text-muted-foreground">#{invoice.invoice_number}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-foreground">${invoice.total_amount?.toLocaleString()}</p>
-                    <Badge variant="secondary" className={`text-xs ${
-                      invoice.status === 'pending_review' ? 'bg-resend-orange/10 text-resend-orange' :
-                      invoice.status === 'approved' ? 'bg-resend-green/10 text-resend-green' :
-                      'bg-secondary text-muted-foreground'
-                    }`}>
-                      {invoice.status?.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-muted-foreground">No invoices yet</div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// 
-// Location Manager Dashboard Location-level metrics
-// 
-function LocationManagerDashboard() {
-  const { location } = useAuth();
-
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices', 'location', location?.id],
-    queryFn: async () => {
-      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
-      if (location?.id) q = q.eq('location_id', location.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!location?.id
-  });
-  const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['inventory', 'location', location?.id],
-    queryFn: async () => {
-      let q = supabase.from('inventory').select('*');
-      if (location?.id) q = q.eq('location_id', location.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!location?.id
-  });
-  const { data: products = [] } = useAuthQuery({
-    queryKey: ['products', 'location', location?.id],
-    queryFn: async () => {
-      let q = supabase.from('products').select('*');
-      if (location?.id) q = q.eq('location_id', location.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!location?.id
-  });
-
-  // -- Realtime subscription for location dashboard --
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    const channel = supabase.channel('location-dash-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { pendingInvoices, lowStockItems, recentInvoices } = React.useMemo(() => {
-    const pending = invoices.filter(i => i.status === 'pending_review').length;
-    const lowStock = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-    const recent = invoices.slice(0, 5);
-    return {
-      pendingInvoices: pending,
-      lowStockItems: lowStock,
-      recentInvoices: recent
-    };
-  }, [invoices, inventory]);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {location?.name || 'Location'} Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">Location operations overview</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices} icon={FileText} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" delayClass="stagger-1" />
-        <StatCard label="Low Stock Items" value={lowStockItems} icon={Warehouse} iconBg="bg-resend-yellow/10" iconColor="text-resend-yellow" linkTo="Inventory" linkText="View inventory" delayClass="stagger-2" />
-        <StatCard label="Products" value={products.length} icon={Package} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" delayClass="stagger-3" />
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Link to={createPageUrl('Invoices')}>
-              <Button className="gap-2 bg-primary hover:opacity-90">
-                <Upload className="h-4 w-4" />
-                Upload Invoice
-              </Button>
-            </Link>
-            <Link to={createPageUrl('AutoOrdering')}>
-              <Button variant="outline" className="gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                Auto-Order
-              </Button>
-            </Link>
-            <Link to={createPageUrl('Recipes')}>
-              <Button variant="outline" className="gap-2">
-                <ChefHat className="h-4 w-4" />
-                Recipes
-              </Button>
-            </Link>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800">
-                  <Mail className="h-4 w-4" />
-                  Generate Shift Briefing
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5 text-indigo-600" />
-                    Daily Manager Shift Briefing
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    This automated briefing was generated by Restops Copilot for {new Date().toLocaleDateString()}.
-                  </p>
-                  <div className="bg-secondary/50 p-4 rounded-lg space-y-3 text-sm">
-                    <h4 className="font-semibold text-foreground">1. Yesterday's Performance</h4>
-                    <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                      <li>Sales: <span className="text-resend-green font-medium">$8,450</span> (105% of forecast)</li>
-                      <li>Labor: <span className="text-resend-green font-medium">27.5%</span> (Target: 28%)</li>
-                      <li>Waste: <span className="text-resend-red font-medium">$125</span> (Primarily Salmon & Produce)</li>
-                    </ul>
-                    <h4 className="font-semibold text-foreground pt-2 border-t border-border/40">2. Today's Forecast</h4>
-                    <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                      <li>Projected Sales: <span className="font-medium text-foreground">$5,200</span></li>
-                      <li>Scheduled Labor: <span className="text-resend-red font-medium">30.7%</span> (Overstaffed by ~4 hours)</li>
-                      <li><span className="text-indigo-600 font-semibold">AI Recommendation:</span> Consider cutting one morning prep shift to align with the 28% labor target.</li>
-                    </ul>
-                    <h4 className="font-semibold text-foreground pt-2 border-t border-border/40">3. Action Items</h4>
-                    <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                      <li>3 Invoices pending your review in 3-Way Match</li>
-                      <li>Bar station count sheet is due tonight</li>
-                    </ul>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            ))}
+            {!recentLogs.length && <p className="py-6 text-center text-sm text-muted-foreground">No recent platform activity</p>}
           </div>
-        </CardContent>
-      </Card>
+        </SectionCard>
+      </div>
     </div>
   );
 }
 
-// 
-// Ground Level Dashboard Minimal view
-// 
-function GroundLevelDashboard() {
-  const { location } = useAuth();
-
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['invoices', 'location', location?.id],
-    queryFn: async () => {
-      let q = supabase.from('invoices').select('*').order('created_at', { ascending: false });
-      if (location?.id) q = q.eq('location_id', location.id);
-      const { data } = await q;
-      return data || [];
-    },
-    enabled: !!location?.id
-  });
-
-  // -- Realtime subscription for ground-level dashboard --
-  const queryClient = useQueryClient();
-  useEffect(() => {
-    const channel = supabase.channel('ground-dash-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { pendingInvoices, myUploads } = React.useMemo(() => {
-    const pending = invoices.filter(i => i.status === 'pending_review');
-    const uploads = invoices.length;
-    return {
-      pendingInvoices: pending,
-      myUploads: uploads
-    };
-  }, [invoices]);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">My Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          {location?.name ? `Assigned to: ${location.name}` : 'Quick overview of your tasks'}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard label="Pending Invoices" value={pendingInvoices.length} icon={Clock} iconBg="bg-resend-orange/10" iconColor="text-resend-orange" linkTo="Invoices" linkText="View invoices" />
-        <StatCard label="My Uploads" value={myUploads} icon={Upload} iconBg="bg-resend-blue/10" iconColor="text-resend-blue" linkTo="Invoices" linkText="Upload invoice" />
-        <StatCard label="Products" value="-" icon={Eye} iconBg="bg-primary/10" iconColor="text-primary" linkTo="Products" linkText="View products" />
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Link to={createPageUrl('Invoices')}>
-              <Button className="gap-2 bg-primary hover:opacity-90">
-                <Upload className="h-4 w-4" />
-                Upload Invoice
-              </Button>
-            </Link>
-            <Link to={createPageUrl('Products')}>
-              <Button variant="outline" className="gap-2">
-                <Package className="h-4 w-4" />
-                View Products
-              </Button>
-            </Link>
-            <Link to={createPageUrl('Inventory')}>
-              <Button variant="outline" className="gap-2">
-                <Warehouse className="h-4 w-4" />
-                Check Inventory
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pending for Review */}
-      {pendingInvoices.length > 0 && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Pending Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pendingInvoices.slice(0, 5).map(invoice => (
-                <div key={invoice.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-resend-orange" />
-                    <div>
-                      <p className="font-medium text-foreground">{invoice.vendor_name}</p>
-                      <p className="text-sm text-muted-foreground">#{invoice.invoice_number}</p>
-                    </div>
-                  </div>
-                  <Badge className="bg-resend-orange/10 text-resend-orange">Pending</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// 
-// Main Dashboard Routes to the correct role-specific view
-// 
 export default function Dashboard() {
+  const { organization, brand, location } = useAuth();
   const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
 
   if (isPlatformAdmin) return <PlatformDashboard />;
-  if (isOrgOwner)      return <OrgOwnerDashboard />;
-  if (isBranchManager) return <BranchManagerDashboard />;
-  if (isLocationManager) return <LocationManagerDashboard />;
-  return <GroundLevelDashboard />;
+  if (isOrgOwner) {
+    return (
+      <OrgOperatorDashboard
+        scope="org"
+        title={`${organization?.name || 'Organization'} Dashboard`}
+        subtitle="Organization control center with daily restaurant performance and platform workflows."
+        scopeLabel="Org Owner"
+      />
+    );
+  }
+  if (isBranchManager) {
+    return (
+      <OrgOperatorDashboard
+        scope="brand"
+        title={`${brand?.name || location?.name || 'Brand'} Dashboard`}
+        subtitle="Brand-level platform operations plus sales, budget, labor, and inventory performance."
+        scopeLabel="Brand Manager"
+      />
+    );
+  }
+  if (isLocationManager) {
+    return (
+      <OrgOperatorDashboard
+        scope="location"
+        title={`${location?.name || 'Location'} Dashboard`}
+        subtitle="Daily restaurant operator dashboard for sales, pacing, AP, inventory, and labor."
+        scopeLabel="Location Manager"
+      />
+    );
+  }
+  return <GroundStaffDashboard />;
 }
