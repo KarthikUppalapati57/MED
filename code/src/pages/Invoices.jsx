@@ -108,6 +108,7 @@ export default function Invoices() {
   const [paymentAccountFilter, setPaymentAccountFilter] = useState('all');
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
+  const [batchScheduleDate, setBatchScheduleDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
@@ -350,6 +351,28 @@ export default function Invoices() {
       toast.success('Selected invoices updated');
     },
     onError: (error) => toast.error(error.message || 'Failed to update selected invoices'),
+  });
+
+  const batchScheduleMutation = useMutation({
+    mutationFn: async ({ ids, accountId, date }) => {
+      return Promise.all(ids.map(async (invoiceId) => {
+        const { error } = await api.client.rpc('schedule_invoice_payment', {
+          p_invoice_id: invoiceId,
+          p_payment_account_id: accountId,
+          p_date: date
+        });
+        if (error) throw error;
+      }));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      setSelectedInvoiceIds([]);
+      setBatchPaymentAccountId('');
+      setBatchScheduleDate('');
+      toast.success('Selected invoices scheduled for payment');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to schedule invoices'),
   });
 
   const deleteMutation = useMutation({
@@ -968,6 +991,60 @@ export default function Invoices() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Batch Actions */}
+          {selectedInvoiceIds.length > 0 && isHigherRole && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border flex flex-col sm:flex-row items-center gap-4">
+              <span className="text-sm font-medium whitespace-nowrap">
+                {selectedInvoiceIds.length} invoice(s) selected:
+              </span>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+                <Select value={batchPaymentAccountId} onValueChange={setBatchPaymentAccountId}>
+                  <SelectTrigger className="w-full sm:w-48 bg-background">
+                    <SelectValue placeholder="Payment Account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentAccounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                    ))}
+                    {paymentAccounts.length === 0 && (
+                      <SelectItem value="none" disabled>No active accounts found</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="date"
+                  value={batchScheduleDate}
+                  onChange={(e) => setBatchScheduleDate(e.target.value)}
+                  className="w-full sm:w-40 bg-background"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <Button 
+                  size="sm"
+                  className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
+                  disabled={!batchPaymentAccountId || !batchScheduleDate || batchScheduleMutation.isPending}
+                  onClick={() => batchScheduleMutation.mutate({ 
+                    ids: selectedInvoiceIds, 
+                    accountId: batchPaymentAccountId, 
+                    date: batchScheduleDate 
+                  })}
+                >
+                  {batchScheduleMutation.isPending ? 'Scheduling...' : 'Schedule Batch'}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    setSelectedInvoiceIds([]);
+                    setBatchPaymentAccountId('');
+                    setBatchScheduleDate('');
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -978,6 +1055,18 @@ export default function Invoices() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox 
+                      checked={filteredInvoices.length > 0 && selectedInvoiceIds.length === filteredInvoices.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedInvoiceIds(filteredInvoices.map(i => i.id));
+                        } else {
+                          setSelectedInvoiceIds([]);
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Invoice #</TableHead>
                   <TableHead>Date</TableHead>
@@ -1004,8 +1093,24 @@ export default function Invoices() {
                 ) : (
                   filteredInvoices.map((invoice) => (
                     <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
-                      <TableCell className="font-medium">{invoice.vendor_name}</TableCell>
-                      <TableCell>{invoice.invoice_number}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox 
+                          checked={selectedInvoiceIds.includes(invoice.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedInvoiceIds(prev => [...prev, invoice.id]);
+                            } else {
+                              setSelectedInvoiceIds(prev => prev.filter(id => id !== invoice.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium" onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                        {invoice.vendor_name}
+                      </TableCell>
+                      <TableCell onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                        {invoice.invoice_number}
+                      </TableCell>
                       <TableCell>
                         {invoice.invoice_date && format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
                       </TableCell>

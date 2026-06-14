@@ -23,6 +23,7 @@ import ItemMappingSelect from './ItemMappingSelect';
 import ReconciliationVarianceTable from './ReconciliationVarianceTable';
 import CategorySummaryTable from './CategorySummaryTable';
 import ApprovalWorkflowEngine from './ApprovalWorkflowEngine';
+import BillPayWidget from './BillPayWidget';
 
 export default function InvoiceEditor({ invoice, onChange }) {
 
@@ -110,6 +111,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
       {/* Approval Workflow Engine */}
       {invoice.id && invoice.status === 'pending_approval' && (
         <ApprovalWorkflowEngine invoice={invoice} />
+      )}
+
+      {/* Bill Pay Widget */}
+      {invoice.id && (
+        <BillPayWidget invoice={invoice} />
       )}
 
       {/* Invoice Details */}

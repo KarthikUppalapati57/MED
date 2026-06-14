@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Link2, AlertCircle, CheckCircle2, ArrowRightLeft, Lock, FileText, Calendar } from 'lucide-react';
 import { toast } from "sonner";
 import { format } from 'date-fns';
+import PaymentAccountsSettings from '@/components/invoices/PaymentAccountsSettings';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
@@ -271,6 +272,7 @@ export default function Accounting() {
           <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
           <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
           <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
+          <TabsTrigger value="payment-accounts" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Payment Accounts</TabsTrigger>
           <TabsTrigger value="close-books" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Close Books</TabsTrigger>
         </TabsList>
 
@@ -679,6 +681,10 @@ export default function Accounting() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="payment-accounts" className="space-y-6">
+          <PaymentAccountsSettings />
         </TabsContent>
 
       </Tabs>
