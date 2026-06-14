@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import ItemMappingSelect from './ItemMappingSelect';
 import ReconciliationVarianceTable from './ReconciliationVarianceTable';
+import CategorySummaryTable from './CategorySummaryTable';
 
 export default function InvoiceEditor({ invoice, onChange }) {
 
@@ -426,6 +427,18 @@ export default function InvoiceEditor({ invoice, onChange }) {
           </CardHeader>
           <CardContent>
             <ReconciliationVarianceTable invoiceId={invoice.id} isEditable={true} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Category Summary & Split Coding */}
+      {invoice.id && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Category & GL Allocations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CategorySummaryTable invoiceId={invoice.id} totalAmount={invoice.total_amount} />
           </CardContent>
         </Card>
       )}
