@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ItemMappingSelect from './ItemMappingSelect';
+import ReconciliationVarianceTable from './ReconciliationVarianceTable';
 
 export default function InvoiceEditor({ invoice, onChange }) {
 
@@ -416,6 +417,18 @@ export default function InvoiceEditor({ invoice, onChange }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Reconciliation */}
+      {invoice.id && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Reconciliation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ReconciliationVarianceTable invoiceId={invoice.id} isEditable={true} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
