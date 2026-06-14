@@ -151,6 +151,7 @@ export const api = {
     Recipe: createEntityClient('recipes', true),
     Product: createEntityClient('products', true),
     Payment: createEntityClient('payments', true),
+    PaymentAccount: createEntityClient('payment_accounts'),
     Invoice: createEntityClient('invoices', true),
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     WastageLog: createEntityClient('wastage_logs'),

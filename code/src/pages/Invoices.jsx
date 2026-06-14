@@ -21,7 +21,11 @@ import {
   Upload,
   Trash2,
   Save,
-  Mail
+  Mail,
+  AlertTriangle,
+  Clock3,
+  CreditCard,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +66,14 @@ import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
+import {
+  ACTION_REASON_LABELS,
+  AP_STATUS_LABELS,
+  deriveActionReason,
+  deriveApStatus,
+  getInvoiceAging,
+  invoicesToCsv,
+} from '@/lib/invoiceAp';
 
 const statusColors = {
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
@@ -73,11 +85,27 @@ const statusColors = {
   duplicate: 'bg-secondary text-muted-foreground',
 };
 
+const apStatusColors = {
+  processing: 'bg-resend-blue/10 text-resend-blue',
+  action_required: 'bg-resend-orange/10 text-resend-orange',
+  pending_approval: 'bg-resend-yellow/10 text-resend-yellow',
+  approved: 'bg-resend-green/10 text-resend-green',
+  scheduled: 'bg-purple-100 text-purple-700',
+  paid: 'bg-resend-green/10 text-resend-green',
+  closed: 'bg-secondary text-muted-foreground',
+  rejected: 'bg-resend-red/10 text-resend-red',
+};
+
 export default function Invoices() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [emailConfigOpen, setEmailConfigOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [apStatusFilter, setApStatusFilter] = useState('all');
+  const [agingFilter, setAgingFilter] = useState('all');
+  const [paymentAccountFilter, setPaymentAccountFilter] = useState('all');
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
@@ -139,6 +167,16 @@ export default function Invoices() {
     queryFn: () => api.entities.Invoice.list('-created_at'),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
+  });
+
+  const { data: paymentAccounts = [] } = useAuthQuery({
+    queryKey: ['payment-accounts', organization?.id],
+    queryFn: () => api.entities.PaymentAccount.list('name'),
+    select: React.useCallback(
+      (data) => filterByContext(data, { organization, brand, location }).filter((account) => account.is_active !== false),
+      [organization, brand, location]
+    ),
+    enabled: !!organization?.id,
   });
 
   useEffect(() => {
@@ -290,6 +328,26 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       toast.success('Invoice updated');
     },
+  });
+
+  const batchUpdateMutation = useMutation({
+    mutationFn: async ({ ids, data }) => {
+      const targets = invoices.filter((invoice) => ids.includes(invoice.id));
+      return Promise.all(targets.map(async (invoice) => {
+        const updated = await api.entities.Invoice.update(invoice.id, data);
+        if (data.ap_status === 'approved') {
+          await ensureLedgerBill({ ...invoice, ...updated }, { status: 'pending' });
+        }
+        return updated;
+      }));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      setSelectedInvoiceIds([]);
+      toast.success('Selected invoices updated');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to update selected invoices'),
   });
 
   const deleteMutation = useMutation({
@@ -607,7 +665,13 @@ export default function Invoices() {
     try {
       await updateMutation.mutateAsync({ 
         id: invoice.id, 
-        data: { status: 'approved', line_items: invoice.line_items }
+        data: {
+          status: 'approved',
+          ap_status: 'approved',
+          action_required_reason: null,
+          action_required_details: null,
+          line_items: invoice.line_items,
+        }
       });
       const approvalResult = await finalizeApprovedInvoiceWorkflow({ ...invoice, status: 'approved' });
       
@@ -626,7 +690,7 @@ export default function Invoices() {
   const handleReject = async (invoice) => {
     await updateMutation.mutateAsync({ 
       id: invoice.id, 
-      data: { status: 'rejected' }
+      data: { status: 'rejected', ap_status: 'rejected' }
     });
     posthog.capture('invoice_failed', { invoiceId: invoice.id, reason: 'rejected' });
   };
@@ -690,7 +754,13 @@ export default function Invoices() {
 
   const handleEditorApprove = async () => {
     try {
-      const data = { ...editingInvoice, status: 'approved' };
+      const data = {
+        ...editingInvoice,
+        status: 'approved',
+        ap_status: 'approved',
+        action_required_reason: null,
+        action_required_details: null,
+      };
       let savedInvoice;
       if (editingInvoice.id) {
         savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });
@@ -736,7 +806,7 @@ export default function Invoices() {
 
   const handleEditorReject = async () => {
     try {
-      const data = { ...editingInvoice, status: 'rejected' };
+      const data = { ...editingInvoice, status: 'rejected', ap_status: 'rejected' };
       let savedInvoice;
       if (editingInvoice.id) {
         savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });

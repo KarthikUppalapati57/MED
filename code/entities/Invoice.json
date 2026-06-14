@@ -62,9 +62,40 @@
         "enum": [
           "unpaid",
           "partial",
-          "paid"
+          "paid",
+          "auto_pay"
         ],
         "default": "unpaid"
+      },
+      "ap_status": {
+        "type": "string",
+        "enum": [
+          "processing",
+          "action_required",
+          "pending_approval",
+          "approved",
+          "scheduled",
+          "paid",
+          "closed",
+          "rejected"
+        ],
+        "default": "processing"
+      },
+      "action_required_reason": {
+        "type": "string"
+      },
+      "action_required_details": {
+        "type": "string"
+      },
+      "assigned_reviewer_id": {
+        "type": "string"
+      },
+      "payment_account_id": {
+        "type": "string"
+      },
+      "scheduled_payment_date": {
+        "type": "string",
+        "format": "date"
       },
       "source": {
         "type": "string",
