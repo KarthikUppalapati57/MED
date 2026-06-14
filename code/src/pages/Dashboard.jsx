@@ -11,10 +11,13 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  Circle,
   CreditCard,
   DollarSign,
   FileText,
+  ListFilter,
   Package,
+  RotateCcw,
   Shield,
   ShoppingCart,
   Target,
@@ -109,6 +112,32 @@ function createCanAccessPage({ organization, userProfile, hasMinRole, isPlatform
     const roleAllowed = !moduleInfo || hasMinRole(moduleInfo.minRole);
     return roleAllowed && isPageInEnabledModules(pageName, organization?.enabled_modules, userProfile?.role);
   };
+}
+
+function todayKey() {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+function actionId(title = '') {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function getDataCoverageSources(metrics, data, canAccessPage = () => true) {
+  const workflowCounts = metrics.workflowCounts || {};
+  return [
+    { label: 'POS Sales', page: 'Performance', count: metrics.monthSales > 0 ? 1 : 0, status: metrics.monthSales > 0 ? 'Connected' : 'Needs setup' },
+    { label: 'Invoices/AP', page: 'Invoices', count: workflowCounts.invoices ?? data.invoices.length, status: (workflowCounts.invoices ?? data.invoices.length) > 0 ? 'Flowing' : 'No records' },
+    { label: 'Inventory', page: 'Inventory', count: workflowCounts.inventoryItems ?? data.inventory.length, status: (workflowCounts.inventoryItems ?? data.inventory.length) > 0 ? 'Flowing' : 'No records' },
+    { label: 'Labor', page: 'Labor', count: metrics.laborCost > 0 ? 1 : 0, status: metrics.laborCost > 0 ? 'Flowing' : 'No shifts' },
+    { label: 'Budget Targets', page: 'Performance', count: metrics.budgetPacing.filter((item) => item.target > 0).length, status: metrics.budgetPacing.some((item) => item.target > 0) ? 'Configured' : 'Needs targets' },
+  ].filter((source) => canAccessPage(source.page));
+}
+
+function getDataHealthScore(metrics, data, canAccessPage = () => true) {
+  const sources = getDataCoverageSources(metrics, data, canAccessPage);
+  if (!sources.length) return 0;
+  const connected = sources.filter((source) => source.count > 0).length;
+  return Math.round((connected / sources.length) * 100);
 }
 
 function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
@@ -586,7 +615,11 @@ function DashboardHeader({ title, subtitle, scopeLabel }) {
   );
 }
 
-function DataHealthBanner({ score = 80 }) {
+function DataHealthBanner({ score = 80, sources = [], canAccessPage = () => true }) {
+  const connected = sources.filter((source) => source.count > 0).length;
+  const total = sources.length;
+  const missing = Math.max(total - connected, 0);
+
   return (
     <Card className="border-brand/30 bg-brand/5 shadow-sm">
       <CardContent className="p-5">
@@ -602,13 +635,15 @@ function DataHealthBanner({ score = 80 }) {
             <div>
               <h2 className="text-base font-semibold text-foreground">Data Health Score</h2>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                POS sales, invoice coding, inventory counts, and labor data feed the operating dashboard. Complete setup to unlock stronger AvT and benchmark recommendations.
+                {connected} of {total || 0} accessible data sources are feeding this dashboard. {missing ? `${missing} source${missing > 1 ? 's' : ''} still need setup or records.` : 'Core source coverage is ready for stronger AvT and benchmark recommendations.'}
               </p>
             </div>
           </div>
-          <Link to={createPageUrl('RestaurantSetup') + '?tab=pos'}>
-            <Button className="bg-brand text-primary-foreground hover:opacity-90">Complete Onboarding</Button>
-          </Link>
+          {canAccessPage('RestaurantSetup') && (
+            <Link to={createPageUrl('RestaurantSetup') + '?tab=pos'}>
+              <Button className="bg-brand text-primary-foreground hover:opacity-90">Complete Onboarding</Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -967,14 +1002,7 @@ function BenchmarkPanel({ metrics, title = 'Scope Benchmarking' }) {
 }
 
 function DataCoveragePanel({ metrics, data, canAccessPage = () => true }) {
-  const workflowCounts = metrics.workflowCounts || {};
-  const sources = [
-    { label: 'POS Sales', page: 'Performance', count: metrics.monthSales > 0 ? 1 : 0, status: metrics.monthSales > 0 ? 'Connected' : 'Needs setup' },
-    { label: 'Invoices/AP', page: 'Invoices', count: workflowCounts.invoices ?? data.invoices.length, status: (workflowCounts.invoices ?? data.invoices.length) > 0 ? 'Flowing' : 'No records' },
-    { label: 'Inventory', page: 'Inventory', count: workflowCounts.inventoryItems ?? data.inventory.length, status: (workflowCounts.inventoryItems ?? data.inventory.length) > 0 ? 'Flowing' : 'No records' },
-    { label: 'Labor', page: 'Labor', count: metrics.laborCost > 0 ? 1 : 0, status: metrics.laborCost > 0 ? 'Flowing' : 'No shifts' },
-    { label: 'Budget Targets', page: 'Performance', count: metrics.budgetPacing.filter((item) => item.target > 0).length, status: metrics.budgetPacing.some((item) => item.target > 0) ? 'Configured' : 'Needs targets' },
-  ].filter((source) => canAccessPage(source.page));
+  const sources = getDataCoverageSources(metrics, data, canAccessPage);
 
   if (!sources.length) return null;
 
@@ -1116,26 +1144,103 @@ function DecisionBriefPanel({ metrics, scope }) {
 
 function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
   const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
+  const storageKey = `dashboard-actions:${scope}:${todayKey()}`;
+  const [filter, setFilter] = React.useState('open');
+  const [statusMap, setStatusMap] = React.useState({});
+
+  React.useEffect(() => {
+    try {
+      setStatusMap(JSON.parse(window.localStorage.getItem(storageKey) || '{}'));
+    } catch {
+      setStatusMap({});
+    }
+  }, [storageKey]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(statusMap));
+  }, [statusMap, storageKey]);
+
+  const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
+  const openCount = actions.length - completedCount;
+  const visibleActions = actions.filter((item) => {
+    const isDone = statusMap[actionId(item.title)] === 'done';
+    if (filter === 'completed') return isDone;
+    if (filter === 'critical') return !isDone && item.priority === 'Critical';
+    if (filter === 'high') return !isDone && (item.priority === 'High' || item.priority === 'Critical');
+    return !isDone;
+  });
+  const filterOptions = [
+    { value: 'open', label: `Open (${openCount})` },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' },
+    { value: 'completed', label: `Done (${completedCount})` },
+  ];
+
+  const toggleAction = (title) => {
+    const key = actionId(title);
+    setStatusMap((current) => ({
+      ...current,
+      [key]: current[key] === 'done' ? 'open' : 'done',
+    }));
+  };
 
   return (
-    <SectionCard title="Daily Action Plan" description="Role-based actions converted from the dashboard signals.">
+    <SectionCard
+      title="Daily Action Plan"
+      description="Role-based actions converted from the dashboard signals."
+      action={(
+        <Button variant="ghost" size="sm" className="gap-2" onClick={() => setStatusMap({})}>
+          <RotateCcw className="h-4 w-4" />
+          Reset
+        </Button>
+      )}
+    >
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/20 p-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{completedCount}/{actions.length} completed today</p>
+          <p className="text-xs text-muted-foreground">Progress is saved in this browser for {todayKey()}.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ListFilter className="h-4 w-4 text-muted-foreground" />
+          {filterOptions.map((item) => (
+            <Button
+              key={item.value}
+              type="button"
+              variant={filter === item.value ? 'default' : 'outline'}
+              size="sm"
+              className="h-8"
+              onClick={() => setFilter(item.value)}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </div>
       <div className="space-y-3">
-        {actions.map((item, index) => (
-          <div key={item.title} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/30 p-4 md:flex-row md:items-start md:justify-between">
+        {visibleActions.map((item, index) => {
+          const isDone = statusMap[actionId(item.title)] === 'done';
+          return (
+          <div key={item.title} className={cn('flex flex-col gap-3 rounded-lg border border-border/60 p-4 md:flex-row md:items-start md:justify-between', isDone ? 'bg-resend-green/5' : 'bg-secondary/30')}>
             <div className="flex gap-3">
-              <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold', {
+              <button
+                type="button"
+                onClick={() => toggleAction(item.title)}
+                className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors', {
                 'bg-resend-red/10 text-resend-red': item.tone === 'red',
                 'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
                 'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
                 'bg-resend-blue/10 text-resend-blue': item.tone === 'blue',
                 'bg-resend-green/10 text-resend-green': item.tone === 'green',
-              })}>
-                {index + 1}
-              </div>
+              })}
+                aria-label={isDone ? `Mark ${item.title} open` : `Mark ${item.title} complete`}
+              >
+                {isDone ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+              </button>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <p className={cn('text-sm font-semibold text-foreground', isDone && 'text-muted-foreground line-through')}>{item.title}</p>
                   <Badge variant="secondary">{item.priority}</Badge>
+                  {isDone && <Badge className="bg-resend-green/10 text-resend-green">Completed</Badge>}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{item.body}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -1150,7 +1255,15 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
               </Link>
             )}
           </div>
-        ))}
+          );
+        })}
+        {!visibleActions.length && (
+          <EmptyState
+            icon={CheckCircle2}
+            title="No actions in this view"
+            description="Change the filter or reset today's progress to see more action items."
+          />
+        )}
       </div>
     </SectionCard>
   );
@@ -1162,16 +1275,47 @@ function StaffShiftPlanPanel({ tasks, metrics }) {
     { label: 'Clear invoice or inventory exceptions', value: `${metrics.pendingInvoices.length + metrics.lowStock.length} items`, icon: CheckCircle2 },
     { label: 'Escalate unresolved blockers to manager', value: metrics.recommendations.length ? 'Needed' : 'None visible', icon: ClipboardList },
   ];
+  const storageKey = `dashboard-staff-shift:${todayKey()}`;
+  const [statusMap, setStatusMap] = React.useState({});
+
+  React.useEffect(() => {
+    try {
+      setStatusMap(JSON.parse(window.localStorage.getItem(storageKey) || '{}'));
+    } catch {
+      setStatusMap({});
+    }
+  }, [storageKey]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(statusMap));
+  }, [statusMap, storageKey]);
+
+  const completeCount = checklist.filter((item) => statusMap[actionId(item.label)] === 'done').length;
 
   return (
-    <SectionCard title="My Shift Plan" description="A simple checklist for ground staff based on assigned module access.">
+    <SectionCard
+      title="My Shift Plan"
+      description="A simple checklist for ground staff based on assigned module access."
+      action={<Badge variant="secondary">{completeCount}/{checklist.length} done</Badge>}
+    >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {checklist.map((item) => (
-          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
-            <item.icon className="h-4 w-4 text-muted-foreground" />
-            <p className="mt-3 text-sm font-semibold text-foreground">{item.label}</p>
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => {
+              const key = actionId(item.label);
+              setStatusMap((current) => ({ ...current, [key]: current[key] === 'done' ? 'open' : 'done' }));
+            }}
+            className={cn('rounded-lg border border-border/60 p-4 text-left transition-colors hover:bg-secondary/60', statusMap[actionId(item.label)] === 'done' ? 'bg-resend-green/5' : 'bg-secondary/30')}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <item.icon className="h-4 w-4 text-muted-foreground" />
+              {statusMap[actionId(item.label)] === 'done' ? <CheckCircle2 className="h-4 w-4 text-resend-green" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+            </div>
+            <p className={cn('mt-3 text-sm font-semibold text-foreground', statusMap[actionId(item.label)] === 'done' && 'text-muted-foreground line-through')}>{item.label}</p>
             <p className="mt-1 text-xs text-muted-foreground">{item.value}</p>
-          </div>
+          </button>
         ))}
       </div>
     </SectionCard>
@@ -1237,11 +1381,13 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
     [hasMinRole, isPlatformAdmin, organization, userProfile]
   );
+  const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
+  const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
 
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
-      <DataHealthBanner />
+      <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <DecisionBriefPanel metrics={metrics} scope={scope} />
       <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
