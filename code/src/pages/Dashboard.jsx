@@ -633,6 +633,29 @@ function variance(current, comparison) {
   return ((Number(current || 0) - Number(comparison || 0)) / Number(comparison)) * 100;
 }
 
+function getMonthProgress(date = new Date()) {
+  const elapsed = Math.max(date.getDate(), 1);
+  const total = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  return { elapsed, total, ratio: elapsed / total };
+}
+
+function getWeekProgress(date = new Date()) {
+  const day = date.getDay();
+  const elapsed = day === 0 ? 7 : day;
+  return { elapsed, total: 7, ratio: elapsed / 7 };
+}
+
+function forecastValue(actual, progressRatio) {
+  if (!actual || !progressRatio) return 0;
+  return Number(actual || 0) / Math.max(progressRatio, 0.05);
+}
+
+function forecastConfidence({ dataHealthScore, salesCount }) {
+  if (dataHealthScore >= 75 && salesCount >= 14) return 'High';
+  if (dataHealthScore >= 45 && salesCount >= 5) return 'Medium';
+  return 'Low';
+}
+
 function getInvoiceAmount(invoice) {
   return Number(invoice?.total_amount || invoice?.amount || invoice?.total || 0);
 }
@@ -938,6 +961,32 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
     const laborPercent = monthSales ? (laborCost / monthSales) * 100 : 0;
     const primeCostPercent = cogsPercent + laborPercent;
     const grossMarginPercent = monthSales ? 100 - cogsPercent : 0;
+    const monthProgress = getMonthProgress(now);
+    const weekProgress = getWeekProgress(now);
+    const forecastMonthSales = forecastValue(monthSales, monthProgress.ratio);
+    const forecastWeekSales = forecastValue(weekSales, weekProgress.ratio);
+    const projectedInvoiceSpend = forecastValue(invoiceSpend, monthProgress.ratio);
+    const projectedLaborCost = forecastValue(laborCost, monthProgress.ratio);
+    const projectedCogsPercent = forecastMonthSales ? (projectedInvoiceSpend / forecastMonthSales) * 100 : cogsPercent;
+    const projectedLaborPercent = forecastMonthSales ? (projectedLaborCost / forecastMonthSales) * 100 : laborPercent;
+    const projectedPrimeCostPercent = projectedCogsPercent + projectedLaborPercent;
+    const dataHealthScore = getDataHealthScore({ monthSales, budgetPacing: [], laborCost, workflowCounts: null }, data);
+    const forecast = {
+      confidence: forecastConfidence({ dataHealthScore, salesCount: data.salesData.length }),
+      inventoryRiskCount: data.inventory.filter((item) => {
+        const current = Number(item.current_quantity || 0);
+        const reorder = Number(item.reorder_point || 5);
+        return current > reorder && current <= reorder * 1.25;
+      }).length + lowStock.length,
+      monthProgress,
+      projectedCogsPercent,
+      projectedLaborPercent,
+      projectedPrimeCostPercent,
+      projectedWeekSales: forecastWeekSales,
+      projectedMonthSales: forecastMonthSales,
+      salesRunRate: monthProgress.elapsed ? monthSales / monthProgress.elapsed : 0,
+      weekProgress,
+    };
 
     const spendByCategoryMap = data.invoices.reduce((acc, invoice) => {
       getLineItems(invoice).forEach((line) => {
@@ -1014,12 +1063,22 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
     if (laborPercent > rules.laborPercent) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
     if (!monthSales) recommendations.push({ tone: 'blue', title: 'POS sales not flowing yet', body: 'Connect or map POS data to unlock daily sales benchmarking.', href: 'RestaurantSetup?tab=pos' });
     if (primeCostPercent > rules.primeCostPercent) recommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(primeCostPercent)}`, body: `COGS plus labor is above the ${plainPercent(rules.primeCostPercent)} operating guardrail.`, href: 'Performance' });
+    if (forecast.projectedPrimeCostPercent > rules.primeCostPercent && primeCostPercent <= rules.primeCostPercent) {
+      recommendations.push({ tone: 'orange', title: `Prime cost forecast ${plainPercent(forecast.projectedPrimeCostPercent)}`, body: 'Current pace is projected to cross the saved prime-cost target before period close.', href: 'Performance' });
+    }
+    if (forecast.projectedLaborPercent > rules.laborPercent && laborPercent <= rules.laborPercent) {
+      recommendations.push({ tone: 'orange', title: `Labor forecast ${plainPercent(forecast.projectedLaborPercent)}`, body: 'Labor pacing may exceed the saved target if sales and staffing continue at this rate.', href: 'Labor' });
+    }
+    if (forecast.inventoryRiskCount > lowStock.length) {
+      recommendations.push({ tone: 'yellow', title: `${forecast.inventoryRiskCount} inventory items at risk`, body: 'Some items are close to reorder thresholds and may become low stock before the next order cycle.', href: 'Inventory' });
+    }
 
     const calculated = {
       budgetPacing,
       cogsPercent,
       dailyRows,
       grossMarginPercent,
+      forecast,
       invoiceSpend,
       laborCost,
       laborPercent,
@@ -1099,6 +1158,17 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
       openOrders: Array.from({ length: Number(kpis.openOrders || workflowCounts.openOrders || 0) }),
       pendingInvoices: Array.from({ length: Number(kpis.pendingInvoices || 0) }),
       grossMarginPercent: 100 - summaryCogsPercent,
+      forecast: {
+        ...calculated.forecast,
+        projectedMonthSales: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio),
+        projectedWeekSales: forecastValue(Number(kpis.salesWeekToDate || 0), calculated.forecast.weekProgress.ratio),
+        salesRunRate: calculated.forecast.monthProgress.elapsed ? Number(kpis.salesPeriod || 0) / calculated.forecast.monthProgress.elapsed : 0,
+        projectedCogsPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (Number(kpis.invoiceSpend || 0) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryCogsPercent,
+        projectedLaborPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (Number(kpis.laborCost || 0) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryLaborPercent,
+        projectedPrimeCostPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)
+          ? ((Number(kpis.invoiceSpend || 0) + Number(kpis.laborCost || 0)) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100
+          : summaryPrimeCostPercent,
+      },
       primeCostPercent: summaryPrimeCostPercent,
       recommendations: mergeRecommendations((summary.alerts || calculated.recommendations).map((item) => ({
         tone: item.tone || 'blue',
@@ -1821,6 +1891,80 @@ function DecisionBriefPanel({ metrics, scope, rules = DEFAULT_DASHBOARD_RULES })
   );
 }
 
+function ForecastIntelligencePanel({ metrics, rules = DEFAULT_DASHBOARD_RULES, canAccessPage = () => true }) {
+  const forecast = metrics.forecast || {};
+  const forecastCards = [
+    {
+      label: 'Week Sales Forecast',
+      value: currency(forecast.projectedWeekSales),
+      helper: `${currency(metrics.weekSales)} actual WTD`,
+      tone: forecast.projectedWeekSales >= metrics.lastWeekSales ? 'green' : 'yellow',
+      href: 'Performance',
+    },
+    {
+      label: 'Month Sales Forecast',
+      value: currency(forecast.projectedMonthSales),
+      helper: `${currency(forecast.salesRunRate)} daily run rate`,
+      tone: forecast.projectedMonthSales >= metrics.monthSales ? 'blue' : 'yellow',
+      href: 'Performance',
+    },
+    {
+      label: 'Prime Cost Forecast',
+      value: plainPercent(forecast.projectedPrimeCostPercent),
+      helper: `Target ${plainPercent(rules.primeCostPercent)}`,
+      tone: forecast.projectedPrimeCostPercent > rules.primeCostPercent ? 'red' : 'green',
+      href: 'Performance',
+    },
+    {
+      label: 'Inventory Risk',
+      value: forecast.inventoryRiskCount || 0,
+      helper: `${metrics.lowStock.length} already low stock`,
+      tone: forecast.inventoryRiskCount > metrics.lowStock.length ? 'orange' : 'green',
+      href: 'Inventory',
+    },
+  ];
+
+  return (
+    <SectionCard title="Forecast Intelligence" description="Projected sales, cost pressure, and inventory risk based on current period pace.">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Badge className={cn({
+          'bg-resend-green/10 text-resend-green': forecast.confidence === 'High',
+          'bg-resend-yellow/10 text-resend-yellow': forecast.confidence === 'Medium',
+          'bg-resend-orange/10 text-resend-orange': forecast.confidence === 'Low',
+        })}>
+          {forecast.confidence || 'Low'} confidence
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          Month {Math.round((forecast.monthProgress?.ratio || 0) * 100)}% complete / Week {Math.round((forecast.weekProgress?.ratio || 0) * 100)}% complete
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {forecastCards.map((item) => (
+          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+            <p className="mt-2 text-xl font-bold text-foreground">{item.value}</p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{item.helper}</p>
+              {item.href && canAccessPage(item.href) && (
+                <Link to={createPageUrl(item.href)} className="text-xs font-semibold text-brand hover:opacity-80">
+                  Open
+                </Link>
+              )}
+            </div>
+            <div className={cn('mt-3 h-1.5 rounded-full', {
+              'bg-resend-green': item.tone === 'green',
+              'bg-resend-blue': item.tone === 'blue',
+              'bg-resend-yellow': item.tone === 'yellow',
+              'bg-resend-orange': item.tone === 'orange',
+              'bg-resend-red': item.tone === 'red',
+            })} />
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function RoleActionPlanPanel({ actions: providedActions, metrics, scope, canAccessPage = () => true, statusMap = {}, setStatusMap, onActionStatusChange, onResetActions }) {
   const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const [filter, setFilter] = React.useState('open');
@@ -2058,6 +2202,123 @@ function createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore
     'Manager Note',
     note?.trim() || 'No note added.',
   ].join('\n');
+}
+
+function createExecutiveReportText({ metrics, scope, actions, statusMap, dataHealthScore, escalations, rules }) {
+  const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
+  const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+  const scopeName = scope === 'brand' ? 'Brand' : scope === 'location' ? 'Location' : 'Organization';
+  const forecast = metrics.forecast || {};
+
+  return [
+    `Restops 360 ${scopeName} Executive Report`,
+    `Date: ${todayKey()}`,
+    '',
+    'Performance',
+    `- Period sales: ${currency(metrics.monthSales)}`,
+    `- Week-to-date sales: ${currency(metrics.weekSales)} (${percent(metrics.weekVsLastWeek)} vs last week)`,
+    `- Gross margin: ${plainPercent(metrics.grossMarginPercent)}`,
+    `- COGS: ${plainPercent(metrics.cogsPercent)} / Target ${plainPercent(rules.cogsPercent)}`,
+    `- Labor: ${plainPercent(metrics.laborPercent)} / Target ${plainPercent(rules.laborPercent)}`,
+    `- Prime cost: ${plainPercent(metrics.primeCostPercent)} / Target ${plainPercent(rules.primeCostPercent)}`,
+    '',
+    'Forecast',
+    `- Week sales forecast: ${currency(forecast.projectedWeekSales)}`,
+    `- Month sales forecast: ${currency(forecast.projectedMonthSales)}`,
+    `- Prime cost forecast: ${plainPercent(forecast.projectedPrimeCostPercent)}`,
+    `- Inventory risk count: ${forecast.inventoryRiskCount || 0}`,
+    `- Forecast confidence: ${forecast.confidence || 'Low'}`,
+    '',
+    'Workflow',
+    `- Data health: ${dataHealthScore}%`,
+    `- Unpaid AP: ${currency(metrics.unpaid)}`,
+    `- Pending invoices: ${metrics.pendingInvoices.length}`,
+    `- Low stock items: ${metrics.lowStock.length}`,
+    `- Completed actions: ${completed.length}/${actions.length}`,
+    `- Open actions: ${open.length}`,
+    `- Escalations: ${escalations.length}`,
+    '',
+    'Top Actions',
+    ...(open.length ? open.slice(0, 5).map((item) => `- [${item.priority}] ${item.title} (${item.owner}, ${item.due})`) : ['- No open actions']),
+  ].join('\n');
+}
+
+function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, organization, rules, scope, statusMap = {}, userProfile }) {
+  const reportText = React.useMemo(
+    () => createExecutiveReportText({ actions, dataHealthScore, escalations, metrics, rules, scope, statusMap }),
+    [actions, dataHealthScore, escalations, metrics, rules, scope, statusMap]
+  );
+  const forecast = metrics.forecast || {};
+  const openActions = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+  const executiveRows = [
+    { label: 'Sales Forecast', value: currency(forecast.projectedMonthSales), helper: `${forecast.confidence || 'Low'} confidence` },
+    { label: 'Prime Forecast', value: plainPercent(forecast.projectedPrimeCostPercent), helper: `Target ${plainPercent(rules.primeCostPercent)}` },
+    { label: 'Open Actions', value: openActions.length, helper: `${escalations.length} escalations` },
+    { label: 'Data Health', value: `${dataHealthScore}%`, helper: `${metrics.pendingInvoices.length} pending invoices` },
+  ];
+
+  const auditReport = (action) => {
+    logAudit({
+      action,
+      entityId: `${scope}:${todayKey()}:executive-report`,
+      entityType: 'dashboard_executive_report',
+      module: AUDIT_MODULES.SYSTEM,
+      orgId: organization?.id,
+      userId: userProfile?.id,
+      details: { scope, escalations: escalations.length, openActions: openActions.length },
+    });
+  };
+
+  const copyReport = async () => {
+    try {
+      await navigator.clipboard.writeText(reportText);
+      auditReport('dashboard_executive_report_copied');
+      toast.success('Executive report copied');
+    } catch {
+      toast.error('Could not copy executive report');
+    }
+  };
+
+  const downloadReport = () => {
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `restops-executive-report-${scope}-${todayKey()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    auditReport('dashboard_executive_report_downloaded');
+    toast.success('Executive report downloaded');
+  };
+
+  return (
+    <SectionCard
+      title="Executive Report"
+      description="Owner-ready scorecard with performance, forecast, workflow, and unresolved action summary."
+      action={(
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={copyReport}>
+            <Copy className="h-4 w-4" />
+            Copy
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={downloadReport}>
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      )}
+    >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {executiveRows.map((row) => (
+          <div key={row.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</p>
+            <p className="mt-2 text-xl font-bold text-foreground">{row.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{row.helper}</p>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
 }
 
 function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, note = '', setNote, onHandoffExport, syncState }) {
@@ -2374,6 +2635,18 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
       <DecisionBriefPanel metrics={metrics} scope={scope} rules={dashboardRules.rules} />
+      <ForecastIntelligencePanel metrics={metrics} rules={dashboardRules.rules} canAccessPage={canAccessPage} />
+      <ExecutiveReportPanel
+        actions={roleActions}
+        dataHealthScore={dataHealthScore}
+        escalations={escalations}
+        metrics={metrics}
+        organization={organization}
+        rules={dashboardRules.rules}
+        scope={scope}
+        statusMap={dashboardPersistence.statusMap}
+        userProfile={userProfile}
+      />
       <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
       <DashboardRulesPanel rules={dashboardRules.rules} onSaveRules={dashboardRules.saveRules} />
       <RoleActionPlanPanel
