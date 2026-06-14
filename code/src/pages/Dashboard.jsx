@@ -55,7 +55,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
-import { notifyManagers } from '@/lib/notificationService';
+import { createNotification, notifyManagers } from '@/lib/notificationService';
 import { createPageUrl } from '@/utils';
 import { filterByContext } from '@/lib/contextUtils';
 import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
@@ -75,6 +75,13 @@ const DEFAULT_DASHBOARD_RULES = {
   notifyCarryover: true,
   notifyHighActions: true,
   notifyPrimeCostBreach: true,
+};
+const DEFAULT_REPORT_PREFERENCES = {
+  dailyHandoff: true,
+  weeklyExecutive: true,
+  includeForecasts: true,
+  includeEscalations: true,
+  recipientRoles: ['org_owner', 'brand_manager', 'branch_manager', 'location_manager'],
 };
 
 function currency(value) {
@@ -220,6 +227,33 @@ function dashboardRulesPayload(rules) {
   };
 }
 
+function normalizeReportPreferences(value = {}) {
+  const recipientRoles = Array.isArray(value.recipientRoles)
+    ? value.recipientRoles
+    : Array.isArray(value.recipient_roles)
+      ? value.recipient_roles
+      : DEFAULT_REPORT_PREFERENCES.recipientRoles;
+  return {
+    ...DEFAULT_REPORT_PREFERENCES,
+    dailyHandoff: Boolean(value.dailyHandoff ?? value.daily_handoff ?? DEFAULT_REPORT_PREFERENCES.dailyHandoff),
+    weeklyExecutive: Boolean(value.weeklyExecutive ?? value.weekly_executive ?? DEFAULT_REPORT_PREFERENCES.weeklyExecutive),
+    includeForecasts: Boolean(value.includeForecasts ?? value.include_forecasts ?? DEFAULT_REPORT_PREFERENCES.includeForecasts),
+    includeEscalations: Boolean(value.includeEscalations ?? value.include_escalations ?? DEFAULT_REPORT_PREFERENCES.includeEscalations),
+    recipientRoles: recipientRoles.length ? recipientRoles : DEFAULT_REPORT_PREFERENCES.recipientRoles,
+  };
+}
+
+function reportPreferencesPayload(preferences) {
+  const normalized = normalizeReportPreferences(preferences);
+  return {
+    daily_handoff: normalized.dailyHandoff,
+    include_escalations: normalized.includeEscalations,
+    include_forecasts: normalized.includeForecasts,
+    recipient_roles: normalized.recipientRoles,
+    weekly_executive: normalized.weeklyExecutive,
+  };
+}
+
 function useDashboardRules({ brand, location, organization, scope, userProfile }) {
   const queryClient = useQueryClient();
   const scopeContext = React.useMemo(
@@ -304,6 +338,93 @@ function useDashboardRules({ brand, location, organization, scope, userProfile }
   const normalizedRules = React.useMemo(() => normalizeDashboardRules(rules), [rules]);
 
   return { rules: normalizedRules, saveRules };
+}
+
+function useDashboardReportPreferences({ brand, location, organization, scope, userProfile }) {
+  const queryClient = useQueryClient();
+  const scopeContext = React.useMemo(
+    () => getDashboardScopeContext(scope, { organization, brand, location }),
+    [brand, location, organization, scope]
+  );
+  const storageKey = `dashboard-report-preferences:${scope}:${scopeContext.scopeKey}`;
+  const [preferences, setPreferences] = useLocalJson(storageKey, DEFAULT_REPORT_PREFERENCES);
+  const orgReady = !!scopeContext.orgId && !!organization?.id;
+
+  const { data: remotePreferences = null } = useAuthQuery({
+    queryKey: ['dashboard-report-preferences', scopeContext.orgId, scope, scopeContext.scopeKey],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_report_preferences')
+        .select('*')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .maybeSingle();
+      if (isMissingDashboardTable(error)) return null;
+      if (error) throw error;
+      return data;
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (remotePreferences) setPreferences(normalizeReportPreferences(remotePreferences));
+  }, [remotePreferences, setPreferences]);
+
+  useEffect(() => {
+    if (!orgReady) return undefined;
+    const channel = supabase.channel(`dashboard-report-preferences-${scope}-${scopeContext.scopeKey}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_report_preferences', filter: `organization_id=eq.${scopeContext.orgId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-report-preferences'] });
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [orgReady, queryClient, scope, scopeContext.orgId, scopeContext.scopeKey]);
+
+  const savePreferences = React.useCallback(async (nextPreferences) => {
+    const normalized = normalizeReportPreferences(nextPreferences);
+    setPreferences(normalized);
+    if (!orgReady) {
+      toast.success('Report preferences saved locally');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('dashboard_report_preferences').upsert({
+        brand_id: scopeContext.brandId,
+        location_id: scopeContext.locationId,
+        organization_id: scopeContext.orgId,
+        scope,
+        scope_key: scopeContext.scopeKey,
+        updated_by: userProfile?.id || null,
+        ...reportPreferencesPayload(normalized),
+      }, { onConflict: 'organization_id,scope,scope_key' });
+      if (error) throw error;
+      logAudit({
+        action: 'dashboard_report_preferences_updated',
+        entityId: `${scopeContext.scopeKey}:report-preferences`,
+        entityType: 'dashboard_report_preferences',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: scopeContext.orgId,
+        userId: userProfile?.id,
+        details: { scope, preferences: normalized },
+      });
+      toast.success('Report preferences synced');
+    } catch (error) {
+      if (isMissingDashboardTable(error)) {
+        toast.success('Report preferences saved locally until Supabase table is applied');
+        return;
+      }
+      toast.error(error.message || 'Failed to save report preferences');
+    }
+  }, [orgReady, scope, scopeContext.brandId, scopeContext.locationId, scopeContext.orgId, scopeContext.scopeKey, setPreferences, userProfile?.id]);
+
+  return {
+    preferences: React.useMemo(() => normalizeReportPreferences(preferences), [preferences]),
+    savePreferences,
+  };
 }
 
 function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
@@ -2243,6 +2364,46 @@ function createExecutiveReportText({ metrics, scope, actions, statusMap, dataHea
   ].join('\n');
 }
 
+async function sendDashboardReportNotifications({ brand, location, organization, preferences, reportText, reportType, scope, userProfile }) {
+  if (!organization?.id) return { notified: 0 };
+  const normalized = normalizeReportPreferences(preferences);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, organization_id, brand_id, location_id, status')
+    .eq('organization_id', organization.id)
+    .in('role', normalized.recipientRoles)
+    .neq('status', 'inactive');
+  if (error) throw error;
+
+  const targets = (data || [])
+    .filter((profile) => profile.id !== userProfile?.id)
+    .filter((profile) => {
+      if (scope === 'brand') return !profile.brand_id || !brand?.id || profile.brand_id === brand.id || profile.role === 'org_owner';
+      if (scope === 'location') {
+        if (profile.role === 'org_owner') return true;
+        if (profile.role === 'brand_manager' || profile.role === 'branch_manager') return !profile.brand_id || !brand?.id || profile.brand_id === brand.id;
+        if (profile.role === 'location_manager') return !profile.location_id || !location?.id || profile.location_id === location.id;
+        return false;
+      }
+      return true;
+    });
+
+  await Promise.all(targets.map((profile) => createNotification({
+    organization_id: organization.id,
+    user_id: profile.id,
+    title: reportType === 'daily' ? 'Daily dashboard handoff ready' : 'Weekly executive dashboard report ready',
+    message: reportText.slice(0, 950),
+    type: 'system',
+    metadata: {
+      dashboard_scope: scope,
+      report_type: reportType,
+      source: 'dashboard_scheduled_report',
+    },
+  })));
+
+  return { notified: targets.length };
+}
+
 function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, organization, rules, scope, statusMap = {}, userProfile }) {
   const reportText = React.useMemo(
     () => createExecutiveReportText({ actions, dataHealthScore, escalations, metrics, rules, scope, statusMap }),
@@ -2316,6 +2477,154 @@ function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, 
             <p className="mt-1 text-xs text-muted-foreground">{row.helper}</p>
           </div>
         ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function ScheduledReportsPanel({
+  actions,
+  brand,
+  dataHealthScore,
+  escalations,
+  location,
+  metrics,
+  onSavePreferences,
+  organization,
+  preferences,
+  rules,
+  scope,
+  statusMap = {},
+  userProfile,
+}) {
+  const [draft, setDraft] = React.useState(() => normalizeReportPreferences(preferences));
+  const [sending, setSending] = React.useState(null);
+
+  useEffect(() => {
+    setDraft(normalizeReportPreferences(preferences));
+  }, [preferences]);
+
+  const roleOptions = [
+    { value: 'org_owner', label: 'Org owners' },
+    { value: 'brand_manager', label: 'Brand managers' },
+    { value: 'branch_manager', label: 'Branch managers' },
+    { value: 'location_manager', label: 'Location managers' },
+  ];
+
+  const updateToggle = (key) => {
+    setDraft((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const updateRole = (role) => {
+    setDraft((current) => {
+      const roles = new Set(current.recipientRoles || []);
+      if (roles.has(role)) roles.delete(role);
+      else roles.add(role);
+      return { ...current, recipientRoles: Array.from(roles) };
+    });
+  };
+
+  const save = () => {
+    onSavePreferences?.(normalizeReportPreferences(draft));
+  };
+
+  const sendNow = async (reportType) => {
+    const normalized = normalizeReportPreferences(draft);
+    const reportText = reportType === 'daily'
+      ? createHandoffText({ actions, dataHealthScore, metrics, note: '', scope, statusMap })
+      : createExecutiveReportText({ actions, dataHealthScore, escalations, metrics, rules, scope, statusMap });
+    setSending(reportType);
+    try {
+      const result = await sendDashboardReportNotifications({
+        brand,
+        location,
+        organization,
+        preferences: normalized,
+        reportText,
+        reportType,
+        scope,
+        userProfile,
+      });
+      logAudit({
+        action: reportType === 'daily' ? 'dashboard_daily_report_sent' : 'dashboard_weekly_report_sent',
+        entityId: `${scope}:${todayKey()}:${reportType}-report`,
+        entityType: 'dashboard_scheduled_report',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: organization?.id,
+        userId: userProfile?.id,
+        details: { scope, notified: result.notified, recipientRoles: normalized.recipientRoles },
+      });
+      toast.success(result.notified ? `Sent to ${result.notified} recipient${result.notified > 1 ? 's' : ''}` : 'No matching recipients found');
+    } catch (error) {
+      toast.error(error.message || 'Failed to send report');
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const preferenceCards = [
+    { key: 'dailyHandoff', label: 'Daily handoff', helper: 'Manager report for open work, risks, and action status.' },
+    { key: 'weeklyExecutive', label: 'Weekly executive', helper: 'Owner scorecard with performance, forecast, and escalation summary.' },
+    { key: 'includeForecasts', label: 'Include forecasts', helper: 'Adds sales, prime cost, and inventory risk projections.' },
+    { key: 'includeEscalations', label: 'Include escalations', helper: 'Adds open escalation count and unresolved blocker context.' },
+  ];
+
+  return (
+    <SectionCard
+      title="Scheduled Reports"
+      description="Report automation preferences for daily handoffs and weekly executive summaries."
+      action={(
+        <Button size="sm" className="gap-2" onClick={save}>
+          <Save className="h-4 w-4" />
+          Save Schedule
+        </Button>
+      )}
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {preferenceCards.map((item) => (
+            <label key={item.key} className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3">
+              <span>
+                <span className="block text-sm font-semibold text-foreground">{item.label}</span>
+                <span className="mt-1 block text-xs text-muted-foreground">{item.helper}</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(draft[item.key])}
+                onChange={() => updateToggle(item.key)}
+                className="mt-1 h-4 w-4 accent-brand"
+              />
+            </label>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipients</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {roleOptions.map((role) => (
+                <label key={role.value} className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-background/60 px-3 py-2">
+                  <span className="text-sm font-medium text-foreground">{role.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={(draft.recipientRoles || []).includes(role.value)}
+                    onChange={() => updateRole(role.value)}
+                    className="h-4 w-4 accent-brand"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('daily')} disabled={sending === 'daily'}>
+              <BellRing className="h-4 w-4" />
+              {sending === 'daily' ? 'Sending' : 'Send Daily Now'}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('weekly')} disabled={sending === 'weekly'}>
+              <BellRing className="h-4 w-4" />
+              {sending === 'weekly' ? 'Sending' : 'Send Weekly Now'}
+            </Button>
+          </div>
+        </div>
       </div>
     </SectionCard>
   );
@@ -2603,6 +2912,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData(scope);
   const dashboardRules = useDashboardRules({ brand, location, organization, scope, userProfile });
+  const reportPreferences = useDashboardReportPreferences({ brand, location, organization, scope, userProfile });
   const metrics = useDashboardMetrics(data, dashboardRules.rules);
   const canAccessPage = React.useMemo(
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
@@ -2642,6 +2952,21 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         escalations={escalations}
         metrics={metrics}
         organization={organization}
+        rules={dashboardRules.rules}
+        scope={scope}
+        statusMap={dashboardPersistence.statusMap}
+        userProfile={userProfile}
+      />
+      <ScheduledReportsPanel
+        actions={roleActions}
+        brand={brand}
+        dataHealthScore={dataHealthScore}
+        escalations={escalations}
+        location={location}
+        metrics={metrics}
+        onSavePreferences={reportPreferences.savePreferences}
+        organization={organization}
+        preferences={reportPreferences.preferences}
         rules={dashboardRules.rules}
         scope={scope}
         statusMap={dashboardPersistence.statusMap}
