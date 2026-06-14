@@ -220,6 +220,24 @@ function useDashboardData(scope) {
   const periodStart = startOfMonth(now).toISOString().split('T')[0];
   const periodEnd = endOfMonth(now).toISOString().split('T')[0];
 
+  const { data: dashboardSummary = null } = useAuthQuery({
+    queryKey: ['dashboard-summary', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_role_dashboard_summary', {
+        p_scope: scope,
+        p_org_id: organization?.id,
+        p_brand_id: scope === 'brand' ? brand?.id || null : null,
+        p_location_id: scope === 'location' || scope === 'staff' ? location?.id || null : null,
+        p_period_start: periodStart,
+        p_period_end: periodEnd,
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: enabled && (scope === 'org' || (scope === 'brand' && !!brand?.id) || ((scope === 'location' || scope === 'staff') && !!location?.id)),
+    retry: false,
+  });
+
   const { data: budgetTargets = [] } = useAuthQuery({
     queryKey: ['dashboard-budget-targets', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
     queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
@@ -244,6 +262,7 @@ function useDashboardData(scope) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-inventory'] }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-budget-targets'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-shifts'] }))
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -251,6 +270,7 @@ function useDashboardData(scope) {
 
   return {
     budgetTargets,
+    dashboardSummary,
     invoices,
     inventory,
     orders,
@@ -376,7 +396,7 @@ function useDashboardMetrics(data) {
     if (laborPercent > 28) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
     if (!monthSales) recommendations.push({ tone: 'blue', title: 'POS sales not flowing yet', body: 'Connect or map POS data to unlock daily sales benchmarking.', href: 'RestaurantSetup?tab=pos' });
 
-    return {
+    const calculated = {
       budgetPacing,
       cogsPercent,
       dailyRows,
@@ -398,6 +418,64 @@ function useDashboardMetrics(data) {
       weekSales,
       weekVsLastWeek: variance(weekSales, lastWeekSales),
       weekVsLastYear: variance(weekSales, lastYearSales),
+      workflowCounts: null,
+    };
+
+    const summary = data.dashboardSummary;
+    if (!summary?.kpis) return calculated;
+
+    const kpis = summary.kpis || {};
+    const workflowCounts = summary.workflows || {};
+    const summarySpend = (summary.spendByCategory || []).map((item, index) => ({
+      name: item.name,
+      value: Number(item.value || 0),
+      color: COLORS[index % COLORS.length],
+    }));
+
+    return {
+      ...calculated,
+      budgetPacing: (summary.budgetPacing || calculated.budgetPacing).map((item) => ({
+        category: item.category,
+        actual: Number(item.actual || 0),
+        target: Number(item.target || 0),
+        remaining: Number(item.remaining || 0),
+        pacing: Number(item.pacing || 0),
+        isGood: Boolean(item.isGood),
+      })),
+      benchmarks: summary.benchmarks || calculated.benchmarks,
+      cogsPercent: Number(kpis.cogsPercent || 0),
+      dailyRows: (summary.salesPerformance || calculated.dailyRows).map((row) => ({
+        name: row.name,
+        actual: Number(row.actual || 0),
+        lastWeek: Number(row.lastWeek || 0),
+        lastYear: Number(row.lastYear || 0),
+        vsLastWeek: Number(row.vsLastWeek || 0),
+        vsLastYear: Number(row.vsLastYear || 0),
+      })),
+      invoiceSpend: Number(kpis.invoiceSpend || 0),
+      laborCost: Number(kpis.laborCost || 0),
+      laborPercent: Number(kpis.laborPercent || 0),
+      lastWeekSales: Number(kpis.salesLastWeek || 0),
+      lastYearSales: Number(kpis.salesLastYear || 0),
+      lowStock: Array.from({ length: Number(kpis.lowStockItems || workflowCounts.lowStock || 0) }),
+      monthSales: Number(kpis.salesPeriod || 0),
+      openOrders: Array.from({ length: Number(kpis.openOrders || workflowCounts.openOrders || 0) }),
+      pendingInvoices: Array.from({ length: Number(kpis.pendingInvoices || 0) }),
+      primeCostPercent: Number(kpis.primeCostPercent || 0),
+      recommendations: (summary.alerts || calculated.recommendations).map((item) => ({
+        tone: item.tone || 'blue',
+        title: item.title,
+        body: item.body,
+        href: item.href,
+      })),
+      spendByCategory: summarySpend.length ? summarySpend : calculated.spendByCategory,
+      today: Number(kpis.salesToday || 0),
+      unpaid: Number(kpis.unpaidAmount || 0),
+      wastageCost: Number(kpis.wastageCost || workflowCounts.wasteCost || 0),
+      weekSales: Number(kpis.salesWeekToDate || 0),
+      weekVsLastWeek: Number(kpis.salesVsLastWeek || 0),
+      weekVsLastYear: Number(kpis.salesVsLastYear || 0),
+      workflowCounts,
     };
   }, [data]);
 }
@@ -579,13 +657,14 @@ function BudgetPacingPanel({ metrics }) {
 
 function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
   const pieData = metrics.spendByCategory.length ? metrics.spendByCategory : [{ name: 'No spend coded', value: 1, color: '#e5e7eb' }];
+  const workflowCounts = metrics.workflowCounts || {};
   const workflows = [
-    { label: 'Invoices', value: data.invoices.length, href: 'Invoices', icon: FileText },
-    { label: 'Payments', value: data.payments.length, href: 'Payments', icon: CreditCard },
-    { label: 'Open Orders', value: metrics.openOrders.length, href: 'AutoOrdering', icon: ShoppingCart },
-    { label: 'Low Stock', value: metrics.lowStock.length, href: 'Inventory', icon: Warehouse },
-    { label: 'Products', value: data.products.length, href: 'Products', icon: Package },
-    { label: 'Waste Cost', value: currency(metrics.wastageCost), href: 'Inventory?tab=wastage', icon: AlertTriangle },
+    { label: 'Invoices', value: workflowCounts.invoices ?? data.invoices.length, href: 'Invoices', icon: FileText },
+    { label: 'Payments', value: workflowCounts.payments ?? data.payments.length, href: 'Payments', icon: CreditCard },
+    { label: 'Open Orders', value: workflowCounts.openOrders ?? metrics.openOrders.length, href: 'AutoOrdering', icon: ShoppingCart },
+    { label: 'Low Stock', value: workflowCounts.lowStock ?? metrics.lowStock.length, href: 'Inventory', icon: Warehouse },
+    { label: 'Products', value: workflowCounts.products ?? data.products.length, href: 'Products', icon: Package },
+    { label: 'Waste Cost', value: currency(workflowCounts.wasteCost ?? metrics.wastageCost), href: 'Inventory?tab=wastage', icon: AlertTriangle },
   ];
 
   return (
@@ -626,7 +705,7 @@ function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
 }
 
 function BenchmarkPanel({ metrics, title = 'Scope Benchmarking' }) {
-  const data = [
+  const data = metrics.benchmarks || [
     { name: 'Sales', actual: metrics.weekSales, benchmark: metrics.lastWeekSales || metrics.weekSales },
     { name: 'COGS', actual: metrics.cogsPercent, benchmark: 32 },
     { name: 'Labor', actual: metrics.laborPercent, benchmark: 28 },
