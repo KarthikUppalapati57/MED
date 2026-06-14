@@ -53,6 +53,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import { AUDIT_MODULES, logAudit } from '@/lib/audit';
 import { createPageUrl } from '@/utils';
 import { filterByContext } from '@/lib/contextUtils';
 import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
@@ -147,22 +148,305 @@ function getDataHealthScore(metrics, data, canAccessPage = () => true) {
   return Math.round((connected / sources.length) * 100);
 }
 
-function useLocalStatusMap(storageKey) {
-  const [statusMap, setStatusMap] = React.useState({});
+function getDashboardScopeContext(scope, { organization, brand, location }) {
+  const orgId = organization?.id || null;
+  const brandId = scope === 'brand' ? brand?.id || null : scope === 'location' || scope === 'staff' ? brand?.id || location?.brand_id || null : null;
+  const locationId = scope === 'location' || scope === 'staff' ? location?.id || null : null;
+  return {
+    brandId,
+    locationId,
+    orgId,
+    scopeKey: scope === 'brand' ? `brand:${brandId || 'none'}` : scope === 'location' || scope === 'staff' ? `location:${locationId || 'none'}` : `org:${orgId || 'none'}`,
+  };
+}
+
+function useLocalJson(storageKey, fallbackValue) {
+  const fallbackRef = React.useRef(fallbackValue);
+  const [value, setValue] = React.useState(fallbackValue);
 
   React.useEffect(() => {
     try {
-      setStatusMap(JSON.parse(window.localStorage.getItem(storageKey) || '{}'));
+      const stored = window.localStorage.getItem(storageKey);
+      setValue(stored ? JSON.parse(stored) : fallbackRef.current);
     } catch {
-      setStatusMap({});
+      setValue(fallbackRef.current);
     }
   }, [storageKey]);
 
   React.useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(statusMap));
-  }, [statusMap, storageKey]);
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  }, [storageKey, value]);
 
-  return [statusMap, setStatusMap];
+  return [value, setValue];
+}
+
+function useLocalStatusMap(storageKey) {
+  return useLocalJson(storageKey, {});
+}
+
+function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
+  const scopeContext = React.useMemo(
+    () => getDashboardScopeContext(scope, { organization, brand, location }),
+    [brand, location, organization, scope]
+  );
+  const actionDate = todayKey();
+  const actionStorageKey = `dashboard-actions:${scope}:${actionDate}:${scopeContext.scopeKey}`;
+  const noteStorageKey = `dashboard-handoff-note:${scope}:${actionDate}:${scopeContext.scopeKey}`;
+  const reviewStorageKey = `dashboard-review-log:${scope}:${scopeContext.scopeKey}`;
+  const [statusMap, setStatusMap] = useLocalStatusMap(actionStorageKey);
+  const [note, setNote] = useLocalJson(noteStorageKey, '');
+  const [reviews, setReviews] = useLocalJson(reviewStorageKey, []);
+  const orgReady = !!scopeContext.orgId && !!organization?.id;
+  const isMissingDashboardTable = (error) => error?.code === '42P01' || error?.code === 'PGRST205' || /dashboard_.*not found|does not exist/i.test(error?.message || '');
+
+  const { data: remoteActionRows = [] } = useAuthQuery({
+    queryKey: ['dashboard-action-status', scopeContext.orgId, scope, scopeContext.scopeKey, actionDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_action_status')
+        .select('action_key, status')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .eq('action_date', actionDate);
+      if (isMissingDashboardTable(error)) return [];
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  const { data: remoteNote = null } = useAuthQuery({
+    queryKey: ['dashboard-handoff-note', scopeContext.orgId, scope, scopeContext.scopeKey, actionDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_handoff_notes')
+        .select('note')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .eq('note_date', actionDate)
+        .maybeSingle();
+      if (isMissingDashboardTable(error)) return null;
+      if (error) throw error;
+      return data;
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  const { data: remoteReviews = [] } = useAuthQuery({
+    queryKey: ['dashboard-review-logs', scopeContext.orgId, scope, scopeContext.scopeKey],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_review_logs')
+        .select('*')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .order('review_date', { ascending: false })
+        .limit(7);
+      if (isMissingDashboardTable(error)) return [];
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!remoteActionRows.length) return;
+    setStatusMap(Object.fromEntries(remoteActionRows.map((row) => [row.action_key, row.status])));
+  }, [remoteActionRows, setStatusMap]);
+
+  useEffect(() => {
+    if (remoteNote?.note !== undefined) setNote(remoteNote.note || '');
+  }, [remoteNote, setNote]);
+
+  useEffect(() => {
+    if (!remoteReviews.length) return;
+    setReviews(remoteReviews.map((review) => ({
+      id: review.id,
+      date: review.review_date,
+      savedAt: review.updated_at || review.created_at,
+      completedCount: Number(review.completed_count || 0),
+      totalCount: Number(review.total_count || 0),
+      dataHealthScore: Number(review.data_health_score || 0),
+      weekSales: Number(review.week_sales || 0),
+      primeCostPercent: Number(review.prime_cost_percent || 0),
+      unpaid: Number(review.unpaid_amount || 0),
+      lowStockCount: Number(review.low_stock_count || 0),
+      pendingInvoiceCount: Number(review.pending_invoice_count || 0),
+      openActions: Array.isArray(review.open_actions) ? review.open_actions : [],
+      note: review.note || '',
+    })));
+  }, [remoteReviews, setReviews]);
+
+  const basePayload = React.useCallback(() => ({
+    brand_id: scopeContext.brandId,
+    location_id: scopeContext.locationId,
+    organization_id: scopeContext.orgId,
+    scope,
+    scope_key: scopeContext.scopeKey,
+  }), [scope, scopeContext.brandId, scopeContext.locationId, scopeContext.orgId, scopeContext.scopeKey]);
+
+  const persistActionStatus = React.useCallback(async (title, status) => {
+    if (!orgReady) return;
+    const key = actionId(title);
+    try {
+      const { error } = await supabase.from('dashboard_action_status').upsert({
+        ...basePayload(),
+        action_date: actionDate,
+        action_key: key,
+        action_title: title,
+        completed_at: status === 'done' ? new Date().toISOString() : null,
+        completed_by: status === 'done' ? userProfile?.id || null : null,
+        status,
+      }, { onConflict: 'organization_id,scope,scope_key,action_date,action_key' });
+      if (error) throw error;
+      logAudit({
+        action: status === 'done' ? 'dashboard_action_completed' : 'dashboard_action_reopened',
+        entityId: key,
+        entityType: 'dashboard_action_status',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: scopeContext.orgId,
+        userId: userProfile?.id,
+        details: { scope, scopeKey: scopeContext.scopeKey, title },
+      });
+    } catch (error) {
+      console.warn('[dashboard] Failed to persist action status:', error.message || error);
+    }
+  }, [actionDate, basePayload, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, userProfile?.id]);
+
+  const resetActions = React.useCallback(async () => {
+    setStatusMap({});
+    if (!orgReady || !actions.length) return;
+    await Promise.all(actions.map((item) => persistActionStatus(item.title, 'open')));
+  }, [actions, orgReady, persistActionStatus, setStatusMap]);
+
+  useEffect(() => {
+    if (!orgReady) return undefined;
+    const timer = window.setTimeout(async () => {
+      try {
+        const { error } = await supabase.from('dashboard_handoff_notes').upsert({
+          ...basePayload(),
+          note,
+          note_date: actionDate,
+        }, { onConflict: 'organization_id,scope,scope_key,note_date' });
+        if (error) throw error;
+      } catch (error) {
+        console.warn('[dashboard] Failed to persist handoff note:', error.message || error);
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [actionDate, basePayload, note, orgReady]);
+
+  const saveReview = React.useCallback(async () => {
+    const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
+    const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+    const snapshot = {
+      id: `${scope}-${Date.now()}`,
+      date: actionDate,
+      savedAt: new Date().toISOString(),
+      completedCount: completed.length,
+      totalCount: actions.length,
+      dataHealthScore,
+      weekSales: metrics.weekSales,
+      primeCostPercent: metrics.primeCostPercent,
+      unpaid: metrics.unpaid,
+      lowStockCount: metrics.lowStock.length,
+      pendingInvoiceCount: metrics.pendingInvoices.length,
+      openActions: open.map((item) => ({ title: item.title, priority: item.priority, owner: item.owner, due: item.due })),
+      note: note.trim(),
+    };
+
+    setReviews((current) => [snapshot, ...current.filter((review) => review.date !== actionDate)].slice(0, 7));
+    if (orgReady) {
+      try {
+        const { error } = await supabase.from('dashboard_review_logs').upsert({
+          ...basePayload(),
+          completed_count: snapshot.completedCount,
+          data_health_score: snapshot.dataHealthScore,
+          low_stock_count: snapshot.lowStockCount,
+          note: snapshot.note,
+          open_actions: snapshot.openActions,
+          pending_invoice_count: snapshot.pendingInvoiceCount,
+          prime_cost_percent: snapshot.primeCostPercent,
+          review_date: actionDate,
+          saved_by: userProfile?.id || null,
+          total_count: snapshot.totalCount,
+          unpaid_amount: snapshot.unpaid,
+          week_sales: snapshot.weekSales,
+        }, { onConflict: 'organization_id,scope,scope_key,review_date' });
+        if (error) throw error;
+        logAudit({
+          action: 'dashboard_review_saved',
+          entityId: `${scopeContext.scopeKey}:${actionDate}`,
+          entityType: 'dashboard_review_log',
+          module: AUDIT_MODULES.SYSTEM,
+          orgId: scopeContext.orgId,
+          userId: userProfile?.id,
+          details: { scope, completed: snapshot.completedCount, open: snapshot.openActions.length },
+        });
+      } catch (error) {
+        console.warn('[dashboard] Failed to persist review log:', error.message || error);
+      }
+    }
+    toast.success('Manager review saved');
+  }, [actionDate, actions, basePayload, dataHealthScore, metrics.lowStock.length, metrics.pendingInvoices.length, metrics.primeCostPercent, metrics.unpaid, metrics.weekSales, note, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, statusMap, userProfile?.id]);
+
+  const clearReviews = React.useCallback(async () => {
+    setReviews([]);
+    if (orgReady) {
+      try {
+        const { error } = await supabase
+          .from('dashboard_review_logs')
+          .delete()
+          .eq('organization_id', scopeContext.orgId)
+          .eq('scope', scope)
+          .eq('scope_key', scopeContext.scopeKey);
+        if (error) throw error;
+        logAudit({
+          action: 'dashboard_reviews_cleared',
+          entityType: 'dashboard_review_log',
+          module: AUDIT_MODULES.SYSTEM,
+          orgId: scopeContext.orgId,
+          userId: userProfile?.id,
+          details: { scope, scopeKey: scopeContext.scopeKey },
+        });
+      } catch (error) {
+        console.warn('[dashboard] Failed to clear review logs:', error.message || error);
+      }
+    }
+    toast.success('Review log cleared');
+  }, [orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, userProfile?.id]);
+
+  const auditHandoffExport = React.useCallback((action) => {
+    logAudit({
+      action,
+      entityId: `${scopeContext.scopeKey}:${actionDate}`,
+      entityType: 'dashboard_handoff_note',
+      module: AUDIT_MODULES.SYSTEM,
+      orgId: scopeContext.orgId,
+      userId: userProfile?.id,
+      details: { scope, scopeKey: scopeContext.scopeKey },
+    });
+  }, [actionDate, scope, scopeContext.orgId, scopeContext.scopeKey, userProfile?.id]);
+
+  return {
+    auditHandoffExport,
+    clearReviews,
+    note,
+    persistActionStatus,
+    resetActions,
+    reviews,
+    saveReview,
+    setNote,
+    setReviews,
+    setStatusMap,
+    statusMap,
+  };
 }
 
 function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
@@ -1167,8 +1451,8 @@ function DecisionBriefPanel({ metrics, scope }) {
   );
 }
 
-function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true, statusMap = {}, setStatusMap }) {
-  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
+function RoleActionPlanPanel({ actions: providedActions, metrics, scope, canAccessPage = () => true, statusMap = {}, setStatusMap, onActionStatusChange, onResetActions }) {
+  const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const [filter, setFilter] = React.useState('open');
 
   const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
@@ -1189,10 +1473,9 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true, statu
 
   const toggleAction = (title) => {
     const key = actionId(title);
-    setStatusMap?.((current) => ({
-      ...current,
-      [key]: current[key] === 'done' ? 'open' : 'done',
-    }));
+    const nextStatus = statusMap[key] === 'done' ? 'open' : 'done';
+    setStatusMap?.((current) => ({ ...current, [key]: nextStatus }));
+    onActionStatusChange?.(title, nextStatus);
   };
 
   return (
@@ -1200,7 +1483,7 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true, statu
       title="Daily Action Plan"
       description="Role-based actions converted from the dashboard signals."
       action={(
-        <Button variant="ghost" size="sm" className="gap-2" onClick={() => setStatusMap?.({})}>
+        <Button variant="ghost" size="sm" className="gap-2" onClick={() => onResetActions ? onResetActions() : setStatusMap?.({})}>
           <RotateCcw className="h-4 w-4" />
           Reset
         </Button>
@@ -1305,19 +1588,8 @@ function createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore
   ].join('\n');
 }
 
-function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true }) {
-  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
-  const noteKey = `dashboard-handoff-note:${scope}:${todayKey()}`;
-  const [note, setNote] = React.useState('');
-
-  React.useEffect(() => {
-    setNote(window.localStorage.getItem(noteKey) || '');
-  }, [noteKey]);
-
-  React.useEffect(() => {
-    window.localStorage.setItem(noteKey, note);
-  }, [note, noteKey]);
-
+function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, note = '', setNote, onHandoffExport }) {
+  const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
   const openCount = actions.length - completedCount;
   const handoffText = createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore, note });
@@ -1325,6 +1597,7 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
   const copyHandoff = async () => {
     try {
       await navigator.clipboard.writeText(handoffText);
+      onHandoffExport?.('dashboard_handoff_copied');
       toast.success('Daily handoff copied');
     } catch {
       toast.error('Could not copy handoff');
@@ -1339,6 +1612,7 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
     link.download = `restops-handoff-${scope}-${todayKey()}.txt`;
     link.click();
     URL.revokeObjectURL(url);
+    onHandoffExport?.('dashboard_handoff_downloaded');
     toast.success('Daily handoff downloaded');
   };
 
@@ -1383,7 +1657,7 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
         <textarea
           id="dashboard-handoff-note"
           value={note}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => setNote?.(event.target.value)}
           className="mt-2 min-h-28 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
           placeholder="Add shift context, vendor issues, staffing notes, or what the next manager should check first."
         />
@@ -1392,55 +1666,12 @@ function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, ca
   );
 }
 
-function ManagerReviewLogPanel({ metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true }) {
-  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
-  const historyKey = `dashboard-review-log:${scope}`;
-  const noteKey = `dashboard-handoff-note:${scope}:${todayKey()}`;
-  const [reviews, setReviews] = React.useState([]);
-
-  React.useEffect(() => {
-    try {
-      setReviews(JSON.parse(window.localStorage.getItem(historyKey) || '[]'));
-    } catch {
-      setReviews([]);
-    }
-  }, [historyKey]);
-
-  React.useEffect(() => {
-    window.localStorage.setItem(historyKey, JSON.stringify(reviews));
-  }, [historyKey, reviews]);
-
+function ManagerReviewLogPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, reviews = [], onSaveReview, onClearReviews }) {
+  const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
   const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
   const latestPriorReview = reviews.find((review) => review.date !== todayKey());
   const carryoverItems = latestPriorReview?.openActions || [];
-
-  const saveReview = () => {
-    const managerNote = window.localStorage.getItem(noteKey) || '';
-    const snapshot = {
-      id: `${scope}-${Date.now()}`,
-      date: todayKey(),
-      savedAt: new Date().toISOString(),
-      completedCount: completed.length,
-      totalCount: actions.length,
-      dataHealthScore,
-      weekSales: metrics.weekSales,
-      primeCostPercent: metrics.primeCostPercent,
-      unpaid: metrics.unpaid,
-      lowStockCount: metrics.lowStock.length,
-      pendingInvoiceCount: metrics.pendingInvoices.length,
-      openActions: open.map((item) => ({ title: item.title, priority: item.priority, owner: item.owner, due: item.due })),
-      note: managerNote.trim(),
-    };
-
-    setReviews((current) => [snapshot, ...current.filter((review) => review.date !== todayKey())].slice(0, 7));
-    toast.success('Manager review saved');
-  };
-
-  const clearReviews = () => {
-    setReviews([]);
-    toast.success('Review log cleared');
-  };
 
   return (
     <SectionCard
@@ -1448,12 +1679,12 @@ function ManagerReviewLogPanel({ metrics, scope, statusMap = {}, dataHealthScore
       description="Save daily review snapshots and keep prior open items visible for follow-up."
       action={(
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={saveReview}>
+          <Button variant="outline" size="sm" className="gap-2" onClick={onSaveReview}>
             <Save className="h-4 w-4" />
             Save Review
           </Button>
           {!!reviews.length && (
-            <Button variant="ghost" size="sm" className="gap-2" onClick={clearReviews}>
+            <Button variant="ghost" size="sm" className="gap-2" onClick={onClearReviews}>
               <Trash2 className="h-4 w-4" />
               Clear
             </Button>
@@ -1633,7 +1864,7 @@ function PlatformActionQueue({ platformStats, recentLogs }) {
 }
 
 function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
-  const { organization, userProfile } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData(scope);
   const metrics = useDashboardMetrics(data);
@@ -1643,7 +1874,17 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   );
   const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
   const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
-  const [actionStatusMap, setActionStatusMap] = useLocalStatusMap(`dashboard-actions:${scope}:${todayKey()}`);
+  const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage), [canAccessPage, metrics, scope]);
+  const dashboardPersistence = useDashboardPersistence({
+    actions: roleActions,
+    brand,
+    dataHealthScore,
+    location,
+    metrics,
+    organization,
+    scope,
+    userProfile,
+  });
 
   return (
     <div className="space-y-6">
@@ -1651,9 +1892,38 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <DecisionBriefPanel metrics={metrics} scope={scope} />
-      <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} statusMap={actionStatusMap} setStatusMap={setActionStatusMap} />
-      <HandoffBriefPanel metrics={metrics} scope={scope} statusMap={actionStatusMap} dataHealthScore={dataHealthScore} canAccessPage={canAccessPage} />
-      <ManagerReviewLogPanel metrics={metrics} scope={scope} statusMap={actionStatusMap} dataHealthScore={dataHealthScore} canAccessPage={canAccessPage} />
+      <RoleActionPlanPanel
+        actions={roleActions}
+        metrics={metrics}
+        scope={scope}
+        canAccessPage={canAccessPage}
+        statusMap={dashboardPersistence.statusMap}
+        setStatusMap={dashboardPersistence.setStatusMap}
+        onActionStatusChange={dashboardPersistence.persistActionStatus}
+        onResetActions={dashboardPersistence.resetActions}
+      />
+      <HandoffBriefPanel
+        actions={roleActions}
+        metrics={metrics}
+        scope={scope}
+        statusMap={dashboardPersistence.statusMap}
+        dataHealthScore={dataHealthScore}
+        canAccessPage={canAccessPage}
+        note={dashboardPersistence.note}
+        setNote={dashboardPersistence.setNote}
+        onHandoffExport={dashboardPersistence.auditHandoffExport}
+      />
+      <ManagerReviewLogPanel
+        actions={roleActions}
+        metrics={metrics}
+        scope={scope}
+        statusMap={dashboardPersistence.statusMap}
+        dataHealthScore={dataHealthScore}
+        canAccessPage={canAccessPage}
+        reviews={dashboardPersistence.reviews}
+        onSaveReview={dashboardPersistence.saveReview}
+        onClearReviews={dashboardPersistence.clearReviews}
+      />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
