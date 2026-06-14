@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Clock,
   Circle,
+  BellRing,
   Copy,
   CreditCard,
   Download,
@@ -54,6 +55,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
+import { notifyManagers } from '@/lib/notificationService';
 import { createPageUrl } from '@/utils';
 import { filterByContext } from '@/lib/contextUtils';
 import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
@@ -1504,6 +1506,75 @@ function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
     .slice(0, 6);
 }
 
+function buildEscalations({ actions, metrics, reviews, statusMap }) {
+  const openActions = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+  const latestPriorReview = reviews.find((review) => review.date !== todayKey());
+  const carryoverItems = latestPriorReview?.openActions || [];
+  const escalations = [];
+
+  openActions
+    .filter((item) => item.priority === 'Critical')
+    .forEach((item) => {
+      escalations.push({
+        title: item.title,
+        body: item.body,
+        owner: item.owner,
+        due: item.due === 'Today' ? 'Due now' : item.due,
+        href: item.href,
+        priority: 'Critical',
+        reason: 'Critical action still open',
+        tone: 'red',
+      });
+    });
+
+  if (openActions.some((item) => item.priority === 'High')) {
+    const highCount = openActions.filter((item) => item.priority === 'High').length;
+    escalations.push({
+      title: `${highCount} high-priority actions open`,
+      body: 'Review owner assignment before the next manager handoff.',
+      owner: 'Manager on duty',
+      due: 'Today',
+      href: 'Dashboard',
+      priority: 'High',
+      reason: 'High-priority work remains open',
+      tone: 'orange',
+    });
+  }
+
+  if (carryoverItems.length) {
+    escalations.push({
+      title: `${carryoverItems.length} carryover item${carryoverItems.length > 1 ? 's' : ''} from prior review`,
+      body: `Last review on ${latestPriorReview.date} had unresolved dashboard actions.`,
+      owner: 'Next manager',
+      due: 'Due now',
+      href: 'Dashboard',
+      priority: 'High',
+      reason: 'Prior review carryover',
+      tone: 'yellow',
+    });
+  }
+
+  if (metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent) {
+    escalations.push({
+      title: `Prime cost above target at ${plainPercent(metrics.primeCostPercent)}`,
+      body: 'COGS plus labor is above the daily operating guardrail.',
+      owner: 'Operator leadership',
+      due: 'Today',
+      href: 'Performance',
+      priority: 'Critical',
+      reason: 'Operating guardrail breach',
+      tone: 'red',
+    });
+  }
+
+  const seen = new Set();
+  return escalations.filter((item) => {
+    if (seen.has(item.title)) return false;
+    seen.add(item.title);
+    return true;
+  }).slice(0, 6);
+}
+
 function DecisionBriefPanel({ metrics, scope }) {
   const salesSignal = metrics.weekVsLastWeek >= 0
     ? `${percent(metrics.weekVsLastWeek)} vs last week`
@@ -1652,6 +1723,108 @@ function RoleActionPlanPanel({ actions: providedActions, metrics, scope, canAcce
           />
         )}
       </div>
+    </SectionCard>
+  );
+}
+
+function EscalationPanel({ escalations, organization, scope, userProfile }) {
+  const [notifyingKey, setNotifyingKey] = React.useState(null);
+
+  const notifyEscalation = async (item) => {
+    if (!organization?.id) {
+      toast.error('No organization found for escalation');
+      return;
+    }
+
+    const key = actionId(item.title);
+    setNotifyingKey(key);
+    try {
+      const result = await notifyManagers({
+        organization_id: organization.id,
+        title: `Dashboard escalation: ${item.title}`,
+        message: `${item.reason}. Owner: ${item.owner}. Due: ${item.due}. ${item.body}`,
+        type: item.priority === 'Critical' ? 'system' : 'system',
+        metadata: {
+          dashboard_scope: scope,
+          escalation_title: item.title,
+          href: item.href || 'Dashboard',
+          priority: item.priority,
+        },
+        exclude_user_id: userProfile?.id,
+      });
+
+      logAudit({
+        action: 'dashboard_escalation_notified',
+        entityId: key,
+        entityType: 'dashboard_escalation',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: organization.id,
+        userId: userProfile?.id,
+        details: { scope, title: item.title, notified: result.notified || 0 },
+      });
+
+      toast.success(result.notified ? `Notified ${result.notified} manager${result.notified > 1 ? 's' : ''}` : 'No managers found to notify');
+    } catch (error) {
+      toast.error(error.message || 'Failed to send escalation');
+    } finally {
+      setNotifyingKey(null);
+    }
+  };
+
+  return (
+    <SectionCard title="Escalation Center" description="Open critical work, carryover, and guardrail breaches that may need manager notification.">
+      {!escalations.length && (
+        <EmptyState
+          icon={CheckCircle2}
+          title="No escalations right now"
+          description="Critical actions, carryover items, and operating guardrails are clear based on the current dashboard state."
+        />
+      )}
+      {!!escalations.length && (
+        <div className="space-y-3">
+          {escalations.map((item) => {
+            const key = actionId(item.title);
+            return (
+              <div key={item.title} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/30 p-4 md:flex-row md:items-start md:justify-between">
+                <div className="flex gap-3">
+                  <div className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', {
+                    'bg-resend-red/10 text-resend-red': item.tone === 'red',
+                    'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
+                    'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
+                  })}>
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                      <Badge className={item.priority === 'Critical' ? 'bg-resend-red/10 text-resend-red' : 'bg-resend-orange/10 text-resend-orange'}>
+                        {item.priority}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.body}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1"><UserCheck className="h-3.5 w-3.5" /> {item.owner}</span>
+                      <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {item.due}</span>
+                      <span>{item.reason}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {item.href && (
+                    <Link to={createPageUrl(item.href)} className="text-xs font-semibold text-brand hover:opacity-80">
+                      Open
+                    </Link>
+                  )}
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => notifyEscalation(item)} disabled={notifyingKey === key}>
+                    <BellRing className="h-4 w-4" />
+                    {notifyingKey === key ? 'Notifying' : 'Notify'}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </SectionCard>
   );
 }
@@ -1980,6 +2153,12 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
     scope,
     userProfile,
   });
+  const escalations = React.useMemo(() => buildEscalations({
+    actions: roleActions,
+    metrics,
+    reviews: dashboardPersistence.reviews,
+    statusMap: dashboardPersistence.statusMap,
+  }), [dashboardPersistence.reviews, dashboardPersistence.statusMap, metrics, roleActions]);
 
   return (
     <div className="space-y-6">
@@ -1998,6 +2177,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         onActionStatusChange={dashboardPersistence.persistActionStatus}
         onResetActions={dashboardPersistence.resetActions}
       />
+      <EscalationPanel escalations={escalations} organization={organization} scope={scope} userProfile={userProfile} />
       <HandoffBriefPanel
         actions={roleActions}
         metrics={metrics}
