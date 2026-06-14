@@ -1,5 +1,6 @@
 -- 076: Dashboard persistence
--- Persists daily dashboard action status, handoff notes, and manager review logs.
+-- Persists daily dashboard action status, handoff notes, manager review logs,
+-- and scope-specific dashboard rules.
 
 CREATE TABLE IF NOT EXISTS public.dashboard_action_status (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -59,6 +60,26 @@ CREATE TABLE IF NOT EXISTS public.dashboard_review_logs (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.dashboard_escalation_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  brand_id UUID REFERENCES public.brands(id) ON DELETE SET NULL,
+  location_id UUID REFERENCES public.locations(id) ON DELETE SET NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('org', 'brand', 'location', 'staff')),
+  scope_key TEXT NOT NULL DEFAULT 'org',
+  cogs_percent NUMERIC NOT NULL DEFAULT 32,
+  labor_percent NUMERIC NOT NULL DEFAULT 28,
+  prime_cost_percent NUMERIC NOT NULL DEFAULT 60,
+  notify_critical_actions BOOLEAN NOT NULL DEFAULT true,
+  notify_high_actions BOOLEAN NOT NULL DEFAULT true,
+  notify_carryover BOOLEAN NOT NULL DEFAULT true,
+  notify_prime_cost_breach BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL DEFAULT auth.uid(),
+  updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL DEFAULT auth.uid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE OR REPLACE FUNCTION public.set_dashboard_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -85,22 +106,32 @@ CREATE TRIGGER dashboard_review_logs_updated_at
 BEFORE UPDATE ON public.dashboard_review_logs
 FOR EACH ROW EXECUTE FUNCTION public.set_dashboard_updated_at();
 
+DROP TRIGGER IF EXISTS dashboard_escalation_rules_updated_at ON public.dashboard_escalation_rules;
+CREATE TRIGGER dashboard_escalation_rules_updated_at
+BEFORE UPDATE ON public.dashboard_escalation_rules
+FOR EACH ROW EXECUTE FUNCTION public.set_dashboard_updated_at();
+
 CREATE INDEX IF NOT EXISTS idx_dashboard_action_status_scope
   ON public.dashboard_action_status (organization_id, scope, action_date DESC);
 CREATE INDEX IF NOT EXISTS idx_dashboard_handoff_notes_scope
   ON public.dashboard_handoff_notes (organization_id, scope, note_date DESC);
 CREATE INDEX IF NOT EXISTS idx_dashboard_review_logs_scope
   ON public.dashboard_review_logs (organization_id, scope, review_date DESC);
+CREATE INDEX IF NOT EXISTS idx_dashboard_escalation_rules_scope
+  ON public.dashboard_escalation_rules (organization_id, scope, scope_key);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_dashboard_action_status_scope
   ON public.dashboard_action_status (organization_id, scope, scope_key, action_date, action_key);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_dashboard_handoff_notes_scope
   ON public.dashboard_handoff_notes (organization_id, scope, scope_key, note_date);
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_dashboard_review_logs_scope
   ON public.dashboard_review_logs (organization_id, scope, scope_key, review_date);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_dashboard_escalation_rules_scope
+  ON public.dashboard_escalation_rules (organization_id, scope, scope_key);
 
 ALTER TABLE public.dashboard_action_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_handoff_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_review_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dashboard_escalation_rules ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION public.can_access_dashboard_scope(
   p_org_id UUID,
@@ -185,13 +216,31 @@ CREATE POLICY "dashboard_review_logs_delete"
   ON public.dashboard_review_logs FOR DELETE
   USING (public.can_access_dashboard_scope(organization_id, brand_id, location_id, scope));
 
+DROP POLICY IF EXISTS "dashboard_escalation_rules_select" ON public.dashboard_escalation_rules;
+CREATE POLICY "dashboard_escalation_rules_select"
+  ON public.dashboard_escalation_rules FOR SELECT
+  USING (public.can_access_dashboard_scope(organization_id, brand_id, location_id, scope));
+
+DROP POLICY IF EXISTS "dashboard_escalation_rules_insert" ON public.dashboard_escalation_rules;
+CREATE POLICY "dashboard_escalation_rules_insert"
+  ON public.dashboard_escalation_rules FOR INSERT
+  WITH CHECK (public.can_access_dashboard_scope(organization_id, brand_id, location_id, scope));
+
+DROP POLICY IF EXISTS "dashboard_escalation_rules_update" ON public.dashboard_escalation_rules;
+CREATE POLICY "dashboard_escalation_rules_update"
+  ON public.dashboard_escalation_rules FOR UPDATE
+  USING (public.can_access_dashboard_scope(organization_id, brand_id, location_id, scope))
+  WITH CHECK (public.can_access_dashboard_scope(organization_id, brand_id, location_id, scope));
+
 GRANT SELECT, INSERT, UPDATE ON public.dashboard_action_status TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.dashboard_handoff_notes TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.dashboard_review_logs TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.dashboard_escalation_rules TO authenticated;
 
 ALTER TABLE public.dashboard_action_status REPLICA IDENTITY FULL;
 ALTER TABLE public.dashboard_handoff_notes REPLICA IDENTITY FULL;
 ALTER TABLE public.dashboard_review_logs REPLICA IDENTITY FULL;
+ALTER TABLE public.dashboard_escalation_rules REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -221,6 +270,15 @@ BEGIN
         AND tablename = 'dashboard_review_logs'
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_review_logs;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'dashboard_escalation_rules'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_escalation_rules;
     END IF;
   END IF;
 END $$;

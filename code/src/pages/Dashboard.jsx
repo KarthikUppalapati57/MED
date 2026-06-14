@@ -67,10 +67,14 @@ import { Progress } from '@/components/ui/progress';
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444', '#84cc16'];
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const OPERATING_TARGETS = {
+const DEFAULT_DASHBOARD_RULES = {
   cogsPercent: 32,
   laborPercent: 28,
   primeCostPercent: 60,
+  notifyCriticalActions: true,
+  notifyCarryover: true,
+  notifyHighActions: true,
+  notifyPrimeCostBreach: true,
 };
 
 function currency(value) {
@@ -186,6 +190,122 @@ function useLocalStatusMap(storageKey) {
   return useLocalJson(storageKey, {});
 }
 
+function isMissingDashboardTable(error) {
+  return error?.code === '42P01' || error?.code === 'PGRST205' || /dashboard_.*not found|does not exist/i.test(error?.message || '');
+}
+
+function normalizeDashboardRules(value = {}) {
+  return {
+    ...DEFAULT_DASHBOARD_RULES,
+    cogsPercent: Number(value.cogsPercent ?? value.cogs_percent ?? DEFAULT_DASHBOARD_RULES.cogsPercent),
+    laborPercent: Number(value.laborPercent ?? value.labor_percent ?? DEFAULT_DASHBOARD_RULES.laborPercent),
+    primeCostPercent: Number(value.primeCostPercent ?? value.prime_cost_percent ?? DEFAULT_DASHBOARD_RULES.primeCostPercent),
+    notifyCriticalActions: Boolean(value.notifyCriticalActions ?? value.notify_critical_actions ?? DEFAULT_DASHBOARD_RULES.notifyCriticalActions),
+    notifyCarryover: Boolean(value.notifyCarryover ?? value.notify_carryover ?? DEFAULT_DASHBOARD_RULES.notifyCarryover),
+    notifyHighActions: Boolean(value.notifyHighActions ?? value.notify_high_actions ?? DEFAULT_DASHBOARD_RULES.notifyHighActions),
+    notifyPrimeCostBreach: Boolean(value.notifyPrimeCostBreach ?? value.notify_prime_cost_breach ?? DEFAULT_DASHBOARD_RULES.notifyPrimeCostBreach),
+  };
+}
+
+function dashboardRulesPayload(rules) {
+  const normalized = normalizeDashboardRules(rules);
+  return {
+    cogs_percent: normalized.cogsPercent,
+    labor_percent: normalized.laborPercent,
+    prime_cost_percent: normalized.primeCostPercent,
+    notify_carryover: normalized.notifyCarryover,
+    notify_critical_actions: normalized.notifyCriticalActions,
+    notify_high_actions: normalized.notifyHighActions,
+    notify_prime_cost_breach: normalized.notifyPrimeCostBreach,
+  };
+}
+
+function useDashboardRules({ brand, location, organization, scope, userProfile }) {
+  const queryClient = useQueryClient();
+  const scopeContext = React.useMemo(
+    () => getDashboardScopeContext(scope, { organization, brand, location }),
+    [brand, location, organization, scope]
+  );
+  const storageKey = `dashboard-rules:${scope}:${scopeContext.scopeKey}`;
+  const [rules, setRules] = useLocalJson(storageKey, DEFAULT_DASHBOARD_RULES);
+  const orgReady = !!scopeContext.orgId && !!organization?.id;
+
+  const { data: remoteRules = null } = useAuthQuery({
+    queryKey: ['dashboard-escalation-rules', scopeContext.orgId, scope, scopeContext.scopeKey],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_escalation_rules')
+        .select('*')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .maybeSingle();
+      if (isMissingDashboardTable(error)) return null;
+      if (error) throw error;
+      return data;
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (remoteRules) setRules(normalizeDashboardRules(remoteRules));
+  }, [remoteRules, setRules]);
+
+  useEffect(() => {
+    if (!orgReady) return undefined;
+    const channel = supabase.channel(`dashboard-rules-${scope}-${scopeContext.scopeKey}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_escalation_rules', filter: `organization_id=eq.${scopeContext.orgId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-escalation-rules'] });
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [orgReady, queryClient, scope, scopeContext.orgId, scopeContext.scopeKey]);
+
+  const saveRules = React.useCallback(async (nextRules) => {
+    const normalized = normalizeDashboardRules(nextRules);
+    setRules(normalized);
+    if (!orgReady) {
+      toast.success('Dashboard rules saved locally');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('dashboard_escalation_rules').upsert({
+        brand_id: scopeContext.brandId,
+        location_id: scopeContext.locationId,
+        organization_id: scopeContext.orgId,
+        scope,
+        scope_key: scopeContext.scopeKey,
+        updated_by: userProfile?.id || null,
+        ...dashboardRulesPayload(normalized),
+      }, { onConflict: 'organization_id,scope,scope_key' });
+      if (error) throw error;
+      logAudit({
+        action: 'dashboard_rules_updated',
+        entityId: `${scopeContext.scopeKey}:rules`,
+        entityType: 'dashboard_escalation_rules',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: scopeContext.orgId,
+        userId: userProfile?.id,
+        details: { scope, rules: normalized },
+      });
+      toast.success('Dashboard rules synced');
+    } catch (error) {
+      if (isMissingDashboardTable(error)) {
+        toast.success('Dashboard rules saved locally until Supabase rules table is applied');
+        return;
+      }
+      toast.error(error.message || 'Failed to save dashboard rules');
+    }
+  }, [orgReady, scope, scopeContext.brandId, scopeContext.locationId, scopeContext.orgId, scopeContext.scopeKey, setRules, userProfile?.id]);
+
+  const normalizedRules = React.useMemo(() => normalizeDashboardRules(rules), [rules]);
+
+  return { rules: normalizedRules, saveRules };
+}
+
 function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
   const queryClient = useQueryClient();
   const scopeContext = React.useMemo(
@@ -201,7 +321,6 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
   const [reviews, setReviews] = useLocalJson(reviewStorageKey, []);
   const [syncState, setSyncState] = React.useState({ mode: 'local', message: 'Saved locally', updatedAt: null });
   const orgReady = !!scopeContext.orgId && !!organization?.id;
-  const isMissingDashboardTable = React.useCallback((error) => error?.code === '42P01' || error?.code === 'PGRST205' || /dashboard_.*not found|does not exist/i.test(error?.message || ''), []);
   const markSynced = React.useCallback((message = 'Synced') => {
     setSyncState({ mode: 'synced', message, updatedAt: new Date().toISOString() });
   }, []);
@@ -781,7 +900,7 @@ function useDashboardData(scope) {
   };
 }
 
-function useDashboardMetrics(data) {
+function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
   return React.useMemo(() => {
     const now = new Date();
     const today = sumBy(data.salesData.filter((sale) => {
@@ -892,9 +1011,9 @@ function useDashboardMetrics(data) {
     if (pendingInvoices.length) recommendations.push({ tone: 'orange', title: `${pendingInvoices.length} invoices pending`, body: 'Clear pending review so AP and inventory stay current.', href: 'Invoices' });
     const overBudget = budgetPacing.filter((item) => !item.isGood && Math.abs(item.pacing) >= 1);
     if (overBudget.length) recommendations.push({ tone: 'yellow', title: `${overBudget[0].category} pacing ${percent(overBudget[0].pacing)}`, body: 'Open budget pacing and inspect category drivers.', href: 'Performance' });
-    if (laborPercent > 28) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
+    if (laborPercent > rules.laborPercent) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
     if (!monthSales) recommendations.push({ tone: 'blue', title: 'POS sales not flowing yet', body: 'Connect or map POS data to unlock daily sales benchmarking.', href: 'RestaurantSetup?tab=pos' });
-    if (primeCostPercent > OPERATING_TARGETS.primeCostPercent) recommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(primeCostPercent)}`, body: 'COGS plus labor is above the 60% operating guardrail.', href: 'Performance' });
+    if (primeCostPercent > rules.primeCostPercent) recommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(primeCostPercent)}`, body: `COGS plus labor is above the ${plainPercent(rules.primeCostPercent)} operating guardrail.`, href: 'Performance' });
 
     const calculated = {
       budgetPacing,
@@ -937,14 +1056,14 @@ function useDashboardMetrics(data) {
     const summaryLaborPercent = Number(kpis.laborPercent || 0);
     const summaryPrimeCostPercent = Number(kpis.primeCostPercent || 0);
     const guardrailRecommendations = [];
-    if (summaryCogsPercent > OPERATING_TARGETS.cogsPercent) {
-      guardrailRecommendations.push({ tone: 'red', title: `COGS at ${plainPercent(summaryCogsPercent)}`, body: 'Food and controllable costs are above the 32% target.', href: 'Performance' });
+    if (summaryCogsPercent > rules.cogsPercent) {
+      guardrailRecommendations.push({ tone: 'red', title: `COGS at ${plainPercent(summaryCogsPercent)}`, body: `Food and controllable costs are above the ${plainPercent(rules.cogsPercent)} target.`, href: 'Performance' });
     }
-    if (summaryLaborPercent > OPERATING_TARGETS.laborPercent) {
-      guardrailRecommendations.push({ tone: 'orange', title: `Labor at ${plainPercent(summaryLaborPercent)}`, body: 'Scheduled or logged labor is above the 28% target.', href: 'Labor' });
+    if (summaryLaborPercent > rules.laborPercent) {
+      guardrailRecommendations.push({ tone: 'orange', title: `Labor at ${plainPercent(summaryLaborPercent)}`, body: `Scheduled or logged labor is above the ${plainPercent(rules.laborPercent)} target.`, href: 'Labor' });
     }
-    if (summaryPrimeCostPercent > OPERATING_TARGETS.primeCostPercent) {
-      guardrailRecommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(summaryPrimeCostPercent)}`, body: 'COGS plus labor is above the 60% operating guardrail.', href: 'Performance' });
+    if (summaryPrimeCostPercent > rules.primeCostPercent) {
+      guardrailRecommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(summaryPrimeCostPercent)}`, body: `COGS plus labor is above the ${plainPercent(rules.primeCostPercent)} operating guardrail.`, href: 'Performance' });
     }
     if (Number(kpis.unpaidAmount || 0) > 0) {
       guardrailRecommendations.push({ tone: 'yellow', title: `${currency(kpis.unpaidAmount)} unpaid AP`, body: 'Open accounts payable can distort cash planning and vendor standing.', href: 'Payments' });
@@ -996,7 +1115,7 @@ function useDashboardMetrics(data) {
       weekVsLastYear: Number(kpis.salesVsLastYear || 0),
       workflowCounts,
     };
-  }, [data]);
+  }, [data, rules.cogsPercent, rules.laborPercent, rules.primeCostPercent]);
 }
 
 function DashboardHeader({ title, subtitle, scopeLabel }) {
@@ -1054,7 +1173,7 @@ function DataHealthBanner({ score = 80, sources = [], canAccessPage = () => true
   );
 }
 
-function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org', canAccessPage = () => true }) {
+function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org', canAccessPage = () => true, rules = DEFAULT_DASHBOARD_RULES }) {
   if (mode === 'platform') {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1075,14 +1194,14 @@ function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org', ca
     ],
     brand: [
       { label: 'Brand WTD Sales', value: currency(metrics.weekSales), icon: TrendingUp, tone: 'green', subtext: `${percent(metrics.weekVsLastWeek)} vs last week` },
-      { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), icon: Activity, tone: metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent ? 'red' : 'green', subtext: `Target ${plainPercent(OPERATING_TARGETS.primeCostPercent)}` },
+      { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), icon: Activity, tone: metrics.primeCostPercent > rules.primeCostPercent ? 'red' : 'green', subtext: `Target ${plainPercent(rules.primeCostPercent)}` },
       { label: 'Open Orders', value: metrics.openOrders.length, icon: ShoppingCart, tone: metrics.openOrders.length ? 'blue' : 'green', linkTo: 'AutoOrdering', linkText: 'Open', requiredPage: 'AutoOrdering' },
       { label: 'Low Stock', value: metrics.lowStock.length, icon: Warehouse, tone: metrics.lowStock.length ? 'orange' : 'green', linkTo: 'Inventory', linkText: 'Review', requiredPage: 'Inventory' },
     ],
     location: [
       { label: "Today's Sales", value: currency(metrics.today), icon: DollarSign, tone: 'green', subtext: `${currency(metrics.weekSales)} week-to-date` },
-      { label: 'COGS', value: plainPercent(metrics.cogsPercent), icon: Package, tone: metrics.cogsPercent > OPERATING_TARGETS.cogsPercent ? 'red' : 'blue', subtext: `Target ${plainPercent(OPERATING_TARGETS.cogsPercent)}` },
-      { label: 'Labor', value: plainPercent(metrics.laborPercent), icon: Users, tone: metrics.laborPercent > OPERATING_TARGETS.laborPercent ? 'orange' : 'purple', subtext: `Target ${plainPercent(OPERATING_TARGETS.laborPercent)}`, requiredPage: 'Labor' },
+      { label: 'COGS', value: plainPercent(metrics.cogsPercent), icon: Package, tone: metrics.cogsPercent > rules.cogsPercent ? 'red' : 'blue', subtext: `Target ${plainPercent(rules.cogsPercent)}` },
+      { label: 'Labor', value: plainPercent(metrics.laborPercent), icon: Users, tone: metrics.laborPercent > rules.laborPercent ? 'orange' : 'purple', subtext: `Target ${plainPercent(rules.laborPercent)}`, requiredPage: 'Labor' },
       { label: 'Action Items', value: metrics.recommendations.length, icon: AlertTriangle, tone: metrics.recommendations.length ? 'red' : 'green', subtext: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock` },
     ],
   };
@@ -1239,11 +1358,11 @@ function BudgetPacingPanel({ metrics }) {
   );
 }
 
-function OperatingSnapshot({ metrics, scope }) {
+function OperatingSnapshot({ metrics, scope, rules = DEFAULT_DASHBOARD_RULES }) {
   const rows = [
     { label: scope === 'location' ? "Today's Sales" : 'Period Sales', value: scope === 'location' ? currency(metrics.today) : currency(metrics.monthSales), helper: `${currency(metrics.weekSales)} WTD` },
     { label: 'Projected Cash Pressure', value: currency(metrics.unpaid * -1), helper: `${currency(metrics.unpaid)} unpaid AP` },
-    { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), helper: `${plainPercent(targetDelta(metrics.primeCostPercent, OPERATING_TARGETS.primeCostPercent))} vs target` },
+    { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), helper: `${plainPercent(targetDelta(metrics.primeCostPercent, rules.primeCostPercent))} vs target` },
     { label: 'Gross Margin', value: plainPercent(metrics.grossMarginPercent), helper: `${currency(metrics.invoiceSpend)} COGS spend` },
     { label: 'Inventory Risk', value: metrics.lowStock.length, helper: 'Low stock items' },
     { label: 'Workflow Load', value: metrics.pendingInvoices.length + metrics.openOrders.length, helper: 'Invoices + open orders' },
@@ -1264,11 +1383,11 @@ function OperatingSnapshot({ metrics, scope }) {
   );
 }
 
-function GuardrailPanel({ metrics, canAccessPage = () => true }) {
+function GuardrailPanel({ metrics, canAccessPage = () => true, rules = DEFAULT_DASHBOARD_RULES }) {
   const guardrails = [
-    { label: 'COGS', actual: metrics.cogsPercent, target: OPERATING_TARGETS.cogsPercent, href: 'Performance' },
-    { label: 'Labor', actual: metrics.laborPercent, target: OPERATING_TARGETS.laborPercent, href: 'Labor' },
-    { label: 'Prime Cost', actual: metrics.primeCostPercent, target: OPERATING_TARGETS.primeCostPercent, href: 'Performance' },
+    { label: 'COGS', actual: metrics.cogsPercent, target: rules.cogsPercent, href: 'Performance' },
+    { label: 'Labor', actual: metrics.laborPercent, target: rules.laborPercent, href: 'Labor' },
+    { label: 'Prime Cost', actual: metrics.primeCostPercent, target: rules.primeCostPercent, href: 'Performance' },
   ];
 
   return (
@@ -1425,13 +1544,98 @@ function DataCoveragePanel({ metrics, data, canAccessPage = () => true }) {
   );
 }
 
+function DashboardRulesPanel({ rules, onSaveRules }) {
+  const [draft, setDraft] = React.useState(() => normalizeDashboardRules(rules));
+
+  useEffect(() => {
+    setDraft(normalizeDashboardRules(rules));
+  }, [rules]);
+
+  const updatePercent = (key, value) => {
+    setDraft((current) => ({
+      ...current,
+      [key]: Math.max(0, Number(value || 0)),
+    }));
+  };
+
+  const updateToggle = (key) => {
+    setDraft((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
+
+  const save = () => {
+    onSaveRules?.(normalizeDashboardRules(draft));
+  };
+
+  const targetFields = [
+    { key: 'cogsPercent', label: 'COGS Target' },
+    { key: 'laborPercent', label: 'Labor Target' },
+    { key: 'primeCostPercent', label: 'Prime Cost Target' },
+  ];
+  const notificationFields = [
+    { key: 'notifyCriticalActions', label: 'Critical actions' },
+    { key: 'notifyHighActions', label: 'High-priority actions' },
+    { key: 'notifyCarryover', label: 'Prior review carryover' },
+    { key: 'notifyPrimeCostBreach', label: 'Prime cost breach' },
+  ];
+
+  return (
+    <SectionCard
+      title="Dashboard Rules Center"
+      description="Role and scope settings for operating targets and escalation behavior."
+      action={(
+        <Button size="sm" className="gap-2" onClick={save}>
+          <Save className="h-4 w-4" />
+          Save Rules
+        </Button>
+      )}
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-3">
+          {targetFields.map((field) => (
+            <label key={field.key} className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{field.label}</span>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={draft[field.key]}
+                  onChange={(event) => updatePercent(field.key, event.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-brand/30"
+                />
+                <span className="text-sm font-semibold text-muted-foreground">%</span>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {notificationFields.map((field) => (
+            <label key={field.key} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3">
+              <span className="text-sm font-semibold text-foreground">{field.label}</span>
+              <input
+                type="checkbox"
+                checked={Boolean(draft[field.key])}
+                onChange={() => updateToggle(field.key)}
+                className="h-4 w-4 accent-brand"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 function getRoleActionLabel(scope) {
   if (scope === 'brand') return 'Brand manager';
   if (scope === 'location') return 'Location manager';
   return 'Org owner';
 }
 
-function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
+function buildRoleActionPlan(metrics, scope, canAccessPage = () => true, rules = DEFAULT_DASHBOARD_RULES) {
   const owner = getRoleActionLabel(scope);
   const items = [];
 
@@ -1448,10 +1652,10 @@ function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
     });
   });
 
-  if (metrics.cogsPercent > OPERATING_TARGETS.cogsPercent && canAccessPage('Performance')) {
+  if (metrics.cogsPercent > rules.cogsPercent && canAccessPage('Performance')) {
     items.push({
       title: 'Review COGS drivers',
-      body: `COGS is ${plainPercent(targetDelta(metrics.cogsPercent, OPERATING_TARGETS.cogsPercent))} over target. Compare invoice categories and recipe/menu cost changes.`,
+      body: `COGS is ${plainPercent(targetDelta(metrics.cogsPercent, rules.cogsPercent))} over target. Compare invoice categories and recipe/menu cost changes.`,
       href: 'Performance',
       owner,
       due: 'Today',
@@ -1460,10 +1664,10 @@ function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
     });
   }
 
-  if (metrics.laborPercent > OPERATING_TARGETS.laborPercent && canAccessPage('Labor')) {
+  if (metrics.laborPercent > rules.laborPercent && canAccessPage('Labor')) {
     items.push({
       title: 'Tighten labor pacing',
-      body: `Labor is ${plainPercent(targetDelta(metrics.laborPercent, OPERATING_TARGETS.laborPercent))} over target. Review schedule coverage against forecasted sales.`,
+      body: `Labor is ${plainPercent(targetDelta(metrics.laborPercent, rules.laborPercent))} over target. Review schedule coverage against forecasted sales.`,
       href: 'Labor',
       owner: scope === 'org' ? 'Location managers' : owner,
       due: 'Next shift',
@@ -1506,15 +1710,16 @@ function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
     .slice(0, 6);
 }
 
-function buildEscalations({ actions, metrics, reviews, statusMap }) {
+function buildEscalations({ actions, metrics, reviews, rules = DEFAULT_DASHBOARD_RULES, statusMap }) {
   const openActions = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
   const latestPriorReview = reviews.find((review) => review.date !== todayKey());
   const carryoverItems = latestPriorReview?.openActions || [];
   const escalations = [];
 
-  openActions
-    .filter((item) => item.priority === 'Critical')
-    .forEach((item) => {
+  if (rules.notifyCriticalActions) {
+    openActions
+      .filter((item) => item.priority === 'Critical')
+      .forEach((item) => {
       escalations.push({
         title: item.title,
         body: item.body,
@@ -1526,8 +1731,9 @@ function buildEscalations({ actions, metrics, reviews, statusMap }) {
         tone: 'red',
       });
     });
+  }
 
-  if (openActions.some((item) => item.priority === 'High')) {
+  if (rules.notifyHighActions && openActions.some((item) => item.priority === 'High')) {
     const highCount = openActions.filter((item) => item.priority === 'High').length;
     escalations.push({
       title: `${highCount} high-priority actions open`,
@@ -1541,7 +1747,7 @@ function buildEscalations({ actions, metrics, reviews, statusMap }) {
     });
   }
 
-  if (carryoverItems.length) {
+  if (rules.notifyCarryover && carryoverItems.length) {
     escalations.push({
       title: `${carryoverItems.length} carryover item${carryoverItems.length > 1 ? 's' : ''} from prior review`,
       body: `Last review on ${latestPriorReview.date} had unresolved dashboard actions.`,
@@ -1554,7 +1760,7 @@ function buildEscalations({ actions, metrics, reviews, statusMap }) {
     });
   }
 
-  if (metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent) {
+  if (rules.notifyPrimeCostBreach && metrics.primeCostPercent > rules.primeCostPercent) {
     escalations.push({
       title: `Prime cost above target at ${plainPercent(metrics.primeCostPercent)}`,
       body: 'COGS plus labor is above the daily operating guardrail.',
@@ -1575,14 +1781,14 @@ function buildEscalations({ actions, metrics, reviews, statusMap }) {
   }).slice(0, 6);
 }
 
-function DecisionBriefPanel({ metrics, scope }) {
+function DecisionBriefPanel({ metrics, scope, rules = DEFAULT_DASHBOARD_RULES }) {
   const salesSignal = metrics.weekVsLastWeek >= 0
     ? `${percent(metrics.weekVsLastWeek)} vs last week`
     : `${percent(metrics.weekVsLastWeek)} vs last week`;
   const riskCount = [
-    metrics.cogsPercent > OPERATING_TARGETS.cogsPercent,
-    metrics.laborPercent > OPERATING_TARGETS.laborPercent,
-    metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent,
+    metrics.cogsPercent > rules.cogsPercent,
+    metrics.laborPercent > rules.laborPercent,
+    metrics.primeCostPercent > rules.primeCostPercent,
     metrics.unpaid > 0,
     metrics.lowStock.length > 0,
   ].filter(Boolean).length;
@@ -2135,14 +2341,15 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const { organization, brand, location, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData(scope);
-  const metrics = useDashboardMetrics(data);
+  const dashboardRules = useDashboardRules({ brand, location, organization, scope, userProfile });
+  const metrics = useDashboardMetrics(data, dashboardRules.rules);
   const canAccessPage = React.useMemo(
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
     [hasMinRole, isPlatformAdmin, organization, userProfile]
   );
   const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
   const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
-  const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage), [canAccessPage, metrics, scope]);
+  const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage, dashboardRules.rules), [canAccessPage, dashboardRules.rules, metrics, scope]);
   const dashboardPersistence = useDashboardPersistence({
     actions: roleActions,
     brand,
@@ -2157,16 +2364,18 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
     actions: roleActions,
     metrics,
     reviews: dashboardPersistence.reviews,
+    rules: dashboardRules.rules,
     statusMap: dashboardPersistence.statusMap,
-  }), [dashboardPersistence.reviews, dashboardPersistence.statusMap, metrics, roleActions]);
+  }), [dashboardPersistence.reviews, dashboardPersistence.statusMap, dashboardRules.rules, metrics, roleActions]);
 
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
-      <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
-      <DecisionBriefPanel metrics={metrics} scope={scope} />
+      <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
+      <DecisionBriefPanel metrics={metrics} scope={scope} rules={dashboardRules.rules} />
       <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
+      <DashboardRulesPanel rules={dashboardRules.rules} onSaveRules={dashboardRules.saveRules} />
       <RoleActionPlanPanel
         actions={roleActions}
         metrics={metrics}
@@ -2202,7 +2411,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         onClearReviews={dashboardPersistence.clearReviews}
         syncState={dashboardPersistence.syncState}
       />
-      <OperatingSnapshot metrics={metrics} scope={scope} />
+      <OperatingSnapshot metrics={metrics} scope={scope} rules={dashboardRules.rules} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
           <NeedsAttentionPanel items={metrics.recommendations} canAccessPage={canAccessPage} />
@@ -2213,7 +2422,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <BudgetPacingPanel metrics={metrics} />
-        <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} />
+        <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
       </div>
       <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
       <SpendAndWorkflowGrid metrics={metrics} data={data} canAccessPage={canAccessPage} />
