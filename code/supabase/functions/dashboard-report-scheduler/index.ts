@@ -239,6 +239,7 @@ serve(async (req) => {
             entity_type: 'dashboard_report_delivery',
             module: 'system',
             org_id: preference.organization_id,
+            table_name: 'dashboard_report_deliveries',
           });
           if (auditError) console.warn('Dashboard report audit insert failed:', auditError.message);
 
