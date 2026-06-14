@@ -196,10 +196,10 @@ async function seedProfile(account, user, context = {}) {
       email: account.email,
       full_name: account.fullName,
       id: user.id,
-      is_active: true,
       location_id: context.locationId || null,
       organization_id: context.organizationId || null,
       role: account.role,
+      status: 'active',
     }, { onConflict: 'id' })
     .select('id')
     .single());
