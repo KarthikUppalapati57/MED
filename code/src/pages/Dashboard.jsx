@@ -844,6 +844,78 @@ function forecastConfidence({ dataHealthScore, salesCount }) {
   return 'Low';
 }
 
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function average(values) {
+  const usable = values.filter((value) => Number.isFinite(Number(value)));
+  if (!usable.length) return 0;
+  return sumBy(usable, (value) => value) / usable.length;
+}
+
+function standardDeviation(values) {
+  const mean = average(values);
+  if (!mean || values.length < 2) return 0;
+  const varianceValue = average(values.map((value) => (Number(value || 0) - mean) ** 2));
+  return Math.sqrt(varianceValue);
+}
+
+function dateKeyFromDate(date) {
+  return format(date, 'yyyy-MM-dd');
+}
+
+function buildSalesHistoryForecast({ now, salesData, salesInRange, monthSales, weekSales, monthProgress, weekProgress, dataHealthScore }) {
+  const dailySales = salesData.reduce((acc, sale) => {
+    const date = getDate(sale);
+    if (!date) return acc;
+    const key = dateKeyFromDate(date);
+    acc[key] = (acc[key] || 0) + Number(sale.revenue || 0);
+    return acc;
+  }, {});
+  const dailyValues = Object.values(dailySales).map(Number).filter((value) => value > 0);
+  const recent28Start = addDays(now, -27);
+  const recent7Start = addDays(now, -6);
+  const previous7Start = addDays(now, -13);
+  const previous7End = addDays(now, -7);
+  const recent28Sales = salesInRange(recent28Start, now);
+  const recent7Sales = salesInRange(recent7Start, now);
+  const previous7Sales = salesInRange(previous7Start, previous7End);
+  const recent28Days = Object.keys(dailySales).filter((key) => {
+    const date = new Date(`${key}T00:00:00`);
+    return date >= recent28Start && date <= now;
+  }).length;
+  const weekday = now.getDay();
+  const sameWeekdayValues = Object.entries(dailySales)
+    .map(([key, value]) => ({ date: new Date(`${key}T00:00:00`), value: Number(value || 0) }))
+    .filter((item) => item.date < now && item.date.getDay() === weekday)
+    .slice(-8)
+    .map((item) => item.value);
+  const avgDaily28 = recent28Days ? recent28Sales / recent28Days : average(dailyValues);
+  const avgDaily7 = recent7Sales / 7;
+  const previousDaily7 = previous7Sales / 7;
+  const sameWeekdayAverage = average(sameWeekdayValues) || avgDaily28;
+  const weightedDailyRunRate = (avgDaily28 * 0.45) + (avgDaily7 * 0.35) + (sameWeekdayAverage * 0.2);
+  const remainingMonthDays = Math.max(monthProgress.total - monthProgress.elapsed, 0);
+  const remainingWeekDays = Math.max(weekProgress.total - weekProgress.elapsed, 0);
+  const volatilityPercent = avgDaily28 ? (standardDeviation(dailyValues.slice(-28)) / avgDaily28) * 100 : 0;
+
+  return {
+    activeSalesDays: recent28Days,
+    confidence: forecastConfidence({ dataHealthScore, salesCount: recent28Days }),
+    method: recent28Days >= 7 ? 'Weighted history' : 'Current pace',
+    projectedMonthSales: recent28Days >= 3 ? monthSales + (remainingMonthDays * weightedDailyRunRate) : forecastValue(monthSales, monthProgress.ratio),
+    projectedWeekSales: recent28Days >= 3 ? weekSales + (remainingWeekDays * weightedDailyRunRate) : forecastValue(weekSales, weekProgress.ratio),
+    sameWeekdayAverage,
+    seasonalIndex: avgDaily28 ? sameWeekdayAverage / avgDaily28 : 1,
+    trendPercent: variance(avgDaily7, previousDaily7),
+    volatilityPercent,
+    weightedDailyRunRate,
+  };
+}
+
 function getInvoiceAmount(invoice) {
   return Number(invoice?.total_amount || invoice?.amount || invoice?.total || 0);
 }
@@ -1151,28 +1223,44 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
     const grossMarginPercent = monthSales ? 100 - cogsPercent : 0;
     const monthProgress = getMonthProgress(now);
     const weekProgress = getWeekProgress(now);
-    const forecastMonthSales = forecastValue(monthSales, monthProgress.ratio);
-    const forecastWeekSales = forecastValue(weekSales, weekProgress.ratio);
+    const dataHealthScore = getDataHealthScore({ monthSales, budgetPacing: [], laborCost, workflowCounts: null }, data);
+    const salesForecast = buildSalesHistoryForecast({
+      dataHealthScore,
+      monthProgress,
+      monthSales,
+      now,
+      salesData: data.salesData,
+      salesInRange,
+      weekProgress,
+      weekSales,
+    });
+    const forecastMonthSales = salesForecast.projectedMonthSales;
+    const forecastWeekSales = salesForecast.projectedWeekSales;
     const projectedInvoiceSpend = forecastValue(invoiceSpend, monthProgress.ratio);
     const projectedLaborCost = forecastValue(laborCost, monthProgress.ratio);
     const projectedCogsPercent = forecastMonthSales ? (projectedInvoiceSpend / forecastMonthSales) * 100 : cogsPercent;
     const projectedLaborPercent = forecastMonthSales ? (projectedLaborCost / forecastMonthSales) * 100 : laborPercent;
     const projectedPrimeCostPercent = projectedCogsPercent + projectedLaborPercent;
-    const dataHealthScore = getDataHealthScore({ monthSales, budgetPacing: [], laborCost, workflowCounts: null }, data);
     const forecast = {
-      confidence: forecastConfidence({ dataHealthScore, salesCount: data.salesData.length }),
+      confidence: salesForecast.confidence,
       inventoryRiskCount: data.inventory.filter((item) => {
         const current = Number(item.current_quantity || 0);
         const reorder = Number(item.reorder_point || 5);
         return current > reorder && current <= reorder * 1.25;
       }).length + lowStock.length,
+      method: salesForecast.method,
       monthProgress,
       projectedCogsPercent,
       projectedLaborPercent,
       projectedPrimeCostPercent,
       projectedWeekSales: forecastWeekSales,
       projectedMonthSales: forecastMonthSales,
-      salesRunRate: monthProgress.elapsed ? monthSales / monthProgress.elapsed : 0,
+      salesRunRate: salesForecast.weightedDailyRunRate || (monthProgress.elapsed ? monthSales / monthProgress.elapsed : 0),
+      sameWeekdayAverage: salesForecast.sameWeekdayAverage,
+      seasonalIndex: salesForecast.seasonalIndex,
+      trendPercent: salesForecast.trendPercent,
+      activeSalesDays: salesForecast.activeSalesDays,
+      volatilityPercent: salesForecast.volatilityPercent,
       weekProgress,
     };
 
@@ -1259,6 +1347,12 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
     }
     if (forecast.inventoryRiskCount > lowStock.length) {
       recommendations.push({ tone: 'yellow', title: `${forecast.inventoryRiskCount} inventory items at risk`, body: 'Some items are close to reorder thresholds and may become low stock before the next order cycle.', href: 'Inventory' });
+    }
+    if (forecast.trendPercent < -10 && monthSales > 0) {
+      recommendations.push({ tone: 'orange', title: `Sales trend down ${plainPercent(Math.abs(forecast.trendPercent))}`, body: 'Recent daily sales velocity is below the prior week. Review promotions, staffing, and daypart performance.', href: 'Performance' });
+    }
+    if (forecast.volatilityPercent > 45 && forecast.activeSalesDays >= 7) {
+      recommendations.push({ tone: 'yellow', title: 'Sales forecast volatility elevated', body: 'Daily sales variance is high enough that forecast confidence may move quickly. Watch labor and ordering assumptions.', href: 'Performance' });
     }
 
     const calculated = {
@@ -1351,10 +1445,10 @@ function useDashboardMetrics(data, rules = DEFAULT_DASHBOARD_RULES) {
         projectedMonthSales: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio),
         projectedWeekSales: forecastValue(Number(kpis.salesWeekToDate || 0), calculated.forecast.weekProgress.ratio),
         salesRunRate: calculated.forecast.monthProgress.elapsed ? Number(kpis.salesPeriod || 0) / calculated.forecast.monthProgress.elapsed : 0,
-        projectedCogsPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (Number(kpis.invoiceSpend || 0) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryCogsPercent,
-        projectedLaborPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (Number(kpis.laborCost || 0) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryLaborPercent,
+        projectedCogsPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (forecastValue(Number(kpis.invoiceSpend || 0), calculated.forecast.monthProgress.ratio) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryCogsPercent,
+        projectedLaborPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio) ? (forecastValue(Number(kpis.laborCost || 0), calculated.forecast.monthProgress.ratio) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100 : summaryLaborPercent,
         projectedPrimeCostPercent: forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)
-          ? ((Number(kpis.invoiceSpend || 0) + Number(kpis.laborCost || 0)) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100
+          ? ((forecastValue(Number(kpis.invoiceSpend || 0), calculated.forecast.monthProgress.ratio) + forecastValue(Number(kpis.laborCost || 0), calculated.forecast.monthProgress.ratio)) / forecastValue(Number(kpis.salesPeriod || 0), calculated.forecast.monthProgress.ratio)) * 100
           : summaryPrimeCostPercent,
       },
       primeCostPercent: summaryPrimeCostPercent,
@@ -2111,6 +2205,11 @@ function ForecastIntelligencePanel({ metrics, rules = DEFAULT_DASHBOARD_RULES, c
       href: 'Inventory',
     },
   ];
+  const signalCards = [
+    { label: 'Sales Trend', value: percent(forecast.trendPercent || 0), helper: 'Recent 7-day velocity vs prior 7 days', tone: Number(forecast.trendPercent || 0) >= 0 ? 'green' : 'orange' },
+    { label: 'Weekday Factor', value: `${Number(forecast.seasonalIndex || 1).toFixed(2)}x`, helper: `${currency(forecast.sameWeekdayAverage)} same-weekday average`, tone: Number(forecast.seasonalIndex || 1) >= 1 ? 'blue' : 'yellow' },
+    { label: 'Volatility', value: plainPercent(forecast.volatilityPercent || 0), helper: `${forecast.activeSalesDays || 0} active sales days`, tone: Number(forecast.volatilityPercent || 0) > 45 ? 'orange' : 'green' },
+  ];
 
   return (
     <SectionCard title="Forecast Intelligence" description="Projected sales, cost pressure, and inventory risk based on current period pace.">
@@ -2122,6 +2221,7 @@ function ForecastIntelligencePanel({ metrics, rules = DEFAULT_DASHBOARD_RULES, c
         })}>
           {forecast.confidence || 'Low'} confidence
         </Badge>
+        <Badge variant="secondary">{forecast.method || 'Current pace'}</Badge>
         <span className="text-xs text-muted-foreground">
           Month {Math.round((forecast.monthProgress?.ratio || 0) * 100)}% complete / Week {Math.round((forecast.weekProgress?.ratio || 0) * 100)}% complete
         </span>
@@ -2146,6 +2246,23 @@ function ForecastIntelligencePanel({ metrics, rules = DEFAULT_DASHBOARD_RULES, c
               'bg-resend-orange': item.tone === 'orange',
               'bg-resend-red': item.tone === 'red',
             })} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {signalCards.map((item) => (
+          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/20 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+              <div className={cn('h-2.5 w-2.5 rounded-full', {
+                'bg-resend-green': item.tone === 'green',
+                'bg-resend-blue': item.tone === 'blue',
+                'bg-resend-yellow': item.tone === 'yellow',
+                'bg-resend-orange': item.tone === 'orange',
+              })} />
+            </div>
+            <p className="mt-2 text-lg font-bold text-foreground">{item.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.helper}</p>
           </div>
         ))}
       </div>
@@ -2414,6 +2531,9 @@ function createExecutiveReportText({ metrics, scope, actions, statusMap, dataHea
     `- Week sales forecast: ${currency(forecast.projectedWeekSales)}`,
     `- Month sales forecast: ${currency(forecast.projectedMonthSales)}`,
     `- Prime cost forecast: ${plainPercent(forecast.projectedPrimeCostPercent)}`,
+    `- Forecast method: ${forecast.method || 'Current pace'}`,
+    `- Sales trend: ${percent(forecast.trendPercent || 0)}`,
+    `- Volatility: ${plainPercent(forecast.volatilityPercent || 0)}`,
     `- Inventory risk count: ${forecast.inventoryRiskCount || 0}`,
     `- Forecast confidence: ${forecast.confidence || 'Low'}`,
     '',
