@@ -44,6 +44,7 @@ export async function logAudit(entry) {
   const row = {
     entity_type:   entry.entityType || entry.action || 'unknown',
     entity_id:     entry.entityId || entry.target_user_id || null,
+    table_name:    entry.tableName || entry.entityType || entry.module || 'system',
     action:        entry.action || 'audit',
     module:        entry.module || null,
     org_id:        entry.orgId || null,
@@ -107,6 +108,7 @@ export async function logAuditBatch(entries) {
   const rows = entries.map(entry => ({
     entity_type:   entry.entityType || entry.action || 'unknown',
     entity_id:     entry.entityId || entry.target_user_id || null,
+    table_name:    entry.tableName || entry.entityType || entry.module || 'system',
     action:        entry.action || 'audit',
     module:        entry.module || null,
     org_id:        entry.orgId || null,
