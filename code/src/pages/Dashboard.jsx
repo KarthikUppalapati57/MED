@@ -135,6 +135,15 @@ function createCanAccessPage({ organization, userProfile, hasMinRole, isPlatform
   };
 }
 
+function canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }) {
+  if (isPlatformAdmin) return true;
+  const role = userProfile?.role;
+  if (scope === 'org') return role === 'org_owner';
+  if (scope === 'brand') return ['org_owner', 'brand_manager', 'branch_manager'].includes(role);
+  if (scope === 'location') return ['org_owner', 'brand_manager', 'branch_manager', 'location_manager'].includes(role);
+  return false;
+}
+
 function todayKey() {
   return format(new Date(), 'yyyy-MM-dd');
 }
@@ -1896,7 +1905,7 @@ function DataCoveragePanel({ metrics, data, canAccessPage = () => true }) {
   );
 }
 
-function DashboardRulesPanel({ rules, onSaveRules }) {
+function DashboardRulesPanel({ canManage = true, rules, onSaveRules }) {
   const [draft, setDraft] = React.useState(() => normalizeDashboardRules(rules));
 
   useEffect(() => {
@@ -1918,6 +1927,7 @@ function DashboardRulesPanel({ rules, onSaveRules }) {
   };
 
   const save = () => {
+    if (!canManage) return;
     onSaveRules?.(normalizeDashboardRules(draft));
   };
 
@@ -1938,10 +1948,13 @@ function DashboardRulesPanel({ rules, onSaveRules }) {
       title="Dashboard Rules Center"
       description="Role and scope settings for operating targets and escalation behavior."
       action={(
-        <Button size="sm" className="gap-2" onClick={save}>
-          <Save className="h-4 w-4" />
-          Save Rules
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!canManage && <Badge variant="secondary">Read-only</Badge>}
+          <Button size="sm" className="gap-2" onClick={save} disabled={!canManage}>
+            <Save className="h-4 w-4" />
+            Save Rules
+          </Button>
+        </div>
       )}
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1956,6 +1969,7 @@ function DashboardRulesPanel({ rules, onSaveRules }) {
                   step="0.1"
                   value={draft[field.key]}
                   onChange={(event) => updatePercent(field.key, event.target.value)}
+                  disabled={!canManage}
                   className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-brand/30"
                 />
                 <span className="text-sm font-semibold text-muted-foreground">%</span>
@@ -1971,6 +1985,7 @@ function DashboardRulesPanel({ rules, onSaveRules }) {
                 type="checkbox"
                 checked={Boolean(draft[field.key])}
                 onChange={() => updateToggle(field.key)}
+                disabled={!canManage}
                 className="h-4 w-4 accent-brand"
               />
             </label>
@@ -2672,6 +2687,7 @@ function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, 
 function ScheduledReportsPanel({
   actions,
   brand,
+  canManage = true,
   dataHealthScore,
   escalations,
   location,
@@ -2712,10 +2728,12 @@ function ScheduledReportsPanel({
   };
 
   const save = () => {
+    if (!canManage) return;
     onSavePreferences?.(normalizeReportPreferences(draft));
   };
 
   const sendNow = async (reportType) => {
+    if (!canManage) return;
     const normalized = normalizeReportPreferences(draft);
     const reportText = reportType === 'daily'
       ? createHandoffText({ actions, dataHealthScore, metrics, note: '', scope, statusMap })
@@ -2761,10 +2779,13 @@ function ScheduledReportsPanel({
       title="Scheduled Reports"
       description="Report automation preferences for daily handoffs and weekly executive summaries."
       action={(
-        <Button size="sm" className="gap-2" onClick={save}>
-          <Save className="h-4 w-4" />
-          Save Schedule
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!canManage && <Badge variant="secondary">Read-only</Badge>}
+          <Button size="sm" className="gap-2" onClick={save} disabled={!canManage}>
+            <Save className="h-4 w-4" />
+            Save Schedule
+          </Button>
+        </div>
       )}
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -2779,6 +2800,7 @@ function ScheduledReportsPanel({
                 type="checkbox"
                 checked={Boolean(draft[item.key])}
                 onChange={() => updateToggle(item.key)}
+                disabled={!canManage}
                 className="mt-1 h-4 w-4 accent-brand"
               />
             </label>
@@ -2795,6 +2817,7 @@ function ScheduledReportsPanel({
                     type="checkbox"
                     checked={(draft.recipientRoles || []).includes(role.value)}
                     onChange={() => updateRole(role.value)}
+                    disabled={!canManage}
                     className="h-4 w-4 accent-brand"
                   />
                 </label>
@@ -2802,11 +2825,11 @@ function ScheduledReportsPanel({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('daily')} disabled={sending === 'daily'}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('daily')} disabled={!canManage || sending === 'daily'}>
               <BellRing className="h-4 w-4" />
               {sending === 'daily' ? 'Sending' : 'Send Daily Now'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('weekly')} disabled={sending === 'weekly'}>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => sendNow('weekly')} disabled={!canManage || sending === 'weekly'}>
               <BellRing className="h-4 w-4" />
               {sending === 'weekly' ? 'Sending' : 'Send Weekly Now'}
             </Button>
@@ -2832,6 +2855,7 @@ function reportTypeLabel(type) {
 
 function DashboardReportHistoryPanel({
   brand,
+  canManage = true,
   deliveries = [],
   isLoading,
   location,
@@ -2872,6 +2896,7 @@ function DashboardReportHistoryPanel({
   };
 
   const resendDelivery = async (delivery) => {
+    if (!canManage) return;
     const reportText = reportTextForDelivery(delivery);
     setResendingId(delivery.id);
     try {
@@ -2908,10 +2933,13 @@ function DashboardReportHistoryPanel({
       title="Report Delivery Log"
       description="Recent scheduled dashboard report runs, delivery status, recipients, and stored snapshots."
       action={(
-        <Button variant="ghost" size="sm" className="gap-2" onClick={onRefresh}>
-          <History className="h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!canManage && <Badge variant="secondary">Read-only</Badge>}
+          <Button variant="ghost" size="sm" className="gap-2" onClick={onRefresh}>
+            <History className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
       )}
     >
       {isLoading && (
@@ -2961,7 +2989,7 @@ function DashboardReportHistoryPanel({
                   <Download className="h-4 w-4" />
                   Download
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => resendDelivery(delivery)} disabled={resendingId === delivery.id}>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => resendDelivery(delivery)} disabled={!canManage || resendingId === delivery.id}>
                   <BellRing className="h-4 w-4" />
                   {resendingId === delivery.id ? 'Resending' : 'Resend'}
                 </Button>
@@ -2970,6 +2998,91 @@ function DashboardReportHistoryPanel({
           ))}
         </div>
       )}
+    </SectionCard>
+  );
+}
+
+function DashboardProductionReadinessPanel({
+  canManageSettings,
+  dataCoverageSources = [],
+  dataHealthScore,
+  metrics,
+  reportDeliveries = [],
+  reportPreferences,
+  rules,
+  syncState,
+}) {
+  const connectedSources = dataCoverageSources.filter((source) => source.count > 0).length;
+  const latestDelivery = reportDeliveries[0];
+  const enabledReports = [
+    reportPreferences?.dailyHandoff ? 'Daily' : null,
+    reportPreferences?.weeklyExecutive ? 'Weekly' : null,
+  ].filter(Boolean);
+  const forecastConfidence = metrics?.forecast?.confidence || 'Low';
+  const schedulerStatus = latestDelivery
+    ? `${latestDelivery.status || 'recorded'} ${reportTypeLabel(latestDelivery.reportType).toLowerCase()}`
+    : 'No delivery runs';
+  const readinessItems = [
+    {
+      label: 'Data Sources',
+      value: `${connectedSources}/${dataCoverageSources.length || 0}`,
+      helper: `${dataHealthScore}% data health across accessible modules`,
+      tone: connectedSources === dataCoverageSources.length && connectedSources > 0 ? 'green' : 'yellow',
+    },
+    {
+      label: 'Persistence',
+      value: syncState?.mode === 'synced' ? 'Synced' : 'Local',
+      helper: syncState?.message || 'Dashboard state fallback is active',
+      tone: syncState?.mode === 'synced' ? 'green' : 'yellow',
+    },
+    {
+      label: 'Report Scheduler',
+      value: enabledReports.length ? enabledReports.join(' + ') : 'Disabled',
+      helper: schedulerStatus,
+      tone: latestDelivery?.status === 'sent' ? 'green' : latestDelivery?.status === 'failed' ? 'red' : 'yellow',
+    },
+    {
+      label: 'Forecast Model',
+      value: forecastConfidence,
+      helper: `${metrics?.forecast?.activeSalesDays || 0} active sales days in the model`,
+      tone: forecastConfidence === 'High' ? 'green' : forecastConfidence === 'Medium' ? 'yellow' : 'orange',
+    },
+    {
+      label: 'Operating Rules',
+      value: `${plainPercent(rules?.primeCostPercent)} prime`,
+      helper: `${plainPercent(rules?.cogsPercent)} COGS, ${plainPercent(rules?.laborPercent)} labor targets`,
+      tone: 'blue',
+    },
+    {
+      label: 'Manager Controls',
+      value: canManageSettings ? 'Enabled' : 'Read-only',
+      helper: canManageSettings ? 'This role can change rules and schedules' : 'This role can review without changing controls',
+      tone: canManageSettings ? 'green' : 'yellow',
+    },
+  ];
+
+  const toneClasses = {
+    blue: 'bg-resend-blue/10 text-resend-blue',
+    green: 'bg-resend-green/10 text-resend-green',
+    orange: 'bg-resend-orange/10 text-resend-orange',
+    red: 'bg-resend-red/10 text-resend-red',
+    yellow: 'bg-resend-yellow/10 text-resend-yellow',
+  };
+
+  return (
+    <SectionCard title="Production Readiness" description="Final operating checks for role-based dashboard rollout.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+        {readinessItems.map((item) => (
+          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+              <Circle className={cn('h-3 w-3 fill-current', toneClasses[item.tone] || 'text-muted-foreground')} />
+            </div>
+            <p className="mt-2 text-lg font-bold text-foreground">{item.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.helper}</p>
+          </div>
+        ))}
+      </div>
     </SectionCard>
   );
 }
@@ -3263,6 +3376,10 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
     [hasMinRole, isPlatformAdmin, organization, userProfile]
   );
+  const canManageSettings = React.useMemo(
+    () => canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }),
+    [isPlatformAdmin, scope, userProfile]
+  );
   const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
   const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
   const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage, dashboardRules.rules), [canAccessPage, dashboardRules.rules, metrics, scope]);
@@ -3305,6 +3422,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <ScheduledReportsPanel
         actions={roleActions}
         brand={brand}
+        canManage={canManageSettings}
         dataHealthScore={dataHealthScore}
         escalations={escalations}
         location={location}
@@ -3319,6 +3437,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       />
       <DashboardReportHistoryPanel
         brand={brand}
+        canManage={canManageSettings}
         deliveries={reportDeliveries.deliveries}
         isLoading={reportDeliveries.isLoading}
         location={location}
@@ -3329,7 +3448,17 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         userProfile={userProfile}
       />
       <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
-      <DashboardRulesPanel rules={dashboardRules.rules} onSaveRules={dashboardRules.saveRules} />
+      <DashboardProductionReadinessPanel
+        canManageSettings={canManageSettings}
+        dataCoverageSources={dataCoverageSources}
+        dataHealthScore={dataHealthScore}
+        metrics={metrics}
+        reportDeliveries={reportDeliveries.deliveries}
+        reportPreferences={reportPreferences.preferences}
+        rules={dashboardRules.rules}
+        syncState={dashboardPersistence.syncState}
+      />
+      <DashboardRulesPanel canManage={canManageSettings} rules={dashboardRules.rules} onSaveRules={dashboardRules.saveRules} />
       <RoleActionPlanPanel
         actions={roleActions}
         metrics={metrics}
