@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { UploadCloud, FileText, Download, Trash2, CalendarAlert } from 'lucide-react';
+import { UploadCloud, FileText, Download, Trash2, Clock } from 'lucide-react';
 import { toast } from "sonner";
 
 export default function DocumentVault({ vendorId }) {
@@ -70,7 +70,7 @@ export default function DocumentVault({ vendorId }) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{new Date(doc.expires_at).toLocaleDateString()}</span>
                         {isExpiringSoon(doc.expires_at) && (
-                          <CalendarAlert className="w-4 h-4 text-resend-red" title="Expiring soon" />
+                          <Clock className="w-4 h-4 text-resend-red" title="Expiring soon" />
                         )}
                       </div>
                     ) : (
