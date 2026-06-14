@@ -9,6 +9,7 @@
     "build:ci": "cross-env IGNORE_BUILD_ERRORS=true vite build || echo 'Build failed but bypassed for CI'",
     "lint": "eslint . --quiet || true",
     "lint:fix": "eslint . --fix",
+    "seed:role-qa": "node scripts/seed-role-qa-data.mjs",
     "typecheck": "tsc -p ./jsconfig.json || true",
     "preview": "vite preview"
   },
