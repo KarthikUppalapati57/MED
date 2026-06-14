@@ -58,13 +58,49 @@ export default function VendorDetail() {
     );
   }
 
-  // Phase 2: AI Summary Placeholder
-  const aiSummary = [
-    "Prices increased 8.4% on 3 items this month.",
-    "2 invoices unpaid.",
-    "This vendor is missing payment setup.",
-    "Order guide has 5 inactive products."
-  ];
+  const { data: vendorItems = [] } = useAuthQuery({
+    queryKey: ['vendor_items_insights', id],
+    queryFn: async () => {
+      const { data } = await api.client.from('vendor_items').select('price_variance_flag, on_order_guide').eq('vendor_id', id);
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Data-Driven Insights
+  const aiSummary = React.useMemo(() => {
+    if (!vendor) return [];
+    const insights = [];
+
+    // Payment setup
+    if (!vendor.default_payment_account_id) {
+      insights.push("This vendor is missing a default payment account setup.");
+    }
+
+    // Unpaid AP
+    if (vendor.unpaid_ap > 0) {
+      insights.push(`There is $${Number(vendor.unpaid_ap).toFixed(2)} in unpaid AP for this vendor.`);
+    }
+
+    // Item Insights
+    if (vendorItems.length > 0) {
+      const priceVariances = vendorItems.filter(i => i.price_variance_flag).length;
+      const orderGuideCount = vendorItems.filter(i => i.on_order_guide).length;
+
+      if (priceVariances > 0) {
+        insights.push(`Prices increased on ${priceVariances} item(s) recently. Review recommended.`);
+      }
+      if (orderGuideCount === 0) {
+        insights.push("No items have been added to the Order Guide yet.");
+      }
+    }
+
+    if (insights.length === 0) {
+      insights.push("Vendor is healthy. No immediate actions required.");
+    }
+
+    return insights;
+  }, [vendor, vendorItems]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
