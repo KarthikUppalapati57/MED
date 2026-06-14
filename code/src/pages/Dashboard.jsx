@@ -12,7 +12,9 @@ import {
   ClipboardList,
   Clock,
   Circle,
+  Copy,
   CreditCard,
+  Download,
   DollarSign,
   FileText,
   ListFilter,
@@ -27,6 +29,7 @@ import {
   Users,
   Warehouse,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Bar,
   BarChart,
@@ -138,6 +141,24 @@ function getDataHealthScore(metrics, data, canAccessPage = () => true) {
   if (!sources.length) return 0;
   const connected = sources.filter((source) => source.count > 0).length;
   return Math.round((connected / sources.length) * 100);
+}
+
+function useLocalStatusMap(storageKey) {
+  const [statusMap, setStatusMap] = React.useState({});
+
+  React.useEffect(() => {
+    try {
+      setStatusMap(JSON.parse(window.localStorage.getItem(storageKey) || '{}'));
+    } catch {
+      setStatusMap({});
+    }
+  }, [storageKey]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(statusMap));
+  }, [statusMap, storageKey]);
+
+  return [statusMap, setStatusMap];
 }
 
 function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
@@ -1142,23 +1163,9 @@ function DecisionBriefPanel({ metrics, scope }) {
   );
 }
 
-function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
+function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true, statusMap = {}, setStatusMap }) {
   const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
-  const storageKey = `dashboard-actions:${scope}:${todayKey()}`;
   const [filter, setFilter] = React.useState('open');
-  const [statusMap, setStatusMap] = React.useState({});
-
-  React.useEffect(() => {
-    try {
-      setStatusMap(JSON.parse(window.localStorage.getItem(storageKey) || '{}'));
-    } catch {
-      setStatusMap({});
-    }
-  }, [storageKey]);
-
-  React.useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(statusMap));
-  }, [statusMap, storageKey]);
 
   const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
   const openCount = actions.length - completedCount;
@@ -1178,7 +1185,7 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
 
   const toggleAction = (title) => {
     const key = actionId(title);
-    setStatusMap((current) => ({
+    setStatusMap?.((current) => ({
       ...current,
       [key]: current[key] === 'done' ? 'open' : 'done',
     }));
@@ -1189,7 +1196,7 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
       title="Daily Action Plan"
       description="Role-based actions converted from the dashboard signals."
       action={(
-        <Button variant="ghost" size="sm" className="gap-2" onClick={() => setStatusMap({})}>
+        <Button variant="ghost" size="sm" className="gap-2" onClick={() => setStatusMap?.({})}>
           <RotateCcw className="h-4 w-4" />
           Reset
         </Button>
@@ -1264,6 +1271,118 @@ function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
             description="Change the filter or reset today's progress to see more action items."
           />
         )}
+      </div>
+    </SectionCard>
+  );
+}
+
+function createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore, note }) {
+  const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
+  const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
+  const scopeName = scope === 'brand' ? 'Brand Manager' : scope === 'location' ? 'Location Manager' : 'Org Owner';
+
+  return [
+    `${scopeName} Daily Handoff`,
+    `Date: ${todayKey()}`,
+    '',
+    `Sales: ${scope === 'location' ? currency(metrics.today) + ' today' : currency(metrics.monthSales) + ' period'} | ${currency(metrics.weekSales)} WTD`,
+    `Prime Cost: ${plainPercent(metrics.primeCostPercent)} | COGS: ${plainPercent(metrics.cogsPercent)} | Labor: ${plainPercent(metrics.laborPercent)}`,
+    `Data Health: ${dataHealthScore}%`,
+    `Open AP: ${currency(metrics.unpaid)} | Low Stock: ${metrics.lowStock.length} | Pending Invoices: ${metrics.pendingInvoices.length}`,
+    '',
+    `Completed Actions (${completed.length})`,
+    ...(completed.length ? completed.map((item) => `- ${item.title}`) : ['- None yet']),
+    '',
+    `Open Actions (${open.length})`,
+    ...(open.length ? open.map((item) => `- [${item.priority}] ${item.title} (${item.owner}, ${item.due})`) : ['- None']),
+    '',
+    'Manager Note',
+    note?.trim() || 'No note added.',
+  ].join('\n');
+}
+
+function HandoffBriefPanel({ metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true }) {
+  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
+  const noteKey = `dashboard-handoff-note:${scope}:${todayKey()}`;
+  const [note, setNote] = React.useState('');
+
+  React.useEffect(() => {
+    setNote(window.localStorage.getItem(noteKey) || '');
+  }, [noteKey]);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(noteKey, note);
+  }, [note, noteKey]);
+
+  const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
+  const openCount = actions.length - completedCount;
+  const handoffText = createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore, note });
+
+  const copyHandoff = async () => {
+    try {
+      await navigator.clipboard.writeText(handoffText);
+      toast.success('Daily handoff copied');
+    } catch {
+      toast.error('Could not copy handoff');
+    }
+  };
+
+  const downloadHandoff = () => {
+    const blob = new Blob([handoffText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `restops-handoff-${scope}-${todayKey()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Daily handoff downloaded');
+  };
+
+  return (
+    <SectionCard
+      title="Daily Handoff"
+      description="Copy or download a manager-ready summary of today’s operating state."
+      action={(
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={copyHandoff}>
+            <Copy className="h-4 w-4" />
+            Copy
+          </Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={downloadHandoff}>
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      )}
+    >
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Action Status</p>
+          <p className="mt-2 text-2xl font-bold text-foreground">{completedCount}/{actions.length}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{openCount} open for follow-up</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operating Summary</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">Prime {plainPercent(metrics.primeCostPercent)} · Data {dataHealthScore}%</p>
+          <p className="mt-1 text-xs text-muted-foreground">{currency(metrics.weekSales)} WTD sales</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Handoff Risk</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">{metrics.lowStock.length + metrics.pendingInvoices.length} workflow exceptions</p>
+          <p className="mt-1 text-xs text-muted-foreground">{currency(metrics.unpaid)} unpaid AP</p>
+        </div>
+      </div>
+      <div className="mt-4">
+        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground" htmlFor="dashboard-handoff-note">
+          Manager note
+        </label>
+        <textarea
+          id="dashboard-handoff-note"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          className="mt-2 min-h-28 w-full rounded-lg border border-border bg-background p-3 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+          placeholder="Add shift context, vendor issues, staffing notes, or what the next manager should check first."
+        />
       </div>
     </SectionCard>
   );
@@ -1383,6 +1502,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   );
   const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
   const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
+  const [actionStatusMap, setActionStatusMap] = useLocalStatusMap(`dashboard-actions:${scope}:${todayKey()}`);
 
   return (
     <div className="space-y-6">
@@ -1390,7 +1510,8 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <DecisionBriefPanel metrics={metrics} scope={scope} />
-      <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
+      <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} statusMap={actionStatusMap} setStatusMap={setActionStatusMap} />
+      <HandoffBriefPanel metrics={metrics} scope={scope} statusMap={actionStatusMap} dataHealthScore={dataHealthScore} canAccessPage={canAccessPage} />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
