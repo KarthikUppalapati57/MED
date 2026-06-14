@@ -427,6 +427,73 @@ function useDashboardReportPreferences({ brand, location, organization, scope, u
   };
 }
 
+function normalizeReportDelivery(row = {}) {
+  return {
+    id: row.id,
+    brandId: row.brand_id || null,
+    createdAt: row.created_at,
+    errorMessage: row.error_message || '',
+    locationId: row.location_id || null,
+    notificationIds: Array.isArray(row.notification_ids) ? row.notification_ids : [],
+    recipientCount: Number(row.recipient_count || 0),
+    recipientRoles: Array.isArray(row.recipient_roles) ? row.recipient_roles : [],
+    reportDate: row.report_date,
+    reportSnapshot: row.report_snapshot || {},
+    reportType: row.report_type || 'daily',
+    scope: row.scope,
+    scopeKey: row.scope_key,
+    sentAt: row.sent_at,
+    status: row.status || 'processing',
+    updatedAt: row.updated_at,
+  };
+}
+
+function useDashboardReportDeliveries({ brand, location, organization, scope }) {
+  const queryClient = useQueryClient();
+  const scopeContext = React.useMemo(
+    () => getDashboardScopeContext(scope, { organization, brand, location }),
+    [brand, location, organization, scope]
+  );
+  const orgReady = !!scopeContext.orgId && !!organization?.id;
+
+  const { data: deliveries = [], isLoading } = useAuthQuery({
+    queryKey: ['dashboard-report-deliveries', scopeContext.orgId, scope, scopeContext.scopeKey],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dashboard_report_deliveries')
+        .select('*')
+        .eq('organization_id', scopeContext.orgId)
+        .eq('scope', scope)
+        .eq('scope_key', scopeContext.scopeKey)
+        .order('report_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(12);
+      if (isMissingDashboardTable(error)) return [];
+      if (error) throw error;
+      return (data || []).map(normalizeReportDelivery);
+    },
+    enabled: orgReady,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!orgReady) return undefined;
+    const channel = supabase.channel(`dashboard-report-deliveries-${scope}-${scopeContext.scopeKey}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_report_deliveries', filter: `organization_id=eq.${scopeContext.orgId}` }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-report-deliveries'] });
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [orgReady, queryClient, scope, scopeContext.orgId, scopeContext.scopeKey]);
+
+  return {
+    deliveries,
+    isLoading,
+    refreshDeliveries: () => queryClient.invalidateQueries({ queryKey: ['dashboard-report-deliveries'] }),
+  };
+}
+
 function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
   const queryClient = useQueryClient();
   const scopeContext = React.useMemo(
@@ -2630,6 +2697,163 @@ function ScheduledReportsPanel({
   );
 }
 
+function reportStatusClass(status) {
+  return {
+    failed: 'bg-resend-red/10 text-resend-red',
+    processing: 'bg-resend-blue/10 text-resend-blue',
+    sent: 'bg-resend-green/10 text-resend-green',
+    skipped: 'bg-resend-yellow/10 text-resend-yellow',
+  }[status] || 'bg-secondary text-muted-foreground';
+}
+
+function reportTypeLabel(type) {
+  return type === 'weekly' ? 'Weekly executive' : 'Daily handoff';
+}
+
+function DashboardReportHistoryPanel({
+  brand,
+  deliveries = [],
+  isLoading,
+  location,
+  onRefresh,
+  organization,
+  preferences,
+  scope,
+  userProfile,
+}) {
+  const [resendingId, setResendingId] = React.useState(null);
+  const visibleDeliveries = deliveries.slice(0, 8);
+
+  const reportTextForDelivery = (delivery) => delivery.reportSnapshot?.reportText || [
+    `Restops 360 ${reportTypeLabel(delivery.reportType)}`,
+    `Date: ${delivery.reportDate}`,
+    '',
+    delivery.errorMessage ? `Error: ${delivery.errorMessage}` : 'No report snapshot was stored for this delivery.',
+  ].join('\n');
+
+  const copyDelivery = async (delivery) => {
+    try {
+      await navigator.clipboard.writeText(reportTextForDelivery(delivery));
+      toast.success('Report snapshot copied');
+    } catch {
+      toast.error('Could not copy report snapshot');
+    }
+  };
+
+  const downloadDelivery = (delivery) => {
+    const blob = new Blob([reportTextForDelivery(delivery)], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `restops-${delivery.reportType}-report-${delivery.reportDate}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report snapshot downloaded');
+  };
+
+  const resendDelivery = async (delivery) => {
+    const reportText = reportTextForDelivery(delivery);
+    setResendingId(delivery.id);
+    try {
+      const result = await sendDashboardReportNotifications({
+        brand,
+        location,
+        organization,
+        preferences,
+        reportText,
+        reportType: delivery.reportType,
+        scope,
+        userProfile,
+      });
+      logAudit({
+        action: 'dashboard_report_delivery_resent',
+        entityId: delivery.id,
+        entityType: 'dashboard_report_delivery',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: organization?.id,
+        userId: userProfile?.id,
+        details: { reportType: delivery.reportType, reportDate: delivery.reportDate, notified: result.notified },
+      });
+      toast.success(result.notified ? `Resent to ${result.notified} recipient${result.notified > 1 ? 's' : ''}` : 'No matching recipients found');
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error.message || 'Failed to resend report');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  return (
+    <SectionCard
+      title="Report Delivery Log"
+      description="Recent scheduled dashboard report runs, delivery status, recipients, and stored snapshots."
+      action={(
+        <Button variant="ghost" size="sm" className="gap-2" onClick={onRefresh}>
+          <History className="h-4 w-4" />
+          Refresh
+        </Button>
+      )}
+    >
+      {isLoading && (
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4 text-sm text-muted-foreground">
+          Loading report deliveries...
+        </div>
+      )}
+      {!isLoading && !visibleDeliveries.length && (
+        <EmptyState
+          icon={History}
+          title="No report deliveries yet"
+          description="Scheduled report runs will appear here after the Phase 16 scheduler and SQL are deployed."
+        />
+      )}
+      {!!visibleDeliveries.length && (
+        <div className="space-y-3">
+          {visibleDeliveries.map((delivery) => (
+            <div key={delivery.id} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/30 p-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={reportStatusClass(delivery.status)}>{delivery.status}</Badge>
+                  <p className="text-sm font-semibold text-foreground">{reportTypeLabel(delivery.reportType)}</p>
+                  <span className="text-xs text-muted-foreground">{delivery.reportDate}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span>{delivery.recipientCount} recipient{delivery.recipientCount === 1 ? '' : 's'}</span>
+                  <span>{delivery.notificationIds.length} notification{delivery.notificationIds.length === 1 ? '' : 's'}</span>
+                  <span>Updated {formatSyncTime(delivery.sentAt || delivery.updatedAt || delivery.createdAt)}</span>
+                </div>
+                {!!delivery.errorMessage && (
+                  <p className="mt-2 text-xs text-resend-red">{delivery.errorMessage}</p>
+                )}
+                {!!delivery.recipientRoles.length && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {delivery.recipientRoles.map((role) => (
+                      <Badge key={role} variant="secondary" className="text-[11px] capitalize">{role.replace(/_/g, ' ')}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => copyDelivery(delivery)}>
+                  <Copy className="h-4 w-4" />
+                  Copy
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadDelivery(delivery)}>
+                  <Download className="h-4 w-4" />
+                  Download
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => resendDelivery(delivery)} disabled={resendingId === delivery.id}>
+                  <BellRing className="h-4 w-4" />
+                  {resendingId === delivery.id ? 'Resending' : 'Resend'}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, note = '', setNote, onHandoffExport, syncState }) {
   const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
@@ -2913,6 +3137,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const data = useDashboardData(scope);
   const dashboardRules = useDashboardRules({ brand, location, organization, scope, userProfile });
   const reportPreferences = useDashboardReportPreferences({ brand, location, organization, scope, userProfile });
+  const reportDeliveries = useDashboardReportDeliveries({ brand, location, organization, scope });
   const metrics = useDashboardMetrics(data, dashboardRules.rules);
   const canAccessPage = React.useMemo(
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
@@ -2970,6 +3195,17 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         rules={dashboardRules.rules}
         scope={scope}
         statusMap={dashboardPersistence.statusMap}
+        userProfile={userProfile}
+      />
+      <DashboardReportHistoryPanel
+        brand={brand}
+        deliveries={reportDeliveries.deliveries}
+        isLoading={reportDeliveries.isLoading}
+        location={location}
+        onRefresh={reportDeliveries.refreshDeliveries}
+        organization={organization}
+        preferences={reportPreferences.preferences}
+        scope={scope}
         userProfile={userProfile}
       />
       <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
