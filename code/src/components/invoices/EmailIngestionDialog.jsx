@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Mail, Loader2, KeyRound, Server, Save } from "lucide-react";
+import { supabase } from '@/lib/supabaseClient';
 
 export default function EmailIngestionDialog({ open, onClose }) {
   const queryClient = useQueryClient();
@@ -42,23 +43,25 @@ export default function EmailIngestionDialog({ open, onClose }) {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const payload = {
-        provider: 'email_imap',
-        organization_id: organization?.id || userProfile?.organization_id,
-        metadata: {
-          ...data,
-          organization_id: organization?.id || userProfile?.organization_id,
-          brand_id: brand?.id || null,
-          location_id: location?.id || userProfile?.location_id || null,
-        },
-        is_active: true
+      const orgId = organization?.id || userProfile?.organization_id;
+      const metadata = {
+        host: data.host,
+        port: data.port,
+        username: data.username,
+        organization_id: orgId,
+        brand_id: brand?.id || null,
+        location_id: location?.id || userProfile?.location_id || null,
       };
       
-      if (emailConfig) {
-        return api.entities.Integration.update(emailConfig.id, payload);
-      } else {
-        return api.entities.Integration.create(payload);
-      }
+      const { data: result, error } = await supabase.rpc('save_secure_integration_credential', {
+        p_organization_id: orgId,
+        p_provider: 'email_imap',
+        p_metadata: metadata,
+        p_secret: data.password
+      });
+
+      if (error) throw error;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['integrations']);

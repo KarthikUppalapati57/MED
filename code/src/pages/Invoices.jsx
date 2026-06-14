@@ -89,6 +89,7 @@ import { cn } from "@/lib/utils";
 
 import InvoiceUploader from '../components/invoices/InvoiceUploader';
 import InvoiceEditor from '../components/invoices/InvoiceEditor';
+import DocumentViewer from '../components/invoices/DocumentViewer';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
@@ -901,6 +902,74 @@ export default function Invoices() {
             className={cn(
               "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
               isResizing && "bg-primary/40"
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={(e) => {
+                              e.preventDefault();
+                              setEditingInvoice(invoice);
+                              setEditorOpen(true);
+                            }}>
+                              <Eye className="h-4 w-4 mr-2" /> View/Edit
+                            </DropdownMenuItem>
+                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'pending_review') && (
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
+                                <Check className="h-4 w-4 mr-2" /> Approve
+                              </DropdownMenuItem>
+                            )}
+                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
+                                <X className="h-4 w-4 mr-2" /> Reject
+                              </DropdownMenuItem>
+                            )}
+                            {invoice.file_url && (
+                              <DropdownMenuItem asChild>
+                                <a href={invoice.file_url} target="_blank" rel="noopener noreferrer">
+                                  <Download className="h-4 w-4 mr-2" /> Download
+                                </a>
+                              </DropdownMenuItem>
+                            )}
+                            {isHigherRole && (
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-resend-red">
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upload Dialog */}
+      <InvoiceUploader
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onInvoiceExtracted={handleInvoiceExtracted}
+      />
+
+      {/* Editor Sheet */}
+      <Sheet open={editorOpen} onOpenChange={setEditorOpen}>
+        <SheetContent 
+          className="p-0 sm:max-w-none overflow-hidden flex flex-col"
+          style={{ width: `${sheetWidth}px`, maxWidth: '100vw' }}
+        >
+          {/* Resize Handle */}
+          <div
+            onMouseDown={startResizing}
+            className={cn(
+              "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
+              isResizing && "bg-primary/40"
             )}
           >
              <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
@@ -913,50 +982,60 @@ export default function Invoices() {
               </SheetTitle>
             </SheetHeader>
             {editingInvoice && (
-              <div className="mt-6">
-                <InvoiceEditor
-                  invoice={editingInvoice}
-                  onChange={setEditingInvoice}
-                />
-                <div className="flex flex-wrap gap-3 mt-6">
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditorOpen(false)}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleEditorSave}
-                    className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5"
-                  >
-                    <Save className="h-4 w-4 mr-1" /> Save
-                  </Button>
-                  {userProfile?.role !== 'ground_staff' && (
-                    <>
-                      <Button
-                    variant="outline"
-                    onClick={handleEditorReject}
-                    className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5"
-                  >
-                    <X className="h-4 w-4 mr-1" /> Reject
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleEditorApprove}
-                    className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5"
-                  >
-                    <Check className="h-4 w-4 mr-1" /> Approve
-                  </Button>
-                  <Button
-                    onClick={handleAcceptInvoice}
-                    className="flex-1 bg-primary hover:bg-primary"
-                  >
-                    Validate
-                  </Button>
-                    </>
-                  )}
+              <div className="mt-6 flex flex-1 overflow-hidden gap-6 h-[calc(100vh-140px)]">
+                {/* Left Pane: Document Viewer */}
+                {editingInvoice.file_url && (
+                  <div className="w-1/2 h-full hidden lg:block rounded-xl overflow-hidden border bg-slate-50">
+                    <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                  </div>
+                )}
+                
+                {/* Right Pane: Editor */}
+                <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'lg:w-1/2' : 'w-full'}`}>
+                  <InvoiceEditor
+                    invoice={editingInvoice}
+                    onChange={setEditingInvoice}
+                  />
+                  <div className="flex flex-wrap gap-3 mt-6 pb-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditorOpen(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleEditorSave}
+                      className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5"
+                    >
+                      <Save className="h-4 w-4 mr-1" /> Save
+                    </Button>
+                    {userProfile?.role !== 'ground_staff' && (
+                      <>
+                        <Button
+                          variant="outline"
+                          onClick={handleEditorReject}
+                          className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5"
+                        >
+                          <X className="h-4 w-4 mr-1" /> Reject
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleEditorApprove}
+                          className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5"
+                        >
+                          <Check className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                        <Button
+                          onClick={handleAcceptInvoice}
+                          className="flex-1 bg-primary hover:bg-primary"
+                        >
+                          Validate
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
