@@ -19,11 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ItemMappingSelect from './ItemMappingSelect';
 import ReconciliationVarianceTable from './ReconciliationVarianceTable';
-import CategorySummaryTable from './CategorySummaryTable';
-import ApprovalWorkflowEngine from './ApprovalWorkflowEngine';
-import BillPayWidget from './BillPayWidget';
+import { CategorySummaryTable } from './CategorySummaryTable';
+import { SplitCodingDialog } from './SplitCodingDialog';
+import { ApprovalWorkflowEngine } from './ApprovalWorkflowEngine';
+import { BillPayWidget } from './BillPayWidget';
+import { InvoiceAuditLog } from './InvoiceAuditLog';
 
 export default function InvoiceEditor({ invoice, onChange }) {
 

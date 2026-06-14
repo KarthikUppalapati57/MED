@@ -215,6 +215,53 @@ export default function Invoices() {
     };
   }, [queryClient]);
 
+  const handleExportCsv = () => {
+    if (!filteredInvoices || filteredInvoices.length === 0) {
+      toast.error('No invoices to export');
+      return;
+    }
+    
+    // Define headers
+    const headers = [
+      'Vendor Name',
+      'Invoice Number',
+      'Invoice Date',
+      'Due Date',
+      'Total Amount',
+      'Status',
+      'Payment Status',
+      'Destination'
+    ];
+
+    // Map data
+    const rows = filteredInvoices.map(inv => [
+      `"${(inv.vendor_name || '').replace(/"/g, '""')}"`,
+      `"${(inv.invoice_number || '').replace(/"/g, '""')}"`,
+      inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
+      inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '',
+      inv.total_amount || 0,
+      inv.status || '',
+      inv.payment_status || '',
+      inv.file_destination || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('Invoices exported successfully');
+  };
+
   // Sanitize invoice data before saving to Supabase
   const sanitizeInvoiceData = (invoiceData) => {
     const cleaned = {
@@ -926,7 +973,11 @@ export default function Invoices() {
           <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
           <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleExportCsv}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
           <Button variant="outline" onClick={() => setEmailConfigOpen(true)}>
             <Mail className="h-4 w-4 mr-2 text-brand" />
             Email Settings
