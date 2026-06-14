@@ -16,6 +16,8 @@ import AccountingControls from './AccountingControls';
 import AIVendorAnalyst from './AIVendorAnalyst';
 import DocumentVault from './DocumentVault';
 import VendorReconciliation from './VendorReconciliation';
+import VendorAuditTrail from './VendorAuditTrail';
+import VendorBulkTools from './VendorBulkTools';
 
 // Placeholder tabs
 const OverviewTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Overview Tab Content</div>;
@@ -27,8 +29,11 @@ const ReceivingTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-m
 export default function VendorDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { organization } = useAuth();
+  const { organization, role, isPlatformAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Role based access control (UI locks)
+  const isElevatedUser = isPlatformAdmin || role === 'org_owner' || role === 'admin';
 
   const { data: vendor, isLoading } = useAuthQuery({
     queryKey: ['vendor', id],
@@ -184,30 +189,36 @@ export default function VendorDetail() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="border-b border-border mb-6 overflow-x-auto pb-px scrollbar-hide">
               <TabsList className="h-auto p-0 bg-transparent inline-flex whitespace-nowrap min-w-max">
-                {['overview', 'items', 'order_guide', 'invoices', 'orders', 'payments', 'receiving', 'reconciliation', 'vault', 'accounting', 'hub', 'ai_analyst'].map(tab => (
-                  <TabsTrigger 
-                    key={tab}
-                    value={tab} 
-                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5 text-sm font-medium transition-colors"
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </TabsTrigger>
-                ))}
+                {['overview', 'items', 'order_guide', 'bulk_tools', 'invoices', 'orders', 'payments', 'receiving', 'reconciliation', 'vault', 'accounting', 'hub', 'ai_analyst', 'audit_trail'].map(tab => {
+                  // UI Lock: Hide specific tabs from lower-level staff
+                  if (!isElevatedUser && (tab === 'accounting' || tab === 'audit_trail' || tab === 'bulk_tools')) return null;
+                  return (
+                    <TabsTrigger 
+                      key={tab}
+                      value={tab} 
+                      className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5 text-sm font-medium transition-colors capitalize"
+                    >
+                      {tab.replace('_', ' ')}
+                    </TabsTrigger>
+                  )
+                })}
               </TabsList>
             </div>
 
             <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab /></TabsContent>
             <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorItemsTab vendorId={id} /></TabsContent>
             <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OrderGuideTab vendorId={id} /></TabsContent>
+            {isElevatedUser && <TabsContent value="bulk_tools" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorBulkTools vendorId={id} /></TabsContent>}
             <TabsContent value="invoices" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><InvoicesTab /></TabsContent>
             <TabsContent value="orders" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OrdersTab /></TabsContent>
             <TabsContent value="payments" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><PaymentsTab /></TabsContent>
             <TabsContent value="receiving" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><ReceivingTab /></TabsContent>
             <TabsContent value="reconciliation" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorReconciliation vendorId={id} /></TabsContent>
             <TabsContent value="vault" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><DocumentVault vendorId={id} /></TabsContent>
-            <TabsContent value="accounting" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><AccountingControls vendorId={id} /></TabsContent>
+            {isElevatedUser && <TabsContent value="accounting" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><AccountingControls vendorId={id} /></TabsContent>}
             <TabsContent value="hub" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><CommunicationHub vendorId={id} /></TabsContent>
             <TabsContent value="ai_analyst" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><AIVendorAnalyst vendorId={id} /></TabsContent>
+            {isElevatedUser && <TabsContent value="audit_trail" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorAuditTrail vendorId={id} /></TabsContent>}
           </Tabs>
         </div>
       </div>
