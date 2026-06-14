@@ -50,17 +50,42 @@ import { Progress } from '@/components/ui/progress';
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444', '#84cc16'];
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const OPERATING_TARGETS = {
+  cogsPercent: 32,
+  laborPercent: 28,
+  primeCostPercent: 60,
+};
 
 function currency(value) {
-  return `$${Number(value || 0).toLocaleString(undefined, {
+  const numeric = Number(value || 0);
+  const formatted = Math.abs(numeric).toLocaleString(undefined, {
     minimumFractionDigits: Math.abs(Number(value || 0)) < 1000 ? 2 : 0,
     maximumFractionDigits: Math.abs(Number(value || 0)) < 1000 ? 2 : 0,
-  })}`;
+  });
+  return `${numeric < 0 ? '-' : ''}$${formatted}`;
 }
 
 function percent(value) {
   if (!Number.isFinite(Number(value))) return '0%';
   return `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(1)}%`;
+}
+
+function plainPercent(value) {
+  if (!Number.isFinite(Number(value))) return '0.0%';
+  return `${Number(value).toFixed(1)}%`;
+}
+
+function targetDelta(actual, target) {
+  return Number(actual || 0) - Number(target || 0);
+}
+
+function mergeRecommendations(primary, secondary) {
+  const seen = new Set();
+  return [...primary, ...secondary].filter((item) => {
+    if (!item?.title || seen.has(item.title)) return false;
+    seen.add(item.title);
+    return true;
+  });
 }
 
 function getDate(record, candidates = ['sale_date', 'invoice_date', 'created_at', 'date']) {
@@ -320,6 +345,7 @@ function useDashboardMetrics(data) {
     const cogsPercent = monthSales ? (invoiceSpend / monthSales) * 100 : 0;
     const laborPercent = monthSales ? (laborCost / monthSales) * 100 : 0;
     const primeCostPercent = cogsPercent + laborPercent;
+    const grossMarginPercent = monthSales ? 100 - cogsPercent : 0;
 
     const spendByCategoryMap = data.invoices.reduce((acc, invoice) => {
       getLineItems(invoice).forEach((line) => {
@@ -395,11 +421,13 @@ function useDashboardMetrics(data) {
     if (overBudget.length) recommendations.push({ tone: 'yellow', title: `${overBudget[0].category} pacing ${percent(overBudget[0].pacing)}`, body: 'Open budget pacing and inspect category drivers.', href: 'Performance' });
     if (laborPercent > 28) recommendations.push({ tone: 'red', title: `Labor at ${laborPercent.toFixed(1)}%`, body: 'Review upcoming shifts against forecasted sales.', href: 'Labor' });
     if (!monthSales) recommendations.push({ tone: 'blue', title: 'POS sales not flowing yet', body: 'Connect or map POS data to unlock daily sales benchmarking.', href: 'RestaurantSetup?tab=pos' });
+    if (primeCostPercent > OPERATING_TARGETS.primeCostPercent) recommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(primeCostPercent)}`, body: 'COGS plus labor is above the 60% operating guardrail.', href: 'Performance' });
 
     const calculated = {
       budgetPacing,
       cogsPercent,
       dailyRows,
+      grossMarginPercent,
       invoiceSpend,
       laborCost,
       laborPercent,
@@ -432,6 +460,23 @@ function useDashboardMetrics(data) {
       color: COLORS[index % COLORS.length],
     }));
 
+    const summaryCogsPercent = Number(kpis.cogsPercent || 0);
+    const summaryLaborPercent = Number(kpis.laborPercent || 0);
+    const summaryPrimeCostPercent = Number(kpis.primeCostPercent || 0);
+    const guardrailRecommendations = [];
+    if (summaryCogsPercent > OPERATING_TARGETS.cogsPercent) {
+      guardrailRecommendations.push({ tone: 'red', title: `COGS at ${plainPercent(summaryCogsPercent)}`, body: 'Food and controllable costs are above the 32% target.', href: 'Performance' });
+    }
+    if (summaryLaborPercent > OPERATING_TARGETS.laborPercent) {
+      guardrailRecommendations.push({ tone: 'orange', title: `Labor at ${plainPercent(summaryLaborPercent)}`, body: 'Scheduled or logged labor is above the 28% target.', href: 'Labor' });
+    }
+    if (summaryPrimeCostPercent > OPERATING_TARGETS.primeCostPercent) {
+      guardrailRecommendations.push({ tone: 'red', title: `Prime cost at ${plainPercent(summaryPrimeCostPercent)}`, body: 'COGS plus labor is above the 60% operating guardrail.', href: 'Performance' });
+    }
+    if (Number(kpis.unpaidAmount || 0) > 0) {
+      guardrailRecommendations.push({ tone: 'yellow', title: `${currency(kpis.unpaidAmount)} unpaid AP`, body: 'Open accounts payable can distort cash planning and vendor standing.', href: 'Payments' });
+    }
+
     return {
       ...calculated,
       budgetPacing: (summary.budgetPacing || calculated.budgetPacing).map((item) => ({
@@ -443,7 +488,7 @@ function useDashboardMetrics(data) {
         isGood: Boolean(item.isGood),
       })),
       benchmarks: summary.benchmarks || calculated.benchmarks,
-      cogsPercent: Number(kpis.cogsPercent || 0),
+      cogsPercent: summaryCogsPercent,
       dailyRows: (summary.salesPerformance || calculated.dailyRows).map((row) => ({
         name: row.name,
         actual: Number(row.actual || 0),
@@ -454,20 +499,21 @@ function useDashboardMetrics(data) {
       })),
       invoiceSpend: Number(kpis.invoiceSpend || 0),
       laborCost: Number(kpis.laborCost || 0),
-      laborPercent: Number(kpis.laborPercent || 0),
+      laborPercent: summaryLaborPercent,
       lastWeekSales: Number(kpis.salesLastWeek || 0),
       lastYearSales: Number(kpis.salesLastYear || 0),
       lowStock: Array.from({ length: Number(kpis.lowStockItems || workflowCounts.lowStock || 0) }),
       monthSales: Number(kpis.salesPeriod || 0),
       openOrders: Array.from({ length: Number(kpis.openOrders || workflowCounts.openOrders || 0) }),
       pendingInvoices: Array.from({ length: Number(kpis.pendingInvoices || 0) }),
-      primeCostPercent: Number(kpis.primeCostPercent || 0),
-      recommendations: (summary.alerts || calculated.recommendations).map((item) => ({
+      grossMarginPercent: 100 - summaryCogsPercent,
+      primeCostPercent: summaryPrimeCostPercent,
+      recommendations: mergeRecommendations((summary.alerts || calculated.recommendations).map((item) => ({
         tone: item.tone || 'blue',
         title: item.title,
         body: item.body,
         href: item.href,
-      })),
+      })), guardrailRecommendations),
       spendByCategory: summarySpend.length ? summarySpend : calculated.spendByCategory,
       today: Number(kpis.salesToday || 0),
       unpaid: Number(kpis.unpaidAmount || 0),
@@ -529,7 +575,7 @@ function DataHealthBanner({ score = 80 }) {
   );
 }
 
-function KpiStrip({ metrics, platformStats, mode = 'operator' }) {
+function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org' }) {
   if (mode === 'platform') {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -541,12 +587,33 @@ function KpiStrip({ metrics, platformStats, mode = 'operator' }) {
     );
   }
 
+  const cardsByScope = {
+    org: [
+      { label: 'Period Sales', value: currency(metrics.monthSales), icon: TrendingUp, tone: 'green', subtext: `${currency(metrics.weekSales)} week-to-date` },
+      { label: 'Gross Margin', value: plainPercent(metrics.grossMarginPercent), icon: BarChart3, tone: metrics.grossMarginPercent >= 68 ? 'green' : 'orange', subtext: `COGS ${plainPercent(metrics.cogsPercent)}` },
+      { label: 'Unpaid AP', value: currency(metrics.unpaid), icon: CreditCard, tone: metrics.unpaid > 0 ? 'yellow' : 'green', linkTo: 'Payments', linkText: 'Review' },
+      { label: 'Needs Attention', value: metrics.recommendations.length, icon: AlertTriangle, tone: metrics.recommendations.length ? 'red' : 'green', subtext: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock` },
+    ],
+    brand: [
+      { label: 'Brand WTD Sales', value: currency(metrics.weekSales), icon: TrendingUp, tone: 'green', subtext: `${percent(metrics.weekVsLastWeek)} vs last week` },
+      { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), icon: Activity, tone: metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent ? 'red' : 'green', subtext: `Target ${plainPercent(OPERATING_TARGETS.primeCostPercent)}` },
+      { label: 'Open Orders', value: metrics.openOrders.length, icon: ShoppingCart, tone: metrics.openOrders.length ? 'blue' : 'green', linkTo: 'AutoOrdering', linkText: 'Open' },
+      { label: 'Low Stock', value: metrics.lowStock.length, icon: Warehouse, tone: metrics.lowStock.length ? 'orange' : 'green', linkTo: 'Inventory', linkText: 'Review' },
+    ],
+    location: [
+      { label: "Today's Sales", value: currency(metrics.today), icon: DollarSign, tone: 'green', subtext: `${currency(metrics.weekSales)} week-to-date` },
+      { label: 'COGS', value: plainPercent(metrics.cogsPercent), icon: Package, tone: metrics.cogsPercent > OPERATING_TARGETS.cogsPercent ? 'red' : 'blue', subtext: `Target ${plainPercent(OPERATING_TARGETS.cogsPercent)}` },
+      { label: 'Labor', value: plainPercent(metrics.laborPercent), icon: Users, tone: metrics.laborPercent > OPERATING_TARGETS.laborPercent ? 'orange' : 'purple', subtext: `Target ${plainPercent(OPERATING_TARGETS.laborPercent)}` },
+      { label: 'Action Items', value: metrics.recommendations.length, icon: AlertTriangle, tone: metrics.recommendations.length ? 'red' : 'green', subtext: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock` },
+    ],
+  };
+  const cards = cardsByScope[scope] || cardsByScope.org;
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Week-To-Date Sales" value={currency(metrics.weekSales)} icon={TrendingUp} tone="green" subtext={`${percent(metrics.weekVsLastWeek)} vs last week`} />
-      <StatCard label="COGS" value={`${metrics.cogsPercent.toFixed(1)}%`} icon={Package} tone={metrics.cogsPercent > 32 ? 'red' : 'blue'} subtext={`${currency(metrics.invoiceSpend)} period spend`} />
-      <StatCard label="Labor" value={`${metrics.laborPercent.toFixed(1)}%`} icon={Users} tone={metrics.laborPercent > 28 ? 'orange' : 'purple'} subtext={`${currency(metrics.laborCost)} scheduled/logged`} />
-      <StatCard label="Needs Attention" value={metrics.recommendations.length} icon={AlertTriangle} tone={metrics.recommendations.length ? 'red' : 'green'} subtext={`${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock`} />
+      {cards.map((card) => (
+        <StatCard key={card.label} {...card} />
+      ))}
     </div>
   );
 }
@@ -655,6 +722,69 @@ function BudgetPacingPanel({ metrics }) {
   );
 }
 
+function OperatingSnapshot({ metrics, scope }) {
+  const rows = [
+    { label: scope === 'location' ? "Today's Sales" : 'Period Sales', value: scope === 'location' ? currency(metrics.today) : currency(metrics.monthSales), helper: `${currency(metrics.weekSales)} WTD` },
+    { label: 'Projected Cash Pressure', value: currency(metrics.unpaid * -1), helper: `${currency(metrics.unpaid)} unpaid AP` },
+    { label: 'Prime Cost', value: plainPercent(metrics.primeCostPercent), helper: `${plainPercent(targetDelta(metrics.primeCostPercent, OPERATING_TARGETS.primeCostPercent))} vs target` },
+    { label: 'Gross Margin', value: plainPercent(metrics.grossMarginPercent), helper: `${currency(metrics.invoiceSpend)} COGS spend` },
+    { label: 'Inventory Risk', value: metrics.lowStock.length, helper: 'Low stock items' },
+    { label: 'Workflow Load', value: metrics.pendingInvoices.length + metrics.openOrders.length, helper: 'Invoices + open orders' },
+  ];
+
+  return (
+    <SectionCard title="Operating Snapshot" description="The shortest answer to how the business is performing and what is pressuring it.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{row.label}</p>
+            <p className="mt-1 text-xl font-bold text-foreground">{row.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{row.helper}</p>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function GuardrailPanel({ metrics }) {
+  const guardrails = [
+    { label: 'COGS', actual: metrics.cogsPercent, target: OPERATING_TARGETS.cogsPercent, href: 'Performance' },
+    { label: 'Labor', actual: metrics.laborPercent, target: OPERATING_TARGETS.laborPercent, href: 'Labor' },
+    { label: 'Prime Cost', actual: metrics.primeCostPercent, target: OPERATING_TARGETS.primeCostPercent, href: 'Performance' },
+  ];
+
+  return (
+    <SectionCard title="Operating Guardrails" description="Restaurant target thresholds that should stay visible every day.">
+      <div className="space-y-4">
+        {guardrails.map((item) => {
+          const over = targetDelta(item.actual, item.target);
+          const isGood = over <= 0;
+          const progress = Math.min((Number(item.actual || 0) / Number(item.target || 1)) * 100, 140);
+          return (
+            <div key={item.label} className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Actual {plainPercent(item.actual)} / Target {plainPercent(item.target)}
+                  </p>
+                </div>
+                <Link to={createPageUrl(item.href)}>
+                  <Badge className={isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
+                    {isGood ? 'Inside target' : `${plainPercent(over)} over`}
+                  </Badge>
+                </Link>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
 function SpendAndWorkflowGrid({ metrics, data, showWorkflow = true }) {
   const pieData = metrics.spendByCategory.length ? metrics.spendByCategory : [{ name: 'No spend coded', value: 1, color: '#e5e7eb' }];
   const workflowCounts = metrics.workflowCounts || {};
@@ -739,7 +869,8 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
     <div className="space-y-6">
       <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
       <DataHealthBanner />
-      <KpiStrip metrics={metrics} />
+      <KpiStrip metrics={metrics} scope={scope} />
+      <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
           <NeedsAttentionPanel items={metrics.recommendations} />
@@ -750,8 +881,9 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <BudgetPacingPanel metrics={metrics} />
-        <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
+        <GuardrailPanel metrics={metrics} />
       </div>
+      <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
       <SpendAndWorkflowGrid metrics={metrics} data={data} />
     </div>
   );
