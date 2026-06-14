@@ -16,6 +16,12 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import AvTCosting from './AvTCosting';
+import { SalesReportWidget } from '../components/performance/SalesReportWidget';
+import { SalesForecastWidget } from '../components/performance/SalesForecastWidget';
+import { UsageReportWidget } from '../components/performance/UsageReportWidget';
+import { ActionCenterWidget } from '../components/performance/ActionCenterWidget';
+import { ExplainableVarianceWidget } from '../components/performance/ExplainableVarianceWidget';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff7300', '#38bdf8', '#fbbf24'];
 
@@ -275,6 +281,12 @@ export default function Performance() {
           <TabsTrigger value="pnl" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Controllable P&L</TabsTrigger>
           <TabsTrigger value="category" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Category Report</TabsTrigger>
           <TabsTrigger value="movers" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Price Movers</TabsTrigger>
+          <TabsTrigger value="sales_report" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Report</TabsTrigger>
+          <TabsTrigger value="sales_forecast" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Forecast</TabsTrigger>
+          <TabsTrigger value="usage_report" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Usage Report</TabsTrigger>
+          <TabsTrigger value="avt" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Theoretical Usage (AvT)</TabsTrigger>
+          <TabsTrigger value="variance" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Variance Breakdown</TabsTrigger>
+          <TabsTrigger value="action_center" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Action Center</TabsTrigger>
           <TabsTrigger value="budget" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Budget Setup</TabsTrigger>
         </TabsList>
 
@@ -613,6 +625,31 @@ export default function Performance() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="sales_report" className="space-y-6 m-0">
+            <SalesReportWidget salesData={salesData} />
+          </TabsContent>
+
+          <TabsContent value="sales_forecast" className="space-y-6 m-0">
+            <SalesForecastWidget salesData={salesData} />
+          </TabsContent>
+
+          <TabsContent value="usage_report" className="space-y-6 m-0">
+            <UsageReportWidget />
+          </TabsContent>
+
+          <TabsContent value="avt" className="space-y-0 m-0">
+            <AvTCosting />
+          </TabsContent>
+
+          <TabsContent value="variance" className="space-y-6 m-0">
+            <ExplainableVarianceWidget varianceTotal={totalSales - budget} />
+          </TabsContent>
+
+          <TabsContent value="action_center" className="space-y-6 m-0">
+            <ActionCenterWidget />
+          </TabsContent>
+
 
         </div>
       </Tabs>
