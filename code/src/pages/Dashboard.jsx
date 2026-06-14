@@ -8,6 +8,8 @@ import {
   ArrowRight,
   BarChart3,
   Building2,
+  CheckCircle2,
+  ClipboardList,
   Clock,
   CreditCard,
   DollarSign,
@@ -15,8 +17,10 @@ import {
   Package,
   Shield,
   ShoppingCart,
+  Target,
   TrendingUp,
   Upload,
+  UserCheck,
   Users,
   Warehouse,
 } from 'lucide-react';
@@ -989,6 +993,241 @@ function DataCoveragePanel({ metrics, data, canAccessPage = () => true }) {
   );
 }
 
+function getRoleActionLabel(scope) {
+  if (scope === 'brand') return 'Brand manager';
+  if (scope === 'location') return 'Location manager';
+  return 'Org owner';
+}
+
+function buildRoleActionPlan(metrics, scope, canAccessPage = () => true) {
+  const owner = getRoleActionLabel(scope);
+  const items = [];
+
+  metrics.recommendations.forEach((item) => {
+    if (item.href && !canAccessPage(pageKeyFromHref(item.href))) return;
+    items.push({
+      title: item.title,
+      body: item.body,
+      href: item.href,
+      owner,
+      due: item.tone === 'red' ? 'Today' : 'This week',
+      priority: item.tone === 'red' ? 'Critical' : item.tone === 'orange' || item.tone === 'yellow' ? 'High' : 'Normal',
+      tone: item.tone,
+    });
+  });
+
+  if (metrics.cogsPercent > OPERATING_TARGETS.cogsPercent && canAccessPage('Performance')) {
+    items.push({
+      title: 'Review COGS drivers',
+      body: `COGS is ${plainPercent(targetDelta(metrics.cogsPercent, OPERATING_TARGETS.cogsPercent))} over target. Compare invoice categories and recipe/menu cost changes.`,
+      href: 'Performance',
+      owner,
+      due: 'Today',
+      priority: 'Critical',
+      tone: 'red',
+    });
+  }
+
+  if (metrics.laborPercent > OPERATING_TARGETS.laborPercent && canAccessPage('Labor')) {
+    items.push({
+      title: 'Tighten labor pacing',
+      body: `Labor is ${plainPercent(targetDelta(metrics.laborPercent, OPERATING_TARGETS.laborPercent))} over target. Review schedule coverage against forecasted sales.`,
+      href: 'Labor',
+      owner: scope === 'org' ? 'Location managers' : owner,
+      due: 'Next shift',
+      priority: 'High',
+      tone: 'orange',
+    });
+  }
+
+  if (metrics.unpaid > 0 && canAccessPage('Payments')) {
+    items.push({
+      title: 'Clear unpaid AP queue',
+      body: `${currency(metrics.unpaid)} is unpaid. Confirm approval status, cash timing, and vendor priority.`,
+      href: 'Payments',
+      owner: scope === 'location' ? 'Location manager' : 'AP owner',
+      due: 'Today',
+      priority: 'High',
+      tone: 'yellow',
+    });
+  }
+
+  if (!items.length) {
+    items.push({
+      title: 'Run the daily operating review',
+      body: 'No urgent issues are visible. Review sales pacing, budget targets, and source data coverage before shift close.',
+      href: canAccessPage('Performance') ? 'Performance' : undefined,
+      owner,
+      due: 'Today',
+      priority: 'Normal',
+      tone: 'green',
+    });
+  }
+
+  const seen = new Set();
+  return items
+    .filter((item) => {
+      if (seen.has(item.title)) return false;
+      seen.add(item.title);
+      return true;
+    })
+    .slice(0, 6);
+}
+
+function DecisionBriefPanel({ metrics, scope }) {
+  const salesSignal = metrics.weekVsLastWeek >= 0
+    ? `${percent(metrics.weekVsLastWeek)} vs last week`
+    : `${percent(metrics.weekVsLastWeek)} vs last week`;
+  const riskCount = [
+    metrics.cogsPercent > OPERATING_TARGETS.cogsPercent,
+    metrics.laborPercent > OPERATING_TARGETS.laborPercent,
+    metrics.primeCostPercent > OPERATING_TARGETS.primeCostPercent,
+    metrics.unpaid > 0,
+    metrics.lowStock.length > 0,
+  ].filter(Boolean).length;
+  const headline = scope === 'location'
+    ? `${currency(metrics.today)} today, ${currency(metrics.weekSales)} WTD`
+    : `${currency(metrics.monthSales)} period sales, ${currency(metrics.weekSales)} WTD`;
+  const focus = riskCount
+    ? `${riskCount} operating guardrail${riskCount > 1 ? 's' : ''} need review before the next close.`
+    : 'Core guardrails are inside target based on the connected data.';
+
+  return (
+    <SectionCard title="Manager Decision Brief" description="A short operating readout for the next leadership check-in.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {[
+          { label: 'Business Read', value: headline, helper: salesSignal, icon: TrendingUp },
+          { label: 'Primary Risk', value: focus, helper: `Prime cost ${plainPercent(metrics.primeCostPercent)}`, icon: Target },
+          { label: 'Handoff Note', value: `${metrics.recommendations.length || 0} action items`, helper: `${metrics.pendingInvoices.length} invoices, ${metrics.lowStock.length} low stock`, icon: ClipboardList },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <item.icon className="h-4 w-4" />
+              {item.label}
+            </div>
+            <p className="mt-3 text-sm font-semibold leading-5 text-foreground">{item.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.helper}</p>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function RoleActionPlanPanel({ metrics, scope, canAccessPage = () => true }) {
+  const actions = buildRoleActionPlan(metrics, scope, canAccessPage);
+
+  return (
+    <SectionCard title="Daily Action Plan" description="Role-based actions converted from the dashboard signals.">
+      <div className="space-y-3">
+        {actions.map((item, index) => (
+          <div key={item.title} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/30 p-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex gap-3">
+              <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold', {
+                'bg-resend-red/10 text-resend-red': item.tone === 'red',
+                'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
+                'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
+                'bg-resend-blue/10 text-resend-blue': item.tone === 'blue',
+                'bg-resend-green/10 text-resend-green': item.tone === 'green',
+              })}>
+                {index + 1}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <Badge variant="secondary">{item.priority}</Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{item.body}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><UserCheck className="h-3.5 w-3.5" /> {item.owner}</span>
+                  <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {item.due}</span>
+                </div>
+              </div>
+            </div>
+            {item.href && (
+              <Link to={createPageUrl(item.href)} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand hover:opacity-80">
+                Open workflow <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function StaffShiftPlanPanel({ tasks, metrics }) {
+  const checklist = [
+    { label: 'Review assigned module queue', value: `${tasks.length} modules`, icon: Shield },
+    { label: 'Clear invoice or inventory exceptions', value: `${metrics.pendingInvoices.length + metrics.lowStock.length} items`, icon: CheckCircle2 },
+    { label: 'Escalate unresolved blockers to manager', value: metrics.recommendations.length ? 'Needed' : 'None visible', icon: ClipboardList },
+  ];
+
+  return (
+    <SectionCard title="My Shift Plan" description="A simple checklist for ground staff based on assigned module access.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {checklist.map((item) => (
+          <div key={item.label} className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+            <item.icon className="h-4 w-4 text-muted-foreground" />
+            <p className="mt-3 text-sm font-semibold text-foreground">{item.label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function PlatformActionQueue({ platformStats, recentLogs }) {
+  const actions = [
+    {
+      title: 'Review trial or pending organizations',
+      body: `${Math.max(platformStats.totalOrgs - platformStats.activeSubscriptions, 0)} organizations are not active subscriptions.`,
+      href: 'PlatformOrganizations',
+      priority: platformStats.totalOrgs === platformStats.activeSubscriptions ? 'Normal' : 'High',
+      tone: platformStats.totalOrgs === platformStats.activeSubscriptions ? 'green' : 'yellow',
+    },
+    {
+      title: 'Audit platform activity',
+      body: recentLogs.length ? `${recentLogs.length} recent audit events are available for review.` : 'No recent audit events are currently visible.',
+      href: 'PlatformAdmin?tab=audit',
+      priority: recentLogs.length ? 'Normal' : 'High',
+      tone: recentLogs.length ? 'blue' : 'orange',
+    },
+    {
+      title: 'Check revenue operations',
+      body: `${currency(platformStats.mrr)} monthly recurring revenue is represented by active plans.`,
+      href: 'PlatformAdmin?tab=accounting',
+      priority: 'Normal',
+      tone: 'green',
+    },
+  ];
+
+  return (
+    <SectionCard title="Platform Action Queue" description="Production operations that keep the hosted platform healthy.">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+        {actions.map((item) => (
+          <Link key={item.title} to={createPageUrl(item.href)} className="rounded-lg border border-border/60 bg-secondary/30 p-4 transition-colors hover:bg-secondary/60">
+            <div className="flex items-center justify-between gap-3">
+              <Badge className={cn({
+                'bg-resend-green/10 text-resend-green': item.tone === 'green',
+                'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
+                'bg-resend-blue/10 text-resend-blue': item.tone === 'blue',
+                'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
+              })}>
+                {item.priority}
+              </Badge>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-foreground">{item.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.body}</p>
+          </Link>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const { organization, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
@@ -1004,6 +1243,8 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
       <DataHealthBanner />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
+      <DecisionBriefPanel metrics={metrics} scope={scope} />
+      <RoleActionPlanPanel metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="xl:col-span-1">
@@ -1075,6 +1316,7 @@ function GroundStaffDashboard() {
           {!tasks.length && <p className="text-sm text-muted-foreground">No module tasks are assigned yet.</p>}
         </div>
       </SectionCard>
+      <StaffShiftPlanPanel tasks={tasks} metrics={metrics} />
       <NeedsAttentionPanel
         items={metrics.recommendations.filter((item) => ['Invoices', 'Inventory', 'Products', 'AutoOrdering'].some((page) => item.href?.startsWith(page)))}
         canAccessPage={canAccessPage}
@@ -1138,6 +1380,7 @@ function PlatformDashboard() {
     <div className="space-y-6">
       <DashboardHeader title="Platform Overview" subtitle="Global SaaS health, customer activity, and revenue operations." scopeLabel="Platform Admin" />
       <KpiStrip mode="platform" platformStats={platformStats} />
+      <PlatformActionQueue platformStats={platformStats} recentLogs={recentLogs} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <SectionCard title="Organization Status" description="Current platform tenant mix.">
           <div className="space-y-3">
