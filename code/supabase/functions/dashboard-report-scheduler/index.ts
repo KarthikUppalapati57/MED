@@ -207,13 +207,6 @@ serve(async (req) => {
             .insert(recipients.map((recipient) => ({
               is_read: false,
               message: reportText.slice(0, 950),
-              metadata: {
-                dashboard_scope: preference.scope,
-                delivery_id: delivery.id,
-                report_date: dateKey,
-                report_type: reportType,
-                source: 'dashboard_report_scheduler',
-              },
               organization_id: preference.organization_id,
               title: reportType === 'daily' ? 'Daily dashboard handoff ready' : 'Weekly executive dashboard report ready',
               type: 'system',
