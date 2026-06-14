@@ -19,10 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import ItemMappingSelect from './ItemMappingSelect';
 
 export default function InvoiceEditor({ invoice, onChange }) {
-
 
   const paidDetection = invoice.validation_results?.paid_status_detection;
   const hasPaidDetection = paidDetection?.detected;
@@ -273,8 +272,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">Product ID</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead className="w-[200px]">Product</TableHead>
+                  <TableHead>Vendor Item Description</TableHead>
                   <TableHead className="w-[80px]">Qty</TableHead>
                   <TableHead className="w-[80px]">Unit</TableHead>
                   <TableHead className="w-[100px]">Unit Price</TableHead>
@@ -288,10 +287,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 {(invoice.line_items || []).map((item, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <Input
-                        value={item.product_id || ''}
-                        onChange={(e) => handleLineItemChange(index, 'product_id', e.target.value)}
-                        className="h-8"
+                      <ItemMappingSelect
+                        value={item.product_id}
+                        onChange={(val) => handleLineItemChange(index, 'product_id', val)}
+                        vendorItemName={item.description}
+                        vendorId={invoice.vendor_id}
                       />
                     </TableCell>
                     <TableCell>
@@ -372,7 +372,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
           {/* Totals */}
           <div className="mt-4 flex justify-end">
             <div className="w-72 space-y-2 bg-slate-50 rounded-lg p-4">
-              <div className="flex justify-between text-sm">
+               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Subtotal:</span>
                 <span className="font-medium">${calculateTotal().toFixed(2)}</span>
               </div>
