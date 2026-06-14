@@ -188,3 +188,39 @@ CREATE POLICY "dashboard_review_logs_delete"
 GRANT SELECT, INSERT, UPDATE ON public.dashboard_action_status TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.dashboard_handoff_notes TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.dashboard_review_logs TO authenticated;
+
+ALTER TABLE public.dashboard_action_status REPLICA IDENTITY FULL;
+ALTER TABLE public.dashboard_handoff_notes REPLICA IDENTITY FULL;
+ALTER TABLE public.dashboard_review_logs REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'dashboard_action_status'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_action_status;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'dashboard_handoff_notes'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_handoff_notes;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = 'dashboard_review_logs'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.dashboard_review_logs;
+    END IF;
+  END IF;
+END $$;

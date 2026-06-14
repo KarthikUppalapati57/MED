@@ -185,6 +185,7 @@ function useLocalStatusMap(storageKey) {
 }
 
 function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
+  const queryClient = useQueryClient();
   const scopeContext = React.useMemo(
     () => getDashboardScopeContext(scope, { organization, brand, location }),
     [brand, location, organization, scope]
@@ -196,21 +197,32 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
   const [statusMap, setStatusMap] = useLocalStatusMap(actionStorageKey);
   const [note, setNote] = useLocalJson(noteStorageKey, '');
   const [reviews, setReviews] = useLocalJson(reviewStorageKey, []);
+  const [syncState, setSyncState] = React.useState({ mode: 'local', message: 'Saved locally', updatedAt: null });
   const orgReady = !!scopeContext.orgId && !!organization?.id;
-  const isMissingDashboardTable = (error) => error?.code === '42P01' || error?.code === 'PGRST205' || /dashboard_.*not found|does not exist/i.test(error?.message || '');
+  const isMissingDashboardTable = React.useCallback((error) => error?.code === '42P01' || error?.code === 'PGRST205' || /dashboard_.*not found|does not exist/i.test(error?.message || ''), []);
+  const markSynced = React.useCallback((message = 'Synced') => {
+    setSyncState({ mode: 'synced', message, updatedAt: new Date().toISOString() });
+  }, []);
+  const markLocal = React.useCallback(() => {
+    setSyncState({ mode: 'local', message: 'Saved locally until Supabase tables are applied', updatedAt: null });
+  }, []);
 
   const { data: remoteActionRows = [] } = useAuthQuery({
     queryKey: ['dashboard-action-status', scopeContext.orgId, scope, scopeContext.scopeKey, actionDate],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dashboard_action_status')
-        .select('action_key, status')
+        .select('action_key, status, updated_at, completed_at, completed_by')
         .eq('organization_id', scopeContext.orgId)
         .eq('scope', scope)
         .eq('scope_key', scopeContext.scopeKey)
         .eq('action_date', actionDate);
-      if (isMissingDashboardTable(error)) return [];
+      if (isMissingDashboardTable(error)) {
+        markLocal();
+        return [];
+      }
       if (error) throw error;
+      markSynced();
       return data || [];
     },
     enabled: orgReady,
@@ -222,14 +234,18 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dashboard_handoff_notes')
-        .select('note')
+        .select('note, updated_at, updated_by')
         .eq('organization_id', scopeContext.orgId)
         .eq('scope', scope)
         .eq('scope_key', scopeContext.scopeKey)
         .eq('note_date', actionDate)
         .maybeSingle();
-      if (isMissingDashboardTable(error)) return null;
+      if (isMissingDashboardTable(error)) {
+        markLocal();
+        return null;
+      }
       if (error) throw error;
+      markSynced();
       return data;
     },
     enabled: orgReady,
@@ -247,8 +263,12 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
         .eq('scope_key', scopeContext.scopeKey)
         .order('review_date', { ascending: false })
         .limit(7);
-      if (isMissingDashboardTable(error)) return [];
+      if (isMissingDashboardTable(error)) {
+        markLocal();
+        return [];
+      }
       if (error) throw error;
+      markSynced();
       return data || [];
     },
     enabled: orgReady,
@@ -259,6 +279,25 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
     if (!remoteActionRows.length) return;
     setStatusMap(Object.fromEntries(remoteActionRows.map((row) => [row.action_key, row.status])));
   }, [remoteActionRows, setStatusMap]);
+
+  useEffect(() => {
+    if (!orgReady) return undefined;
+    const invalidatePersistence = () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-action-status'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-handoff-note'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-review-logs'] });
+      setSyncState({ mode: 'synced', message: 'Updated just now', updatedAt: new Date().toISOString() });
+    };
+    const channel = supabase.channel(`dashboard-persistence-${scope}-${scopeContext.scopeKey}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_action_status', filter: `organization_id=eq.${scopeContext.orgId}` }, invalidatePersistence)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_handoff_notes', filter: `organization_id=eq.${scopeContext.orgId}` }, invalidatePersistence)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_review_logs', filter: `organization_id=eq.${scopeContext.orgId}` }, invalidatePersistence)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setSyncState((current) => ({ ...current, mode: current.mode === 'local' ? 'local' : 'synced', message: current.mode === 'local' ? current.message : 'Realtime synced' }));
+      });
+
+    return () => supabase.removeChannel(channel);
+  }, [orgReady, queryClient, scope, scopeContext.orgId, scopeContext.scopeKey]);
 
   useEffect(() => {
     if (remoteNote?.note !== undefined) setNote(remoteNote.note || '');
@@ -305,6 +344,7 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
         status,
       }, { onConflict: 'organization_id,scope,scope_key,action_date,action_key' });
       if (error) throw error;
+      markSynced('Action synced');
       logAudit({
         action: status === 'done' ? 'dashboard_action_completed' : 'dashboard_action_reopened',
         entityId: key,
@@ -315,9 +355,10 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
         details: { scope, scopeKey: scopeContext.scopeKey, title },
       });
     } catch (error) {
+      if (isMissingDashboardTable(error)) markLocal();
       console.warn('[dashboard] Failed to persist action status:', error.message || error);
     }
-  }, [actionDate, basePayload, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, userProfile?.id]);
+  }, [actionDate, basePayload, isMissingDashboardTable, markLocal, markSynced, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, userProfile?.id]);
 
   const resetActions = React.useCallback(async () => {
     setStatusMap({});
@@ -335,12 +376,14 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           note_date: actionDate,
         }, { onConflict: 'organization_id,scope,scope_key,note_date' });
         if (error) throw error;
+        markSynced('Handoff note synced');
       } catch (error) {
+        if (isMissingDashboardTable(error)) markLocal();
         console.warn('[dashboard] Failed to persist handoff note:', error.message || error);
       }
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [actionDate, basePayload, note, orgReady]);
+  }, [actionDate, basePayload, isMissingDashboardTable, markLocal, markSynced, note, orgReady]);
 
   const saveReview = React.useCallback(async () => {
     const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
@@ -380,6 +423,7 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           week_sales: snapshot.weekSales,
         }, { onConflict: 'organization_id,scope,scope_key,review_date' });
         if (error) throw error;
+        markSynced('Review synced');
         logAudit({
           action: 'dashboard_review_saved',
           entityId: `${scopeContext.scopeKey}:${actionDate}`,
@@ -390,11 +434,12 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           details: { scope, completed: snapshot.completedCount, open: snapshot.openActions.length },
         });
       } catch (error) {
+        if (isMissingDashboardTable(error)) markLocal();
         console.warn('[dashboard] Failed to persist review log:', error.message || error);
       }
     }
     toast.success('Manager review saved');
-  }, [actionDate, actions, basePayload, dataHealthScore, metrics.lowStock.length, metrics.pendingInvoices.length, metrics.primeCostPercent, metrics.unpaid, metrics.weekSales, note, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, statusMap, userProfile?.id]);
+  }, [actionDate, actions, basePayload, dataHealthScore, isMissingDashboardTable, markLocal, markSynced, metrics.lowStock.length, metrics.pendingInvoices.length, metrics.primeCostPercent, metrics.unpaid, metrics.weekSales, note, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, statusMap, userProfile?.id]);
 
   const clearReviews = React.useCallback(async () => {
     setReviews([]);
@@ -407,6 +452,7 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           .eq('scope', scope)
           .eq('scope_key', scopeContext.scopeKey);
         if (error) throw error;
+        markSynced('Reviews cleared');
         logAudit({
           action: 'dashboard_reviews_cleared',
           entityType: 'dashboard_review_log',
@@ -416,11 +462,12 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           details: { scope, scopeKey: scopeContext.scopeKey },
         });
       } catch (error) {
+        if (isMissingDashboardTable(error)) markLocal();
         console.warn('[dashboard] Failed to clear review logs:', error.message || error);
       }
     }
     toast.success('Review log cleared');
-  }, [orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, userProfile?.id]);
+  }, [isMissingDashboardTable, markLocal, markSynced, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, userProfile?.id]);
 
   const auditHandoffExport = React.useCallback((action) => {
     logAudit({
@@ -445,6 +492,7 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
     setNote,
     setReviews,
     setStatusMap,
+    syncState,
     statusMap,
   };
 }
@@ -540,6 +588,51 @@ function EmptyState({ icon: Icon = AlertTriangle, title, description, actionHref
         </Link>
       )}
     </div>
+  );
+}
+
+function formatSyncTime(value) {
+  if (!value) return 'Not synced yet';
+  try {
+    return format(new Date(value), 'MMM d, h:mm a');
+  } catch {
+    return 'Recently';
+  }
+}
+
+function SyncStatusBadge({ syncState }) {
+  const mode = syncState?.mode || 'local';
+  const isSynced = mode === 'synced';
+  return (
+    <Badge className={isSynced ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/10 text-resend-yellow'}>
+      {isSynced ? 'Synced' : 'Local'}
+    </Badge>
+  );
+}
+
+function CollaborationStatusPanel({ syncState }) {
+  return (
+    <SectionCard title="Collaboration Status" description="Realtime dashboard persistence and multi-manager sync state.">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sync Mode</p>
+          <div className="mt-2 flex items-center gap-2">
+            <SyncStatusBadge syncState={syncState} />
+            <span className="text-sm font-semibold text-foreground">{syncState?.message || 'Saved locally'}</span>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Last Update</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">{formatSyncTime(syncState?.updatedAt)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Updates refresh automatically when Supabase realtime is active.</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-secondary/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shared Work</p>
+          <p className="mt-2 text-sm font-semibold text-foreground">{syncState?.mode === 'synced' ? 'Cross-device ready' : 'Waiting for Phase 9 SQL'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Action status, notes, and reviews use the same persistence scope.</p>
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -1588,7 +1681,7 @@ function createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore
   ].join('\n');
 }
 
-function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, note = '', setNote, onHandoffExport }) {
+function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, note = '', setNote, onHandoffExport, syncState }) {
   const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const completedCount = actions.filter((item) => statusMap[actionId(item.title)] === 'done').length;
   const openCount = actions.length - completedCount;
@@ -1621,7 +1714,8 @@ function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap
       title="Daily Handoff"
       description="Copy or download a manager-ready summary of today's operating state."
       action={(
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SyncStatusBadge syncState={syncState} />
           <Button variant="outline" size="sm" className="gap-2" onClick={copyHandoff}>
             <Copy className="h-4 w-4" />
             Copy
@@ -1666,7 +1760,7 @@ function HandoffBriefPanel({ actions: providedActions, metrics, scope, statusMap
   );
 }
 
-function ManagerReviewLogPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, reviews = [], onSaveReview, onClearReviews }) {
+function ManagerReviewLogPanel({ actions: providedActions, metrics, scope, statusMap = {}, dataHealthScore, canAccessPage = () => true, reviews = [], onSaveReview, onClearReviews, syncState }) {
   const actions = providedActions || buildRoleActionPlan(metrics, scope, canAccessPage);
   const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
   const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
@@ -1678,7 +1772,8 @@ function ManagerReviewLogPanel({ actions: providedActions, metrics, scope, statu
       title="Manager Review Log"
       description="Save daily review snapshots and keep prior open items visible for follow-up."
       action={(
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SyncStatusBadge syncState={syncState} />
           <Button variant="outline" size="sm" className="gap-2" onClick={onSaveReview}>
             <Save className="h-4 w-4" />
             Save Review
@@ -1892,6 +1987,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
       <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} />
       <DecisionBriefPanel metrics={metrics} scope={scope} />
+      <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
       <RoleActionPlanPanel
         actions={roleActions}
         metrics={metrics}
@@ -1912,6 +2008,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         note={dashboardPersistence.note}
         setNote={dashboardPersistence.setNote}
         onHandoffExport={dashboardPersistence.auditHandoffExport}
+        syncState={dashboardPersistence.syncState}
       />
       <ManagerReviewLogPanel
         actions={roleActions}
@@ -1923,6 +2020,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         reviews={dashboardPersistence.reviews}
         onSaveReview={dashboardPersistence.saveReview}
         onClearReviews={dashboardPersistence.clearReviews}
+        syncState={dashboardPersistence.syncState}
       />
       <OperatingSnapshot metrics={metrics} scope={scope} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
