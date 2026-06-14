@@ -793,7 +793,7 @@ const AuthenticatedApp = () => {
           {Object.entries(Pages).map(([path, Page]) => (
             <Route
               key={path}
-              path={`/${path}`}
+              path={path === 'Vendors' ? `/${path}/*` : `/${path}`}
               element={
                 <LayoutWrapper currentPageName={path}>
                   <ProtectedModule pageName={path}>
