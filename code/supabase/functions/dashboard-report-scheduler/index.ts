@@ -216,6 +216,7 @@ serve(async (req) => {
           if (notificationError) throw notificationError;
 
           await supabase.from('dashboard_report_deliveries').update({
+            error_message: null,
             notification_ids: (notifications || []).map((item) => item.id),
             recipient_count: recipients.length,
             report_snapshot: { summary, reportText },
