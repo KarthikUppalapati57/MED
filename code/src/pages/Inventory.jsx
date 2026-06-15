@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import ActiveCountSession from '@/components/inventory/ActiveCountSession';
 import POSSyncEngine from '@/components/inventory/POSSyncEngine';
+import InventoryTransfers from '@/components/inventory/InventoryTransfers';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -586,10 +587,11 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-9 mb-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-10 mb-6">
           <TabsTrigger value="inventory">Inventory List</TabsTrigger>
           <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
           <TabsTrigger value="pos-sync" className="text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
+          <TabsTrigger value="transfers" className="text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
           <TabsTrigger value="counts">Stock Counts</TabsTrigger>
@@ -604,6 +606,10 @@ export default function Inventory() {
 
         <TabsContent value="pos-sync" className="space-y-4">
           <POSSyncEngine inventory={inventory} recipes={recipes} updateInventoryMutation={updateMutation} />
+        </TabsContent>
+
+        <TabsContent value="transfers" className="space-y-4">
+          <InventoryTransfers inventory={inventory} updateInventoryMutation={updateMutation} organization={organization} />
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">
