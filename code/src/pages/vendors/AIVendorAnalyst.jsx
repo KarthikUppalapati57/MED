@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Send, Loader2, Bot, User } from 'lucide-react';
-import { api } from '@/lib/apiClient';
+import { Sparkles, Send, Bot, User } from 'lucide-react';
 
 export default function AIVendorAnalyst({ vendorId }) {
   const { organization } = useAuth();

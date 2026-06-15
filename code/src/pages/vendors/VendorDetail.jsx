@@ -3,12 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Building2, MapPin, Mail, Phone, Globe, Star, Sparkles, FileText, Activity } from 'lucide-react';
-import { toast } from "sonner";
+import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity } from 'lucide-react';
 import VendorItemsTab from './VendorItemsTab';
 import OrderGuideTab from './OrderGuideTab';
 import CommunicationHub from './CommunicationHub';
@@ -19,12 +18,32 @@ import VendorReconciliation from './VendorReconciliation';
 import VendorAuditTrail from './VendorAuditTrail';
 import VendorBulkTools from './VendorBulkTools';
 
-// Placeholder tabs
-const OverviewTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Overview Tab Content</div>;
-const InvoicesTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Invoices Tab Content</div>;
-const OrdersTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Orders Tab Content</div>;
-const PaymentsTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Payments Tab Content</div>;
-const ReceivingTab = () => <div className="p-4 bg-secondary/20 rounded-lg text-muted-foreground text-sm">Receiving Tab Content</div>;
+// Helper for unimplemented tabs linking out to master modules
+const LinkedTabPlaceholder = ({ title, description, linkText, linkPath }) => {
+  const navigate = useNavigate();
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 bg-secondary/5 rounded-xl border border-dashed border-border/60">
+      <div className="bg-primary/10 p-3 rounded-full mb-4">
+        <FileText className="h-6 w-6 text-primary" />
+      </div>
+      <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+      <p className="text-muted-foreground text-sm text-center max-w-sm mb-6">{description}</p>
+      <Button variant="outline" onClick={() => navigate(linkPath)}>{linkText}</Button>
+    </div>
+  );
+};
+
+const OverviewTab = () => (
+  <div className="py-12 text-center text-muted-foreground">
+    <Activity className="h-8 w-8 mx-auto mb-3 opacity-20" />
+    <p>Comprehensive vendor overview dashboard is under construction.</p>
+  </div>
+);
+
+const InvoicesTab = () => <LinkedTabPlaceholder title="Vendor Invoices" description="Manage and process all invoices for this vendor from the centralized Accounts Payable hub." linkText="Go to AP Hub" linkPath="/Invoices" />;
+const OrdersTab = () => <LinkedTabPlaceholder title="Vendor Orders" description="Create and track purchase orders for this vendor from the main Inventory module." linkText="Go to Orders" linkPath="/Orders" />;
+const PaymentsTab = () => <LinkedTabPlaceholder title="Vendor Payments" description="Schedule and execute bill payments for this vendor from the centralized Bill Pay module." linkText="Go to Payments" linkPath="/Payments" />;
+const ReceivingTab = () => <LinkedTabPlaceholder title="Receiving Logs" description="Track receiving logs and delivery exceptions for this vendor." linkText="Go to Receiving" linkPath="/Receiving" />;
 
 export default function VendorDetail() {
   const { id } = useParams();

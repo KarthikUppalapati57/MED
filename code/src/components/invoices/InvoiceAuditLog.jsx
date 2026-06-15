@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { History, Activity, AlertCircle } from 'lucide-react';
+import { History, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 export function InvoiceAuditLog({ invoiceId }) {

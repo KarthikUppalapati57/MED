@@ -18,7 +18,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
 
 export default function ItemMappingSelect({ 
   value, 

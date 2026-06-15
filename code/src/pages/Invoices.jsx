@@ -4,7 +4,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
-import { usePermissions } from '@/hooks/usePermissions';
 import { filterByContext } from '@/lib/contextUtils';
 import { supabase } from '@/lib/supabaseClient';
 import { notifyManagers } from '@/lib/notificationService';

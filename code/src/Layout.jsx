@@ -381,7 +381,7 @@ export default function Layout({ children, currentPageName }) {
     );
     if (activeParent) setExpandedMenu(activeParent.name);
   // Only run on page/path changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [currentPageName, location.search]);
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { MessageSquare, AlertCircle, CheckCircle2, Clock, Send, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Send, Plus } from 'lucide-react';
 
 export default function CommunicationHub({ vendorId }) {
   const { organization, user } = useAuth();

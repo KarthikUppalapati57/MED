@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as LinkIcon, Target, CalendarDays, ReceiptText, ClipboardList } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as LinkIcon, Target } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQueryClient } from '@tanstack/react-query';

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, TrendingDown, TrendingUp, Calculator, DollarSign, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Calculator, DollarSign } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 export default function AvTDashboard() {

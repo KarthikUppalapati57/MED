@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { filterByContext } from '@/lib/contextUtils';
 import {
   Table,
   TableBody,
@@ -13,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

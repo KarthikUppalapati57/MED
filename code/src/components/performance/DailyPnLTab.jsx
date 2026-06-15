@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Activity, DollarSign, TrendingDown, TrendingUp, Users, ShoppingCart, Percent } from 'lucide-react';
+import { Activity, DollarSign, TrendingDown, TrendingUp, Users, ShoppingCart } from 'lucide-react';
 
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (value) => `${Number(value || 0).toFixed(1)}%`;

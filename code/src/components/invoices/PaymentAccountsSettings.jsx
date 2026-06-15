@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Landmark, CreditCard, Banknote, Building2, Loader2, Zap, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Landmark, CreditCard, Banknote, Building2, Loader2, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";

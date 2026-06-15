@@ -6,7 +6,6 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Plus, Trash, Check, Copy } from 'lucide-react';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 const AVAILABLE_EVENTS = [

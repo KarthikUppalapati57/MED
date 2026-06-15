@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
-import { Download, FileJson, FileSpreadsheet } from 'lucide-react';
+import { FileJson, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 

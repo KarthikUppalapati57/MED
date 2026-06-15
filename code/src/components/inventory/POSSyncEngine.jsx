@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calculator, DownloadCloud, AlertTriangle, CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { Calculator, DownloadCloud, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Papa from 'papaparse';
-import { api } from '@/lib/apiClient';
 
 export default function POSSyncEngine({ inventory, recipes, updateInventoryMutation }) {
   const [isSimulating, setIsSimulating] = useState(false);

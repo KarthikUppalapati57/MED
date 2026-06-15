@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Store, ArrowRightLeft, Plus, CheckCircle, Clock, Search, XCircle, FileText } from 'lucide-react';
+import { Store, ArrowRightLeft, Plus, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -31,7 +31,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { filterByContext } from '@/lib/contextUtils';
 
 export default function Commissary() {
   const { organization, location, userProfile } = useAuth();

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Landmark, Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export function BillPayWidget({ invoice }) {
   const { organization } = useAuth();
