@@ -223,10 +223,10 @@ export default function Recipes() {
   useEffect(() => {
     const channel = supabase.channel('recipes-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['recipes'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
       })
       .subscribe();
 
@@ -238,7 +238,7 @@ export default function Recipes() {
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Recipe.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Recipe created');
       setDialogOpen(false);
       resetForm();
@@ -248,7 +248,7 @@ export default function Recipes() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Recipe.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       toast.success('Recipe updated');
       setDialogOpen(false);
       resetForm();
@@ -272,7 +272,7 @@ export default function Recipes() {
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipes', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
     },
     onSuccess: () => {
       toast.success('Recipe deleted');

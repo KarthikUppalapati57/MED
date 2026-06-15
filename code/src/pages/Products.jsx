@@ -157,7 +157,7 @@ export default function Products() {
   useEffect(() => {
     const channel = supabase.channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['products', organization?.id, location?.id] });
+        queryClient.invalidateQueries({ queryKey: ['products'] });
       })
       .subscribe();
       
