@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import VendorStatementsTab from './VendorStatementsTab';
 import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
@@ -27,6 +28,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tabs,
   TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui/tabs";
 import {
   Table,
@@ -310,7 +313,11 @@ export default function VendorList() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-
+        <TabsList>
+          <TabsTrigger value="vendors">Vendors</TabsTrigger>
+          <TabsTrigger value="vendor-items">Vendor Items</TabsTrigger>
+          <TabsTrigger value="statements">Statements</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="vendors" className="space-y-4">
 
@@ -529,6 +536,11 @@ export default function VendorList() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Statements Tab */}
+        <TabsContent value="statements">
+          <VendorStatementsTab vendors={vendors} />
         </TabsContent>
       </Tabs>
 
