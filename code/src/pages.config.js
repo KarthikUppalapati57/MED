@@ -40,7 +40,6 @@ const Integrations = React.lazy(() => import('./pages/Integrations'));
 const Notifications = React.lazy(() => import('./pages/Notifications'));
 const AvTCosting = React.lazy(() => import('./pages/AvTCosting'));
 const Performance = React.lazy(() => import('./pages/Performance'));
-const PurchaseCard = React.lazy(() => import('./pages/PurchaseCard'));
 const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
 const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
 const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
@@ -76,7 +75,6 @@ export const PAGES = {
     "Notifications": Notifications,
     "AvTCosting": AvTCosting,
     "Performance": Performance,
-    "PurchaseCard": PurchaseCard,
     "MenuEngineering": MenuEngineering,
     "RestaurantSetup": RestaurantSetup,
     "DeveloperPortal": DeveloperPortal,

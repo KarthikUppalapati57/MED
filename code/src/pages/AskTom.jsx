@@ -70,12 +70,7 @@ export default function AskTom() {
     enabled: !!organization?.id,
   });
 
-  const { data: cardTransactions = [] } = useAuthQuery({
-    queryKey: ['ask-tom-card-transactions', organization?.id],
-    queryFn: () => api.entities.PurchaseCardTransaction.list('-transaction_date', { limit: 40 }),
-    select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
-    enabled: !!organization?.id,
-  });
+
 
   const createThreadMutation = useMutation({
     mutationFn: (payload) => api.entities.AskTomThread.create(payload),
@@ -118,7 +113,6 @@ export default function AskTom() {
       sales: sales.slice(0, 40),
       invoices: invoices.slice(0, 30),
       smartPrep: prepPlans.slice(0, 30),
-      cardTransactions: cardTransactions.slice(0, 30),
     },
   });
 
@@ -149,7 +143,7 @@ export default function AskTom() {
       try {
         answer = await sendGeminiMessage(history, question, contextData);
       } catch (error) {
-        answer = `I could not reach the AI engine right now. Based on the synced context I can still see ${prepPlans.length} prep plans, ${invoices.length} recent invoices, and ${cardTransactions.length} card transactions in scope. ${error.message || ''}`.trim();
+        answer = `I could not reach the AI engine right now. Based on the synced context I can still see ${prepPlans.length} prep plans, and ${invoices.length} recent invoices in scope. ${error.message || ''}`.trim();
       }
 
       await createMessageMutation.mutateAsync({
@@ -175,7 +169,7 @@ export default function AskTom() {
             <Bot className="h-6 w-6 text-brand" />
             Ask Tom
           </h1>
-          <p className="text-muted-foreground mt-1">Ask operational questions across prep, invoices, card spend, sales, and labor context.</p>
+          <p className="text-muted-foreground mt-1">Ask operational questions across prep, invoices, sales, and labor context.</p>
         </div>
         <Button
           variant="outline"

@@ -13,20 +13,29 @@
 
 export const MODULE_DEFINITIONS = {
   dashboard:  { label: "Dashboard",       pages: ["Dashboard"],                                  minRole: "ground_staff",     icon: "LayoutDashboard" },
+/**
+ * moduleConfig.js Central module registry for RBAC & multi-tenant access control
+ * 
+ * Each module defines:
+ *   - label: Display name for sidebar & UI
+ *   - pages: Array of page keys (from pages.config.js) that belong to this module
+ *   - minRole: Minimum role required to access this module
+ *   - icon: Lucide icon name for UI rendering
+ * 
+ * The enabled_modules field on the organizations table (jsonb array)
+ * stores which module keys an org has access to based on their subscription plan.
+ */
+
+export const MODULE_DEFINITIONS = {
+  dashboard:  { label: "Dashboard",       pages: ["Dashboard"],                                  minRole: "ground_staff",     icon: "LayoutDashboard" },
   invoices:   { label: "Invoices",        pages: ["Invoices"],                                   minRole: "ground_staff",     icon: "FileText" },
   payments:   { label: "Bill Pay",        pages: ["Payments"],                                   minRole: "location_manager", icon: "CreditCard" },
   products:   { label: "Products",        pages: ["Products"],                                   minRole: "ground_staff",     icon: "Package" },
   inventory:  { label: "Inventory",       pages: ["Inventory"],                                  minRole: "ground_staff",     icon: "Warehouse" },
   orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
   smartprep:  { label: "SmartPrep",       pages: ["SmartPrep"],                                  minRole: "location_manager", icon: "ChefHat" },
-  purchase_card: { label: "Purchase Card", pages: ["PurchaseCard"],                              minRole: "branch_manager",   icon: "CreditCard" },
   ask_tom:    { label: "Ask Tom",         pages: ["AskTom"],                                     minRole: "manager",          icon: "Bot" },
   recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering", "AvTCosting"], minRole: "location_manager", icon: "ChefHat" },
-  vendors:    { label: "Vendors",         pages: ["Vendors"],                                    minRole: "location_manager", icon: "Store" },
-  labor:      { label: "Labor",           pages: ["Labor"],                                      minRole: "location_manager", icon: "Users" },
-  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
-  integrations: { label: "Integrations",  pages: ["Integrations", "DeveloperPortal"], minRole: "org_owner", icon: "Settings" },
-  performance:{ label: "Performance",     pages: ["Performance"], minRole: "branch_manager", icon: "Activity" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
   accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
   setup:      { label: "Setup",            pages: ["RestaurantSetup"], minRole: "location_manager", icon: "Settings" },

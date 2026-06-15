@@ -83,22 +83,6 @@ const navigation = [
     icon: CreditCard, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Invoices', href: 'Payments?tab=invoices', icon: FileText },
-      { name: 'Payment History', href: 'Payments?tab=history', icon: History },
-      { name: 'Reconciliation', href: 'Payments?tab=reconciliation', icon: ArrowRightLeft },
-      { name: 'Gateway Setup', href: 'Payments?tab=setup', icon: Settings }
-    ]
-  },
-  { name: 'Purchase Card', href: 'PurchaseCard', icon: CreditCard, minRole: 'branch_manager' },
-  { 
-    name: 'Products', 
-    icon: Package, 
-    minRole: 'ground_staff',
-    subItems: [
-      { name: 'All Products', href: 'Products?tab=all-products', icon: Package },
-      { name: 'Product Review', href: 'Products?tab=new-review', icon: Check },
-      { name: 'Purchase Report', href: 'Products?tab=purchase-report', icon: FileText }
-    ]
   },
   { 
     name: 'Inventory', 
