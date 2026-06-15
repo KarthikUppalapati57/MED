@@ -47,8 +47,4 @@ CREATE POLICY "Users can delete general_ledger_entries for their organizations"
         )
     );
 
--- Trigger to update timestamp
-CREATE TRIGGER handle_updated_at_general_ledger_entries
-    BEFORE UPDATE ON public.general_ledger_entries
-    FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at();
+
