@@ -25,7 +25,12 @@ import {
   AlertTriangle,
   Clock3,
   CreditCard,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Camera,
+  Inbox,
+  ClipboardCheck,
+  Link2,
+  RefreshCcw
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +103,27 @@ const apStatusColors = {
   closed: 'bg-secondary text-muted-foreground',
   rejected: 'bg-resend-red/10 text-resend-red',
 };
+
+const intakeMethods = [
+  { label: 'Upload', detail: 'PDF, image, CSV', icon: Upload },
+  { label: 'Photo', detail: 'Mobile capture', icon: Camera },
+  { label: 'Email', detail: 'Inbox routing', icon: Inbox },
+  { label: 'EDI', detail: 'Vendor import', icon: Link2 },
+];
+
+const workflowStages = [
+  { key: 'pending_review', label: 'Review', icon: Eye },
+  { key: 'action_required', label: 'Action', icon: AlertTriangle },
+  { key: 'pending_approval', label: 'Approval', icon: ClipboardCheck },
+  { key: 'approved', label: 'Approved', icon: Check },
+  { key: 'scheduled', label: 'Scheduled', icon: Clock3 },
+  { key: 'paid', label: 'Paid', icon: CreditCard },
+];
+
+const formatMoney = (value) => `$${Number(value || 0).toLocaleString(undefined, {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+})}`;
 
 export default function Invoices() {
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -227,34 +253,7 @@ export default function Invoices() {
       return;
     }
     
-    // Define headers
-    const headers = [
-      'Vendor Name',
-      'Invoice Number',
-      'Invoice Date',
-      'Due Date',
-      'Total Amount',
-      'Status',
-      'Payment Status',
-      'Destination'
-    ];
-
-    // Map data
-    const rows = filteredInvoices.map(inv => [
-      `"${(inv.vendor_name || '').replace(/"/g, '""')}"`,
-      `"${(inv.invoice_number || '').replace(/"/g, '""')}"`,
-      inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
-      inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '',
-      inv.total_amount || 0,
-      inv.status || '',
-      inv.payment_status || '',
-      inv.file_destination || ''
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.join(','))
-    ].join('\n');
+    const csvContent = invoicesToCsv(filteredInvoices, paymentAccounts);
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -963,15 +962,36 @@ export default function Invoices() {
         inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
         inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const currentApStatus = deriveApStatus(inv);
+      const matchesApStatus = apStatusFilter === 'all' || currentApStatus === apStatusFilter;
+      const aging = getInvoiceAging(inv);
+      const matchesAging = agingFilter === 'all' || aging.bucket === agingFilter;
+      const matchesPaymentAccount = paymentAccountFilter === 'all' || inv.payment_account_id === paymentAccountFilter;
+      return matchesSearch && matchesStatus && matchesApStatus && matchesAging && matchesPaymentAccount;
     });
-  }, [invoices, search, statusFilter]);
+  }, [invoices, search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter]);
 
   const stats = React.useMemo(() => {
     let validatedCount = 0;
     let approvedCount = 0;
     let totalApprovedAmount = 0;
+    let actionRequiredCount = 0;
+    let pendingApprovalCount = 0;
+    let scheduledAmount = 0;
+    let unpaidAmount = 0;
+    let overdueCount = 0;
+    const stageCounts = workflowStages.reduce((acc, stage) => ({ ...acc, [stage.key]: 0 }), {});
+
     for (const inv of invoices) {
+      const currentApStatus = deriveApStatus(inv);
+      const aging = getInvoiceAging(inv);
+      stageCounts[currentApStatus] = (stageCounts[currentApStatus] || 0) + 1;
+      if (currentApStatus === 'action_required') actionRequiredCount++;
+      if (currentApStatus === 'pending_approval') pendingApprovalCount++;
+      if (currentApStatus === 'scheduled') scheduledAmount += Number(inv.total_amount || 0);
+      if (!['paid', 'closed'].includes(currentApStatus)) unpaidAmount += Number(inv.total_amount || 0);
+      if (aging.overdue) overdueCount++;
+
       if (inv.status === 'validated') {
         validatedCount++;
       } else if (inv.status === 'approved') {
@@ -979,7 +999,18 @@ export default function Invoices() {
         totalApprovedAmount += (inv.total_amount || 0);
       }
     }
-    return { validatedCount, approvedCount, totalApprovedAmount };
+
+    return {
+      validatedCount,
+      approvedCount,
+      totalApprovedAmount,
+      actionRequiredCount,
+      pendingApprovalCount,
+      scheduledAmount,
+      unpaidAmount,
+      overdueCount,
+      stageCounts,
+    };
   }, [invoices]);
 
   return (
@@ -992,7 +1023,7 @@ export default function Invoices() {
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleExportCsv}>
-            <Download className="h-4 w-4 mr-2" />
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
           <Button variant="outline" onClick={() => setEmailConfigOpen(true)}>
@@ -1006,38 +1037,100 @@ export default function Invoices() {
         </div>
       </div>
 
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-4">
+          <div className="grid gap-3 md:grid-cols-[1.1fr_2fr]">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Invoice command center</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Capture, review, approve, schedule, and sync every vendor bill from one workflow.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {intakeMethods.map(({ label, detail, icon: Icon }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={label === 'Email' ? () => setEmailConfigOpen(true) : () => setUploadOpen(true)}
+                  className="text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors"
+                >
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Icon className="h-4 w-4 text-primary" />
+                    {label}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{detail}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Validated</p>
-            <p className="text-2xl font-bold text-resend-blue">
-              {stats.validatedCount}
-            </p>
+            <p className="text-sm text-muted-foreground">Needs Action</p>
+            <p className="text-2xl font-bold text-resend-orange">{stats.actionRequiredCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-resend-green">
-              {stats.approvedCount}
-            </p>
+            <p className="text-sm text-muted-foreground">Pending Approval</p>
+            <p className="text-2xl font-bold text-resend-yellow">{stats.pendingApprovalCount}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Approved</p>
-            <p className="text-2xl font-bold text-foreground">
-              ${stats.totalApprovedAmount.toLocaleString()}
-            </p>
+            <p className="text-sm text-muted-foreground">Scheduled</p>
+            <p className="text-2xl font-bold text-purple-700">{formatMoney(stats.scheduledAmount)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Open AP</p>
+            <p className="text-2xl font-bold text-foreground">{formatMoney(stats.unpaidAmount)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Overdue</p>
+            <p className="text-2xl font-bold text-resend-red">{stats.overdueCount}</p>
           </CardContent>
         </Card>
       </div>
 
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            {workflowStages.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setApStatusFilter(apStatusFilter === key ? 'all' : key)}
+                className={cn(
+                  "rounded-md border px-3 py-3 text-left transition-colors",
+                  apStatusFilter === key ? "border-primary bg-primary/5" : "border-border bg-background hover:bg-secondary"
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <span className="text-xl font-bold">{stats.stageCounts[key] || 0}</span>
+                </div>
+                <p className="text-sm font-medium mt-2">{label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {AP_STATUS_LABELS[key] || label}
+                </p>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filters */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(240px,1fr)_repeat(4,180px)_120px]">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1048,16 +1141,65 @@ export default function Invoices() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-44">
+              <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending_review">Pending Review</SelectItem>
                 <SelectItem value="validated">Validated</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={apStatusFilter} onValueChange={setApStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="AP status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All AP</SelectItem>
+                {Object.entries(AP_STATUS_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={agingFilter} onValueChange={setAgingFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Aging" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Aging</SelectItem>
+                <SelectItem value="Current">Current</SelectItem>
+                <SelectItem value="1-30 days">1-30 days</SelectItem>
+                <SelectItem value="31-60 days">31-60 days</SelectItem>
+                <SelectItem value="61-90 days">61-90 days</SelectItem>
+                <SelectItem value="90+ days">90+ days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={paymentAccountFilter} onValueChange={setPaymentAccountFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pay account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                {paymentAccounts.map(acc => (
+                  <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('all');
+                setApStatusFilter('all');
+                setAgingFilter('all');
+                setPaymentAccountFilter('all');
+              }}
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
           </div>
 
           {/* Batch Actions */}
@@ -1140,7 +1282,8 @@ export default function Invoices() {
                   <TableHead>Date</TableHead>
                   <TableHead>Due Date</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>AP Status</TableHead>
+                  <TableHead>Aging</TableHead>
                   <TableHead>Destination</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -1148,101 +1291,124 @@ export default function Invoices() {
               <TableBody>
                 {loadingInvoices ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredInvoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No invoices found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox 
-                          checked={selectedInvoiceIds.includes(invoice.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedInvoiceIds(prev => [...prev, invoice.id]);
-                            } else {
-                              setSelectedInvoiceIds(prev => prev.filter(id => id !== invoice.id));
-                            }
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium" onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
-                        {invoice.vendor_name}
-                      </TableCell>
-                      <TableCell onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
-                        {invoice.invoice_number}
-                      </TableCell>
-                      <TableCell>
-                        {invoice.invoice_date && format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        {invoice.due_date && format(new Date(invoice.due_date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        ${invoice.total_amount?.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[invoice.status]}>
-                          {invoice.status?.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={invoice.file_destination === 'payments' ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
-                          {invoice.file_destination === 'payments' ? 'Payments' : 'Storage'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={(e) => {
-                              e.preventDefault();
-                              setEditingInvoice(invoice);
-                              setEditorOpen(true);
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" /> View/Edit
-                            </DropdownMenuItem>
-                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'pending_review') && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
-                                <Check className="h-4 w-4 mr-2" /> Approve
+                  filteredInvoices.map((invoice) => {
+                    const currentApStatus = deriveApStatus(invoice);
+                    const actionReason = deriveActionReason(invoice);
+                    const aging = getInvoiceAging(invoice);
+                    return (
+                      <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox 
+                            checked={selectedInvoiceIds.includes(invoice.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedInvoiceIds(prev => [...prev, invoice.id]);
+                              } else {
+                                setSelectedInvoiceIds(prev => prev.filter(id => id !== invoice.id));
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium" onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                          <div>{invoice.vendor_name || 'Unassigned vendor'}</div>
+                          {actionReason && (
+                            <div className="text-xs text-resend-orange mt-1">
+                              {ACTION_REASON_LABELS[actionReason] || actionReason}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                          {invoice.invoice_number || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {invoice.invoice_date && format(new Date(invoice.invoice_date), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          {invoice.due_date && format(new Date(invoice.due_date), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {formatMoney(invoice.total_amount)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge className={apStatusColors[currentApStatus] || statusColors[invoice.status]}>
+                              {AP_STATUS_LABELS[currentApStatus] || currentApStatus?.replace('_', ' ')}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Source: {invoice.source || invoice.file_destination || 'upload'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={aging.overdue ? 'border-red-200 text-resend-red bg-red-50' : 'border-slate-200 text-slate-600 bg-slate-50'}
+                          >
+                            {aging.bucket}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={invoice.file_destination === 'payments' ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
+                            {invoice.file_destination === 'payments' ? 'Payments' : 'Storage'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={(e) => {
+                                e.preventDefault();
+                                setEditingInvoice(invoice);
+                                setEditorOpen(true);
+                              }}>
+                                <Eye className="h-4 w-4 mr-2" /> View/Edit
                               </DropdownMenuItem>
-                            )}
-                            {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
-                                <X className="h-4 w-4 mr-2" /> Reject
+                              {isHigherRole && ['validated', 'pending_review'].includes(invoice.status) && (
+                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
+                                  <Check className="h-4 w-4 mr-2" /> Approve
+                                </DropdownMenuItem>
+                              )}
+                              {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
+                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
+                                  <X className="h-4 w-4 mr-2" /> Reject
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setCreditRequestInvoice(invoice); }} className="text-resend-orange">
+                                <AlertTriangle className="h-4 w-4 mr-2" /> Request Credit
                               </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setCreditRequestInvoice(invoice); }} className="text-resend-orange">
-                              <AlertTriangle className="h-4 w-4 mr-2" /> Request Credit
-                            </DropdownMenuItem>
-                            {invoice.file_url && (
-                              <DropdownMenuItem asChild>
-                                <a href={invoice.file_url} target="_blank" rel="noopener noreferrer">
-                                  <Download className="h-4 w-4 mr-2" /> Download
-                                </a>
-                              </DropdownMenuItem>
-                            )}
-                            {isHigherRole && (
-                              <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-resend-red">
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                              {invoice.file_url && (
+                                <DropdownMenuItem asChild>
+                                  <a href={invoice.file_url} target="_blank" rel="noopener noreferrer">
+                                    <Download className="h-4 w-4 mr-2" /> Download
+                                  </a>
+                                </DropdownMenuItem>
+                              )}
+                              {isHigherRole && (
+                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleDelete(invoice); }} className="text-resend-red">
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
