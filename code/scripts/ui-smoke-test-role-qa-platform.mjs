@@ -18,30 +18,35 @@ const accounts = [
     role: 'platform_admin',
     dashboardText: 'Platform Overview',
     routes: ['Dashboard', 'PlatformAdmin', 'PlatformUsers', 'PlatformOrganizations', 'PlatformPlans', 'PlatformInvoices', 'PlatformUserManagement', 'PlatformAuditLogs'],
+    forbiddenRoutes: ['Invoices', 'Payments', 'Inventory', 'OrgManagement'],
   },
   {
     email: 'qa.owner.bistro@restops.test',
     role: 'org_owner',
     dashboardText: 'QA Bistro Group Dashboard',
     routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'OrgManagement', 'UserManagement', 'RestaurantSetup', 'Integrations', 'AuditLogs'],
+    forbiddenRoutes: ['PlatformAdmin', 'PlatformUsers', 'PlatformOrganizations', 'PlatformPlans', 'PlatformInvoices', 'PlatformUserManagement', 'PlatformAuditLogs'],
   },
   {
     email: 'qa.brand.northfork@restops.test',
     role: 'branch_manager',
     dashboardText: 'North Fork Grill Dashboard',
     routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup'],
+    forbiddenRoutes: ['OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
   },
   {
     email: 'qa.location.northfork@restops.test',
     role: 'location_manager',
     dashboardText: 'North Fork Downtown Dashboard',
     routes: ['Dashboard', 'Notifications', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
+    forbiddenRoutes: ['Performance', 'Accounting', 'OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
   },
   {
     email: 'qa.staff.northfork@restops.test',
     role: 'ground_staff',
     dashboardText: 'My Dashboard',
     routes: ['Dashboard', 'Notifications', 'Invoices', 'Products', 'Inventory', 'AutoOrdering'],
+    forbiddenRoutes: ['Performance', 'Payments', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup', 'UserManagement', 'PlatformAdmin'],
   },
 ];
 
@@ -82,6 +87,24 @@ function hasFailureText(text) {
   ].some((needle) => text.includes(needle));
 }
 
+function isKnownConsoleWarning(message) {
+  return [
+    'plausible.io/js/script.js',
+    'violates the following Content Security Policy directive',
+    'TypeError: Failed to fetch',
+    'Failed to load resource: the server responded with a status of 400',
+    'Failed to load resource: the server responded with a status of 404',
+  ].some((needle) => message.includes(needle));
+}
+
+async function waitForAppSettled(page) {
+  await page.waitForLoadState('networkidle', { timeout: 12000 }).catch(() => {});
+  await page.waitForFunction(() => {
+    const text = document.body?.innerText || '';
+    return text.trim().length > 0 && !text.trim().startsWith('Loading...');
+  }, null, { timeout: 12000 }).catch(() => {});
+}
+
 async function login(page, account) {
   await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByPlaceholder('you@restaurant.com').fill(account.email);
@@ -90,7 +113,7 @@ async function login(page, account) {
     page.waitForLoadState('domcontentloaded').catch(() => {}),
     page.getByRole('button', { name: 'Sign In' }).click(),
   ]);
-  await page.waitForTimeout(3500);
+  await waitForAppSettled(page);
 }
 
 async function runAccount(browser, account) {
@@ -113,6 +136,7 @@ async function runAccount(browser, account) {
   const failures = [];
   await login(page, account);
 
+  await page.getByText(account.dashboardText, { exact: false }).waitFor({ timeout: 15000 }).catch(() => {});
   const dashboardText = await page.locator('body').innerText({ timeout: 15000 });
   if (!dashboardText.includes(account.dashboardText)) {
     failures.push(`dashboard did not show "${account.dashboardText}"`);
@@ -124,7 +148,7 @@ async function runAccount(browser, account) {
   const routeResults = [];
   for (const route of account.routes) {
     await page.goto(routeUrl(route), { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(1200);
+    await waitForAppSettled(page);
     const text = await page.locator('body').innerText({ timeout: 15000 });
     const ok = !hasFailureText(text);
     if (!ok) failures.push(`${route} displayed failure/auth text`);
@@ -135,14 +159,41 @@ async function runAccount(browser, account) {
     });
   }
 
+  const forbiddenRouteResults = [];
+  for (const route of account.forbiddenRoutes || []) {
+    await page.goto(routeUrl(route), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitForAppSettled(page);
+    const text = await page.locator('body').innerText({ timeout: 15000 });
+    const currentPath = new URL(page.url()).pathname.replace(/^\/+/, '').toLowerCase();
+    const redirectedAway = currentPath !== route.toLowerCase();
+    const blocked = redirectedAway || hasFailureText(text);
+    if (!blocked) failures.push(`${route} was reachable but should be blocked`);
+    forbiddenRouteResults.push({
+      route,
+      blocked,
+      redirectedAway,
+      currentPath,
+      title: text.split('\n').find(Boolean) || '',
+    });
+  }
+
   await context.close();
   return {
     account: account.email,
     role: account.role,
     ok: failures.length === 0,
     routesChecked: routeResults.length,
+    forbiddenRoutesChecked: forbiddenRouteResults.length,
     routeResults,
-    consoleErrors: consoleErrors.filter((message) => !message.includes('Sentry') && !message.includes('PostHog')).slice(0, 10),
+    forbiddenRouteResults,
+    consoleWarnings: consoleErrors
+      .filter((message) => !message.includes('Sentry') && !message.includes('PostHog'))
+      .filter(isKnownConsoleWarning)
+      .slice(0, 10),
+    consoleErrors: consoleErrors
+      .filter((message) => !message.includes('Sentry') && !message.includes('PostHog'))
+      .filter((message) => !isKnownConsoleWarning(message))
+      .slice(0, 10),
     failures,
   };
 }
