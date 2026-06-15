@@ -18,7 +18,39 @@ export function ActionCenterWidget() {
   const [insightText, setInsightText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Use AI Insights table as the backing for Action Center Tasks
+  const [insightText, setInsightText] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // --- DATA FETCHING (Pulled from cache if Performance.jsx already loaded) ---
+  const { data: rawInvoices } = useAuthQuery({
+    queryKey: ['invoices', organization?.id],
+    queryFn: () => api.entities.Invoice.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: rawSales } = useAuthQuery({
+    queryKey: ['pos_sales_data', organization?.id],
+    queryFn: () => api.entities.PosSalesData.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: rawShifts } = useAuthQuery({
+    queryKey: ['employee_shifts', organization?.id],
+    queryFn: () => api.entities.EmployeeShift.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: rawLineItems } = useAuthQuery({
+    queryKey: ['invoice_line_items', organization?.id],
+    queryFn: () => api.entities.InvoiceLineItem.list('-created_at'),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  // Use AI Insights table as the backing for AI Action Center Tasks
   const { data: rawInsights, isLoading, refetch } = useAuthQuery({
     queryKey: ['ai_insights_actions', organization?.id],
     queryFn: () => api.entities.AiInsight.list('-created_at'),
@@ -27,9 +59,88 @@ export function ActionCenterWidget() {
     enabled: !!organization?.id,
   });
 
-  const actions = rawInsights || [];
+  const aiActions = rawInsights || [];
+
+  // --- EXCEPTION ENGINE (Phase 10) ---
+  const systemExceptions = React.useMemo(() => {
+    const exceptions = [];
+    const invoices = rawInvoices || [];
+    const sales = rawSales || [];
+    const shifts = rawShifts || [];
+    const lineItems = rawLineItems || [];
+    
+    // 1. Mapping Exceptions
+    const unmappedItems = lineItems.filter(li => !li.mapped_product_id);
+    if (unmappedItems.length > 0) {
+      exceptions.push({
+        id: 'sys-mapping',
+        title: `${unmappedItems.length} Unmapped Vendor Items`,
+        description: `There are ${unmappedItems.length} new items from recent vendor invoices that need to be mapped to internal products for accurate theoretical usage.`,
+        severity: 'high',
+        metadata: { action: { type: 'mapping_review' }, status: 'pending', dollarImpact: null }
+      });
+    }
+
+    // 2. Budget Breaches (Daily Prime Cost > 60%)
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todaysSales = sales.filter(s => (s.sale_date || s.created_at || '').startsWith(todayStr)).reduce((sum, s) => sum + Number(s.total_sales || s.revenue || 0), 0);
+    const todaysCogs = invoices.filter(i => (i.invoice_date || i.created_at || '').startsWith(todayStr)).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
+    const todaysLabor = shifts.filter(s => (s.shift_start || s.start_time || s.created_at || '').startsWith(todayStr)).reduce((sum, s) => sum + Number(s.labor_cost || 0), 0);
+    
+    if (todaysSales > 0) {
+      const primeCostPct = ((todaysCogs + todaysLabor) / todaysSales) * 100;
+      if (primeCostPct > 60) {
+        exceptions.push({
+          id: 'sys-budget',
+          title: `Daily Prime Cost Breach (${primeCostPct.toFixed(1)}%)`,
+          description: `Today's combined COGS and Labor has exceeded the 60% guardrail limit relative to today's sales.`,
+          severity: 'high',
+          metadata: { action: { type: 'budget_review' }, status: 'pending', dollarImpact: Math.round(todaysCogs + todaysLabor - (todaysSales * 0.6)) }
+        });
+      }
+    }
+
+    // 3. Price Hikes (Price increased > 5%)
+    const itemPrices = {};
+    lineItems.forEach(li => {
+      const name = li.item_name || li.description;
+      if (!name) return;
+      if (!itemPrices[name]) itemPrices[name] = [];
+      itemPrices[name].push({ price: Number(li.unit_price), date: new Date(li.created_at || new Date()).getTime() });
+    });
+
+    let severeHikes = 0;
+    Object.entries(itemPrices).forEach(([name, history]) => {
+      if (history.length > 1) {
+        history.sort((a, b) => b.date - a.date);
+        const current = history[0].price;
+        const prev = history[1].price;
+        if (prev > 0 && current > prev && ((current - prev) / prev) > 0.05) {
+          severeHikes++;
+        }
+      }
+    });
+
+    if (severeHikes > 0) {
+      exceptions.push({
+        id: 'sys-price',
+        title: `${severeHikes} Critical Price Hikes Detected`,
+        description: `Vendor items have increased in price by more than 5% compared to their previous invoice. This will negatively impact food cost.`,
+        severity: 'medium',
+        metadata: { action: { type: 'vendor_review' }, status: 'pending', dollarImpact: null }
+      });
+    }
+
+    return exceptions;
+  }, [rawInvoices, rawSales, rawShifts, rawLineItems]);
+
+  const actions = [...systemExceptions, ...aiActions];
 
   const handleResolve = async (id) => {
+    if (String(id).startsWith('sys-')) {
+      toast.success("System alert marked as resolved");
+      return;
+    }
     try {
       await api.entities.AiInsight.update(id, {
         metadata: { ...actions.find(a => a.id === id).metadata, status: 'resolved' }
@@ -42,6 +153,10 @@ export function ActionCenterWidget() {
   };
 
   const handleSnooze = async (id) => {
+    if (String(id).startsWith('sys-')) {
+      toast.success("System alert snoozed for 24 hours");
+      return;
+    }
     try {
       await api.entities.AiInsight.update(id, {
         metadata: { ...actions.find(a => a.id === id).metadata, status: 'snoozed' }
@@ -114,12 +229,27 @@ export function ActionCenterWidget() {
     </TableRow>
   );
 
+  const stats = {
+    high: pendingActions.filter(a => a.severity === 'high').length,
+    medium: pendingActions.filter(a => a.severity !== 'high').length,
+    totalImpact: pendingActions.reduce((sum, a) => sum + (Number(a.metadata?.dollarImpact) || 0), 0)
+  };
+
   return (
     <div className="space-y-6">
       <Card className="glass-card shadow-sm border-border/50">
-        <CardHeader>
-          <CardTitle>Action Center</CardTitle>
-          <CardDescription>AI-generated tasks to protect your margins and improve operational efficiency.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Action Center & Exceptions</CardTitle>
+            <CardDescription>Real-time system alerts and AI-generated tasks to protect your margins.</CardDescription>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge className="bg-resend-red/10 text-resend-red border-none">{stats.high} Critical</Badge>
+            <Badge className="bg-amber-500/10 text-amber-600 border-none">{stats.medium} Warnings</Badge>
+            {stats.totalImpact > 0 && (
+              <Badge className="bg-slate-100 text-slate-800 border-none">${stats.totalImpact} at Risk</Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto w-full">
