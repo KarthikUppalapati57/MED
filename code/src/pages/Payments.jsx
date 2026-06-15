@@ -59,6 +59,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
 import { confirmBankTransfer } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
@@ -103,8 +104,8 @@ export default function Payments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [scheduleDialogInvoice, setScheduleDialogInvoice] = useState(null);
-  const [recordDialogInvoice, setRecordDialogInvoice] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({
     payment_account_id: '',
     scheduled_payment_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
@@ -335,9 +336,59 @@ export default function Payments() {
   const openScheduleDialog = (invoice) => {
     setScheduleDialogInvoice(invoice);
     setScheduleForm({
-      payment_account_id: invoice.payment_account_id || paymentAccounts[0]?.id || '',
-      scheduled_payment_date: invoice.scheduled_payment_date || invoice.due_date || new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      payment_account_id: invoice ? (invoice.payment_account_id || paymentAccounts[0]?.id || '') : (paymentAccounts[0]?.id || ''),
+      scheduled_payment_date: invoice ? (invoice.scheduled_payment_date || invoice.due_date || new Date(Date.now() + 86400000).toISOString().slice(0, 10)) : new Date(Date.now() + 86400000).toISOString().slice(0, 10),
     });
+  };
+
+  const handleBulkSchedule = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    
+    // Group selected invoices by vendor, as a single scheduled_payment should ideally be per-vendor
+    const selected = invoices.filter(i => selectedInvoiceIds.includes(i.id));
+    const vendors = [...new Set(selected.map(i => i.vendor_id))];
+    
+    if (vendors.length > 1) {
+      toast.error('Please select invoices from a single vendor to schedule a batch payment.');
+      return;
+    }
+
+    openScheduleDialog(null); // Open dialog in bulk mode
+  };
+
+  const submitSchedulePayment = async () => {
+    try {
+      if (scheduleDialogInvoice) {
+        // Single schedule
+        await schedulePayment.mutateAsync({
+          invoice: scheduleDialogInvoice,
+          paymentAccountId: scheduleForm.payment_account_id,
+          date: scheduleForm.scheduled_payment_date
+        });
+      } else {
+        // Bulk schedule
+        const selected = invoices.filter(i => selectedInvoiceIds.includes(i.id));
+        const amounts = selected.map(i => Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)));
+        const vendorId = selected[0].vendor_id;
+        
+        const { error } = await supabase.rpc('schedule_payment_batch', {
+          p_vendor_id: vendorId,
+          p_payment_account_id: scheduleForm.payment_account_id,
+          p_scheduled_date: scheduleForm.scheduled_payment_date,
+          p_invoice_ids: selected.map(i => i.id),
+          p_amounts: amounts
+        });
+        
+        if (error) throw error;
+        
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+        setScheduleDialogInvoice(null);
+        setSelectedInvoiceIds([]);
+        toast.success(`Scheduled payment for ${selected.length} invoices`);
+      }
+    } catch (e) {
+      toast.error(e.message || 'Failed to schedule payments');
+    }
   };
 
   const openRecordDialog = (invoice) => {
@@ -559,14 +610,31 @@ export default function Payments() {
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="mt-4">
           <Card className="border-0 shadow-sm">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between py-4">
               <CardTitle>All Invoices</CardTitle>
+              {selectedInvoiceIds.length > 0 && (
+                <Button onClick={handleBulkSchedule} size="sm" className="bg-primary hover:bg-primary">
+                  <Clock className="w-4 h-4 mr-2" /> Schedule Selected ({selectedInvoiceIds.length})
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox 
+                          checked={filteredInvoices.length > 0 && selectedInvoiceIds.length === filteredInvoices.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedInvoiceIds(filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).map(i => i.id));
+                            } else {
+                              setSelectedInvoiceIds([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Due Date</TableHead>
@@ -600,6 +668,20 @@ export default function Payments() {
 
                         return (
                           <TableRow key={invoice.id}>
+                            <TableCell>
+                              {['approved', 'partially_paid', 'pending_review'].includes(invoice.status) && (
+                                <Checkbox 
+                                  checked={selectedInvoiceIds.includes(invoice.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedInvoiceIds([...selectedInvoiceIds, invoice.id]);
+                                    } else {
+                                      setSelectedInvoiceIds(selectedInvoiceIds.filter(id => id !== invoice.id));
+                                    }
+                                  }}
+                                />
+                              )}
+                            </TableCell>
                             <TableCell className="font-medium">{invoice.vendor_name}</TableCell>
                             <TableCell>{invoice.invoice_number}</TableCell>
                             <TableCell>
@@ -1100,33 +1182,32 @@ export default function Payments() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!scheduleDialogInvoice} onOpenChange={(open) => !open && setScheduleDialogInvoice(null)}>
+      {/* Schedule Payment Dialog */}
+      <Dialog open={scheduleDialogInvoice !== null || (selectedInvoiceIds.length > 0 && scheduleForm.scheduled_payment_date && !scheduleDialogInvoice)} onOpenChange={(open) => { if (!open) { setScheduleDialogInvoice(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Schedule Payment</DialogTitle>
             <DialogDescription>
-              Assign a payment account and payment date for invoice {scheduleDialogInvoice?.invoice_number || ''}.
+              {scheduleDialogInvoice 
+                ? `Schedule payment for ${scheduleDialogInvoice?.vendor_name} invoice #${scheduleDialogInvoice?.invoice_number}`
+                : `Schedule batch payment for ${selectedInvoiceIds.length} invoices`
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label>Payment Account</Label>
               <Select
                 value={scheduleForm.payment_account_id}
-                onValueChange={(value) => setScheduleForm({ ...scheduleForm, payment_account_id: value })}
+                onValueChange={(val) => setScheduleForm(prev => ({ ...prev, payment_account_id: val }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an account" />
+                  <SelectValue placeholder="Select account..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {paymentAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name} ({account.account_type?.replace(/_/g, ' ') || 'account'})
-                    </SelectItem>
+                  {paymentAccounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.name} (...{acc.account_number_last4})</SelectItem>
                   ))}
-                  {paymentAccounts.length === 0 && (
-                    <SelectItem value="none" disabled>No active accounts found</SelectItem>
-                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1135,26 +1216,23 @@ export default function Payments() {
               <Input
                 type="date"
                 value={scheduleForm.scheduled_payment_date}
+                onChange={(e) => setScheduleForm(prev => ({ ...prev, scheduled_payment_date: e.target.value }))}
                 min={new Date().toISOString().slice(0, 10)}
-                onChange={(event) => setScheduleForm({ ...scheduleForm, scheduled_payment_date: event.target.value })}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
-            <Button
-              disabled={!scheduleForm.payment_account_id || !scheduleForm.scheduled_payment_date || schedulePayment.isPending}
-              onClick={() => schedulePayment.mutate({
-                invoice: scheduleDialogInvoice,
-                paymentAccountId: scheduleForm.payment_account_id,
-                date: scheduleForm.scheduled_payment_date,
-              })}
+            <Button 
+              onClick={submitSchedulePayment}
+              className="bg-primary hover:bg-primary"
             >
-              {schedulePayment.isPending ? 'Scheduling...' : 'Schedule Payment'}
+              Confirm Schedule
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <Dialog open={!!recordDialogInvoice} onOpenChange={(open) => !open && setRecordDialogInvoice(null)}>
         <DialogContent>
