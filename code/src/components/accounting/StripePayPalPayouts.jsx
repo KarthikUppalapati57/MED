@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,6 +21,8 @@ export default function StripePayPalPayouts() {
   const [paymentMethod, setPaymentMethod] = useState('stripe'); // 'stripe' or 'paypal'
   const [isProcessing, setIsProcessing] = useState(false);
   const [justPayOpen, setJustPayOpen] = useState(false);
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
 
   // Fetch only approved invoices that are unpaid
   const { data: invoices = [], isLoading } = useQuery({
@@ -54,17 +57,34 @@ export default function StripePayPalPayouts() {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // After successful Stripe/PayPal transfer, update the invoices in Supabase
+      const totalCredit = parseFloat(creditAmount) || 0;
+      let creditRemaining = totalCredit;
+
       for (const id of selectedInvoices) {
+        const inv = invoices.find(i => i.id === id);
+        
+        // Apply credit to invoices until the credit runs out
+        const invTotal = parseFloat(inv.total_amount || 0);
+        let appliedToThisInvoice = 0;
+        
+        if (creditRemaining > 0) {
+          appliedToThisInvoice = Math.min(invTotal, creditRemaining);
+          creditRemaining -= appliedToThisInvoice;
+        }
+
         await api.entities.Invoice.update(id, {
           status: 'paid',
+          credit_applied: appliedToThisInvoice,
+          credit_reason: appliedToThisInvoice > 0 ? creditReason : null
         });
 
         // Record the payment in the ledger
-        const inv = invoices.find(i => i.id === id);
+        const finalPayoutAmt = invTotal - appliedToThisInvoice;
+        
         await api.entities.LedgerPayment.create({
           organization_id: organization?.id,
           vendor_id: inv.vendor_id,
-          amount: inv.total_amount,
+          amount: finalPayoutAmt,
           payment_date: new Date().toISOString().split('T')[0],
           payment_method: paymentMethod,
           reference: `${paymentMethod.toUpperCase()}-PAYOUT-${Date.now()}`,
@@ -187,8 +207,41 @@ export default function StripePayPalPayouts() {
                     <span className="font-medium">{selectedInvoices.length}</span>
                   </div>
                   <div className="flex justify-between mb-4">
-                    <span className="text-muted-foreground">Total Payout</span>
-                    <span className="font-bold text-xl">${selectedTotal.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-medium">${selectedTotal.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4 space-y-3">
+                    <Label className="text-sm font-medium flex items-center justify-between text-slate-700">
+                      Apply Vendor Credit
+                      <span className="text-xs font-normal text-slate-500">(Optional Short Pay)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <DollarSign className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          type="number" 
+                          placeholder="0.00" 
+                          className="pl-8 bg-white h-9"
+                          value={creditAmount}
+                          onChange={(e) => setCreditAmount(e.target.value)}
+                        />
+                      </div>
+                      <Input 
+                        type="text" 
+                        placeholder="Reason (e.g. Bad tomatoes)" 
+                        className="flex-[2] bg-white h-9"
+                        value={creditReason}
+                        onChange={(e) => setCreditReason(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between mb-4 pt-2 border-t">
+                    <span className="font-semibold">Final Payout Amount</span>
+                    <span className="font-bold text-xl text-indigo-600">
+                      ${Math.max(0, selectedTotal - (parseFloat(creditAmount) || 0)).toFixed(2)}
+                    </span>
                   </div>
                   
                   <Button 
