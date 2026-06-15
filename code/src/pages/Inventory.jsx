@@ -4,6 +4,7 @@ import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import ActiveCountSession from '@/components/inventory/ActiveCountSession';
 import POSSyncEngine from '@/components/inventory/POSSyncEngine';
 import InventoryTransfers from '@/components/inventory/InventoryTransfers';
+import AvTDashboard from '@/components/inventory/AvTDashboard';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -633,6 +634,7 @@ export default function Inventory() {
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-10 mb-6">
           <TabsTrigger value="inventory">Inventory List</TabsTrigger>
           <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
+          <TabsTrigger value="avt" className="data-[state=active]:text-resend-green">Actual vs Theoretical</TabsTrigger>
           <TabsTrigger value="pos-sync" className="text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
           <TabsTrigger value="transfers" className="text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -646,6 +648,10 @@ export default function Inventory() {
 
         <TabsContent value="receiving" className="space-y-4">
           <LoadingDockReceiving />
+        </TabsContent>
+
+        <TabsContent value="avt" className="space-y-4">
+          <AvTDashboard />
         </TabsContent>
 
         <TabsContent value="pos-sync" className="space-y-4">
