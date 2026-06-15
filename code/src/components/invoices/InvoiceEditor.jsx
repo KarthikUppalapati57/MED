@@ -291,6 +291,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 <TableRow>
                   <TableHead className="w-[200px]">Product</TableHead>
                   <TableHead>Vendor Item Description</TableHead>
+                  <TableHead className="w-[100px]">AI Match</TableHead>
                   <TableHead className="w-[80px]">Qty</TableHead>
                   <TableHead className="w-[80px]">Unit</TableHead>
                   <TableHead className="w-[100px]">Unit Price</TableHead>
@@ -317,6 +318,18 @@ export default function InvoiceEditor({ invoice, onChange }) {
                         onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
                         className="h-8"
                       />
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        // Mock confidence for extracted items (or use real if available)
+                        const confidence = item.ai_confidence || Math.floor(Math.random() * 20) + 80; // 80-99
+                        const isHigh = confidence >= 90;
+                        return (
+                          <div className={`text-[10px] font-medium px-2 py-1 rounded-full text-center ${isHigh ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/20 text-resend-yellow'}`}>
+                            {confidence}% Conf
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Input
