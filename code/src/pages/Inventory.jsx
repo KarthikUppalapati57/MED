@@ -641,6 +641,7 @@ export default function Inventory() {
           <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
           <TabsTrigger value="waste-summary">Waste Summary</TabsTrigger>
           <TabsTrigger value="daily-snapshot">Daily Snapshot</TabsTrigger>
+          <TabsTrigger value="hardware-setup">Hardware & Scales</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receiving" className="space-y-4">
@@ -1235,6 +1236,85 @@ export default function Inventory() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="hardware-setup" className="space-y-4">
+          <Card className="border-0 shadow-sm border-t-4 border-t-cyan-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ScanBarcode className="w-5 h-5 text-cyan-500" />
+                  Bluetooth Hardware & Scale Integrations
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Connect Freepour scales and handheld scanners to automatically sync real-time weights to the Inventory Counts ledger.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" className="text-cyan-600 border-cyan-200 bg-cyan-50" onClick={() => toast.success("Searching for Bluetooth devices...")}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Scan for Devices
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                {/* Connected Devices */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Connected Devices</h3>
+                  <div className="rounded-lg border bg-card p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-cyan-100 flex items-center justify-center">
+                        <Camera className="h-5 w-5 text-cyan-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Freepour Smart Scale X1</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-green-500"></span> Online (Battery: 82%)
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="bg-cyan-50 text-cyan-700">Active</Badge>
+                  </div>
+                  
+                  <div className="rounded-lg border bg-card p-4 flex items-center justify-between opacity-60">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+                        <ScanBarcode className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Zebra BT Scanner</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="h-2 w-2 rounded-full bg-zinc-300"></span> Offline (Last seen 2 days ago)
+                        </p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs">Reconnect</Button>
+                  </div>
+                </div>
+
+                {/* Incoming Data Stream */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Live Scale Data Stream</h3>
+                  <div className="rounded-lg bg-zinc-950 p-4 font-mono text-xs overflow-hidden h-48 flex flex-col justify-end relative">
+                    <div className="absolute top-2 right-2 flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      <span className="text-green-500 font-sans text-[10px] font-bold tracking-wider">LIVE</span>
+                    </div>
+                    <div className="space-y-2 opacity-80">
+                      <p className="text-zinc-500">[10:02:14] System: Listening on COM4...</p>
+                      <p className="text-zinc-400">[10:04:22] Scale X1: Tare weight set to 0.00g</p>
+                      <p className="text-zinc-300">[10:04:45] Scale X1: Weight detected: <span className="text-green-400 font-bold">1,250g (Tito's Vodka 1L)</span></p>
+                      <p className="text-zinc-300">[10:04:46] System: Match found! Calculating volume (Specific gravity: 0.95)...</p>
+                      <p className="text-cyan-400">[10:04:46] API: POST /api/v1/inventory/counts</p>
+                      <p className="text-green-400">[10:04:47] Database: Successfully recorded 1.3L for Tito's Vodka (CountSheet #402)</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

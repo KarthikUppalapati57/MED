@@ -34,7 +34,8 @@ import posthog from '@/lib/posthog';
 
 const TABS = [
   { id: 'requests', label: 'Requests', icon: ShieldAlert },
-  { id: 'invite', label: 'Invite Clients', icon: UserPlus }
+  { id: 'invite', label: 'Invite Clients', icon: UserPlus },
+  { id: 'ocr', label: 'OCR Review Queue', icon: FileText }
 ];
 
 const ACCESS_LEVELS = [
@@ -1410,6 +1411,65 @@ The Restops Platform Team
              </div>
           </TabsContent>
 
+          <TabsContent value="ocr">
+            <Card className="border-0 shadow-sm border-t-4 border-t-resend-yellow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <FileText className="w-5 h-5 text-resend-yellow" />
+                  Manual OCR Review Queue
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Invoices flagged by the AI engine with a confidence score &lt; 80%. These require human validation before being posted to the client's ledger.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Received</TableHead>
+                      <TableHead>Organization</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Reason Flagged</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>10 mins ago</TableCell>
+                      <TableCell className="font-medium">Osteria Morini</TableCell>
+                      <TableCell>Local Farm Prod.</TableCell>
+                      <TableCell><Badge className="bg-rose-50 text-rose-700 border-rose-200">42%</Badge></TableCell>
+                      <TableCell className="text-muted-foreground text-sm">Handwritten totals illegible</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="default" onClick={() => toast.success("Opening Human-in-the-loop Transcription Interface...")}>Review</Button>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>1 hour ago</TableCell>
+                      <TableCell className="font-medium">Burger Palace</TableCell>
+                      <TableCell>Sysco</TableCell>
+                      <TableCell><Badge className="bg-amber-50 text-amber-700 border-amber-200">75%</Badge></TableCell>
+                      <TableCell className="text-muted-foreground text-sm">Missing Invoice Number</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="default" onClick={() => toast.success("Opening Human-in-the-loop Transcription Interface...")}>Review</Button>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>2 hours ago</TableCell>
+                      <TableCell className="font-medium">Osteria Morini</TableCell>
+                      <TableCell>Ecolab</TableCell>
+                      <TableCell><Badge className="bg-amber-50 text-amber-700 border-amber-200">79%</Badge></TableCell>
+                      <TableCell className="text-muted-foreground text-sm">Water damage / smeared ink</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="default" onClick={() => toast.success("Opening Human-in-the-loop Transcription Interface...")}>Review</Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
         </div>
       </Tabs>
