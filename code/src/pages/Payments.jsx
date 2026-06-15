@@ -106,6 +106,7 @@ export default function Payments() {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [scheduleDialogInvoice, setScheduleDialogInvoice] = useState(null);
+  const [recordDialogInvoice, setRecordDialogInvoice] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({
     payment_account_id: '',
     scheduled_payment_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
