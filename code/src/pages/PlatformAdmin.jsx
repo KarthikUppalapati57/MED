@@ -1068,17 +1068,17 @@ The Restops Platform Team
                         title="Resend Invite"
                         onClick={async () => {
                           toast.loading("Resending invite...", { id: 'resend-invite' });
-                          const { error } = await supabase.functions.invoke('invite-client', {
-                            body: {
-                              email: invite.email,
-                              full_name: invite.full_name || '',
-                              role: invite.role,
-                              org_id: invite.organization_id,
-                              resend: true
-                            }
+                          const link = `${window.location.origin}/signup/${invite.token}`;
+                          const emailResult = await sendInvitationEmail({
+                            to_email: invite.email,
+                            to_name: invite.email.split('@')[0],
+                            role: "Organization Owner",
+                            org_name: "Restops Platform",
+                            invite_link: link
                           });
-                          if (error) {
-                            toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
+                          
+                          if (!emailResult.success) {
+                            toast.error(`Failed to resend: ${emailResult.error}`, { id: 'resend-invite' });
                           } else {
                             toast.success("Invite resent successfully!", { id: 'resend-invite' });
                           }
