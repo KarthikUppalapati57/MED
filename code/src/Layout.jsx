@@ -127,6 +127,7 @@ const navigation = [
     ]
   },
   { name: 'SmartPrep', href: 'SmartPrep', icon: ChefHat, minRole: 'location_manager' },
+  { name: 'Commissary', href: 'Commissary', icon: Building2, minRole: 'location_manager' },
   { 
     name: 'Recipes', 
     pageKey: 'Recipes',
