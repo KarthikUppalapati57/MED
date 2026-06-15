@@ -373,6 +373,25 @@ export default function Performance() {
 
         <div className="flex-1 w-full relative">
           <TabsContent value="overview" className="space-y-6 m-0 h-full">
+            {/* Empty State Banner for Missing Data */}
+            {(totalSales === 0 || totalCogs === 0) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900">Missing Data for Accurate Analytics</h3>
+                  <p className="text-amber-700 text-sm mt-1">Your performance analytics look empty or incomplete. Connect your POS or upload invoices to see real-time insights.</p>
+                  <div className="flex gap-3 mt-3">
+                    <Button variant="outline" size="sm" className="bg-white hover:bg-amber-100 border-amber-300 text-amber-900" onClick={() => window.location.href = '/Invoices'}>
+                      <Upload className="w-4 h-4 mr-2" /> Upload Invoices
+                    </Button>
+                    <Button variant="outline" size="sm" className="bg-white hover:bg-amber-100 border-amber-300 text-amber-900" onClick={() => window.location.href = '/Integrations'}>
+                      <LinkIcon className="w-4 h-4 mr-2" /> Connect POS
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Top KPIs Grid - Perfectly Aligned */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="glass-card shadow-sm border-border/50 h-[140px] flex flex-col justify-center">
