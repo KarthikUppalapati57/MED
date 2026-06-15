@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
+import ActiveCountSession from '@/components/inventory/ActiveCountSession';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -233,16 +234,19 @@ export default function Inventory() {
         organization_id: organization?.id,
         count_sheet_id: sheet.id,
         status: 'completed',
-        counted_data: Object.fromEntries((sheet.items || []).map((item) => [
-          item.inventory_id || item.product_name,
-          {
-            product_name: item.product_name,
-            expected_quantity: item.expected_quantity || 0,
-            counted_quantity: item.expected_quantity || 0,
-            unit: item.unit || 'ea',
-          },
-        ])),
-        variance_data: {},
+        counted_data: Object.fromEntries((sheet.items || []).map((item) => {
+          const countedQty = counts[item.inventory_id] !== undefined && counts[item.inventory_id] !== '' ? parseFloat(counts[item.inventory_id]) : item.expected_quantity || 0;
+          return [
+            item.inventory_id || item.product_name,
+            {
+              product_name: item.product_name,
+              expected_quantity: item.expected_quantity || 0,
+              counted_quantity: countedQty,
+              unit: item.unit || 'ea',
+            },
+          ];
+        })),
+        variance_data: {}, // Variance logic will go here
         completed_at: new Date().toISOString(),
         counted_by: userProfile?.id || null,
       });
@@ -1424,42 +1428,17 @@ export default function Inventory() {
         </DialogContent>
       </Dialog>
 
-      {/* Active Count Session Dialog */}
-      <Dialog open={activeSessionOpen} onOpenChange={setActiveSessionOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Active Count Session</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Count Sheet</Label>
-              <Select value={selectedCountSheetId} onValueChange={setSelectedCountSheetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a count sheet" />
-                </SelectTrigger>
-                <SelectContent>
-                  {countSheets.map((sheet) => (
-                    <SelectItem key={sheet.id} value={sheet.id}>{sheet.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              This records a completed count session using expected quantities. Variance entry can be reviewed from the saved session.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setActiveSessionOpen(false)}>Cancel</Button>
-            <Button
-              className="bg-primary hover:bg-primary text-primary-foreground"
-              disabled={completeCountSessionMutation.isPending || countSheets.length === 0}
-              onClick={() => completeCountSessionMutation.mutate()}
-            >
-              {completeCountSessionMutation.isPending ? 'Completing...' : 'Complete Count'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Active Count Session (Full Screen Wizard) */}
+      {activeSessionOpen && countSheets.length > 0 && (
+        <ActiveCountSession
+          sheet={countSheets.find(s => s.id === selectedCountSheetId) || countSheets[0]}
+          inventory={inventory}
+          onComplete={(counts) => {
+             completeCountSessionMutation.mutate(counts);
+          }}
+          onCancel={() => setActiveSessionOpen(false)}
+        />
+      )}
     </div>
   );
 }
