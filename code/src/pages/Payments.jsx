@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -54,6 +55,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -101,6 +103,17 @@ export default function Payments() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [scheduleDialogInvoice, setScheduleDialogInvoice] = useState(null);
+  const [recordDialogInvoice, setRecordDialogInvoice] = useState(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    payment_account_id: '',
+    scheduled_payment_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  });
+  const [recordForm, setRecordForm] = useState({
+    amount: '',
+    reference: '',
+    method: 'manual',
+  });
   const [paymentSettings, setPaymentSettings] = useState({
     autoPayApprovedInvoices: false,
     defaultPaymentMethod: 'stripe',
@@ -128,6 +141,16 @@ export default function Payments() {
     queryFn: () => api.entities.Payment.list('-created_at'),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
+  });
+
+  const { data: paymentAccounts = [] } = useAuthQuery({
+    queryKey: ['payment-accounts', organization?.id],
+    queryFn: () => api.entities.PaymentAccount.list('name'),
+    select: React.useCallback(
+      (data) => filterByContext(data, { organization, brand, location }).filter((account) => account.is_active !== false),
+      [organization, brand, location]
+    ),
+    enabled: !!organization?.id,
   });
 
   const { data: orgPlans = [] } = useAuthQuery({
@@ -218,6 +241,47 @@ export default function Payments() {
     onError: (error) => toast.error(error.message || 'Failed to save payment settings'),
   });
 
+  const schedulePayment = useMutation({
+    mutationFn: async ({ invoice, paymentAccountId, date }) => {
+      const { error } = await supabase.rpc('schedule_invoice_payment', {
+        p_invoice_id: invoice.id,
+        p_payment_account_id: paymentAccountId,
+        p_date: date,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      setScheduleDialogInvoice(null);
+      toast.success('Payment scheduled');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to schedule payment'),
+  });
+
+  const recordInvoicePayment = useMutation({
+    mutationFn: async ({ invoice, amount, reference, method }) => {
+      const { data, error } = await supabase.rpc('record_invoice_payment', {
+        p_invoice_id: invoice.id,
+        p_amount: Number(amount),
+        p_reference: reference,
+        p_payment_method: method,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: async (result) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-payments'] });
+      setRecordDialogInvoice(null);
+      setRecordForm({ amount: '', reference: '', method: 'manual' });
+      toast.success(result?.status === 'partially_paid' ? 'Partial payment recorded' : 'Payment recorded');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to record payment'),
+  });
+
   const getVendorFileDestination = async (vendorId) => {
     if (!vendorId) return 'storage';
     try {
@@ -241,21 +305,50 @@ export default function Payments() {
   };
 
   // Stats
-  const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue } = React.useMemo(() => {
-    const appUnpaid = invoices.filter(i => i.status === 'approved' && !['paid', 'auto_pay'].includes(i.payment_status));
-    const dueSum = appUnpaid.reduce((sum, i) => sum + (i.total_amount || 0), 0);
+  const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue, overdueAmount, scheduledInvoices, scheduledAmount, partialInvoices, dueNextSevenAmount } = React.useMemo(() => {
+    const openInvoices = invoices.filter(i => !['paid', 'auto_pay'].includes(i.payment_status) && i.status !== 'rejected');
+    const appUnpaid = openInvoices.filter(i => ['approved', 'scheduled', 'partially_paid'].includes(i.status));
+    const dueSum = appUnpaid.reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0);
     const paidSum = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
     const pending = payments.filter(p => p.status === 'pending').length;
     const now = new Date();
-    const overdueCount = appUnpaid.filter(i => i.due_date && new Date(i.due_date) < now).length;
+    const nextSeven = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const overdueRows = appUnpaid.filter(i => i.due_date && new Date(i.due_date) < now);
+    const scheduledRows = appUnpaid.filter(i => i.scheduled_payment_date && i.status === 'scheduled');
+    const partialRows = appUnpaid.filter(i => i.payment_status === 'partial' || i.status === 'partially_paid');
     return {
       approvedUnpaid: appUnpaid,
       totalDue: dueSum,
       totalPaid: paidSum,
       pendingPayments: pending,
-      overdue: overdueCount,
+      overdue: overdueRows.length,
+      overdueAmount: overdueRows.reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0),
+      scheduledInvoices: scheduledRows,
+      scheduledAmount: scheduledRows.reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0),
+      partialInvoices: partialRows,
+      dueNextSevenAmount: appUnpaid
+        .filter(i => i.due_date && new Date(i.due_date) <= nextSeven)
+        .reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0),
     };
   }, [invoices, payments]);
+
+  const openScheduleDialog = (invoice) => {
+    setScheduleDialogInvoice(invoice);
+    setScheduleForm({
+      payment_account_id: invoice.payment_account_id || paymentAccounts[0]?.id || '',
+      scheduled_payment_date: invoice.scheduled_payment_date || invoice.due_date || new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    });
+  };
+
+  const openRecordDialog = (invoice) => {
+    const remaining = Math.max(0, Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0));
+    setRecordDialogInvoice(invoice);
+    setRecordForm({
+      amount: remaining.toFixed(2),
+      reference: '',
+      method: 'manual',
+    });
+  };
 
   const handlePayNow = (invoice) => {
     setSelectedInvoice(invoice);
@@ -318,6 +411,41 @@ export default function Payments() {
         <h1 className="text-2xl font-bold text-foreground">Payments</h1>
         <p className="text-muted-foreground mt-1">Process and track invoice payments</p>
       </div>
+
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-4">
+          <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Bill Pay command center</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Approve, schedule, record partial payments, and monitor cash timing from one AP queue.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <button type="button" onClick={() => setActiveTab('invoices')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+                <p className="text-xs text-muted-foreground">Approved Unpaid</p>
+                <p className="text-xl font-bold">{approvedUnpaid.length}</p>
+                <p className="text-xs text-muted-foreground">{`$${totalDue.toLocaleString()}`}</p>
+              </button>
+              <button type="button" onClick={() => setActiveTab('schedule')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+                <p className="text-xs text-muted-foreground">Scheduled</p>
+                <p className="text-xl font-bold">{scheduledInvoices.length}</p>
+                <p className="text-xs text-muted-foreground">{`$${scheduledAmount.toLocaleString()}`}</p>
+              </button>
+              <button type="button" onClick={() => setStatusFilter('partial')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+                <p className="text-xs text-muted-foreground">Partial</p>
+                <p className="text-xl font-bold">{partialInvoices.length}</p>
+                <p className="text-xs text-muted-foreground">Remaining balance</p>
+              </button>
+              <button type="button" onClick={() => setStatusFilter('approved')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+                <p className="text-xs text-muted-foreground">Due 7 Days</p>
+                <p className="text-xl font-bold">{`$${dueNextSevenAmount.toLocaleString()}`}</p>
+                <p className="text-xs text-muted-foreground">Cash needed</p>
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -419,6 +547,7 @@ export default function Payments() {
         <div className="border-b border-border">
           <TabsList className="h-auto p-0 bg-transparent gap-6 justify-start w-full overflow-x-auto">
             <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Vendor Invoices</TabsTrigger>
+            <TabsTrigger value="schedule" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Scheduled Payments</TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payment History</TabsTrigger>
             <TabsTrigger value="reconciliation" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Reconciliation</TabsTrigger>
             <TabsTrigger value="setup" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payment Setup</TabsTrigger>
@@ -466,6 +595,8 @@ export default function Payments() {
                         const isOverdue = dueDate && dueDate < new Date() && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const canPay = invoice.status === 'approved' && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canSchedule = ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canRecord = ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
 
                         return (
                           <TableRow key={invoice.id}>
@@ -530,6 +661,101 @@ export default function Payments() {
                                     <CreditCard className="h-3 w-3 mr-1" /> Pay Now
                                   </Button>
                                 )}
+                                {canSchedule && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openScheduleDialog(invoice)}
+                                    className="h-8 px-2"
+                                  >
+                                    <Clock className="h-3 w-3 mr-1" /> {invoice.status === 'scheduled' ? 'Reschedule' : 'Schedule'}
+                                  </Button>
+                                )}
+                                {canRecord && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openRecordDialog(invoice)}
+                                    className="h-8 px-2 border-green-300 text-resend-green hover:bg-resend-green/5"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" /> Record
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Scheduled Payments Tab */}
+        <TabsContent value="schedule" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Scheduled Payments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Scheduled Date</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Payment Account</TableHead>
+                      <TableHead>Balance</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {scheduledInvoices.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          No scheduled payments yet
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      scheduledInvoices.map((invoice) => {
+                        const paymentAccount = paymentAccounts.find((account) => account.id === invoice.payment_account_id);
+                        const remainingBalance = Math.max(0, Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0));
+                        const scheduledDate = invoice.scheduled_payment_date ? new Date(invoice.scheduled_payment_date) : null;
+                        const isPastScheduled = scheduledDate && scheduledDate < new Date();
+                        return (
+                          <TableRow key={invoice.id}>
+                            <TableCell>
+                              <span className={isPastScheduled ? 'text-resend-red font-medium' : ''}>
+                                {scheduledDate ? format(scheduledDate, 'MMM d, yyyy') : '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium">{invoice.vendor_name || '-'}</TableCell>
+                            <TableCell>{invoice.invoice_number || '-'}</TableCell>
+                            <TableCell>{invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : '-'}</TableCell>
+                            <TableCell>{paymentAccount?.name || 'Unassigned'}</TableCell>
+                            <TableCell className="font-semibold">${remainingBalance.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge className={isPastScheduled ? 'bg-resend-red/10 text-resend-red' : 'bg-resend-yellow/10 text-resend-yellow'}>
+                                {isPastScheduled ? 'Past Scheduled' : 'Scheduled'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openScheduleDialog(invoice)} className="h-8">
+                                  Reschedule
+                                </Button>
+                                <Button size="sm" onClick={() => openRecordDialog(invoice)} className="h-8 bg-resend-green hover:bg-green-700">
+                                  Record Paid
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -873,6 +1099,132 @@ export default function Payments() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!scheduleDialogInvoice} onOpenChange={(open) => !open && setScheduleDialogInvoice(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Payment</DialogTitle>
+            <DialogDescription>
+              Assign a payment account and payment date for invoice {scheduleDialogInvoice?.invoice_number || ''}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Payment Account</Label>
+              <Select
+                value={scheduleForm.payment_account_id}
+                onValueChange={(value) => setScheduleForm({ ...scheduleForm, payment_account_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} ({account.account_type?.replace(/_/g, ' ') || 'account'})
+                    </SelectItem>
+                  ))}
+                  {paymentAccounts.length === 0 && (
+                    <SelectItem value="none" disabled>No active accounts found</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Scheduled Date</Label>
+              <Input
+                type="date"
+                value={scheduleForm.scheduled_payment_date}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setScheduleForm({ ...scheduleForm, scheduled_payment_date: event.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
+            <Button
+              disabled={!scheduleForm.payment_account_id || !scheduleForm.scheduled_payment_date || schedulePayment.isPending}
+              onClick={() => schedulePayment.mutate({
+                invoice: scheduleDialogInvoice,
+                paymentAccountId: scheduleForm.payment_account_id,
+                date: scheduleForm.scheduled_payment_date,
+              })}
+            >
+              {schedulePayment.isPending ? 'Scheduling...' : 'Schedule Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!recordDialogInvoice} onOpenChange={(open) => !open && setRecordDialogInvoice(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Record a full or partial vendor payment made outside the payment gateway.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-secondary/40 p-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Invoice Total</p>
+                <p className="font-semibold">${Number(recordDialogInvoice?.total_amount || 0).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Already Paid</p>
+                <p className="font-semibold">${Number(recordDialogInvoice?.paid_amount || 0).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Amount Paid</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={recordForm.amount}
+                onChange={(event) => setRecordForm({ ...recordForm, amount: event.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={recordForm.method} onValueChange={(value) => setRecordForm({ ...recordForm, method: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual / Check</SelectItem>
+                  <SelectItem value="bank_transfer">ACH / Bank Transfer</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reference / Check Number</Label>
+              <Input
+                value={recordForm.reference}
+                onChange={(event) => setRecordForm({ ...recordForm, reference: event.target.value })}
+                placeholder="e.g. Check #1234 or bank confirmation"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecordDialogInvoice(null)}>Cancel</Button>
+            <Button
+              className="bg-resend-green hover:bg-green-700"
+              disabled={!recordForm.amount || !recordForm.reference.trim() || recordInvoicePayment.isPending}
+              onClick={() => recordInvoicePayment.mutate({
+                invoice: recordDialogInvoice,
+                amount: recordForm.amount,
+                reference: recordForm.reference,
+                method: recordForm.method,
+              })}
+            >
+              {recordInvoicePayment.isPending ? 'Recording...' : 'Record Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Gateway Modal */}
       <PaymentGatewayModal
