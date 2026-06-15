@@ -26,8 +26,7 @@ const TABLE_SCOPE_COLUMNS = {
   pos_menu_mapping: ['organization_id'],
   pos_sales_data: ['organization_id', 'location_id'],
   products: ['organization_id', 'brand_id', 'location_id'],
-  purchase_cards: ['organization_id', 'brand_id', 'location_id'],
-  purchase_card_transactions: ['organization_id', 'brand_id', 'location_id'],
+
   purchase_orders: ['organization_id', 'location_id'],
   receivings: ['organization_id'],
   recipes: ['organization_id', 'brand_id', 'location_id'],
@@ -200,8 +199,7 @@ export const api = {
     OperationalSetting: createEntityClient('operational_settings'),
     BudgetTarget: createEntityClient('budget_targets'),
     SmartPrepPlan: createEntityClient('smart_prep_plans'),
-    PurchaseCard: createEntityClient('purchase_cards'),
-    PurchaseCardTransaction: createEntityClient('purchase_card_transactions'),
+
     AskTomThread: createEntityClient('ask_tom_threads'),
     AskTomMessage: createEntityClient('ask_tom_messages'),
   },

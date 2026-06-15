@@ -16,6 +16,7 @@ import { Link2, AlertCircle, CheckCircle2, ArrowRightLeft, Lock, FileText, Calen
 import { toast } from "sonner";
 import { format } from 'date-fns';
 import PaymentAccountsSettings from '@/components/invoices/PaymentAccountsSettings';
+import StripePayPalPayouts from '@/components/accounting/StripePayPalPayouts';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
@@ -267,6 +268,7 @@ export default function Accounting() {
         <TabsList className="mb-6 flex flex-wrap gap-2 h-auto bg-transparent border-b rounded-none w-full justify-start">
           <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Dashboard</TabsTrigger>
           <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export</TabsTrigger>
+          <TabsTrigger value="bill-pay" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-indigo-600 font-semibold">Bill Pay</TabsTrigger>
           <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
           <TabsTrigger value="gl-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">GL Mapping</TabsTrigger>
           <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
@@ -475,6 +477,10 @@ export default function Accounting() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="bill-pay" className="space-y-6">
+          <StripePayPalPayouts />
         </TabsContent>
 
         <TabsContent value="reconciliation" className="space-y-6">

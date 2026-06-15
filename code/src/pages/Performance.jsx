@@ -22,6 +22,7 @@ import { SalesForecastWidget } from '../components/performance/SalesForecastWidg
 import { UsageReportWidget } from '../components/performance/UsageReportWidget';
 import { ActionCenterWidget } from '../components/performance/ActionCenterWidget';
 import { ExplainableVarianceWidget } from '../components/performance/ExplainableVarianceWidget';
+import PredictiveAlerts from '../components/labor/PredictiveAlerts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff7300', '#38bdf8', '#fbbf24'];
 
@@ -342,6 +343,8 @@ export default function Performance() {
                 </CardContent>
               </Card>
             </div>
+
+            <PredictiveAlerts />
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Sales Trend Chart */}
