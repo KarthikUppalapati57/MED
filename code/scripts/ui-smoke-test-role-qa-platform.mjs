@@ -49,8 +49,18 @@ async function getUserId(email) {
   const client = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(`${email} auth lookup failed: ${error.message}`);
+  let data;
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const result = await client.auth.signInWithPassword({ email, password });
+    data = result.data;
+    lastError = result.error;
+    if (!lastError && data?.user?.id) break;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+  }
+  if (lastError || !data?.user?.id) {
+    throw new Error(`${email} auth lookup failed: ${lastError?.message || JSON.stringify(lastError) || 'missing user id'}`);
+  }
   const userId = data.user.id;
   await client.auth.signOut();
   return userId;
