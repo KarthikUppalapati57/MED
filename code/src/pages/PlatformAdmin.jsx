@@ -296,7 +296,7 @@ export default function PlatformAdmin() {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
-      const { error: insertErr } = await supabase
+      const { data: newInvite, error: insertErr } = await supabase
         .from("invitations")
         .insert([{
           email: inviteEmail,
@@ -372,7 +372,7 @@ export default function PlatformAdmin() {
       expiresAt.setDate(expiresAt.getDate() + 7);
 
       // 1. Create invitation
-      const { error: inviteErr } = await supabase
+      const { data: newInvite, error: inviteErr } = await supabase
         .from("invitations")
         .insert([{
           email: request.email,
