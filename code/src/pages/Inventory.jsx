@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
 import ActiveCountSession from '@/components/inventory/ActiveCountSession';
+import POSSyncEngine from '@/components/inventory/POSSyncEngine';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -125,6 +126,13 @@ export default function Inventory() {
   const { data: countSessions = [] } = useAuthQuery({
     queryKey: ['count_sessions', organization?.id],
     queryFn: () => api.entities.CountSession.list(),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: recipes = [] } = useAuthQuery({
+    queryKey: ['recipes', organization?.id],
+    queryFn: () => api.entities.Recipe.list(),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
@@ -578,9 +586,10 @@ export default function Inventory() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-8 mb-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-9 mb-6">
           <TabsTrigger value="inventory">Inventory List</TabsTrigger>
           <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
+          <TabsTrigger value="pos-sync" className="text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
           <TabsTrigger value="counts">Stock Counts</TabsTrigger>
@@ -591,6 +600,10 @@ export default function Inventory() {
 
         <TabsContent value="receiving" className="space-y-4">
           <LoadingDockReceiving />
+        </TabsContent>
+
+        <TabsContent value="pos-sync" className="space-y-4">
+          <POSSyncEngine inventory={inventory} recipes={recipes} updateInventoryMutation={updateMutation} />
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">
