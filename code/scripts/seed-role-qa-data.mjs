@@ -26,7 +26,6 @@ const MODULES = [
   'inventory',
   'orders',
   'smartprep',
-  'purchase_card',
   'ask_tom',
   'recipes',
   'vendors',
