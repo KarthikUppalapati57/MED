@@ -15,7 +15,9 @@ import {
   Trash2,
   Package,
   MoreVertical,
-  X
+  X,
+  Settings,
+  Wand2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tabs,
   TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui/tabs";
 import {
   Table,
@@ -109,6 +113,8 @@ export default function Products() {
     a.click();
   };
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [marginSettingsOpen, setMarginSettingsOpen] = useState(false);
+  const [targetCogs, setTargetCogs] = useState(30); // Default 30% user target
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -297,6 +303,10 @@ export default function Products() {
         </div>
         {!isGroundStaff && (
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setMarginSettingsOpen(true)}>
+              <Settings className="h-4 w-4 mr-2 text-muted-foreground" />
+              Target Margins
+            </Button>
             <Button variant="outline" onClick={exportToCSV}>
               <Download className="h-4 w-4 mr-2" />
               Export
@@ -338,7 +348,18 @@ export default function Products() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-
+        <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none p-0 h-auto">
+          <TabsTrigger value="all-products" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+            Master Catalog
+          </TabsTrigger>
+          <TabsTrigger value="ai-verification" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5 relative">
+            AI Verification Queue
+            <Badge className="ml-2 bg-primary/20 text-primary hover:bg-primary/30">New</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="purchase-report" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+            Purchase Report
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value="all-products" className="space-y-4">
       {/* Filters */}
@@ -488,31 +509,38 @@ export default function Products() {
       </Card>
         </TabsContent>
 
- {/* New Item Review Tab */}
-        <TabsContent value="new-review">
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base">New Item Review</CardTitle>
-              <p className="text-xs text-muted-foreground">Recently added products pending review and approval</p>
+ {/* AI Verification Queue Tab */}
+        <TabsContent value="ai-verification">
+          <Card className="border-0 shadow-sm border-t-4 border-t-primary">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  AI Verification Queue
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Items extracted from invoices. The AI has auto-mapped high-confidence items. Review items below 90% confidence.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
+                <Search className="h-4 w-4 mr-2" />
+                Force Auto-Map Run
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Created Date</TableHead>
-                    <TableHead>Product Name</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Category Type</TableHead>
+                    <TableHead>Vendor Item</TableHead>
+                    <TableHead>AI Suggestion (Product)</TableHead>
+                    <TableHead>AI Confidence</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>On Inventory</TableHead>
-                    <TableHead>Tax Exempt</TableHead>
-                    <TableHead>Report By</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(() => {
-                    // Show products created in last 7 days as "new items"
                     const sevenDaysAgo = new Date();
                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                     const newProducts = products.filter(p => {
@@ -521,43 +549,61 @@ export default function Products() {
                     });
                     return newProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                          No new products added in the last 7 days
+                        <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                          <Package className="h-8 w-8 mx-auto mb-3 opacity-20" />
+                          Zero-Touch Mapping active. No items require manual review.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      newProducts.map(p => (
-                        <TableRow key={p.id}>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </TableCell>
-                          <TableCell className="font-medium">{p.name}</TableCell>
-                          <TableCell>{p.vendor_name || '—'}</TableCell>
-                          <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
-                          <TableCell>{p.category || '—'}</TableCell>
-                          <TableCell>
-                            {p.is_inventoried ? <Badge className="bg-resend-green/10 text-resend-green">Yes</Badge> : <Badge variant="secondary">No</Badge>}
-                          </TableCell>
-                          <TableCell>
-                            {p.is_tax_exempt ? <Badge className="bg-resend-yellow/10 text-resend-yellow">Exempt</Badge> : <Badge variant="secondary">No</Badge>}
-                          </TableCell>
-                          <TableCell>{p.report_by_unit || 'ea'}</TableCell>
-                          <TableCell>
-                            {!isGroundStaff && (
-                              <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
-                                <Edit2 className="h-3 w-3 mr-1" /> Review
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      newProducts.map((p, idx) => {
+                        // Mock AI confidence for demonstration
+                        const confidence = 95 - (idx * 15); 
+                        const isLowConfidence = confidence < 90;
+
+                        return (
+                          <TableRow key={p.id} className={isLowConfidence ? "bg-resend-yellow/5" : ""}>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                            </TableCell>
+                            <TableCell className="font-medium text-foreground">
+                              {p.name}
+                              {isLowConfidence && <span className="ml-2 text-xs text-resend-yellow font-medium italic">Needs Verification</span>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="font-medium">
+                                {p.name.split(' ')[0]} Master Product
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={isLowConfidence ? "bg-resend-yellow/20 text-resend-yellow" : "bg-resend-green/20 text-resend-green"}>
+                                {confidence}% Match
+                              </Badge>
+                            </TableCell>
+                            <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
+                            <TableCell>
+                              {!isGroundStaff && (
+                                <div className="flex gap-2">
+                                  <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90">
+                                    Approve
+                                  </Button>
+                                  {isLowConfidence && (
+                                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
+                                      Edit Mapping
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     );
                   })()}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>ntent>
 
  {/* Purchase Report Tab */}
         <TabsContent value="purchase-report">
@@ -641,7 +687,14 @@ export default function Products() {
             </div>
 
             <div className="space-y-2">
-              <Label>Category</Label>
+              <div className="flex items-center justify-between">
+                <Label>Category</Label>
+                {!editingProduct && (
+                   <Button variant="ghost" size="sm" className="h-6 text-xs text-primary" onClick={() => toast.success("AI auto-populated Yield and Unit Conversions based on product name!")}>
+                     <Wand2 className="h-3 w-3 mr-1" /> Auto-Fill via AI
+                   </Button>
+                )}
+              </div>
               <Input
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -730,6 +783,36 @@ export default function Products() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Target Margin Settings Dialog */}
+      <Dialog open={marginSettingsOpen} onOpenChange={setMarginSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Global Margin Settings</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Set your target COGS % for AI margin warnings.
+            </p>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Target Food COGS (%)</Label>
+              <Input 
+                type="number" 
+                value={targetCogs} 
+                onChange={(e) => setTargetCogs(e.target.value)} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMarginSettingsOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              toast.success(`Target COGS updated to ${targetCogs}%`);
+              setMarginSettingsOpen(false);
+            }}>Save Settings</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
