@@ -41,22 +41,7 @@ export default function VendorDetail() {
     enabled: !!id,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
 
-  if (!vendor) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        <p>Vendor not found.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate('/Vendors')}>Go Back</Button>
-      </div>
-    );
-  }
 
   const { data: vendorItems = [] } = useAuthQuery({
     queryKey: ['vendor_items_insights', id],
@@ -101,6 +86,23 @@ export default function VendorDetail() {
 
     return insights;
   }, [vendor, vendorItems]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p>Vendor not found.</p>
+        <Button variant="outline" className="mt-4" onClick={() => navigate('/Vendors')}>Go Back</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
