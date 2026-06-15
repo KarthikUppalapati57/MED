@@ -64,6 +64,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import BudgetProgressWidget from '@/components/dashboard/BudgetProgressWidget';
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444', '#84cc16'];
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1674,51 +1675,7 @@ function SalesPerformanceTable({ metrics }) {
     </SectionCard>
   );
 }
-
-function BudgetPacingPanel({ metrics }) {
-  const hasBudgetData = metrics.budgetPacing.some((item) => Number(item.actual || 0) > 0 || Number(item.target || 0) > 0);
-
-  return (
-    <SectionCard title="Budget Pacing" description="Targets, actual spend, remaining budget, and over/under signal for this period.">
-      {!hasBudgetData && (
-        <EmptyState
-          icon={BarChart3}
-          title="No budget targets or actuals yet"
-          description="Set period targets in Performance so this panel can show pacing by Sales, COGS, Labor, and Prime Cost."
-          actionHref="Performance"
-          actionLabel="Set budget targets"
-        />
-      )}
-      {hasBudgetData && (
-      <div className="space-y-4">
-        {metrics.budgetPacing.slice(0, 8).map((item) => {
-          const progress = item.target ? Math.min((item.actual / item.target) * 100, 140) : 0;
-          return (
-            <div key={item.category} className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{item.category}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Actual {currency(item.actual)} / Target {currency(item.target)}
-                  </p>
-                </div>
-                <Badge className={item.isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
-                  {item.isGood ? 'On track' : 'Needs review'}
-                </Badge>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <p className={cn('text-xs', item.remaining >= 0 ? 'text-muted-foreground' : 'text-resend-red')}>
-                {item.remaining >= 0 ? `${currency(item.remaining)} remaining` : `${currency(Math.abs(item.remaining))} over`} ({percent(item.pacing)})
-              </p>
-            </div>
-          );
-        })}
-      </div>
-      )}
-    </SectionCard>
-  );
-}
-
+// BudgetPacingPanel has been moved to src/components/dashboard/BudgetProgressWidget.jsx
 function OperatingSnapshot({ metrics, scope, rules = DEFAULT_DASHBOARD_RULES }) {
   const rows = [
     { label: scope === 'location' ? "Today's Sales" : 'Period Sales', value: scope === 'location' ? currency(metrics.today) : currency(metrics.monthSales), helper: `${currency(metrics.weekSales)} WTD` },
@@ -3503,7 +3460,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         </div>
       </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <BudgetPacingPanel metrics={metrics} />
+        <BudgetProgressWidget metrics={metrics} />
         <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
       </div>
       <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />

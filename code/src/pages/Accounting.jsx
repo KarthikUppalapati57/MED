@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format } from 'date-fns';
 import PaymentAccountsSettings from '@/components/invoices/PaymentAccountsSettings';
 import StripePayPalPayouts from '@/components/accounting/StripePayPalPayouts';
+import PeriodBudgetsTab from '@/components/accounting/PeriodBudgetsTab';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
@@ -275,6 +276,7 @@ export default function Accounting() {
           <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
           <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
           <TabsTrigger value="payment-accounts" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Payment Accounts</TabsTrigger>
+          <TabsTrigger value="budgets" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-teal-600 font-semibold">Budgets</TabsTrigger>
           <TabsTrigger value="close-books" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Close Books</TabsTrigger>
         </TabsList>
 
@@ -370,6 +372,11 @@ export default function Accounting() {
             </div>
           </div>
         </TabsContent>
+
+        <TabsContent value="budgets" className="space-y-6">
+          <PeriodBudgetsTab />
+        </TabsContent>
+
         <TabsContent value="close-books" className="space-y-6">
           <Card className="border-rose-100 shadow-sm overflow-hidden bg-rose-50/30">
             <CardHeader className="bg-rose-50 border-b border-rose-100">
