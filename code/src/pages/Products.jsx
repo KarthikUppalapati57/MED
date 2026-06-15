@@ -62,6 +62,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
+import ProductsLiveDashboard from './ProductsLiveDashboard';
 
 const categoryColors = {
   food: 'bg-resend-green/10 text-resend-green',
@@ -346,6 +347,9 @@ export default function Products() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Predictive Engine Live Dashboard */}
+      <ProductsLiveDashboard targetCogs={targetCogs} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none p-0 h-auto">
