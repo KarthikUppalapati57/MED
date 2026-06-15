@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as LinkIcon, Target } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as LinkIcon, Target, CalendarDays, ReceiptText, ClipboardList } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,20 @@ import PredictiveAlerts from '../components/labor/PredictiveAlerts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff7300', '#38bdf8', '#fbbf24'];
 
+const money = (value) => `$${Number(value || 0).toLocaleString(undefined, {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+})}`;
+
+const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
+
+const sameDate = (value, target) => {
+  if (!value || !target) return false;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.toISOString().slice(0, 10) === target;
+};
+
 export default function Performance() {
   const [activeTab, setActiveTab] = useState('overview');
   const [budgetDrafts, setBudgetDrafts] = useState({});
@@ -35,6 +49,7 @@ export default function Performance() {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  const todayKey = now.toISOString().slice(0, 10);
 
   const { data: rawSalesData, isLoading: loadingSales } = useAuthQuery({
     queryKey: ['pos_sales_data', organization?.id],
@@ -229,6 +244,69 @@ export default function Performance() {
     variance: row.budget > 0 ? ((row.actual - row.budget) / row.budget) * 100 : 0,
   }));
 
+  const dailyPnl = useMemo(() => {
+    const todaysSales = salesData.reduce((sum, record) => {
+      const dateValue = record.sale_date || record.date || record.created_at;
+      return sameDate(dateValue, todayKey) ? sum + Number(record.revenue || record.total_sales || 0) : sum;
+    }, 0);
+
+    const todaysInvoices = invoices.filter((invoice) => sameDate(invoice.invoice_date || invoice.created_at, todayKey));
+    const todaysInvoiceSpend = todaysInvoices.reduce((sum, invoice) => sum + Number(invoice.total_amount || 0), 0);
+
+    const todaysLabor = shifts.reduce((sum, shift) => {
+      const dateValue = shift.shift_start || shift.start_time || shift.created_at;
+      return sameDate(dateValue, todayKey) ? sum + Number(shift.labor_cost || 0) : sum;
+    }, 0);
+
+    const periodDaysElapsed = Math.max(1, Math.min(now.getDate(), new Date(periodEnd).getDate()));
+    const dailySalesTarget = Number(budgetByCategory.Sales?.target_amount || 0) / periodDaysElapsed || (totalSales ? totalSales / periodDaysElapsed : 0);
+    const dailyCogsTarget = Number(budgetByCategory.COGS?.target_amount || 0) / periodDaysElapsed || (todaysSales * 0.32);
+    const dailyLaborTarget = Number(budgetByCategory.Labor?.target_amount || 0) / periodDaysElapsed || (todaysSales * 0.28);
+    const dailyPrimeTarget = Number(budgetByCategory['Prime Cost']?.target_amount || 0) / periodDaysElapsed || (todaysSales * 0.6);
+    const prime = todaysInvoiceSpend + todaysLabor;
+
+    const pendingInvoices = invoices.filter((invoice) => ['pending_review', 'validated', 'flagged'].includes(invoice.status));
+    const missingInvoiceRisk = todaysSales > 0 && todaysInvoiceSpend === 0;
+    const highPriceMovers = moversData.filter((item) => item.status === 'critical' || item.status === 'warning').slice(0, 5);
+
+    const alerts = [];
+    if (missingInvoiceRisk) alerts.push({ tone: 'orange', title: 'Sales without invoice spend', body: 'Today has POS sales but no same-day invoice spend. Confirm vendor documents are uploaded.' });
+    if (todaysSales > 0 && (todaysInvoiceSpend / todaysSales) * 100 > 32) alerts.push({ tone: 'red', title: 'COGS above target', body: `Today COGS is ${pct((todaysInvoiceSpend / todaysSales) * 100)} against a 32.0% guardrail.` });
+    if (todaysSales > 0 && (todaysLabor / todaysSales) * 100 > 28) alerts.push({ tone: 'red', title: 'Labor above target', body: `Today labor is ${pct((todaysLabor / todaysSales) * 100)} against a 28.0% guardrail.` });
+    if (pendingInvoices.length > 0) alerts.push({ tone: 'blue', title: `${pendingInvoices.length} invoices need review`, body: 'Clear invoice review so AP, inventory, and P&L stay current.' });
+    if (highPriceMovers.length > 0) alerts.push({ tone: 'orange', title: `${highPriceMovers.length} price movers`, body: 'Review vendor item price increases before they distort food cost.' });
+
+    return {
+      rows: [
+        { label: 'Sales', actual: todaysSales, target: dailySalesTarget, kind: 'sales' },
+        { label: 'COGS', actual: todaysInvoiceSpend, target: dailyCogsTarget, kind: 'cost' },
+        { label: 'Labor', actual: todaysLabor, target: dailyLaborTarget, kind: 'cost' },
+        { label: 'Prime Cost', actual: prime, target: dailyPrimeTarget, kind: 'cost' },
+      ].map((row) => ({
+        ...row,
+        percentOfSales: todaysSales > 0 ? (row.actual / todaysSales) * 100 : 0,
+        variance: row.target > 0 ? ((row.actual - row.target) / row.target) * 100 : 0,
+      })),
+      todaysSales,
+      todaysInvoiceSpend,
+      todaysLabor,
+      prime,
+      primePercent: todaysSales > 0 ? (prime / todaysSales) * 100 : 0,
+      grossProfit: todaysSales - todaysInvoiceSpend,
+      estimatedControllableProfit: todaysSales - prime,
+      invoicesCaptured: todaysInvoices.length,
+      pendingInvoices,
+      highPriceMovers,
+      alerts,
+      coverage: [
+        { label: 'POS Sales', ready: salesData.length > 0, count: salesData.length },
+        { label: 'Invoices', ready: invoices.length > 0, count: invoices.length },
+        { label: 'Labor', ready: shifts.length > 0, count: shifts.length },
+        { label: 'Budgets', ready: budgetTargets.length > 0, count: budgetTargets.length },
+      ],
+    };
+  }, [salesData, invoices, shifts, todayKey, budgetByCategory, periodEnd, totalSales, moversData, budgetTargets.length]);
+
   // --- EMPTY STATES ---
   if (!loadingSales && !loadingInvoices && salesData.length === 0 && invoices.length === 0) {
     return (
@@ -279,6 +357,7 @@ export default function Performance() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
         <TabsList className="mb-6 flex flex-wrap gap-2 h-auto bg-transparent border-b rounded-none w-full justify-start shrink-0">
           <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Overview</TabsTrigger>
+          <TabsTrigger value="daily_pnl" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Daily P&L</TabsTrigger>
           <TabsTrigger value="pnl" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Controllable P&L</TabsTrigger>
           <TabsTrigger value="category" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Category Report</TabsTrigger>
           <TabsTrigger value="movers" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Price Movers</TabsTrigger>
@@ -406,6 +485,187 @@ export default function Performance() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="daily_pnl" className="space-y-6 m-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <Card className="glass-card shadow-sm border-border/50">
+                <CardContent className="p-6">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4" /> Today's Sales
+                  </p>
+                  <p className="text-3xl font-bold mt-2">{money(dailyPnl.todaysSales)}</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {dailyPnl.invoicesCaptured} invoice{dailyPnl.invoicesCaptured === 1 ? '' : 's'} captured today
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card shadow-sm border-border/50">
+                <CardContent className="p-6">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Package className="w-4 h-4" /> Today's COGS
+                  </p>
+                  <p className="text-3xl font-bold mt-2">{money(dailyPnl.todaysInvoiceSpend)}</p>
+                  <p className={dailyPnl.todaysSales > 0 && (dailyPnl.todaysInvoiceSpend / dailyPnl.todaysSales) * 100 > 32 ? 'text-sm text-resend-red mt-2' : 'text-sm text-muted-foreground mt-2'}>
+                    {pct(dailyPnl.todaysSales > 0 ? (dailyPnl.todaysInvoiceSpend / dailyPnl.todaysSales) * 100 : 0)} of sales
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card shadow-sm border-border/50">
+                <CardContent className="p-6">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="w-4 h-4" /> Today's Labor
+                  </p>
+                  <p className="text-3xl font-bold mt-2">{money(dailyPnl.todaysLabor)}</p>
+                  <p className={dailyPnl.todaysSales > 0 && (dailyPnl.todaysLabor / dailyPnl.todaysSales) * 100 > 28 ? 'text-sm text-resend-red mt-2' : 'text-sm text-muted-foreground mt-2'}>
+                    {pct(dailyPnl.todaysSales > 0 ? (dailyPnl.todaysLabor / dailyPnl.todaysSales) * 100 : 0)} of sales
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card shadow-sm border-border/50 bg-gradient-to-br from-brand/5 to-brand/10">
+                <CardContent className="p-6">
+                  <p className="text-sm font-medium text-brand-dark flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-brand" /> Prime Cost
+                  </p>
+                  <p className="text-3xl font-bold mt-2 text-brand-dark">{pct(dailyPnl.primePercent)}</p>
+                  <p className="text-sm text-brand mt-2">{money(dailyPnl.prime)} total today</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <Card className="xl:col-span-2 glass-card shadow-sm border-border/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ReceiptText className="h-5 w-5 text-brand" />
+                    Daily Restaurant P&L
+                  </CardTitle>
+                  <CardDescription>Same-day performance using POS sales, invoices, labor, and current targets.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Line</TableHead>
+                          <TableHead className="text-right">Actual</TableHead>
+                          <TableHead className="text-right">% Sales</TableHead>
+                          <TableHead className="text-right">Daily Target</TableHead>
+                          <TableHead className="text-right">Variance</TableHead>
+                          <TableHead className="text-right">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dailyPnl.rows.map((row) => {
+                          const isGood = row.kind === 'sales' ? row.actual >= row.target : row.actual <= row.target;
+                          return (
+                            <TableRow key={row.label}>
+                              <TableCell className="font-medium">{row.label}</TableCell>
+                              <TableCell className="text-right">{money(row.actual)}</TableCell>
+                              <TableCell className="text-right">{row.label === 'Sales' ? '-' : pct(row.percentOfSales)}</TableCell>
+                              <TableCell className="text-right">{money(row.target)}</TableCell>
+                              <TableCell className={isGood ? 'text-right text-resend-green' : 'text-right text-resend-red'}>
+                                {row.variance > 0 ? '+' : ''}{pct(row.variance)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge className={isGood ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-red/10 text-resend-red'}>
+                                  {isGood ? 'On Track' : 'Review'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        <TableRow>
+                          <TableCell className="font-semibold">Gross Profit</TableCell>
+                          <TableCell className="text-right font-semibold">{money(dailyPnl.grossProfit)}</TableCell>
+                          <TableCell className="text-right">{pct(dailyPnl.todaysSales > 0 ? (dailyPnl.grossProfit / dailyPnl.todaysSales) * 100 : 0)}</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right"><Badge variant="outline">Calculated</Badge></TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-semibold">Est. Controllable Profit</TableCell>
+                          <TableCell className="text-right font-semibold">{money(dailyPnl.estimatedControllableProfit)}</TableCell>
+                          <TableCell className="text-right">{pct(dailyPnl.todaysSales > 0 ? (dailyPnl.estimatedControllableProfit / dailyPnl.todaysSales) * 100 : 0)}</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right">-</TableCell>
+                          <TableCell className="text-right"><Badge variant="outline">Estimate</Badge></TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card className="glass-card shadow-sm border-border/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5 text-brand" />
+                      Data Coverage
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {dailyPnl.coverage.map((source) => (
+                      <div key={source.label} className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium">{source.label}</p>
+                          <p className="text-xs text-muted-foreground">{source.count} records in scope</p>
+                        </div>
+                        <Badge className={source.ready ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-orange/10 text-resend-orange'}>
+                          {source.ready ? 'Live' : 'Missing'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card shadow-sm border-border/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Daily Exceptions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {dailyPnl.alerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No daily P&L exceptions right now.</p>
+                    ) : dailyPnl.alerts.map((alert, index) => (
+                      <div key={`${alert.title}-${index}`} className="rounded-md border border-border/50 px-3 py-2">
+                        <p className={alert.tone === 'red' ? 'text-sm font-semibold text-resend-red' : alert.tone === 'orange' ? 'text-sm font-semibold text-resend-orange' : 'text-sm font-semibold text-brand'}>
+                          {alert.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">{alert.body}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <Card className="glass-card shadow-sm border-border/50">
+              <CardHeader>
+                <CardTitle>Top Cost Changes Feeding P&L</CardTitle>
+                <CardDescription>Vendor price movements that can affect food cost and recipe margins.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {dailyPnl.highPriceMovers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No high-impact price movers yet.</p>
+                  ) : dailyPnl.highPriceMovers.map((item) => (
+                    <div key={item.item} className="rounded-md border border-border/50 px-3 py-3">
+                      <p className="font-medium truncate">{item.item}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        ${item.previousPrice.toFixed(2)} to ${item.currentPrice.toFixed(2)}
+                      </p>
+                      <Badge className={item.change > 0 ? 'mt-3 bg-resend-red/10 text-resend-red' : 'mt-3 bg-resend-green/10 text-resend-green'}>
+                        {item.change > 0 ? '+' : ''}{item.change}%
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="pnl" className="space-y-6 m-0">
