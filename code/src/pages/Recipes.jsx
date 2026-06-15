@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/geminiService';
+import ProductsLiveDashboard from './ProductsLiveDashboard';
 import {
   Plus,
   Search,
@@ -540,6 +541,9 @@ export default function Recipes() {
         </Card>
       </div>
 
+      {/* Live Margins Ticker */}
+      <ProductsLiveDashboard targetCogs={30} />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
 
 
@@ -1070,9 +1074,14 @@ export default function Recipes() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Ingredients</Label>
-                <Button variant="outline" size="sm" onClick={addIngredient}>
-                  <Plus className="h-4 w-4 mr-1" /> Add
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" className="h-8 text-xs text-primary bg-primary/5 hover:bg-primary/10" onClick={() => toast.success("AI auto-calculated Yield and Unit Conversions for ingredients!")}>
+                    <Sparkles className="h-3 w-3 mr-1" /> AI Yield Conversions
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={addIngredient}>
+                    <Plus className="h-4 w-4 mr-1" /> Add
+                  </Button>
+                </div>
               </div>
               {formData.ingredients.map((ing, idx) => {
                 const itemVal = ing.product_id ? `product_${ing.product_id}` : (ing.sub_recipe_id ? `recipe_${ing.sub_recipe_id}` : '');
