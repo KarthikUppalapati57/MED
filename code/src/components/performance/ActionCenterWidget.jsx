@@ -18,9 +18,6 @@ export function ActionCenterWidget() {
   const [insightText, setInsightText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const [insightText, setInsightText] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-
   // --- DATA FETCHING (Pulled from cache if Performance.jsx already loaded) ---
   const { data: rawInvoices } = useAuthQuery({
     queryKey: ['invoices', organization?.id],
