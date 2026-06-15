@@ -25,7 +25,9 @@ import {
   Download,
   X,
   Clock,
-  Sparkles
+  Sparkles,
+  ScanBarcode,
+  Camera
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +86,7 @@ export default function Inventory() {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [wastageDialogOpen, setWastageDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [convertForm, setConvertForm] = useState({ fromUnit: '', toUnit: '', quantity: 0 });
@@ -472,6 +475,9 @@ export default function Inventory() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Button variant="outline" onClick={() => setScannerDialogOpen(true)} className="border-primary/50 text-primary hover:bg-primary/5">
+              <ScanBarcode className="h-4 w-4 mr-2" /> Scan Item
             </Button>
             <Button onClick={() => setAddDialogOpen(true)} className="bg-primary hover:bg-primary">
               <Plus className="h-4 w-4 mr-2" /> Add Item
@@ -1439,6 +1445,49 @@ export default function Inventory() {
           onCancel={() => setActiveSessionOpen(false)}
         />
       )}
+      {/* Scanner Dialog */}
+      <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
+        <DialogContent className="sm:max-w-md overflow-hidden p-0 bg-black border-none">
+          <div className="flex flex-col items-center justify-center p-8 space-y-6 text-center relative h-[400px]">
+            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+            
+            <Camera className="h-16 w-16 text-white/50 animate-pulse mb-4 z-10" />
+            <div className="w-64 h-64 border-2 border-primary/50 relative z-10">
+               <div className="absolute top-0 left-0 w-full h-1 bg-resend-green animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(40,167,69,0.8)]"></div>
+            </div>
+            
+            <p className="text-white font-medium z-10">Point camera at a product barcode to quickly find and edit it.</p>
+            
+            <Button 
+              className="mt-8 z-10 bg-primary hover:bg-primary text-white w-full" 
+              onClick={() => {
+                if (inventory.length > 0) {
+                  const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
+                  setSelectedItem(randomItem);
+                  setEditForm({ ...randomItem });
+                  setScannerDialogOpen(false);
+                  setTimeout(() => setEditDialogOpen(true), 100);
+                  toast.success(`Scanned: ${randomItem.product_name}`);
+                } else {
+                  toast.error("No items in inventory to scan.");
+                }
+              }}
+            >
+              Simulate Successful Scan
+            </Button>
+            <Button variant="ghost" className="text-white/70 hover:text-white z-10 absolute top-2 right-2" onClick={() => setScannerDialogOpen(false)}>
+              <X className="h-5 w-5" />
+            </Button>
+            <style jsx>{`
+              @keyframes scan {
+                0% { top: 0; }
+                50% { top: 100%; }
+                100% { top: 0; }
+              }
+            `}</style>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

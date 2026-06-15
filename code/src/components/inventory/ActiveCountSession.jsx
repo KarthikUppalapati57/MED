@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { ArrowLeft, ArrowRight, Check, X, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Check, X, AlertCircle, ScanBarcode, Camera } from 'lucide-react';
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function ActiveCountSession({ sheet, inventory, onComplete, onCancel }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [counts, setCounts] = useState({});
+  const [isScanning, setIsScanning] = useState(false);
 
   // Auto-sort items by location zone to mimic walk-path
   const sortedItems = useMemo(() => {
@@ -55,6 +57,16 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
   const actualVal = currentCount ? parseFloat(currentCount) : null;
   const isVariance = actualVal !== null && actualVal !== theoretical;
 
+  const handleSimulateScan = () => {
+    // Pick a random item from the remaining items to simulate a successful scan
+    const nextUncountedIndex = sortedItems.findIndex((item, idx) => idx !== currentIndex && !counts[item.product_id]);
+    const targetIndex = nextUncountedIndex !== -1 ? nextUncountedIndex : Math.floor(Math.random() * sortedItems.length);
+    
+    setIsScanning(false);
+    setCurrentIndex(targetIndex);
+    toast.success(`Scanned: ${sortedItems[targetIndex].product_name}`);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col md:items-center md:justify-center md:bg-black/50">
       <div className="flex-1 w-full bg-background flex flex-col md:max-w-md md:h-[800px] md:max-h-[90vh] md:rounded-2xl md:shadow-2xl md:overflow-hidden md:border">
@@ -66,7 +78,12 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             <h2 className="font-bold text-lg">{sheet.name}</h2>
             <p className="text-xs text-muted-foreground">{currentIndex + 1} of {sortedItems.length}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => onComplete(counts)} className="text-primary font-medium">Done</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={() => setIsScanning(!isScanning)}>
+              <ScanBarcode className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onComplete(counts)} className="text-primary font-medium">Done</Button>
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -74,14 +91,37 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
           <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
 
-        {/* Item Details */}
-        <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4 bg-slate-50/50">
-          <Badge variant="outline" className="text-xs tracking-wider uppercase text-muted-foreground bg-white">
-            {currentItem.location || 'Unassigned Zone'}
-          </Badge>
-          
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{currentItem.product_name}</h1>
-          <p className="text-lg text-muted-foreground">Count in <span className="font-bold text-primary">{currentItem.unit || 'ea'}</span></p>
+        {/* Item Details or Scanner Overlay */}
+        {isScanning ? (
+          <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-6 bg-black relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
+            <Camera className="h-16 w-16 text-white/50 animate-pulse mb-4" />
+            <div className="w-64 h-64 border-2 border-primary/50 relative">
+               <div className="absolute top-0 left-0 w-full h-1 bg-resend-green animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(40,167,69,0.8)]"></div>
+            </div>
+            <p className="text-white font-medium z-10">Point camera at a barcode</p>
+            <Button className="mt-8 z-10 bg-primary hover:bg-primary text-white" onClick={handleSimulateScan}>
+              Simulate Successful Scan
+            </Button>
+            <Button variant="ghost" className="text-white/70 hover:text-white z-10 mt-2" onClick={() => setIsScanning(false)}>
+              Cancel Scanning
+            </Button>
+            <style jsx>{`
+              @keyframes scan {
+                0% { top: 0; }
+                50% { top: 100%; }
+                100% { top: 0; }
+              }
+            `}</style>
+          </div>
+        ) : (
+          <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4 bg-slate-50/50">
+            <Badge variant="outline" className="text-xs tracking-wider uppercase text-muted-foreground bg-white">
+              {currentItem.location || 'Unassigned Zone'}
+            </Badge>
+            
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{currentItem.product_name}</h1>
+            <p className="text-lg text-muted-foreground">Count in <span className="font-bold text-primary">{currentItem.unit || 'ea'}</span></p>
           
           <div className="w-full max-w-[240px] mt-4 relative">
             <div className={`text-6xl font-black py-4 border-b-4 ${isVariance ? 'text-resend-orange border-resend-orange' : 'text-foreground border-foreground'} transition-colors`}>
@@ -106,6 +146,7 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             )}
           </div>
         </div>
+        )}
 
         {/* Massive Touch Numpad */}
         <div className="bg-card p-4 pb-8 shrink-0">
