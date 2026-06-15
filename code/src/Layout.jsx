@@ -424,7 +424,7 @@ export default function Layout({ children, currentPageName }) {
                 if (query) return location.search.includes(query.split('=')[1] || query);
                 return true;
               });
-              const isExpanded = expandedMenu === item.name || (expandedMenu === null && isActive);
+              const isExpanded = expandedMenu === item.name || isActive;
               return (
                 <div 
                   key={item.name} 
