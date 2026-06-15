@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Settings, Server, Database, Store, Link as LinkIcon, Lock, KeyRound, Loader2, CreditCard, Activity } from "lucide-react";
+import { Settings, Server, Database, Store, Link as LinkIcon, Lock, KeyRound, Loader2, CreditCard, Activity, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
