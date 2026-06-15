@@ -141,6 +141,19 @@ export default function Products() {
     enabled: !!organization?.id,
   });
 
+  const { data: globalItems = [] } = useAuthQuery({
+    queryKey: ['global_vendor_items'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('global_vendor_items').select('*');
+      if (error) {
+        console.warn('global_vendor_items error', error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: !!organization?.id,
+  });
+
   useEffect(() => {
     const channel = supabase.channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
@@ -564,6 +577,9 @@ export default function Products() {
                         const confidence = 95 - (idx * 15); 
                         const isLowConfidence = confidence < 90;
 
+                        // Check if we have a global crowdsourced match
+                        const globalMatch = globalItems.find(g => g.item_name.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(g.item_name.toLowerCase()));
+
                         return (
                           <TableRow key={p.id} className={isLowConfidence ? "bg-resend-yellow/5" : ""}>
                             <TableCell className="text-sm text-muted-foreground">
@@ -571,26 +587,44 @@ export default function Products() {
                             </TableCell>
                             <TableCell className="font-medium text-foreground">
                               {p.name}
-                              {isLowConfidence && <span className="ml-2 text-xs text-resend-yellow font-medium italic">Needs Verification</span>}
+                              {isLowConfidence && !globalMatch && <span className="ml-2 text-xs text-resend-yellow font-medium italic">Needs Verification</span>}
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="font-medium">
                                 {p.name.split(' ')[0]} Master Product
                               </Badge>
+                              {globalMatch && (
+                                <div className="mt-1 text-[10px] text-primary flex items-center gap-1">
+                                  <Wand2 className="h-3 w-3" />
+                                  Crowdsourced Match: {globalMatch.mapping_count}+ restaurants map this to {getCOALabel(globalMatch.most_common_category)}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
-                              <Badge className={isLowConfidence ? "bg-resend-yellow/20 text-resend-yellow" : "bg-resend-green/20 text-resend-green"}>
-                                {confidence}% Match
-                              </Badge>
+                              {globalMatch ? (
+                                <Badge className="bg-primary/20 text-primary">
+                                  {globalMatch.confidence_score}% Network Match
+                                </Badge>
+                              ) : (
+                                <Badge className={isLowConfidence ? "bg-resend-yellow/20 text-resend-yellow" : "bg-resend-green/20 text-resend-green"}>
+                                  {confidence}% Match
+                                </Badge>
+                              )}
                             </TableCell>
-                            <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(p.accounting_category)}</Badge></TableCell>
+                            <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(globalMatch?.most_common_category || p.accounting_category)}</Badge></TableCell>
                             <TableCell>
                               {!isGroundStaff && (
                                 <div className="flex gap-2">
-                                  <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90">
-                                    Approve
+                                  <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+                                    if(globalMatch) {
+                                      updateMutation.mutate({ id: p.id, data: { accounting_category: globalMatch.most_common_category } });
+                                    } else {
+                                      toast.success('Approved');
+                                    }
+                                  }}>
+                                    {globalMatch ? 'Accept Network Mapping' : 'Approve'}
                                   </Button>
-                                  {isLowConfidence && (
+                                  {(isLowConfidence || globalMatch) && (
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
                                       Edit Mapping
                                     </Button>
