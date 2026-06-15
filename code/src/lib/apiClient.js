@@ -156,6 +156,7 @@ export const api = {
     Invoice: createEntityClient('invoices', true),
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     InvoiceAllocation: createEntityClient('invoice_allocations'),
+    CreditRequest: createEntityClient('credit_requests'),
     WastageLog: createEntityClient('wastage_logs'),
     User: createEntityClient('profiles'),
     Notification: createEntityClient('notifications'),

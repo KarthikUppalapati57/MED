@@ -67,6 +67,7 @@ import InvoiceEditor from '../components/invoices/InvoiceEditor';
 import DocumentViewer from '../components/invoices/DocumentViewer';
 import ValidationDialog from '../components/invoices/ValidationDialog';
 import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
+import CreditRequestDialog from '../components/invoices/CreditRequestDialog';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import {
   ACTION_REASON_LABELS,
@@ -108,7 +109,12 @@ export default function Invoices() {
   const [paymentAccountFilter, setPaymentAccountFilter] = useState('all');
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
-  const [batchScheduleDate, setBatchScheduleDate] = useState('');
+  const [batchScheduleDate, setBatchScheduleDate] = useState(
+    new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  );
+  
+  // Credit Request State
+  const [creditRequestInvoice, setCreditRequestInvoice] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
@@ -1217,6 +1223,9 @@ export default function Invoices() {
                                 <X className="h-4 w-4 mr-2" /> Reject
                               </DropdownMenuItem>
                             )}
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setCreditRequestInvoice(invoice); }} className="text-resend-orange">
+                              <AlertTriangle className="h-4 w-4 mr-2" /> Request Credit
+                            </DropdownMenuItem>
                             {invoice.file_url && (
                               <DropdownMenuItem asChild>
                                 <a href={invoice.file_url} target="_blank" rel="noopener noreferrer">
@@ -1247,6 +1256,15 @@ export default function Invoices() {
         onOpenChange={setUploadOpen}
         onInvoiceExtracted={handleInvoiceExtracted}
       />
+
+      {/* Credit Request Dialog */}
+      {creditRequestInvoice && (
+        <CreditRequestDialog
+          invoice={creditRequestInvoice}
+          open={!!creditRequestInvoice}
+          onOpenChange={(open) => !open && setCreditRequestInvoice(null)}
+        />
+      )}
 
       {/* Editor Sheet */}
       <Sheet open={editorOpen} onOpenChange={setEditorOpen}>
