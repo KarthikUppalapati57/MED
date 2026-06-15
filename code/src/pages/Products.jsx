@@ -607,7 +607,7 @@ export default function Products() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>ntent>
+        </TabsContent>
 
  {/* Purchase Report Tab */}
         <TabsContent value="purchase-report">
