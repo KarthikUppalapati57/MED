@@ -33,6 +33,8 @@ const TABLE_SCOPE_COLUMNS = {
   recipe_ingredients: ['organization_id'],
   smart_prep_plans: ['organization_id', 'brand_id', 'location_id'],
   vendors: ['organization_id', 'brand_id', 'location_id'],
+  vendor_items: ['organization_id'],
+  vendor_item_mappings: ['organization_id'],
   vendor_item_prices: ['organization_id'],
   wastage_logs: ['organization_id', 'brand_id', 'location_id'],
 };
@@ -148,6 +150,8 @@ export const api = {
     AutoOrder: createEntityClient('auto_orders'),
     Inventory: createEntityClient('inventory', true),
     Vendor: createEntityClient('vendors'),
+    VendorItem: createEntityClient('vendor_items'),
+    VendorItemMapping: createEntityClient('vendor_item_mappings'),
     Recipe: createEntityClient('recipes', true),
     Product: createEntityClient('products', true),
     Payment: createEntityClient('payments', true),

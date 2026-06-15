@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Edit2, Trash2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Edit2, Trash2, Link as LinkIcon, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from "sonner";
 
 export default function VendorItemsTab({ vendorId }) {
@@ -21,7 +23,8 @@ export default function VendorItemsTab({ vendorId }) {
     vendor_item_name: '',
     vendor_item_code: '',
     vendor_unit: '',
-    default_price: ''
+    default_price: '',
+    internal_product_id: ''
   });
 
   const { data: items = [], isLoading } = useQuery({
@@ -43,6 +46,21 @@ export default function VendorItemsTab({ vendorId }) {
       return data || [];
     },
     enabled: !!vendorId && !!organization?.id
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-for-vendor-item-mapping', organization?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, product_id, latest_price')
+        .eq('organization_id', organization?.id)
+        .is('deleted_at', null)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organization?.id
   });
 
   const createMutation = useMutation({
@@ -94,17 +112,19 @@ export default function VendorItemsTab({ vendorId }) {
   });
 
   const resetForm = () => {
-    setFormData({ vendor_item_name: '', vendor_item_code: '', vendor_unit: '', default_price: '' });
+    setFormData({ vendor_item_name: '', vendor_item_code: '', vendor_unit: '', default_price: '', internal_product_id: '' });
     setEditingItem(null);
   };
 
   const handleEdit = (item) => {
+    const mapping = item.vendor_item_mappings?.[0];
     setEditingItem(item);
     setFormData({
       vendor_item_name: item.vendor_item_name || '',
       vendor_item_code: item.vendor_item_code || '',
       vendor_unit: item.vendor_unit || '',
-      default_price: item.default_price || ''
+      default_price: item.default_price || '',
+      internal_product_id: mapping?.internal_product_id || ''
     });
     setDialogOpen(true);
   };
@@ -121,12 +141,31 @@ export default function VendorItemsTab({ vendorId }) {
       default_price: formData.default_price ? parseFloat(formData.default_price) : null
     };
 
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, updates: payload });
-    } else {
-      createMutation.mutate(payload);
-    }
+    const saveItem = editingItem
+      ? updateMutation.mutateAsync({ id: editingItem.id, updates: payload }).then((rows) => rows?.[0] || editingItem)
+      : createMutation.mutateAsync(payload).then((rows) => rows?.[0]);
+
+    saveItem.then(async (savedItem) => {
+      if (!savedItem?.id || !formData.internal_product_id) return;
+      const existing = savedItem.vendor_item_mappings?.find(
+        (mapping) => mapping.internal_product_id === formData.internal_product_id
+      );
+      if (existing) return;
+
+      const { error } = await supabase.from('vendor_item_mappings').insert({
+        organization_id: organization?.id,
+        vendor_item_id: savedItem.id,
+        internal_product_id: formData.internal_product_id,
+        conversion_multiplier: 1,
+        is_verified: true
+      });
+      if (error) throw error;
+      toast.success('Product mapping saved');
+      queryClient.invalidateQueries(['vendor_items', vendorId]);
+    }).catch((err) => toast.error(`Failed to save mapping: ${err.message}`));
   };
+
+  const formatPrice = (value) => `$${Number(value || 0).toFixed(2)}`;
 
   const filteredItems = items.filter(item => 
     item.vendor_item_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -158,7 +197,8 @@ export default function VendorItemsTab({ vendorId }) {
               <TableHead>Item Code</TableHead>
               <TableHead>Item Name</TableHead>
               <TableHead>Unit / Pack</TableHead>
-              <TableHead>Default Price</TableHead>
+              <TableHead>Last Price</TableHead>
+              <TableHead>Change</TableHead>
               <TableHead>Mapped Product</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
@@ -166,14 +206,14 @@ export default function VendorItemsTab({ vendorId }) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No vendor items found. Add one to get started.
                 </TableCell>
               </TableRow>
@@ -185,15 +225,35 @@ export default function VendorItemsTab({ vendorId }) {
                     <TableCell className="font-mono text-xs">{item.vendor_item_code || '—'}</TableCell>
                     <TableCell className="font-medium">{item.vendor_item_name}</TableCell>
                     <TableCell>{item.vendor_unit || '—'}</TableCell>
-                    <TableCell>${Number(item.default_price || 0).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{formatPrice(item.last_price ?? item.default_price)}</div>
+                      {item.previous_price != null && (
+                        <div className="text-xs text-muted-foreground">Prev {formatPrice(item.previous_price)}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {item.price_variance_flag ? (
+                        <Badge className="bg-resend-orange/10 text-resend-orange">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {Number(item.last_price_change_percent || 0).toFixed(1)}%
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {item.last_price_change_percent != null ? `${Number(item.last_price_change_percent).toFixed(1)}%` : '-'}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {mapping?.products?.name ? (
                         <div className="flex items-center gap-2 text-sm text-resend-green">
                           <LinkIcon className="h-3 w-3" />
                           {mapping.products.name}
+                          {mapping.is_verified && <Badge variant="outline" className="text-xs">Verified</Badge>}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">Unmapped</span>
+                        <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">
+                          {item.mapping_status || 'Unmapped'}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -255,6 +315,24 @@ export default function VendorItemsTab({ vendorId }) {
                 onChange={e => setFormData({...formData, default_price: e.target.value})}
                 placeholder="0.00"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Mapped Internal Product</Label>
+              <Select
+                value={formData.internal_product_id}
+                onValueChange={(value) => setFormData({ ...formData, internal_product_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select product to verify mapping" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map(product => (
+                    <SelectItem key={product.id} value={product.id}>
+                      {product.name} {product.product_id ? `(${product.product_id})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

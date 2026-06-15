@@ -321,6 +321,135 @@ export default function Invoices() {
     return cleaned;
   };
 
+  const normalizeLineItemForVendorCatalog = (item = {}) => {
+    const name = (item.description || item.item_name || item.product_name || '').trim();
+    const code = (item.vendor_item_code || item.item_code || item.sku || item.product_code || '').trim();
+    const unit = (item.vendor_unit || item.unit || item.pack_size || '').trim();
+    const unitPrice = Number(item.unit_price ?? item.price ?? 0) || 0;
+    return { name, code, unit, unitPrice };
+  };
+
+  const findExistingVendorItem = async ({ organizationId, vendorId, name, code }) => {
+    if (!organizationId || !name) return null;
+    let query = api.client
+      .from('vendor_items')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('vendor_item_name', name);
+
+    if (vendorId) {
+      query = query.eq('vendor_id', vendorId);
+    } else {
+      query = query.is('vendor_id', null);
+    }
+
+    if (code) query = query.eq('vendor_item_code', code);
+
+    const { data, error } = await query.maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  };
+
+  const syncInvoiceVendorCatalog = async (invoice, lineItems = [], lineRecords = []) => {
+    if (!invoice?.organization_id || !lineItems.length) return;
+
+    const existingProducts = await api.entities.Product.list();
+    const productByName = new Map();
+    const productByProductId = new Map();
+    existingProducts.forEach((product) => {
+      if (product.name) productByName.set(product.name.toLowerCase(), product);
+      if (product.product_id) productByProductId.set(product.product_id, product);
+    });
+
+    const operations = lineItems.map(async (item, index) => {
+      const { name, code, unit, unitPrice } = normalizeLineItemForVendorCatalog(item);
+      if (!name) return null;
+
+      const existingItem = await findExistingVendorItem({
+        organizationId: invoice.organization_id,
+        vendorId: invoice.vendor_id || null,
+        name,
+        code,
+      });
+
+      const previousPrice = Number(existingItem?.last_price ?? existingItem?.default_price ?? 0) || null;
+      const threshold = Number(existingItem?.price_variance_threshold_percent ?? 10) || 10;
+      const priceChangePercent = previousPrice && unitPrice
+        ? ((unitPrice - previousPrice) / previousPrice) * 100
+        : 0;
+      const priceVarianceFlag = previousPrice
+        ? Math.abs(priceChangePercent) >= threshold
+        : false;
+
+      const vendorPayload = {
+        organization_id: invoice.organization_id,
+        vendor_id: invoice.vendor_id || null,
+        vendor_item_code: code || null,
+        vendor_item_name: name,
+        vendor_unit: unit || item.unit || null,
+        default_price: existingItem?.default_price ?? unitPrice,
+        previous_price: previousPrice,
+        last_price: unitPrice,
+        last_invoice_id: invoice.id,
+        last_purchased_at: invoice.invoice_date || new Date().toISOString().slice(0, 10),
+        last_price_change_percent: Number(priceChangePercent.toFixed(2)),
+        price_variance_flag: priceVarianceFlag,
+        mapping_status: existingItem?.mapping_status || 'unmapped',
+        match_confidence: existingItem?.match_confidence || 0,
+        updated_at: new Date().toISOString(),
+      };
+
+      let vendorItem = existingItem;
+      if (vendorItem) {
+        vendorItem = await api.entities.VendorItem.update(vendorItem.id, vendorPayload);
+      } else {
+        vendorItem = await api.entities.VendorItem.create(vendorPayload);
+      }
+
+      const product = (item.product_id && productByProductId.get(item.product_id))
+        || productByName.get(name.toLowerCase());
+
+      if (product?.id) {
+        const existingMappings = await api.entities.VendorItemMapping.filter({
+          vendor_item_id: vendorItem.id,
+          internal_product_id: product.id,
+        });
+        if (!existingMappings.length) {
+          await api.entities.VendorItemMapping.create({
+            organization_id: invoice.organization_id,
+            vendor_item_id: vendorItem.id,
+            internal_product_id: product.id,
+            conversion_multiplier: 1,
+            is_verified: false,
+          });
+        }
+      }
+
+      const lineRecord = lineRecords[index];
+      if (lineRecord?.id) {
+        await api.entities.InvoiceLineItem.update(lineRecord.id, {
+          vendor_id: invoice.vendor_id || null,
+          vendor_item_id: vendorItem.id,
+          vendor_item_code: code || null,
+          vendor_unit: unit || item.unit || null,
+          price_variance_percent: Number(priceChangePercent.toFixed(2)),
+          price_variance_flag: priceVarianceFlag,
+        });
+      }
+
+      return vendorItem;
+    });
+
+    const results = await Promise.allSettled(operations);
+    const flaggedCount = results.filter((result) => result.status === 'fulfilled' && result.value?.price_variance_flag).length;
+    queryClient.invalidateQueries({ queryKey: ['vendor_items'] });
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+
+    if (flaggedCount > 0) {
+      toast.warning(`${flaggedCount} vendor item price change${flaggedCount === 1 ? '' : 's'} need review.`);
+    }
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data) => {
       const lineItems = data.line_items || [];
@@ -329,8 +458,9 @@ export default function Invoices() {
       
       const invoice = await api.entities.Invoice.create(cleaned);
       
+      let lineRecords = [];
       if (lineItems.length > 0) {
-        await Promise.all(lineItems.map(item => 
+        lineRecords = await Promise.all(lineItems.map(item => 
           api.entities.InvoiceLineItem.create({
             invoice_id: invoice.id,
             organization_id: invoice.organization_id,
@@ -341,6 +471,7 @@ export default function Invoices() {
             total_price: item.extended_price || 0
           })
         ));
+        await syncInvoiceVendorCatalog(invoice, lineItems, lineRecords);
       }
       return { ...invoice, line_items: lineItems };
     },
@@ -364,8 +495,9 @@ export default function Invoices() {
         await Promise.all(oldItems.map(item => api.entities.InvoiceLineItem.delete(item.id)));
       }
       
+      let lineRecords = [];
       if (lineItems.length > 0) {
-        await Promise.all(lineItems.map(item => 
+        lineRecords = await Promise.all(lineItems.map(item => 
           api.entities.InvoiceLineItem.create({
             invoice_id: invoice.id,
             organization_id: invoice.organization_id,
@@ -376,6 +508,7 @@ export default function Invoices() {
             total_price: item.extended_price || 0
           })
         ));
+        await syncInvoiceVendorCatalog(invoice, lineItems, lineRecords);
       }
       return { ...invoice, line_items: lineItems };
     },
