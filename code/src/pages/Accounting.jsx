@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import PaymentAccountsSettings from '@/components/invoices/PaymentAccountsSettings';
 import StripePayPalPayouts from '@/components/accounting/StripePayPalPayouts';
 import PeriodBudgetsTab from '@/components/accounting/PeriodBudgetsTab';
+import AccountingExportQueueTab from '@/components/accounting/AccountingExportQueueTab';
 
 export default function Accounting() {
   const queryClient = useQueryClient();
@@ -273,6 +274,7 @@ export default function Accounting() {
           <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
           <TabsTrigger value="gl-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">GL Mapping</TabsTrigger>
           <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
+          <TabsTrigger value="export-queue" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export Queue</TabsTrigger>
           <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
           <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
           <TabsTrigger value="payment-accounts" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Payment Accounts</TabsTrigger>
@@ -375,6 +377,10 @@ export default function Accounting() {
 
         <TabsContent value="budgets" className="space-y-6">
           <PeriodBudgetsTab />
+        </TabsContent>
+
+        <TabsContent value="export-queue" className="space-y-6">
+          <AccountingExportQueueTab />
         </TabsContent>
 
         <TabsContent value="close-books" className="space-y-6">
