@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { ArrowRightLeft, Send, Search, Building2, PackageCheck } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +22,11 @@ export default function InventoryTransfers({ inventory, updateInventoryMutation,
   const [selectedItems, setSelectedItems] = useState([]);
   const [destination, setDestination] = useState('');
   
-  // Mock locations for destination (in a real app, this would come from an API endpoint listing other locations in the org)
-  const mockLocations = [
-    { id: 'loc-1', name: 'Downtown Kitchen' },
-    { id: 'loc-2', name: 'Westside Commissary' },
-    { id: 'loc-3', name: 'Airport Kiosk' }
-  ];
-
+  const { data: locations = [] } = useAuthQuery({
+    queryKey: ['locations', organization?.id],
+    queryFn: () => api.entities.Location.list(),
+    enabled: !!organization?.id,
+  });
   const handleAddItem = (item) => {
     if (!selectedItems.find(i => i.id === item.id)) {
       setSelectedItems([...selectedItems, { ...item, transfer_quantity: 1 }]);
@@ -72,11 +71,33 @@ export default function InventoryTransfers({ inventory, updateInventoryMutation,
           }
         });
 
-        // 2. In a real application, we would also CREATE/UPDATE an inventory record at the destination `location_id`.
-        // We will simulate that for the demo.
+        // 2. Update destination location
+        const destInventoryList = await api.entities.Inventory.list();
+        const destItem = destInventoryList.find(i => i.product_id === item.product_id && i.location_id === destination);
+        
+        if (destItem) {
+          await updateInventoryMutation.mutateAsync({
+            id: destItem.id,
+            data: {
+              current_quantity: (destItem.current_quantity || 0) + item.transfer_quantity,
+            }
+          });
+        } else {
+          // If the item doesn't exist at the destination, create it
+          await api.entities.Inventory.create({
+            organization_id: organization?.id,
+            location_id: destination,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            current_quantity: item.transfer_quantity,
+            current_unit: item.current_unit,
+            accounting_category: item.accounting_category,
+            unit_cost: item.unit_cost,
+          });
+        }
       }
 
-      toast.success(`Transfer Complete! Sent ${selectedItems.length} items to ${mockLocations.find(l=>l.id === destination)?.name}`);
+      toast.success(`Transfer Complete! Sent ${selectedItems.length} items to ${locations.find(l=>l.id === destination)?.name || 'Destination'}`);
       setSelectedItems([]);
       setDestination('');
     } catch (error) {
@@ -116,7 +137,7 @@ export default function InventoryTransfers({ inventory, updateInventoryMutation,
                     <SelectValue placeholder="Select destination..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockLocations.map(loc => (
+                    {locations.map(loc => (
                       <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                     ))}
                   </SelectContent>

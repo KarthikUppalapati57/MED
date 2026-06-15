@@ -277,17 +277,22 @@ export default function Inventory() {
         try {
           const isFavorable = totalVarianceValue > 0; // We have MORE stock than theoretical
           
-          // Mocking the GL entry generation to our accounting module
-          console.log("Generating Automated GL Entry for Variance:", {
+          // Real API call to insert into General Ledger
+          await api.entities.GeneralLedgerEntry.create({
+            organization_id: organization?.id,
+            date: new Date().toISOString(),
+            reference: `INV-VAR-${Date.now()}`,
+            description: `Inventory Count Variance Adjustment`,
             debit_account: isFavorable ? 'Inventory Asset (1210)' : 'COGS - Variance (5100)',
             credit_account: isFavorable ? 'COGS - Variance (5100)' : 'Inventory Asset (1210)',
             amount: Math.abs(totalVarianceValue),
+            created_by: userProfile?.id || null
           });
           
-          // In real implementation: await api.entities.GeneralLedger.create(...)
           toast.success(`Automated GL Entry Generated: ${isFavorable ? 'Credited' : 'Debited'} COGS for $${Math.abs(totalVarianceValue).toFixed(2)}`);
         } catch (e) {
           console.error("Failed to generate GL entry", e);
+          toast.error("Failed to generate automated GL entry");
         }
       }
 

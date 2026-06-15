@@ -176,6 +176,7 @@ export const api = {
     LedgerBill: createEntityClient('ledger_bills', true),
     LedgerPayment: createEntityClient('ledger_payments', true),
     LedgerEntry: createEntityClient('ledger_entries'),
+    GeneralLedgerEntry: createEntityClient('general_ledger_entries'),
     AiInsight: createEntityClient('ai_insights'),
     EventLog: createEntityClient('event_logs'),
     DomainEvent: createEntityClient('domain_events'),
