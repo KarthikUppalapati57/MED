@@ -103,7 +103,9 @@ export default function Recipes() {
     instructions: '',
     selling_price: 0,
     target_margin_percent: 70,
-    margin_alert_enabled: true
+    margin_alert_enabled: true,
+    yield_percentage: 100,
+    is_batch: false
   });
 
   const queryClient = useQueryClient();
@@ -205,7 +207,8 @@ export default function Recipes() {
     const packagingCost = formData.packaging_items.reduce((sum, p) => sum + (p.total_cost || 0), 0);
     const laborCost = (formData.labor_time_minutes / 60) * formData.labor_rate_per_hour;
     const totalCost = ingredientCost + packagingCost + laborCost;
-    const costPerServing = formData.yield_quantity > 0 ? totalCost / formData.yield_quantity : totalCost;
+    const effectiveYield = formData.yield_quantity * ((formData.yield_percentage || 100) / 100);
+    const costPerServing = effectiveYield > 0 ? totalCost / effectiveYield : totalCost;
 
     return {
       ingredientCost,
@@ -214,7 +217,7 @@ export default function Recipes() {
       totalCost,
       costPerServing
     };
-  }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity]);
+  }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity, formData.yield_percentage]);
 
   // Realtime subscription
   useEffect(() => {
@@ -292,7 +295,9 @@ export default function Recipes() {
       instructions: '',
       selling_price: 0,
       target_margin_percent: 70,
-      margin_alert_enabled: true
+      margin_alert_enabled: true,
+      yield_percentage: 100,
+      is_batch: false
     });
     setEditingRecipe(null);
   };
@@ -314,7 +319,9 @@ export default function Recipes() {
       instructions: recipe.instructions || '',
       selling_price: recipe.selling_price || 0,
       target_margin_percent: recipe.target_margin_percent !== undefined ? recipe.target_margin_percent : 70,
-      margin_alert_enabled: recipe.margin_alert_enabled !== undefined ? recipe.margin_alert_enabled : true
+      margin_alert_enabled: recipe.margin_alert_enabled !== undefined ? recipe.margin_alert_enabled : true,
+      yield_percentage: recipe.yield_percentage !== undefined ? recipe.yield_percentage : 100,
+      is_batch: recipe.is_batch !== undefined ? recipe.is_batch : false
     });
     setDialogOpen(true);
   };
@@ -420,8 +427,9 @@ export default function Recipes() {
       );
       const laborCost = ((recipe.labor_time_minutes || 0) / 60) * (recipe.labor_rate_per_hour || 0);
       const totalCost = ingredientCost + packagingCost + laborCost;
-      const costPerServing = (recipe.yield_quantity || 1) > 0
-        ? totalCost / (recipe.yield_quantity || 1)
+      const effectiveYield = (recipe.yield_quantity || 1) * ((recipe.yield_percentage || 100) / 100);
+      const costPerServing = effectiveYield > 0
+        ? totalCost / effectiveYield
         : totalCost;
 
       await updateMutation.mutateAsync({
@@ -1047,6 +1055,32 @@ export default function Recipes() {
                     placeholder="servings"
                   />
                 </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Yield Percentage (%)</Label>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    type="number"
+                    value={formData.yield_percentage}
+                    onChange={(e) => setFormData({ ...formData, yield_percentage: parseFloat(e.target.value) || 0 })}
+                  />
+                  <span className="text-xs text-muted-foreground">Accounts for moisture/trim loss</span>
+                </div>
+              </div>
+              <div className="space-y-2 flex flex-col justify-center pt-6">
+                <Label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-gray-300"
+                    checked={formData.is_batch}
+                    onChange={(e) => setFormData({ ...formData, is_batch: e.target.checked })}
+                  />
+                  <span>This is a Batch/Prep Recipe</span>
+                </Label>
+                <span className="text-xs text-muted-foreground ml-6">Batch recipes can be used as ingredients in other recipes</span>
               </div>
             </div>
 
