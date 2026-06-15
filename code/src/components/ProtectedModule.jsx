@@ -48,8 +48,11 @@ export default function ProtectedModule({ pageName, children }) {
     return <AccessDenied reason="role" requiredRole={moduleInfo.minRole || 'explicit_grant'} />;
   }
 
-  // If explicitly granted, bypass role and module checks
+  // If explicitly granted, bypass plan/module checks but never platform-only routes.
   if (explicitPerm === 'read' || explicitPerm === 'full') {
+    if (moduleInfo.minRole === 'platform_admin') {
+      return <AccessDenied reason="role" requiredRole={moduleInfo.minRole} />;
+    }
     return <>{children}</>;
   }
 

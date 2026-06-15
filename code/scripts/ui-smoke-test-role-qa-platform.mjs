@@ -2,7 +2,8 @@ import 'dotenv/config';
 import { chromium } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
-const baseUrl = process.env.ROLE_QA_BASE_URL || 'https://restops-360.com';
+const baseUrlArg = process.argv.find((arg) => arg.startsWith('--base-url='))?.split('=').slice(1).join('=');
+const baseUrl = baseUrlArg || process.env.ROLE_QA_BASE_URL || 'https://restops-360.com';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const password = process.env.ROLE_QA_PASSWORD || 'RestopsQA!2026';
@@ -31,15 +32,15 @@ const accounts = [
     email: 'qa.brand.northfork@restops.test',
     role: 'branch_manager',
     dashboardText: 'North Fork Grill Dashboard',
-    routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup'],
-    forbiddenRoutes: ['OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
+    routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
+    forbiddenRoutes: ['Accounting', 'OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
   },
   {
     email: 'qa.location.northfork@restops.test',
     role: 'location_manager',
     dashboardText: 'North Fork Downtown Dashboard',
-    routes: ['Dashboard', 'Notifications', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
-    forbiddenRoutes: ['Performance', 'Accounting', 'OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
+    routes: ['Dashboard', 'Performance', 'Notifications', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
+    forbiddenRoutes: ['Accounting', 'OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
   },
   {
     email: 'qa.staff.northfork@restops.test',
@@ -81,6 +82,8 @@ function hasFailureText(text) {
     'Page Not Found',
     'Welcome Back',
     'Secure Your Account',
+    'Access Restricted',
+    'Module Not Available',
     'Access denied',
     'You do not have access',
     'Something went wrong',

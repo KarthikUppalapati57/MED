@@ -21,11 +21,11 @@ export const MODULE_DEFINITIONS = {
   smartprep:  { label: "SmartPrep",       pages: ["SmartPrep"],                                  minRole: "location_manager", icon: "ChefHat" },
   ask_tom:    { label: "Ask Tom",         pages: ["AskTom"],                                     minRole: "manager",          icon: "Bot" },
   recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering", "AvTCosting"], minRole: "location_manager", icon: "ChefHat" },
-  vendors:    { label: "Vendors",         pages: ["Vendors", "VendorBulkTools"],             minRole: "branch_manager",   icon: "Store" },
+  vendors:    { label: "Vendors",         pages: ["Vendors", "VendorBulkTools"],             minRole: "location_manager", icon: "Store" },
   labor:      { label: "Labor",           pages: ["Labor"],                                      minRole: "location_manager", icon: "Users" },
-  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "location_manager", icon: "Users" },
+  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "org_owner", icon: "Users" },
   integrations: { label: "Integrations",  pages: ["Integrations", "DeveloperPortal"], minRole: "org_owner", icon: "Settings" },
-  performance:{ label: "Performance",     pages: ["Performance"], minRole: "branch_manager", icon: "Activity" },
+  performance:{ label: "Performance",     pages: ["Performance"], minRole: "location_manager", icon: "Activity" },
   platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
   accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
   setup:      { label: "Setup",            pages: ["RestaurantSetup"], minRole: "location_manager", icon: "Settings" },
@@ -35,7 +35,7 @@ export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
 // Core modules that are ALWAYS accessible regardless of subscription plan.
 // These are non-revenue operational essentials.
-const CORE_MODULE_KEYS = ['dashboard', 'admin', 'setup'];
+const CORE_MODULE_KEYS = ['dashboard', 'setup'];
 
 /**
  * Returns the Set of page names that are enabled for the given module list.

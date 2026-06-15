@@ -27,13 +27,13 @@ const accounts = [
     email: 'qa.brand.northfork@restops.test',
     role: 'branch_manager',
     expectedContext: ['organization_id', 'brand_id'],
-    expectedPages: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup'],
+    expectedPages: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'AskTom', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
   },
   {
     email: 'qa.location.northfork@restops.test',
     role: 'location_manager',
     expectedContext: ['organization_id', 'brand_id', 'location_id'],
-    expectedPages: ['Dashboard', 'Notifications', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
+    expectedPages: ['Dashboard', 'Performance', 'Notifications', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
   },
   {
     email: 'qa.staff.northfork@restops.test',

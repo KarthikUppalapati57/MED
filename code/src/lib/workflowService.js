@@ -104,11 +104,9 @@ export async function sendOrderWorkflow({ order, sendMethod = 'email', userId })
       user_id: userId || null,
       title: 'Purchase order sent',
       message: `${order.order_number || 'Order'} was queued for ${order.vendor_name || 'the vendor'} via ${sendMethod}.`,
-      body: `${order.order_number || 'Order'} was queued for ${order.vendor_name || 'the vendor'} via ${sendMethod}.`,
       type: 'order',
       metadata: { order_id: order.id, send_method: sendMethod },
       is_read: false,
-      read: false,
     }),
     emitWorkflowEvent('order.sent', 'auto_order', order.id, {
       order_number: order.order_number,
@@ -286,11 +284,9 @@ export async function receiveOrderWorkflow({
       user_id: userId || null,
       title: hasDiscrepancy ? 'Receiving discrepancy' : 'Order received',
       message: `${order.order_number || 'Order'} was ${hasDiscrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
-      body: `${order.order_number || 'Order'} was ${hasDiscrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
       type: 'inventory',
       metadata: { order_id: order.id, receiving_id: receiving.id, has_discrepancy: hasDiscrepancy },
       is_read: false,
-      read: false,
     }),
     emitWorkflowEvent(hasDiscrepancy ? 'order.receiving_discrepancy' : 'order.received', 'receiving', receiving.id, {
       order_id: order.id,

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Shield, Search, Download, CheckCircle2, X, Loader2, Trash2, Mail, Building2, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, 
-  Receipt, History, Fingerprint, Send
+  Receipt, History, Fingerprint, Send, FileText
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
