@@ -18,7 +18,8 @@ import posthog from '@/lib/posthog';
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
   POS: 'pos',
-  ACCOUNTING: 'accounting'
+  ACCOUNTING: 'accounting',
+  EDI: 'edi'
 };
 
 const INTEGRATIONS = [
@@ -131,6 +132,46 @@ const INTEGRATIONS = [
     color: 'emerald',
     connected: false,
     fields: ['Sender ID', 'Sender Password', 'Company ID', 'User ID', 'User Password']
+  },
+  {
+    id: 'sysco',
+    name: 'Sysco EDI',
+    type: INTEGRATION_TYPES.EDI,
+    description: 'AS2/X12 Purchase Order transmission',
+    icon: Server,
+    color: 'blue',
+    connected: false,
+    fields: ['AS2 ID', 'Partner AS2 ID', 'Certificate (PEM)']
+  },
+  {
+    id: 'usfoods',
+    name: 'US Foods EDI',
+    type: INTEGRATION_TYPES.EDI,
+    description: 'AS2/X12 Purchase Order transmission',
+    icon: Server,
+    color: 'emerald',
+    connected: false,
+    fields: ['AS2 ID', 'Partner AS2 ID', 'Certificate (PEM)']
+  },
+  {
+    id: 'aloha',
+    name: 'NCR Aloha (Legacy)',
+    type: INTEGRATION_TYPES.POS,
+    description: 'On-premise POS integration via Agent',
+    icon: Store,
+    color: 'slate',
+    connected: false,
+    fields: ['API Key', 'Store ID']
+  },
+  {
+    id: 'micros',
+    name: 'Oracle MICROS (Legacy)',
+    type: INTEGRATION_TYPES.POS,
+    description: 'On-premise POS integration via Agent',
+    icon: Store,
+    color: 'red',
+    connected: false,
+    fields: ['Enterprise ID', 'API URL', 'Auth Token']
   }
 ];
 
@@ -338,6 +379,15 @@ export default function Integrations() {
           >
             Accounting Systems (Back-Office)
           </button>
+          <button 
+            onClick={() => setActiveTab(INTEGRATION_TYPES.EDI)}
+            className={cn(
+              "px-4 py-3 text-sm font-bold border-b-2 transition-all",
+              activeTab === INTEGRATION_TYPES.EDI ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            EDI (Supply Chain)
+          </button>
         </div>
 
         <TabsContent value={INTEGRATION_TYPES.MCP} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -349,9 +399,15 @@ export default function Integrations() {
         <TabsContent value={INTEGRATION_TYPES.POS} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div className="mb-6 p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-amber-800 flex items-start gap-3">
              <Lock className="w-5 h-5 shrink-0 text-amber-600" />
-             <div>
-               <p className="text-sm font-bold">Secure Webhook Endpoints</p>
-               <p className="text-xs mt-1">When connecting a POS system, all inbound traffic is routed through our secure `pos-webhook` Edge Function edge network to guarantee payload authenticity.</p>
+             <div className="w-full">
+               <p className="text-sm font-bold">Secure Webhook Endpoints & Legacy Agents</p>
+               <p className="text-xs mt-1">When connecting a POS system, all inbound traffic is routed through our secure `pos-webhook` Edge Function to guarantee payload authenticity.</p>
+               <div className="mt-3 flex items-center gap-2">
+                 <Input readOnly value="https://api.restops.com/v1/webhooks/pos/{location_id}" className="bg-white text-xs font-mono h-8" />
+                 <Button size="sm" variant="outline" className="h-8 shrink-0 bg-white" onClick={() => toast.success("Webhook URL copied to clipboard")}>
+                   <Copy className="h-3 w-3 mr-1" /> Copy URL
+                 </Button>
+               </div>
              </div>
            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -371,6 +427,19 @@ export default function Integrations() {
              {INTEGRATIONS.filter(i => i.type === INTEGRATION_TYPES.ACCOUNTING).map(renderIntegrationCard)}
            </div>
         </TabsContent>
+
+        <TabsContent value={INTEGRATION_TYPES.EDI} className="mt-0 outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+           <div className="mb-6 p-4 rounded-2xl bg-cyan-50/50 border border-cyan-200 text-cyan-800 flex items-start gap-3">
+             <Server className="w-5 h-5 shrink-0 text-cyan-600" />
+             <div>
+               <p className="text-sm font-bold">AS2/X12 Middleware</p>
+               <p className="text-xs mt-1">Restops automatically translates modern JSON purchase orders into legacy X12 EDI formats required by massive broadline distributors like Sysco and US Foods.</p>
+             </div>
+           </div>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+             {INTEGRATIONS.filter(i => i.type === INTEGRATION_TYPES.EDI).map(renderIntegrationCard)}
+           </div>
+         </TabsContent>
       </Tabs>
 
       {/* Connection Dialog */}
