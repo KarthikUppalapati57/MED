@@ -14,8 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Landmark, CreditCard, Banknote, Building2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Landmark, CreditCard, Banknote, Building2, Loader2, Zap, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 export default function PaymentAccountsSettings() {
   const { organization } = useAuth();
@@ -41,6 +43,23 @@ export default function PaymentAccountsSettings() {
       return data || [];
     },
     enabled: !!organization?.id
+  });
+
+  const { data: vendors = [], isLoading: loadingVendors } = useQuery({
+    queryKey: ['vendors', organization?.id],
+    queryFn: () => api.entities.Vendor.filter({ organization_id: organization?.id }),
+    enabled: !!organization?.id
+  });
+
+  const updateVendorMutation = useMutation({
+    mutationFn: async ({ id, updates }) => {
+      return api.entities.Vendor.update(id, updates);
+    },
+    onSuccess: () => {
+      toast.success("Vendor AutoPay settings updated");
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+    },
+    onError: (err) => toast.error(err.message)
   });
 
   const createAccountMutation = useMutation({
@@ -94,6 +113,7 @@ export default function PaymentAccountsSettings() {
   if (isLoading) return <div className="p-8 text-center animate-pulse">Loading payment accounts...</div>;
 
   return (
+    <div className="space-y-6">
     <Card className="border-border">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -212,5 +232,70 @@ export default function PaymentAccountsSettings() {
 
       </CardContent>
     </Card>
+
+    <Card className="border-border">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Zap className="w-5 h-5 text-indigo-600" />
+          AutoPay Rules
+        </CardTitle>
+        <CardDescription>
+          Automatically process payouts the moment an invoice from these vendors reaches "Approved" status.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loadingVendors ? (
+          <div className="p-8 text-center animate-pulse">Loading vendors...</div>
+        ) : (
+          <div className="space-y-4">
+            {vendors.map(vendor => (
+              <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{vendor.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    {vendor.autopay_enabled ? (
+                      <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 border-none">AutoPay Active</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-slate-500">AutoPay Disabled</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="space-y-1 text-right">
+                    <Label className="text-xs text-muted-foreground">Default Method</Label>
+                    <Select 
+                      value={vendor.default_payment_method || 'stripe'} 
+                      onValueChange={(v) => updateVendorMutation.mutate({ id: vendor.id, updates: { default_payment_method: v }})}
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-xs bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stripe">Stripe (ACH)</SelectItem>
+                        <SelectItem value="paypal">PayPal</SelectItem>
+                        <SelectItem value="check">Mailed Check</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Label className="text-xs text-muted-foreground">Enable</Label>
+                    <Switch 
+                      checked={!!vendor.autopay_enabled}
+                      onCheckedChange={(checked) => updateVendorMutation.mutate({ id: vendor.id, updates: { autopay_enabled: checked }})}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {vendors.length === 0 && (
+              <div className="text-center p-6 border border-dashed rounded-lg text-slate-500 text-sm">
+                No vendors found.
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+    </div>
   );
 }

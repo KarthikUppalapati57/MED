@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
+import JustPayVendorDialog from './JustPayVendorDialog';
 
 export default function StripePayPalPayouts() {
   const { organization, userProfile } = useAuth();
@@ -18,6 +19,7 @@ export default function StripePayPalPayouts() {
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('stripe'); // 'stripe' or 'paypal'
   const [isProcessing, setIsProcessing] = useState(false);
+  const [justPayOpen, setJustPayOpen] = useState(false);
 
   // Fetch only approved invoices that are unpaid
   const { data: invoices = [], isLoading } = useQuery({
@@ -71,7 +73,7 @@ export default function StripePayPalPayouts() {
         });
       }
 
-      toast.success(`Successfully processed ${selectedInvoices.length} payouts via ${paymentMethod === 'stripe' ? 'Stripe Connect' : 'PayPal Payouts'}.`);
+      toast.success(`Successfully processed ${selectedInvoices.length} payouts via ${paymentMethod === 'stripe' ? 'Stripe Connect' : paymentMethod === 'paypal' ? 'PayPal Payouts' : 'Lob Checks API'}.`);
       setSelectedInvoices([]);
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (e) {
@@ -88,14 +90,19 @@ export default function StripePayPalPayouts() {
   return (
     <div className="space-y-6">
       <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-50 via-white to-blue-50">
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-indigo-600" />
-            Digital B2B Bill Pay
-          </CardTitle>
-          <CardDescription>
-            Select approved invoices and instantly settle them using your connected Stripe or PayPal business accounts.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <DollarSign className="h-6 w-6 text-indigo-600" />
+              Digital B2B Bill Pay
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Select approved invoices and instantly settle them using your connected Stripe or PayPal business accounts.
+            </CardDescription>
+          </div>
+          <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => setJustPayOpen(true)}>
+            Just Pay a Vendor
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -164,6 +171,13 @@ export default function StripePayPalPayouts() {
                         <Badge variant="outline" className="bg-blue-50 text-blue-700">Digital Wallet</Badge>
                       </Label>
                     </div>
+                    <div className="flex items-center space-x-3 border p-4 rounded-lg cursor-pointer hover:bg-slate-50">
+                      <RadioGroupItem value="check" id="check" />
+                      <Label htmlFor="check" className="flex-1 cursor-pointer font-medium flex items-center justify-between">
+                        Mailed Check
+                        <Badge variant="outline" className="bg-slate-100 text-slate-700">Lob API</Badge>
+                      </Label>
+                    </div>
                   </RadioGroup>
                 </div>
 
@@ -185,7 +199,7 @@ export default function StripePayPalPayouts() {
                     {isProcessing ? (
                       <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Processing {paymentMethod} API...</>
                     ) : (
-                      <><ArrowRight className="h-5 w-5 mr-2" /> Submit Payouts via {paymentMethod === 'stripe' ? 'Stripe' : 'PayPal'}</>
+                      <><ArrowRight className="h-5 w-5 mr-2" /> Submit Payouts via {paymentMethod === 'stripe' ? 'Stripe' : paymentMethod === 'paypal' ? 'PayPal' : 'Mailed Check'}</>
                     )}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground mt-3">
@@ -197,6 +211,7 @@ export default function StripePayPalPayouts() {
           </div>
         </CardContent>
       </Card>
+      <JustPayVendorDialog open={justPayOpen} onOpenChange={setJustPayOpen} />
     </div>
   );
 }
