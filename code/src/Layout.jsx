@@ -34,7 +34,8 @@ import {
   Plus,
   Receipt,
   ArrowLeft,
-  Bot
+  Bot,
+  Smartphone
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },

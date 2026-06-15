@@ -45,6 +45,7 @@ const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
 const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
 const SmartPrep = React.lazy(() => import('./pages/SmartPrep'));
 const Commissary = React.lazy(() => import('./pages/Commissary'));
+const MobileApp = React.lazy(() => import('./pages/MobileApp'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -80,7 +81,8 @@ export const PAGES = {
     "RestaurantSetup": RestaurantSetup,
     "DeveloperPortal": DeveloperPortal,
     "SmartPrep": SmartPrep,
-    "Commissary": Commissary
+    "Commissary": Commissary,
+    "MobileApp": MobileApp
 }
 
 export const pagesConfig = {
