@@ -8,6 +8,17 @@ CREATE TABLE IF NOT EXISTS public.roles (
     name TEXT UNIQUE NOT NULL
 );
 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM pg_constraint 
+        WHERE conrelid = 'public.roles'::regclass AND contype = 'u'
+    ) THEN
+        ALTER TABLE public.roles ADD CONSTRAINT roles_name_key UNIQUE (name);
+    END IF;
+END $$;
+
 -- 2. Permissions Table
 CREATE TABLE IF NOT EXISTS public.permissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
