@@ -59,16 +59,40 @@ export function ApprovalWorkflowEngine({ invoice }) {
       if (error) throw error;
       return data;
     },
+    // Optimistic Update Implementation
+    onMutate: async ({ stepId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['approval-workflow', invoice.id] });
+      const previousData = queryClient.getQueryData(['approval-workflow', invoice.id]);
+
+      // Optimistically update the UI to reflect the pending action
+      if (previousData) {
+        queryClient.setQueryData(['approval-workflow', invoice.id], {
+          ...previousData,
+          steps: previousData.steps.map(step => 
+            step.id === stepId 
+              ? { ...step, status, comments, acted_at: new Date().toISOString() }
+              : step
+          ),
+          status: status === 'rejected' ? 'rejected' : previousData.status // Simplified optimistic status
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, newStep, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(['approval-workflow', invoice.id], context.previousData);
+      }
+      toast.error('Failed to execute approval: ' + err.message);
+    },
     onSuccess: (data) => {
       toast.success(`Invoice ${data.status.replace('_', ' ')}`);
       setComments('');
-      queryClient.invalidateQueries({ queryKey: ['approval-workflow', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      // Trigger a reload of the invoice data to reflect new status
       window.dispatchEvent(new CustomEvent('invoice-updated'));
     },
-    onError: (err) => {
-      toast.error('Failed to execute approval: ' + err.message);
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['approval-workflow', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     }
   });
 

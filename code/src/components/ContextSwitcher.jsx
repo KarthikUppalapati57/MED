@@ -54,7 +54,7 @@ export default function ContextSwitcher() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('brands')
-        .select('id, name, organization_id')
+        .select('brand_id, name, organization_id')
         .eq('organization_id', activeOrgId)
         .order('name');
       if (error) throw error;
@@ -160,9 +160,9 @@ export default function ContextSwitcher() {
               <DropdownMenuSeparator />
               {orgBrands.map(b => (
                 <DropdownMenuItem
-                  key={b.id}
+                  key={b.brand_id}
                   onClick={() => switchContext('brand', b)}
-                  className={cn("gap-2 text-sm", brand?.id === b.id && "bg-purple-500/5 text-purple-400")}
+                  className={cn("gap-2 text-sm", brand?.brand_id === b.brand_id && "bg-purple-500/5 text-purple-400")}
                 >
                   <Store className="h-3.5 w-3.5" />
                   {b.name}

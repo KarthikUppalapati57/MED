@@ -77,7 +77,7 @@ export default function PlatformUsers() {
       {
         queryKey: ['platform-brands-lookup'],
         queryFn: async () => {
-          const { data, error } = await supabase.from("brands").select("id, name");
+          const { data, error } = await supabase.from("brands").select("brand_id, name");
           if (error) throw error;
           return data || [];
         },
@@ -110,7 +110,7 @@ export default function PlatformUsers() {
 
   const brandMap = useMemo(() => {
     return brands.reduce((acc, b) => {
-      acc[b.id] = b.name;
+      acc[b.brand_id] = b.name;
       return acc;
     }, {});
   }, [brands]);

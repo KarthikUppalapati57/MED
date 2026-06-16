@@ -75,7 +75,7 @@ export default function OrgManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('brands')
-        .select('id, name, organization_id, created_at')
+        .select('brand_id, name, organization_id, created_at')
         .order('name');
       if (error) throw error;
       return data || [];
@@ -237,13 +237,13 @@ export default function OrgManagement() {
     const prevBrands = queryClient.getQueryData(['my-brands']);
     const prevLocations = queryClient.getQueryData(['my-locations']);
     
-    queryClient.setQueryData(['my-brands'], old => old ? old.filter(b => b.id !== brand.id) : []);
-    queryClient.setQueryData(['my-locations'], old => old ? old.filter(l => l.brand_id !== brand.id) : []);
+    queryClient.setQueryData(['my-brands'], old => old ? old.filter(b => b.brand_id !== brand.brand_id) : []);
+    queryClient.setQueryData(['my-locations'], old => old ? old.filter(l => l.brand_id !== brand.brand_id) : []);
 
     try {
       // Delete locations first
-      await supabase.from('locations').delete().eq('brand_id', brand.id);
-      const { error } = await supabase.from('brands').delete().eq('id', brand.id);
+      await supabase.from('locations').delete().eq('brand_id', brand.brand_id);
+      const { error } = await supabase.from('brands').delete().eq('brand_id', brand.brand_id);
       if (error) throw error;
       
       const { toast } = await import('sonner');
@@ -283,7 +283,7 @@ export default function OrgManagement() {
     if (!editBrandName.trim() || !editBrand) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('brands').update({ name: editBrandName.trim() }).eq('id', editBrand.id);
+      const { error } = await supabase.from('brands').update({ name: editBrandName.trim() }).eq('brand_id', editBrand.brand_id);
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['my-brands'] });
       const { toast } = await import('sonner');
@@ -470,16 +470,16 @@ export default function OrgManagement() {
                           <div className="p-4 pl-20 text-xs text-muted-foreground italic">No brands yet - add your first brand</div>
                         ) : (
                           orgBrands.map(brand => {
-                            const brandLocations = getBrandLocations(brand.id);
-                            const isBrandExpanded = expandedBrands.has(brand.id);
-                            const brandStaff = getBrandStaffCount(brand.id);
+                            const brandLocations = getBrandLocations(brand.brand_id);
+                            const isBrandExpanded = expandedBrands.has(brand.brand_id);
+                            const brandStaff = getBrandStaffCount(brand.brand_id);
 
                             return (
-                              <div key={brand.id}>
+                              <div key={brand.brand_id}>
                                 {/* Brand Row */}
                                 <div
                                   className="flex items-center gap-3 py-3 px-4 pl-12 cursor-pointer hover:bg-secondary/50 transition-colors border-t border-border first:border-t-0"
-                                  onClick={() => toggleBrand(brand.id)}
+                                  onClick={() => toggleBrand(brand.brand_id)}
                                 >
                                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                                     {isBrandExpanded ? <ChevronDown className="w-3.5 h-3.5 text-violet-500" /> : <ChevronRight className="w-3.5 h-3.5 text-violet-500" />}
@@ -497,7 +497,7 @@ export default function OrgManagement() {
                                     {canManage && (
                                       <>
                                         <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-violet-600 hover:bg-violet-50"
-                                          onClick={() => { setAddLocationDialog({ orgId: org.id, brandId: brand.id }); setNewLocationName(''); setNewLocationAddress(''); }}>
+                                          onClick={() => { setAddLocationDialog({ orgId: org.id, brandId: brand.brand_id }); setNewLocationName(''); setNewLocationAddress(''); }}>
                                           <Plus className="w-3 h-3 mr-1" /> Location
                                         </Button>
                                         <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"

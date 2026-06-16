@@ -55,8 +55,33 @@ export function useRealtimeEvents() {
       )
       .subscribe();
 
+    // Track C: Listen to partitioned logs for admins
+    let logsChannel = null;
+    if (role === 'platform_admin' || role === 'org_owner') {
+      logsChannel = supabase
+        .channel('admin-logs-channel')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+          (payload) => {
+            queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+            window.dispatchEvent(new CustomEvent('audit-log-event', { detail: payload.new }));
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'error_logs' },
+          (payload) => {
+            queryClient.invalidateQueries({ queryKey: ['error-logs'] });
+            window.dispatchEvent(new CustomEvent('error-log-event', { detail: payload.new }));
+          }
+        )
+        .subscribe();
+    }
+
     return () => {
       supabase.removeChannel(channel);
+      if (logsChannel) supabase.removeChannel(logsChannel);
     };
-  }, [activeOrg?.id, queryClient]);
+  }, [activeOrg?.id, queryClient, role]);
 }

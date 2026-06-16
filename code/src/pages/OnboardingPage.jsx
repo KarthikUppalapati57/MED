@@ -317,7 +317,7 @@ export default function OnboardingPage() {
             .filter(loc => loc.name.trim())
             .map(loc => ({
               organization_id: orgId,
-              brand_id: newBrand.id,
+              brand_id: newBrand.brand_id,
               name: loc.name.trim(),
               address: loc.address.trim() || 'Address pending',
             }));

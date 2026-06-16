@@ -62,7 +62,7 @@ export default function PlatformOrganizations() {
       {
         queryKey: ['platform_brands_all'],
         queryFn: async () => {
-          const { data, error } = await supabase.from('brands').select('id, name, organization_id, created_at');
+          const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at');
           if (error) throw error;
           return data;
         }
@@ -208,14 +208,14 @@ export default function PlatformOrganizations() {
   const downloadTemplate = () => {
     if (!selectedOrg) return;
     const orgBrands = brands.filter(b => b.organization_id === selectedOrg.id);
-    const orgLocations = locations.filter(l => orgBrands.some(b => b.id === l.brand_id));
+    const orgLocations = locations.filter(l => orgBrands.some(b => b.brand_id === l.brand_id));
     
     let csvData = [];
     if (orgBrands.length === 0) {
       csvData.push([selectedOrg.name, "Example Brand", "Example Location", "123 Main St"]);
     } else {
       orgBrands.forEach(brand => {
-        const brandLocs = orgLocations.filter(l => l.brand_id === brand.id);
+        const brandLocs = orgLocations.filter(l => l.brand_id === brand.brand_id);
         if (brandLocs.length === 0) {
           csvData.push([selectedOrg.name, brand.name, "", ""]);
         } else {
@@ -268,7 +268,7 @@ export default function PlatformOrganizations() {
     
     try {
       const orgBrands = brands.filter(b => b.organization_id === selectedOrgId);
-      const orgLocations = locations.filter(l => orgBrands.some(b => b.id === l.brand_id));
+      const orgLocations = locations.filter(l => orgBrands.some(b => b.brand_id === l.brand_id));
       
       let newBrandsCount = 0;
       let newLocsCount = 0;
@@ -293,14 +293,14 @@ export default function PlatformOrganizations() {
         const existingBrand = orgBrands.find(b => b.name.toLowerCase() === bName.toLowerCase());
         
         if (existingBrand) {
-          brandId = existingBrand.id;
+          brandId = existingBrand.brand_id;
         } else {
           const { data: newBrand, error: brandErr } = await supabase
             .from('brands')
             .insert({ organization_id: selectedOrgId, name: bName })
             .select().single();
           if (brandErr) throw brandErr;
-          brandId = newBrand.id;
+          brandId = newBrand.brand_id;
           newBrandsCount++;
         }
 
@@ -355,7 +355,7 @@ export default function PlatformOrganizations() {
         if (manualEntry.locationName) {
           const { error: locErr } = await supabase.from('locations').insert({
             organization_id: selectedOrgId,
-            brand_id: newBrand.id,
+            brand_id: newBrand.brand_id,
             name: manualEntry.locationName,
             address: manualEntry.locationAddress || ''
           });
@@ -394,7 +394,7 @@ export default function PlatformOrganizations() {
 
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const orgBrands = brands.filter(b => b.organization_id === selectedOrgId);
-  const orgLocations = locations.filter(l => orgBrands.some(b => b.id === l.brand_id));
+  const orgLocations = locations.filter(l => orgBrands.some(b => b.brand_id === l.brand_id));
   const orgUsers = users.filter(u => u.organization_id === selectedOrgId);
   
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
@@ -584,10 +584,10 @@ export default function PlatformOrganizations() {
                   ) : (
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                       {orgBrands.map(brand => {
-                        const bLocs = orgLocations.filter(l => l.brand_id === brand.id);
-                        const bUsers = orgUsers.filter(u => u.brand_id === brand.id);
+                        const bLocs = orgLocations.filter(l => l.brand_id === brand.brand_id);
+                        const bUsers = orgUsers.filter(u => u.brand_id === brand.brand_id);
                         return (
-                          <Card key={brand.id} className="border-border shadow-sm overflow-hidden flex flex-col bg-card">
+                          <Card key={brand.brand_id} className="border-border shadow-sm overflow-hidden flex flex-col bg-card">
                             <div className="p-5 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-card shadow-sm border border-border rounded-xl flex items-center justify-center">
@@ -658,7 +658,7 @@ export default function PlatformOrganizations() {
                             levelIcon = MapPin;
                           } else if (user.brand_id) {
                             level = 'Brand';
-                            levelContext = orgBrands.find(b => b.id === user.brand_id)?.name || 'Unknown';
+                            levelContext = orgBrands.find(b => b.brand_id === user.brand_id)?.name || 'Unknown';
                             levelIcon = Store;
                           }
 
