@@ -139,6 +139,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
         total_amount: extractedData.total_amount || 0,
         line_items: extractedData.line_items || [],
         file_url: newFileUrl,
+        file_type: fileToProcess.type,
         source,
         status: 'pending_review',
         payment_status: extractedData.payment_status || 'unpaid',

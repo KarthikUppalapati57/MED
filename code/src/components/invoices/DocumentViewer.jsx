@@ -19,7 +19,7 @@ export default function DocumentViewer({ fileUrl, fileType }) {
     );
   }
 
-  const isPdf = fileType === 'application/pdf' || fileUrl.toLowerCase().endsWith('.pdf');
+  const isPdf = fileType === 'application/pdf' || (fileUrl && fileUrl.toLowerCase().includes('.pdf'));
 
   return (
     <div className="flex flex-col h-full bg-slate-100/50 rounded-xl overflow-hidden border">
