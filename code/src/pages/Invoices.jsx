@@ -524,8 +524,8 @@ export default function Invoices() {
       const targets = invoices.filter((invoice) => ids.includes(invoice.id));
       return Promise.all(targets.map(async (invoice) => {
         const updated = await api.entities.Invoice.update(invoice.id, data);
-        if (data.ap_status === 'approved') {
-          await ensureLedgerBill({ ...invoice, ...updated }, { status: 'pending' });
+        if (data.status === 'approved') {
+          await finalizeApprovedInvoiceWorkflow({ ...invoice, ...updated });
         }
         return updated;
       }));
@@ -1366,7 +1366,7 @@ export default function Invoices() {
                 <Button 
                   size="sm"
                   className="bg-purple-600 hover:bg-purple-700 whitespace-nowrap"
-                  disabled={!batchPaymentAccountId || !batchScheduleDate || batchScheduleMutation.isPending}
+                  disabled={!batchPaymentAccountId || !batchScheduleDate || batchScheduleMutation.isPending || batchUpdateMutation.isPending}
                   onClick={() => batchScheduleMutation.mutate({ 
                     ids: selectedInvoiceIds, 
                     accountId: batchPaymentAccountId, 
@@ -1374,6 +1374,29 @@ export default function Invoices() {
                   })}
                 >
                   {batchScheduleMutation.isPending ? 'Scheduling...' : 'Schedule Batch'}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-resend-green hover:bg-resend-green/90 whitespace-nowrap"
+                  disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
+                  onClick={() => batchUpdateMutation.mutate({
+                    ids: selectedInvoiceIds,
+                    data: { status: 'approved', ap_status: 'approved', action_required_reason: null }
+                  })}
+                >
+                  Approve Batch
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="whitespace-nowrap"
+                  disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
+                  onClick={() => batchUpdateMutation.mutate({
+                    ids: selectedInvoiceIds,
+                    data: { status: 'rejected', ap_status: 'rejected' }
+                  })}
+                >
+                  Reject Batch
                 </Button>
                 <Button 
                   size="sm" 
