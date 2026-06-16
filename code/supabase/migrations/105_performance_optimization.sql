@@ -45,20 +45,20 @@ $$;
 
 -- Protect existing indexes from throwing errors using IF NOT EXISTS
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invoices_organization_id ON public.invoices(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_invoices_vendor_id ON public.invoices(vendor_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_inventory_organization_id ON public.inventory(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_inventory_product_id ON public.inventory(product_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_organization_id ON public.payments(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_vendor_id ON public.payments(vendor_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_wastage_logs_organization_id ON public.wastage_logs(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_recipes_organization_id ON public.recipes(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_auto_orders_organization_id ON public.auto_orders(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_vendors_organization_id ON public.vendors(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_organization_id ON public.products(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_brands_organization_id ON public.brands(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_locations_organization_id ON public.locations(organization_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_organization_members_user_id ON public.organization_members(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_organization_members_org_id ON public.organization_members(organization_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_organization_id ON public.invoices(organization_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_vendor_id ON public.invoices(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_organization_id ON public.inventory(organization_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_product_id ON public.inventory(product_id);
+CREATE INDEX IF NOT EXISTS idx_payments_organization_id ON public.payments(organization_id);
+CREATE INDEX IF NOT EXISTS idx_payments_vendor_id ON public.payments(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_wastage_logs_organization_id ON public.wastage_logs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_organization_id ON public.recipes(organization_id);
+CREATE INDEX IF NOT EXISTS idx_auto_orders_organization_id ON public.auto_orders(organization_id);
+CREATE INDEX IF NOT EXISTS idx_vendors_organization_id ON public.vendors(organization_id);
+CREATE INDEX IF NOT EXISTS idx_products_organization_id ON public.products(organization_id);
+CREATE INDEX IF NOT EXISTS idx_brands_organization_id ON public.brands(organization_id);
+CREATE INDEX IF NOT EXISTS idx_locations_organization_id ON public.locations(organization_id);
+CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON public.organization_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_organization_members_org_id ON public.organization_members(organization_id);
 
 -- End of Migration
