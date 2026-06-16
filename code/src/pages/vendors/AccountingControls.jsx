@@ -18,7 +18,7 @@ export default function AccountingControls({ vendorId }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vendors')
-        .select('payment_terms, default_expense_category, default_payment_account_id, file_routing_preference')
+        .select('default_expense_category, default_payment_account_id, file_routing_preference')
         .eq('id', vendorId)
         .single();
       if (error) throw error;
@@ -41,7 +41,6 @@ export default function AccountingControls({ vendorId }) {
   React.useEffect(() => {
     if (vendor && !formData) {
       setFormData({
-        payment_terms: vendor.payment_terms || 'net_30',
         default_expense_category: vendor.default_expense_category || 'food',
         default_payment_account_id: vendor.default_payment_account_id || 'none',
         file_routing_preference: vendor.file_routing_preference || 'storage'
@@ -68,7 +67,6 @@ export default function AccountingControls({ vendorId }) {
   const handleSave = () => {
     if (!formData) return;
     updateMutation.mutate({
-      payment_terms: formData.payment_terms,
       default_expense_category: formData.default_expense_category,
       default_payment_account_id: formData.default_payment_account_id === 'none' ? null : formData.default_payment_account_id,
       file_routing_preference: formData.file_routing_preference

@@ -135,7 +135,7 @@ export default function Payments() {
     queryKey: ['invoices-payments', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', {
       limit: 500,
-      select: 'id, invoice_number, vendor_name, total_amount, amount_paid, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
+      select: 'id, invoice_number, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
@@ -145,7 +145,7 @@ export default function Payments() {
     queryKey: ['payments', organization?.id],
     queryFn: () => api.entities.Payment.list('-created_at', {
       limit: 500,
-      select: 'id, invoice_id, invoice_number, vendor_name, amount, status, method, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
+      select: 'id, invoice_id, invoice_number, vendor_name, amount, status, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),

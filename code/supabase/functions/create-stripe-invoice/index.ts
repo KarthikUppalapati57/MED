@@ -43,7 +43,7 @@ serve(async (req) => {
     // Get organization details
     const { data: org, error: orgError } = await supabaseClient
       .from('organizations')
-      .select('name, admin_email, plan_id, stripe_customer_id')
+      .select('name, primary_contact_email, plan_id, stripe_customer_id')
       .eq('id', org_id)
       .single()
 
@@ -52,7 +52,7 @@ serve(async (req) => {
     let customerId = org.stripe_customer_id
     if (!customerId) {
       customerId = await createOrRetrieveCustomer({
-        email: org.admin_email || '',
+        email: org.primary_contact_email || '',
         uuid: org_id
       })
     }

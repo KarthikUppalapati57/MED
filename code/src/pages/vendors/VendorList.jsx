@@ -104,9 +104,9 @@ export default function VendorList() {
 
   const { data, isLoading } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
-    queryFn: () => api.entities.Vendor.list('-created_at', {
+    queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, contact_name, email, phone, status, category, payment_terms, created_at',
+      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, default_expense_category, default_payment_method, default_payment_account_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
@@ -216,11 +216,18 @@ export default function VendorList() {
       return;
     }
 
+    const vendorPayload = {
+      name: formData.name,
+      email: formData.email || null,
+      status: formData.status || 'active',
+      file_routing_preference: formData.file_routing_preference || 'storage',
+    };
+
     if (editingVendor) {
-      updateMutation.mutate({ id: editingVendor.id, data: formData });
+      updateMutation.mutate({ id: editingVendor.id, data: vendorPayload });
     } else {
       createMutation.mutate({
-        ...formData,
+        ...vendorPayload,
         organization_id: organization?.id,
         brand_id: brand?.id || null,
         location_id: location?.id || null,
@@ -233,7 +240,7 @@ export default function VendorList() {
     setSuggestionsOpen(true);
 
     try {
-      const categories = [...new Set(vendors.flatMap(v => Array.isArray(v.categories) ? v.categories : []))];
+      const categories = [...new Set(vendors.map(v => v.default_expense_category).filter(Boolean))];
 
       const localSuggestions = (categories.length ? categories : ['general']).slice(0, 3).map((cat, idx) => ({
         name: `Suggested ${cat} vendor ${idx + 1}`,

@@ -940,9 +940,6 @@ export default function UserManagement() {
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
         queryClient.invalidateQueries({ queryKey: ['users'] });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['team-members'] });
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       })
@@ -994,43 +991,19 @@ export default function UserManagement() {
   const { data: members = [], isLoading } = useAuthQuery({
     queryKey: ['team-members', activeOrgId, activeBrandId, activeLocationId, showArchived],
     queryFn: async () => {
-      let finalUsers = [];
-      try {
-        let memQuery = supabase
-          .from('memberships')
-          .select('*, profiles(id, email, full_name, updated_at, location_id, brand_id)')
-          .eq('org_id', activeOrgId);
-          
-        const { data, error } = await memQuery;
-        
-        if (!error && data && data.length > 0) {
-          finalUsers = data.map(m => ({
-            ...m,
-            membership_id: m.id,
-            email: m.profiles?.email,
-            full_name: m.profiles?.full_name,
-            location_id: m.profiles?.location_id || m.location_id,
-            brand_id: m.profiles?.brand_id || m.brand_id,
-          }));
-        }
-      } catch { /* fall through */ }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, updated_at, location_id, brand_id, role, signing_privileges, status')
+        .eq('organization_id', activeOrgId);
 
-      if (finalUsers.length === 0) {
-        // Fallback: profiles table (Restops-style)
-        let q = supabase
-          .from('profiles')
-          .select('id, email, full_name, updated_at, location_id, brand_id, role, capabilities')
-          .eq('organization_id', activeOrgId);
-          
-        const { data, error } = await q;
-        if (error) throw error;
-        finalUsers = (data || []).map(p => ({
-          ...p,
-          membership_id: p.id,
-          user_id: p.id,
-          profiles: p,
-        }));
-      }
+      if (error) throw error;
+
+      const finalUsers = (data || []).map(p => ({
+        ...p,
+        membership_id: p.id,
+        user_id: p.id,
+        profiles: p,
+      }));
 
       // Merge pending invitations
       try {

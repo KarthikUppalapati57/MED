@@ -33,18 +33,19 @@ serve(async (req) => {
     
     // Log the webhook payload to the database
     const { error: insertError } = await supabaseClient
-      .from('integration_logs')
+      .from('event_logs')
       .insert([
         {
-          provider: provider,
-          event_type: payload.type || payload.event_type || 'unknown_event',
-          payload: payload,
-          status: 'received'
+          organization_id: payload.organization_id || null,
+          event_name: `${provider}.${payload.type || payload.event_type || 'unknown_event'}`,
+          entity_type: 'pos_webhook',
+          entity_id: payload.id || null,
+          payload: payload
         }
       ])
 
     if (insertError) {
-      console.warn("Could not log to integration_logs (table may not exist yet). Proceeding.", insertError)
+      console.warn("Could not log POS webhook event. Proceeding.", insertError)
     }
 
     // Handle POS specific logic

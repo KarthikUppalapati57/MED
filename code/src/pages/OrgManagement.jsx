@@ -61,7 +61,7 @@ export default function OrgManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, subscription_status, plan_id, admin_email, created_at, stripe_customer_id, logo_url')
+        .select('id, name, slug, subscription_status, plan_id, admin_email:primary_contact_email, created_at, stripe_customer_id')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];

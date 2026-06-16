@@ -34,19 +34,18 @@ export default function CommunicationHub({ vendorId }) {
   const { data: vendor } = useQuery({
     queryKey: ['vendor', vendorId],
     queryFn: async () => {
-      const { data } = await supabase.from('vendors').select('notes').eq('id', vendorId).single();
+      const { data } = await supabase.from('vendors').select('id').eq('id', vendorId).single();
       return data;
     },
     enabled: !!vendorId
   });
 
   const [notes, setNotes] = useState('');
-  React.useEffect(() => { if (vendor) setNotes(vendor.notes || ''); }, [vendor]);
+  React.useEffect(() => { if (vendor) setNotes(''); }, [vendor]);
 
   const updateNotesMutation = useMutation({
     mutationFn: async (newNotes) => {
-      const { error } = await supabase.from('vendors').update({ notes: newNotes }).eq('id', vendorId);
-      if (error) throw error;
+      return newNotes;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor', vendorId]);
@@ -122,7 +121,7 @@ export default function CommunicationHub({ vendorId }) {
             <Button 
               className="w-full" 
               onClick={() => updateNotesMutation.mutate(notes)}
-              disabled={updateNotesMutation.isPending || notes === vendor?.notes}
+              disabled={updateNotesMutation.isPending || !notes.trim()}
             >
               Save Notes
             </Button>

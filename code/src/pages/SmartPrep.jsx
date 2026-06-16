@@ -71,7 +71,7 @@ export default function SmartPrep() {
     queryKey: ['recipes', organization?.id],
     queryFn: () => api.entities.Recipe.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, recipe_yield, yield_unit, cost_per_serving, status',
+      select: 'id, organization_id, brand_id, location_id, name, yield_quantity, yield_unit, cost_per_serving, status',
     }),
     select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
     enabled: !!organization?.id,

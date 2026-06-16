@@ -160,7 +160,7 @@ export default function Inventory() {
 
   const { data: countSessions = [] } = useAuthQuery({
     queryKey: ['count_sessions', organization?.id],
-    queryFn: () => api.entities.CountSession.list('-created_at', { limit: 200 }),
+    queryFn: () => api.entities.CountSession.list('-started_at', { limit: 200 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsCountSessions,
   });

@@ -116,7 +116,7 @@ export default function Recipes() {
     queryKey: ['recipes', organization?.id],
     queryFn: () => api.entities.Recipe.list('-created_at', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, category, status, recipe_yield, yield_unit, serving_size, serving_unit, cost_per_serving, selling_price, target_margin_percent, ingredients, labor_rate_per_hour, preparation_time_minutes, created_at',
+      select: 'id, organization_id, brand_id, location_id, name, category, status, yield_quantity, yield_unit, cost_per_serving, selling_price, target_margin_percent, ingredients, labor_rate_per_hour, labor_time_minutes, created_at',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,

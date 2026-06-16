@@ -37,7 +37,7 @@ serve(async (req) => {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('stripe_customer_id, email')
+      .select('stripe_customer_id, primary_contact_email')
       .eq('id', profile.organization_id)
       .single();
 
@@ -46,7 +46,7 @@ serve(async (req) => {
     // Create a new customer if one doesn't exist
     if (!customerId) {
       const customer = await stripe.customers.create({
-        email: user.email, // fallback to user email if org email is missing
+        email: org?.primary_contact_email || user.email,
         metadata: {
           organization_id: profile.organization_id
         }
