@@ -360,6 +360,7 @@ export default function Invoices() {
     existingProducts.forEach((product) => {
       if (product.name) productByName.set(product.name.toLowerCase(), product);
       if (product.product_id) productByProductId.set(product.product_id, product);
+      if (product.id) productByProductId.set(product.id, product);
     });
 
     const operations = lineItems.map(async (item, index) => {
@@ -466,6 +467,7 @@ export default function Invoices() {
             invoice_id: invoice.id,
             organization_id: invoice.organization_id,
             inventory_item_id: item.product_id || null,
+            internal_product_id: item.product_id || null,
             item_name: item.description || 'Unknown Item',
             quantity: item.quantity || 1,
             unit_price: item.unit_price || 0,
@@ -503,6 +505,7 @@ export default function Invoices() {
             invoice_id: invoice.id,
             organization_id: invoice.organization_id,
             inventory_item_id: item.product_id || null,
+            internal_product_id: item.product_id || null,
             item_name: item.description || 'Unknown Item',
             quantity: item.quantity || 1,
             unit_price: item.unit_price || 0,
@@ -737,6 +740,9 @@ export default function Invoices() {
       if (p.product_id) {
         productByProductIdMap.set(p.product_id, p);
       }
+      if (p.id) {
+        productByProductIdMap.set(p.id, p);
+      }
       if (p.name) {
         productByNameMap.set(p.name.toLowerCase(), p);
       }
@@ -779,7 +785,7 @@ export default function Invoices() {
       const itemProductId = item.product_id || '';
 
       // O(1) Product Lookup
-      let existingProduct = itemProductId ? productByProductIdMap.get(`PRD-${itemProductId}`) : null;
+      let existingProduct = itemProductId ? (productByProductIdMap.get(itemProductId) || productByProductIdMap.get(`PRD-${itemProductId}`)) : null;
       if (!existingProduct) {
         existingProduct = productByNameMap.get(name.toLowerCase());
       }

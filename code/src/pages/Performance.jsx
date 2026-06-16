@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const sameDate = (value, target) => {
 };
 
 export default function Performance() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [budgetDrafts, setBudgetDrafts] = useState({});
   const queryClient = useQueryClient();
@@ -323,43 +325,11 @@ export default function Performance() {
     };
   }, [salesData, invoices, shifts, todayKey, budgetByCategory, periodEnd, totalSales, moversData, budgetTargets.length]);
 
-  // --- EMPTY STATES ---
-  if (!loadingSales && !loadingInvoices && salesData.length === 0 && invoices.length === 0) {
-    return (
-      <div className="space-y-6 animate-fade-in-scale max-w-5xl mx-auto mt-12">
-        <div className="text-center space-y-2 mb-8">
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">Welcome to Performance</h1>
-          <p className="text-muted-foreground text-lg">Connect your data sources to unlock real-time financial analytics.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-6">
-          <Card className="glass-card shadow-sm hover:shadow-md transition-all border-border/50 text-center flex flex-col items-center justify-center p-8">
-            <div className="h-16 w-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-4">
-              <LinkIcon className="h-8 w-8 text-blue-500" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Connect POS</h3>
-            <p className="text-sm text-muted-foreground mb-6">Sync your sales, labor, and product mix automatically.</p>
-            <Button className="w-full">Integrations</Button>
-          </Card>
-          <Card className="glass-card shadow-sm hover:shadow-md transition-all border-border/50 text-center flex flex-col items-center justify-center p-8">
-            <div className="h-16 w-16 bg-resend-green/10 rounded-full flex items-center justify-center mb-4">
-              <Upload className="h-8 w-8 text-resend-green" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Upload Invoices</h3>
-            <p className="text-sm text-muted-foreground mb-6">Digitize your invoices to track COGS and price movers.</p>
-            <Button className="w-full bg-resend-green hover:bg-resend-green/90 text-white">Upload Now</Button>
-          </Card>
-          <Card className="glass-card shadow-sm hover:shadow-md transition-all border-border/50 text-center flex flex-col items-center justify-center p-8">
-            <div className="h-16 w-16 bg-purple-500/10 rounded-full flex items-center justify-center mb-4">
-              <Target className="h-8 w-8 text-purple-500" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Set Budgets</h3>
-            <p className="text-sm text-muted-foreground mb-6">Define your targets for Sales, COGS, and Labor.</p>
-            <Button variant="outline" className="w-full" onClick={() => setActiveTab('budget')}>Configure</Button>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // --- HEALTH SCORE COMPUTATION ---
+  const readySources = dailyPnl.coverage.filter(c => c.ready).length;
+  const totalSources = dailyPnl.coverage.length;
+  const healthScore = Math.round((readySources / totalSources) * 100);
+  const showHealthBanner = readySources < totalSources && !loadingSales && !loadingInvoices;
 
   return (
     <div className="space-y-6 animate-fade-in-scale flex flex-col h-full w-full">
@@ -369,6 +339,31 @@ export default function Performance() {
           <p className="text-muted-foreground mt-1 text-lg">High-level KPIs, actual vs budget, and trend analysis.</p>
         </div>
       </div>
+
+      {showHealthBanner && (
+        <div className="bg-[#151110] border border-brand/20 rounded-xl p-4 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-5">
+            <div className="relative flex items-center justify-center w-12 h-12">
+              <svg className="w-12 h-12 transform -rotate-90">
+                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-brand/10" />
+                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={125.6} strokeDashoffset={125.6 - (125.6 * healthScore) / 100} className="text-brand transition-all duration-1000 ease-in-out" />
+              </svg>
+              <div className="absolute flex items-center justify-center text-[10px] font-bold text-brand">
+                {healthScore}%
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white/90">Data Health Score</h3>
+              <p className="text-xs text-white/60 mt-0.5">
+                {readySources} of {totalSources} accessible data sources are feeding this dashboard. {totalSources - readySources} sources still need setup or records.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" className="bg-brand hover:bg-brand/90 text-white font-medium px-6 py-4 h-auto shadow-md transition-all" onClick={() => navigate('/Integrations')}>
+            Complete Onboarding
+          </Button>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
         <TabsList className="mb-6 flex flex-wrap gap-2 h-auto bg-transparent border-b rounded-none w-full justify-start shrink-0">
@@ -388,24 +383,7 @@ export default function Performance() {
 
         <div className="flex-1 w-full relative">
           <TabsContent value="overview" className="space-y-6 m-0 h-full">
-            {/* Empty State Banner for Missing Data */}
-            {(totalSales === 0 || totalCogs === 0) && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
-                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900">Missing Data for Accurate Analytics</h3>
-                  <p className="text-amber-700 text-sm mt-1">Your performance analytics look empty or incomplete. Connect your POS or upload invoices to see real-time insights.</p>
-                  <div className="flex gap-3 mt-3">
-                    <Button variant="outline" size="sm" className="bg-white hover:bg-amber-100 border-amber-300 text-amber-900" onClick={() => window.location.href = '/Invoices'}>
-                      <Upload className="w-4 h-4 mr-2" /> Upload Invoices
-                    </Button>
-                    <Button variant="outline" size="sm" className="bg-white hover:bg-amber-100 border-amber-300 text-amber-900" onClick={() => window.location.href = '/Integrations'}>
-                      <LinkIcon className="w-4 h-4 mr-2" /> Connect POS
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Data Missing Banner removed in favor of top-level Data Health Score */}
 
             {/* Top KPIs Grid - Perfectly Aligned */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

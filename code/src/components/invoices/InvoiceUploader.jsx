@@ -34,9 +34,6 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
   // Cleanup object URLs and Camera to prevent memory leaks
   useEffect(() => {
     return () => {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
-      }
       stopCamera();
     };
   }, [fileUrl]);

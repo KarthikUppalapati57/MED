@@ -113,7 +113,7 @@ export default function AvTCosting() {
           <Button 
             onClick={handleRefresh} 
             disabled={isRefreshing}
-            className="bg-white text-slate-900 border shadow-sm hover:bg-slate-50"
+            className="bg-background text-foreground border shadow-sm hover:bg-muted"
           >
             <RefreshCw className={cn("w-4 h-4 mr-2", isRefreshing && "animate-spin")} />
             Sync Latest Data
@@ -122,7 +122,7 @@ export default function AvTCosting() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-none shadow-md bg-white overflow-hidden relative group">
+        <Card className="border-none shadow-md bg-card overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <DollarSign className="w-24 h-24 text-rose-500" />
           </div>
@@ -137,7 +137,7 @@ export default function AvTCosting() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white overflow-hidden relative group">
+        <Card className="border-none shadow-md bg-card overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <BarChart3 className="w-24 h-24 text-brand" />
           </div>
@@ -152,7 +152,7 @@ export default function AvTCosting() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-white overflow-hidden relative group">
+        <Card className="border-none shadow-md bg-card overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
             <AlertTriangle className="w-24 h-24 text-amber-500" />
           </div>
@@ -181,7 +181,7 @@ export default function AvTCosting() {
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   formatter={(value) => [`$${value}`, undefined]}
                 />
                 <Legend />
@@ -192,7 +192,7 @@ export default function AvTCosting() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-md bg-gradient-to-b from-rose-50 to-white">
+        <Card className="border-none shadow-md bg-gradient-to-b from-rose-50 to-background dark:from-rose-950/20 dark:to-background">
           <CardHeader>
             <CardTitle className="flex items-center text-rose-900">
               <AlertTriangle className="w-5 h-5 mr-2 text-rose-500" />
@@ -203,7 +203,7 @@ export default function AvTCosting() {
           <CardContent>
             <div className="space-y-4">
               {topBleeders.slice(0, 4).map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-white shadow-sm border border-rose-100">
+                <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-card shadow-sm border border-rose-100 dark:border-rose-900/50">
                   <div>
                     <p className="font-bold text-sm text-slate-900">{item.ingredient}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
@@ -231,7 +231,7 @@ export default function AvTCosting() {
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50 hover:bg-slate-50">
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="font-bold">Ingredient</TableHead>
                 <TableHead className="text-right font-bold">Theoretical Qty</TableHead>
                 <TableHead className="text-right font-bold">Actual Qty</TableHead>
@@ -269,9 +269,9 @@ export default function AvTCosting() {
                       ${metrics.varianceCost.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
-                      {item.status === 'critical' && <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none"><AlertCircle className="w-3 h-3 mr-1" /> Critical</Badge>}
-                      {item.status === 'warning' && <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none"><AlertTriangle className="w-3 h-3 mr-1" /> Watch</Badge>}
-                      {item.status === 'good' && <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none"><CheckCircle2 className="w-3 h-3 mr-1" /> On Target</Badge>}
+                      {item.status === 'critical' && <Badge className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 hover:bg-rose-200 border-none"><AlertCircle className="w-3 h-3 mr-1" /> Critical</Badge>}
+                      {item.status === 'warning' && <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 border-none"><AlertTriangle className="w-3 h-3 mr-1" /> Watch</Badge>}
+                      {item.status === 'good' && <Badge className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 border-none"><CheckCircle2 className="w-3 h-3 mr-1" /> On Target</Badge>}
                     </TableCell>
                   </TableRow>
                 );

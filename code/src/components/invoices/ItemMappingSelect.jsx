@@ -78,7 +78,7 @@ export default function ItemMappingSelect({
                   key={product.id}
                   value={product.name}
                   onSelect={() => {
-                    onChange(product.product_id || product.id);
+                    onChange(product.id);
                     setOpen(false);
                   }}
                 >

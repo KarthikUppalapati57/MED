@@ -384,8 +384,8 @@ export default function Accounting() {
         </TabsContent>
 
         <TabsContent value="close-books" className="space-y-6">
-          <Card className="border-rose-100 shadow-sm overflow-hidden bg-rose-50/30">
-            <CardHeader className="bg-rose-50 border-b border-rose-100">
+          <Card className="border-rose-100 dark:border-rose-900/50 shadow-sm overflow-hidden bg-rose-50/30 dark:bg-rose-950/20">
+            <CardHeader className="bg-rose-50 dark:bg-rose-950/40 border-b border-rose-100 dark:border-rose-900/50">
               <CardTitle className="flex items-center text-rose-900">
                 <Lock className="w-5 h-5 mr-2 text-rose-600" />
                 Audit-Ready Books
@@ -415,7 +415,7 @@ export default function Accounting() {
                 {loadingPeriods ? (
                   <p className="text-sm text-muted-foreground">Loading closed periods...</p>
                 ) : closedPeriods.length === 0 ? (
-                  <div className="p-4 border rounded bg-white text-sm text-muted-foreground">No periods have been closed yet.</div>
+                  <div className="p-4 border rounded bg-card text-sm text-muted-foreground">No periods have been closed yet.</div>
                 ) : (
                   <Table>
                     <TableHeader>
