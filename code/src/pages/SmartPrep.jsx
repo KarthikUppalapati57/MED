@@ -59,14 +59,20 @@ export default function SmartPrep() {
 
   const { data: plans = [] } = useAuthQuery({
     queryKey: ['smart-prep-plans', organization?.id],
-    queryFn: () => api.entities.SmartPrepPlan.list('-prep_date'),
+    queryFn: () => api.entities.SmartPrepPlan.list('-prep_date', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, name, recipe_id, prep_date, prep_quantity, on_hand_quantity, forecast_quantity, unit, priority, status, notes',
+    }),
     select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
     enabled: !!organization?.id,
   });
 
   const { data: recipes = [] } = useAuthQuery({
     queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list('name'),
+    queryFn: () => api.entities.Recipe.list('name', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, name, recipe_yield, yield_unit, cost_per_serving, status',
+    }),
     select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
     enabled: !!organization?.id,
   });

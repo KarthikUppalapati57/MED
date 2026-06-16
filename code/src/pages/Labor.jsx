@@ -31,19 +31,28 @@ export default function Labor() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
+  const needsEmployees = ['summary', 'shifts', 'employees'].includes(activeTab);
+  const needsShifts = ['summary', 'shifts'].includes(activeTab);
+  const needsForecast = activeTab === 'summary';
 
   const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
     queryKey: ['employees', organization?.id],
-    queryFn: () => api.entities.Employee.list('-created_at'),
+    queryFn: () => api.entities.Employee.list('-created_at', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, first_name, last_name, name, email, phone, role, status, hourly_rate, created_at',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsEmployees,
   });
 
   const { data: shifts = [], isLoading: loadingShifts } = useAuthQuery({
     queryKey: ['employee_shifts', organization?.id],
-    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
+    queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, employee_id, shift_start, shift_end, start_time, end_time, status, labor_cost, created_at',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsShifts,
   });
 
   useEffect(() => {
@@ -78,7 +87,7 @@ export default function Labor() {
       }
       return data || [];
     },
-    enabled: !!location?.id
+    enabled: !!location?.id && needsForecast
   });
 
   const externalFactors = [

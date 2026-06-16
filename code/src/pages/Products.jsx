@@ -133,10 +133,14 @@ export default function Products() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location } = useAuth();
+  const needsGlobalItems = activeTab === 'ai-verification';
 
   const { data: products = [], isLoading } = useAuthQuery({
     queryKey: ['products', organization?.id],
-    queryFn: () => api.entities.Product.list('-created_at'),
+    queryFn: () => api.entities.Product.list('-created_at', {
+      limit: 1000,
+      select: 'id, product_id, name, description, category, accounting_category, is_inventoried, is_tax_exempt, report_by_unit, base_unit, latest_price, location_specific, organization_id, brand_id, location_id, created_at',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
@@ -144,14 +148,18 @@ export default function Products() {
   const { data: globalItems = [] } = useAuthQuery({
     queryKey: ['global_vendor_items'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('global_vendor_items').select('id, item_name, mapping_count, most_common_category, confidence_score');
+      const { data, error } = await supabase
+        .from('global_vendor_items')
+        .select('id, item_name, mapping_count, most_common_category, confidence_score')
+        .order('mapping_count', { ascending: false })
+        .limit(500);
       if (error) {
         console.warn('global_vendor_items error', error);
         return [];
       }
       return data || [];
     },
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsGlobalItems,
   });
 
   useEffect(() => {

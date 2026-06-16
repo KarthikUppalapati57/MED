@@ -115,6 +115,11 @@ export default function Inventory() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
+  const needsInventory = ['inventory', 'summary', 'daily-snapshot', 'counts', 'count-sheets'].includes(activeTab) || editDialogOpen || addDialogOpen || convertDialogOpen || wastageDialogOpen || scannerDialogOpen || activeSessionOpen;
+  const needsWastage = ['wastage', 'waste-summary', 'daily-snapshot', 'summary'].includes(activeTab) || wastageDialogOpen;
+  const needsCountSheets = ['counts', 'count-sheets'].includes(activeTab) || activeSessionOpen || newTemplateOpen;
+  const needsCountSessions = activeTab === 'counts' || activeSessionOpen;
+  const needsRecipes = activeTab === 'pos-sync';
 
   const { data: inventory = [], isLoading } = useAuthQuery({
     queryKey: ['inventory', organization?.id, location?.id, page, debouncedSearch, categoryFilter],
@@ -130,41 +135,41 @@ export default function Inventory() {
       });
     },
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsInventory,
   });
 
   const { data: inventoryMetrics } = useAuthQuery({
     queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
     queryFn: () => api.metrics.getInventoryTotals(organization?.id, debouncedSearch, location?.id),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
   });
 
   const { data: wastageLogs = [] } = useAuthQuery({
     queryKey: ['wastage', organization?.id],
-    queryFn: () => api.entities.WastageLog.list('-created_at'),
+    queryFn: () => api.entities.WastageLog.list('-created_at', { limit: 300 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsWastage,
   });
 
   const { data: countSheets = [] } = useAuthQuery({
     queryKey: ['count_sheets', organization?.id],
-    queryFn: () => api.entities.CountSheet.list(),
+    queryFn: () => api.entities.CountSheet.list('-created_at', { limit: 200 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsCountSheets,
   });
 
   const { data: countSessions = [] } = useAuthQuery({
     queryKey: ['count_sessions', organization?.id],
-    queryFn: () => api.entities.CountSession.list(),
+    queryFn: () => api.entities.CountSession.list('-created_at', { limit: 200 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsCountSessions,
   });
 
   const { data: recipes = [] } = useAuthQuery({
     queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list(),
+    queryFn: () => api.entities.Recipe.list('name', { limit: 300 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsRecipes,
   });
 
   useEffect(() => {

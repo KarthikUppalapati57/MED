@@ -199,7 +199,8 @@ export default function Invoices() {
   const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
     queryKey: ['invoices-dashboard', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', { 
-      select: 'id, invoice_number, vendor_name, total_amount, status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, location_id, file_url, source' 
+      limit: 500,
+      select: 'id, invoice_number, vendor_name, total_amount, status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, brand_id, location_id, file_url, source, payment_account_id, scheduled_payment_date'
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
@@ -354,7 +355,10 @@ export default function Invoices() {
   const syncInvoiceVendorCatalog = async (invoice, lineItems = [], lineRecords = []) => {
     if (!invoice?.organization_id || !lineItems.length) return;
 
-    const existingProducts = await api.entities.Product.list();
+    const existingProducts = await api.entities.Product.list('name', {
+      limit: 1000,
+      select: 'id, product_id, name, latest_price, organization_id, brand_id, location_id',
+    });
     const productByName = new Map();
     const productByProductId = new Map();
     existingProducts.forEach((product) => {
@@ -729,8 +733,14 @@ export default function Invoices() {
     }
 
     const [existingProducts, existingInventory] = await Promise.all([
-      api.entities.Product.list(),
-      api.entities.Inventory.list(),
+      api.entities.Product.list('name', {
+        limit: 1000,
+        select: 'id, product_id, name, latest_price, organization_id, brand_id, location_id',
+      }),
+      api.entities.Inventory.list('product_name', {
+        limit: 1000,
+        select: 'id, product_id, product_name, current_quantity, current_value, unit_cost, organization_id, brand_id, location_id',
+      }),
     ]);
 
     // O(1) Precomputed Lookups

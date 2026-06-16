@@ -25,45 +25,77 @@ export default function Accounting() {
   const navigate = useNavigate();
   const { organization, userProfile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'dashboard';
+  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const needsInvoices = ['export', 'reconciliation'].includes(activeTab);
+  const needsPayments = activeTab === 'reconciliation';
+  const needsVendors = activeTab === 'vendor-mapping';
+  const needsSalesData = ['sales-mapping', 'pmix-mapping'].includes(activeTab);
+  const needsGlMappings = ['gl-mapping', 'sales-mapping'].includes(activeTab);
+  const needsClosedPeriods = activeTab === 'close-books';
 
   const { data: logs = [], isLoading: loadingLogs } = useAuthQuery({
     queryKey: ['accounting_sync_logs'],
-    queryFn: () => api.entities.AccountingSyncLog.list('-created_at'),
+    queryFn: () => api.entities.AccountingSyncLog.list('-created_at', {
+      limit: 50,
+      select: 'id, entity_type, sync_status, error_message, created_at',
+    }),
   });
 
   const { data: integrations = [], isLoading: loadingIntegrations } = useAuthQuery({
     queryKey: ['integrations'],
-    queryFn: () => api.entities.Integration.list('-created_at'),
+    queryFn: () => api.entities.Integration.list('-created_at', {
+      limit: 50,
+      select: 'id, organization_id, provider, is_active, connected_at, created_at',
+    }),
   });
 
   const { data: closedPeriods = [], isLoading: loadingPeriods, refetch: refetchPeriods } = useAuthQuery({
     queryKey: ['closed_periods'],
-    queryFn: () => api.entities.ClosedPeriod.list('-start_date'),
+    queryFn: () => api.entities.ClosedPeriod.list('-start_date', { limit: 100 }),
+    enabled: needsClosedPeriods,
   });
 
   const { data: glMappings = [], isLoading: loadingGlMappings, refetch: refetchGlMappings } = useAuthQuery({
     queryKey: ['gl_mappings'],
     queryFn: () => api.entities.GlMapping.list('category'),
+    enabled: needsGlMappings,
   });
 
   const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
     queryKey: ['accounting-invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryFn: () => api.entities.Invoice.list('-created_at', {
+      limit: 500,
+      select: 'id, invoice_number, vendor_name, invoice_date, due_date, status, total_amount, organization_id, brand_id, location_id',
+    }),
+    enabled: needsInvoices,
   });
 
   const { data: payments = [], isLoading: loadingPayments } = useAuthQuery({
     queryKey: ['accounting-payments'],
-    queryFn: () => api.entities.Payment.list('-payment_date'),
+    queryFn: () => api.entities.Payment.list('-payment_date', {
+      limit: 500,
+      select: 'id, invoice_id, payment_date, created_at, vendor_name, invoice_number, payment_method, method, amount, status, organization_id, brand_id, location_id',
+    }),
+    enabled: needsPayments,
   });
 
   const { data: vendors = [], isLoading: loadingVendors } = useAuthQuery({
     queryKey: ['accounting-vendors'],
-    queryFn: () => api.entities.Vendor.list('name'),
+    queryFn: () => api.entities.Vendor.list('name', {
+      limit: 500,
+      select: 'id, name, vendor_name, accounting_name, external_name, accounting_vendor_id, external_id, qbo_vendor_id, status, organization_id, brand_id, location_id',
+    }),
+    enabled: needsVendors,
   });
 
   const { data: salesData = [], isLoading: loadingSalesData } = useAuthQuery({
     queryKey: ['accounting-pos-sales-data'],
-    queryFn: () => api.entities.PosSalesData.list('-sale_date'),
+    queryFn: () => api.entities.PosSalesData.list('-sale_date', {
+      limit: 500,
+      select: 'id, pos_provider, source, category, menu_category, item_category, item_name, menu_item_name, product_name, quantity, units_sold, net_sales, sales_amount, total_sales, organization_id, location_id',
+    }),
+    enabled: needsSalesData,
   });
 
   useEffect(() => {
@@ -87,8 +119,6 @@ export default function Accounting() {
     };
   }, [queryClient]);
 
-  const activeTab = searchParams.get('tab') || 'dashboard';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [closeDialogOpen, setCloseDialogOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
   const [editingGlMapping, setEditingGlMapping] = React.useState(null);

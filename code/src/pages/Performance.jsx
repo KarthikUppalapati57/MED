@@ -93,9 +93,9 @@ export default function Performance() {
       },
       {
         queryKey: ['invoice_allocations', organization?.id],
-        queryFn: () => api.entities.InvoiceAllocation.list('-created_at', {
+        queryFn: () => api.entities.InvoiceAllocation.list(null, {
           limit: 500,
-          select: 'id, organization_id, location_id, allocation_type, category_name, amount, created_at',
+          select: 'id, organization_id, location_id, allocation_type, category_name, amount',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsAllocations,

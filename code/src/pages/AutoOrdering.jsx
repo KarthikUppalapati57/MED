@@ -100,12 +100,21 @@ export default function AutoOrdering() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
+  const needsOrderList = ['all-orders', 'place-order', 'invoice-approval', 'receiving'].includes(activeTab);
+  const needsInventory = ['all-orders', 'place-order', 'transfers'].includes(activeTab) || newTransferOpen;
+  const needsVendors = ['all-orders', 'place-order'].includes(activeTab);
+  const needsLocations = activeTab === 'transfers' || newTransferOpen;
+  const needsInvoices = activeTab === 'invoice-approval';
+  const needsVendorPrices = activeTab === 'place-order';
+  const needsTransfers = activeTab === 'transfers';
+  const needsReceivings = ['invoice-approval', 'receiving'].includes(activeTab);
+  const needsOrderingSettings = activeTab === 'order-setup';
 
   const { data: orders = [], isLoading } = useAuthQuery({
     queryKey: ['auto-orders', organization?.id],
-    queryFn: () => api.entities.AutoOrder.list('-created_at'),
+    queryFn: () => api.entities.AutoOrder.list('-created_at', { limit: 300 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsOrderList,
   });
 
   useEffect(() => {
@@ -122,57 +131,66 @@ export default function AutoOrdering() {
 
   const { data: inventory = [] } = useAuthQuery({
     queryKey: ['inventory', organization?.id],
-    queryFn: () => api.entities.Inventory.list(),
+    queryFn: () => api.entities.Inventory.list('product_name', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, product_id, product_name, current_quantity, current_unit, unit_cost, reorder_point, par_level, vendor_name',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsInventory,
   });
 
   const { data: vendors = [] } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
-    queryFn: () => api.entities.Vendor.list(),
+    queryFn: () => api.entities.Vendor.list('name', { limit: 300, select: 'id, organization_id, brand_id, location_id, name, vendor_name' }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsVendors,
   });
 
   const { data: locations = [] } = useAuthQuery({
     queryKey: ['locations', organization?.id],
-    queryFn: () => api.entities.Location.list('name'),
+    queryFn: () => api.entities.Location.list('name', { select: 'id, name, brand_id, organization_id' }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location: null }), [organization, brand]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsLocations,
   });
 
   const { data: invoices = [] } = useAuthQuery({
     queryKey: ['order-invoice-approval', organization?.id],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryFn: () => api.entities.Invoice.list('-created_at', {
+      limit: 300,
+      select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, purchase_order_id, matched_order_id, po_number',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsInvoices,
   });
 
   const { data: vendorPrices = [] } = useAuthQuery({
     queryKey: ['vendor_item_prices', organization?.id],
-    queryFn: () => api.entities.VendorItemPrice.list(),
+    queryFn: () => api.entities.VendorItemPrice.list('-created_at', {
+      limit: 500,
+      select: 'id, organization_id, vendor_id, product_name, price, is_approved_supplier, created_at',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsVendorPrices,
   });
 
   const { data: transfers = [] } = useAuthQuery({
     queryKey: ['transfers', organization?.id],
-    queryFn: () => api.entities.Transfer.list('-created_at'),
+    queryFn: () => api.entities.Transfer.list('-created_at', { limit: 300 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsTransfers,
   });
 
   const { data: receivings = [] } = useAuthQuery({
     queryKey: ['receivings', organization?.id],
-    queryFn: () => api.entities.Receiving.list('-received_date'),
+    queryFn: () => api.entities.Receiving.list('-received_date', { limit: 300 }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsReceivings,
   });
 
   const { data: settingsRows = [] } = useAuthQuery({
     queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'],
     queryFn: () => api.entities.OperationalSetting.filter({ organization_id: organization?.id }),
-    enabled: !!organization?.id,
+    enabled: !!organization?.id && needsOrderingSettings,
   });
 
   const orderingSettingsRow = settingsRows.find((row) => row.category === 'ordering');

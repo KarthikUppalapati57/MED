@@ -104,7 +104,10 @@ export default function VendorList() {
 
   const { data, isLoading } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
-    queryFn: () => api.entities.Vendor.list('-created_at'),
+    queryFn: () => api.entities.Vendor.list('-created_at', {
+      limit: 500,
+      select: 'id, organization_id, brand_id, location_id, name, contact_name, email, phone, status, category, payment_terms, created_at',
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
