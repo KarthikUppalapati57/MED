@@ -1102,7 +1102,7 @@ function useDashboardData(scope) {
   const { data: invoices = [] } = useAuthQuery({
     queryKey: ['dashboard-invoices', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.Invoice.list('-created_at', {
-      limit: 500,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, total_amount, status, payment_status, due_date, invoice_date, created_at',
     }),
     select: selectByScope,
@@ -1112,7 +1112,7 @@ function useDashboardData(scope) {
   const { data: payments = [] } = useAuthQuery({
     queryKey: ['dashboard-payments', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.Payment.list('-created_at', {
-      limit: 500,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, amount, status, payment_date, created_at',
     }),
     select: selectByScope,
@@ -1122,7 +1122,7 @@ function useDashboardData(scope) {
   const { data: inventory = [] } = useAuthQuery({
     queryKey: ['dashboard-inventory', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.Inventory.list(null, {
-      limit: 500,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, current_quantity, current_value, unit_cost, product_name',
     }),
     select: selectByScope,
@@ -1132,7 +1132,7 @@ function useDashboardData(scope) {
   const { data: products = [] } = useAuthQuery({
     queryKey: ['dashboard-products', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.Product.list(null, {
-      limit: 1000,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, is_inventoried',
     }),
     select: selectByScope,
@@ -1142,7 +1142,7 @@ function useDashboardData(scope) {
   const { data: salesData = [] } = useAuthQuery({
     queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.PosSalesData.list('-sale_date', {
-      limit: 500,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, sale_date, date, revenue, total_sales',
     }),
     select: selectByScope,
@@ -1152,7 +1152,7 @@ function useDashboardData(scope) {
   const { data: shifts = [] } = useAuthQuery({
     queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
-      limit: 500,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, shift_start, status, labor_cost',
     }),
     select: selectByScope,
@@ -1162,7 +1162,7 @@ function useDashboardData(scope) {
   const { data: orders = [] } = useAuthQuery({
     queryKey: ['dashboard-orders', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.AutoOrder.list('-created_at', {
-      limit: 300,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, status, created_at',
     }),
     select: selectByScope,
@@ -1172,7 +1172,7 @@ function useDashboardData(scope) {
   const { data: wastageLogs = [] } = useAuthQuery({
     queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.WastageLog.list('-created_at', {
-      limit: 300,
+      limit: 50,
       select: 'id, organization_id, brand_id, location_id, total_cost, created_at',
     }),
     select: selectByScope,

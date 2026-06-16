@@ -52,54 +52,70 @@ export default function PlatformUsers() {
     }
   };
 
-  const results = useAuthQueries({
-    queries: [
-      {
-        queryKey: ['platform-all-users'],
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
-          if (error) throw error;
-          return data || [];
-        },
-        enabled: authChecked && userRole === 'platform_admin',
-      },
-      {
-        queryKey: ['platform-orgs-lookup'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from("organizations").select("id, name, subscription_status");
-          if (error) throw error;
-          return data || [];
-        },
-        enabled: authChecked && userRole === 'platform_admin',
-      },
-      {
-        queryKey: ['platform-brands-lookup'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from("brands").select("brand_id, name");
-          if (error) throw error;
-          return data || [];
-        },
-        enabled: authChecked && userRole === 'platform_admin',
-      },
-      {
-        queryKey: ['platform-locations-lookup'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from("locations").select("id, name");
-          if (error) throw error;
-          return data || [];
-        },
-        enabled: authChecked && userRole === 'platform_admin',
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+
+  const { data: usersData, isLoading: isLoadingProfiles } = useAuthQuery({
+    queryKey: ['platform-all-users', page, searchQuery],
+    queryFn: async () => {
+      let query = supabase
+        .from("profiles")
+        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id", { count: 'exact' });
+        
+      if (searchQuery) {
+        query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
       }
-    ]
+      
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        
+      if (error) throw error;
+      return { data, count };
+    },
+    enabled: authChecked && userRole === 'platform_admin',
   });
 
-  const isLoadingProfiles = results[0].isLoading;
-  const profiles = results[0].data || [];
-  const orgs = results[1].data || [];
-  const brands = results[2].data || [];
-  const locations = results[3].data || [];
+  const profiles = usersData?.data || [];
+  const totalUsers = usersData?.count || 0;
+  const totalPages = Math.ceil(totalUsers / PAGE_SIZE);
+
+  const orgIds = Array.from(new Set(profiles.map(p => p.organization_id).filter(Boolean)));
+  const brandIds = Array.from(new Set(profiles.map(p => p.brand_id).filter(Boolean)));
+  const locationIds = Array.from(new Set(profiles.map(p => p.location_id).filter(Boolean)));
+
+  const { data: orgs = [] } = useAuthQuery({
+    queryKey: ['platform-orgs-lookup', orgIds],
+    queryFn: async () => {
+      if (orgIds.length === 0) return [];
+      const { data, error } = await supabase.from("organizations").select("id, name, subscription_status").in('id', orgIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: authChecked && userRole === 'platform_admin' && orgIds.length > 0,
+  });
+
+  const { data: brands = [] } = useAuthQuery({
+    queryKey: ['platform-brands-lookup', brandIds],
+    queryFn: async () => {
+      if (brandIds.length === 0) return [];
+      const { data, error } = await supabase.from("brands").select("brand_id, name").in('brand_id', brandIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: authChecked && userRole === 'platform_admin' && brandIds.length > 0,
+  });
+
+  const { data: locations = [] } = useAuthQuery({
+    queryKey: ['platform-locations-lookup', locationIds],
+    queryFn: async () => {
+      if (locationIds.length === 0) return [];
+      const { data, error } = await supabase.from("locations").select("id, name").in('id', locationIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: authChecked && userRole === 'platform_admin' && locationIds.length > 0,
+  });
 
   const orgMap = useMemo(() => {
     return orgs.reduce((acc, org) => {
@@ -122,17 +138,7 @@ export default function PlatformUsers() {
     }, {});
   }, [locations]);
 
-  const filteredUsers = useMemo(() => {
-    const term = searchQuery.trim().toLowerCase();
-    return profiles.filter((p) => {
-      if (!term) return true;
-      const matchSearch =
-        p.full_name?.toLowerCase().includes(term) ||
-        p.email?.toLowerCase().includes(term) ||
-        orgMap[p.organization_id]?.name?.toLowerCase().includes(term);
-      return matchSearch;
-    });
-  }, [profiles, searchQuery, orgMap]);
+  const filteredUsers = profiles; // Already filtered by server
 
   if (!authChecked) {
     return (
@@ -268,6 +274,28 @@ export default function PlatformUsers() {
               ))}
             </TableBody>
           </Table>
+          
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border flex items-center justify-between text-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Previous
+              </Button>
+              <span className="text-muted-foreground font-medium">Page {page + 1} of {totalPages} ({totalUsers} total)</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

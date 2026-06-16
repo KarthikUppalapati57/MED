@@ -24,6 +24,8 @@ export default defineConfig({
             'lucide-react', 'framer-motion', 'clsx', 'tailwind-merge',
             '@tanstack/react-query', 'date-fns', 'sonner'
           ],
+          'vendor-charts': ['recharts'],
+          'vendor-utils': ['papaparse'],
         }
       }
     }

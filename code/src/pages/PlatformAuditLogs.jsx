@@ -38,41 +38,41 @@ export default function PlatformAuditLogs() {
     };
   }, [queryClient]);
 
- // Audit Logs Query 
-  const { data: auditLogs = [], isLoading: isLoadingLogs } = useAuthQuery({
-    queryKey: ['platform-wide-audit-logs', logModuleFilter],
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+
+  const { data: logsData, isLoading: isLoadingLogs } = useAuthQuery({
+    queryKey: ['platform-wide-audit-logs', logModuleFilter, page, searchQuery],
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
-        .select('*, profiles:user_id(email, full_name)')
-        .order('created_at', { ascending: false })
-        .limit(200);
+        .select('*, profiles:user_id(email, full_name)', { count: 'exact' });
+        
       if (logModuleFilter !== 'All') {
         q = q.eq('table_name', logModuleFilter.toLowerCase());
       } else {
         q = q.in('table_name', ['organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations']);
       }
-      const { data, error } = await q;
+      
+      if (searchQuery) {
+        q = q.or(`action.ilike.%${searchQuery}%,table_name.ilike.%${searchQuery}%,record_id.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error, count } = await q
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        
       if (error) throw error;
-      return data || [];
+      return { data, count };
     },
     enabled: authChecked && userRole === 'platform_admin',
   });
 
-  // Filter logs by search
-  const filteredLogs = React.useMemo(() => {
-    return auditLogs.filter(log => {
-      const term = searchQuery.trim().toLowerCase();
-      if (!term) return true;
-      return (
-        log.action?.toLowerCase().includes(term) ||
-        log.table_name?.toLowerCase().includes(term) ||
-        log.profiles?.email?.toLowerCase().includes(term) ||
-        log.profiles?.full_name?.toLowerCase().includes(term) ||
-        log.record_id?.toLowerCase().includes(term)
-      );
-    });
-  }, [auditLogs, searchQuery]);
+  const auditLogs = logsData?.data || [];
+  const totalLogs = logsData?.count || 0;
+  const totalPages = Math.ceil(totalLogs / PAGE_SIZE);
+
+  const filteredLogs = auditLogs;
 
   // Stats
   const todayLogs = React.useMemo(() => {
@@ -154,8 +154,8 @@ export default function PlatformAuditLogs() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase">Total Entries</p>
-                <p className="text-2xl font-bold mt-1">{auditLogs.length}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">All time records</p>
+                <p className="text-2xl font-bold mt-1">{totalLogs}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Matching records</p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
                 <Database className="h-5 w-5 text-muted-foreground" />
@@ -298,6 +298,28 @@ export default function PlatformAuditLogs() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {totalPages > 1 && (
+            <div className="pt-4 border-t border-border flex items-center justify-between text-sm mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Previous
+              </Button>
+              <span className="text-muted-foreground font-medium">Page {page + 1} of {totalPages} ({totalLogs} total)</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                Next
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

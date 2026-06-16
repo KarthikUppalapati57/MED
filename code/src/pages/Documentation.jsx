@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import InteractiveScene from '@/components/InteractiveScene';
+
+const InteractiveScene = lazy(() => import('@/components/InteractiveScene'));
 import RestopsLogo from '@/components/RestopsLogo';
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
@@ -173,7 +174,9 @@ export default function Documentation() {
           className="absolute inset-0 flex items-center justify-center opacity-40"
         >
           <div className="w-full h-full max-w-[2400px] max-h-[100vh]">
-            <InteractiveScene />
+            <Suspense fallback={null}>
+              <InteractiveScene />
+            </Suspense>
           </div>
         </motion.div>
       </div>

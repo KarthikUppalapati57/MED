@@ -49,71 +49,87 @@ export default function PlatformOrganizations() {
     selectedBrandId: ''
   });
   
-  const results = useAuthQueries({
-    queries: [
-      {
-        queryKey: ['platform_organizations_full'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from('organizations').select('id, name, slug, subscription_status, plan_id, admin_email, created_at').order('name');
-          if (error) throw error;
-          return data;
-        }
-      },
-      {
-        queryKey: ['platform_brands_all'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at');
-          if (error) throw error;
-          return data;
-        }
-      },
-      {
-        queryKey: ['platform_locations_all'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at');
-          if (error) throw error;
-          return data;
-        }
-      },
-      {
-        queryKey: ['platform_users_all'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from('users').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status');
-          if (error) throw error;
-          return data;
-        }
-      },
-      {
-        queryKey: ['platform_plans'],
-        queryFn: async () => {
-          const { data, error } = await supabase.from('plans').select('id, name, price_monthly, max_users, max_locations').order('price_monthly');
-          if (error) throw error;
-          return data;
-        }
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+
+  const { data: orgsData, isLoading: isLoadingOrgs } = useAuthQuery({
+    queryKey: ['platform_organizations_paginated', page, searchTerm],
+    queryFn: async () => {
+      let query = supabase.from('organizations')
+        .select('id, name, slug, subscription_status, plan_id, admin_email, created_at, status', { count: 'exact' });
+      
+      if (searchTerm) {
+        query = query.ilike('name', `%${searchTerm}%`);
       }
-    ]
+
+      const { data, error, count } = await query
+        .order('name')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (error) throw error;
+      return { data, count };
+    }
   });
 
-  const isLoadingOrgs = results[0].isLoading;
-  const orgs = results[0].data || [];
-  const brands = results[1].data || [];
-  const locations = results[2].data || [];
-  const users = results[3].data || [];
-  const plans = results[4].data || [];
+  const orgs = orgsData?.data || [];
+  const totalOrgs = orgsData?.count || 0;
+  const totalPages = Math.ceil(totalOrgs / PAGE_SIZE);
+
+  const { data: orgBrands = [] } = useAuthQuery({
+    queryKey: ['platform_org_brands', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at').eq('organization_id', selectedOrgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedOrgId
+  });
+
+  const { data: orgLocations = [] } = useAuthQuery({
+    queryKey: ['platform_org_locations', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at').eq('organization_id', selectedOrgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedOrgId
+  });
+
+  const { data: orgUsers = [] } = useAuthQuery({
+    queryKey: ['platform_org_users', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const { data, error } = await supabase.from('users').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status').eq('organization_id', selectedOrgId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedOrgId
+  });
+
+  const { data: plans = [] } = useAuthQuery({
+    queryKey: ['platform_plans'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('plans').select('id, name, price_monthly, max_users, max_locations').order('price_monthly');
+      if (error) throw error;
+      return data;
+    }
+  });
 
   React.useEffect(() => {
     const channel = supabase.channel('platform-orgs-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+        queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
+        queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+        queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_users_all'] });
+        queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, () => {
         queryClient.invalidateQueries({ queryKey: ['platform_plans'] });
@@ -170,7 +186,7 @@ export default function PlatformOrganizations() {
         });
       }
       // Invalidate this page's query
-      queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
       // Invalidate Platform Users query
       queryClient.invalidateQueries({ queryKey: ['platform-orgs-lookup'] });
       // Invalidate Platform Plans query
@@ -193,10 +209,10 @@ export default function PlatformOrganizations() {
       posthog.capture('workspace_deleted');
       toast.success("Organization successfully deleted");
       setSelectedOrgId(null);
-      queryClient.invalidateQueries({ queryKey: ['platform_organizations_full'] });
-      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
-      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
-      queryClient.invalidateQueries({ queryKey: ['platform_users_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to delete organization");
@@ -207,8 +223,6 @@ export default function PlatformOrganizations() {
 
   const downloadTemplate = () => {
     if (!selectedOrg) return;
-    const orgBrands = brands.filter(b => b.organization_id === selectedOrg.id);
-    const orgLocations = locations.filter(l => orgBrands.some(b => b.brand_id === l.brand_id));
     
     let csvData = [];
     if (orgBrands.length === 0) {
@@ -330,8 +344,8 @@ export default function PlatformOrganizations() {
       setIsHierarchyModalOpen(false);
       setCsvFile(null);
       setCsvData([]);
-      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
-      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to import hierarchy');
@@ -376,8 +390,8 @@ export default function PlatformOrganizations() {
 
       setManualEntry({ type: 'brand', brandName: '', locationName: '', locationAddress: '', selectedBrandId: '' });
       setIsHierarchyModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['platform_brands_all'] });
-      queryClient.invalidateQueries({ queryKey: ['platform_locations_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to modify hierarchy");
@@ -386,17 +400,7 @@ export default function PlatformOrganizations() {
     }
   };
 
-  const filteredOrgs = orgs.filter(org => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return true;
-    return org.name?.toLowerCase().includes(term) || org.admin_email?.toLowerCase().includes(term);
-  });
-
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
-  const orgBrands = brands.filter(b => b.organization_id === selectedOrgId);
-  const orgLocations = locations.filter(l => orgBrands.some(b => b.brand_id === l.brand_id));
-  const orgUsers = users.filter(u => u.organization_id === selectedOrgId);
-  
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
 
   return (
@@ -428,11 +432,9 @@ export default function PlatformOrganizations() {
               Array(5).fill(0).map((_, i) => (
                 <div key={i} className="h-16 bg-secondary animate-pulse rounded-lg m-2"></div>
               ))
-            ) : filteredOrgs.length === 0 ? (
+            ) : orgs.length === 0 ? (
               <div className="text-center py-8 text-xs text-muted-foreground italic">No organizations found.</div>
-            ) : filteredOrgs.map(org => {
-              const bCount = brands.filter(b => b.organization_id === org.id).length;
-              const uCount = users.filter(u => u.organization_id === org.id).length;
+            ) : orgs.map(org => {
               const isActive = org.status !== 'archived' && org.status !== 'suspended';
               const isSelected = selectedOrgId === org.id;
 
@@ -457,9 +459,7 @@ export default function PlatformOrganizations() {
                       isSelected ? "text-primary" : "text-foreground"
                     )}>{org.name}</p>
                     <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate flex items-center gap-2">
-                      <span>{bCount} Brands</span>
-                      <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                      <span>{uCount} Users</span>
+                      <span>{org.plan_id || 'Free'}</span>
                     </p>
                   </div>
                   <ChevronRight className={cn(
@@ -471,6 +471,30 @@ export default function PlatformOrganizations() {
             })}
           </div>
         </ScrollArea>
+        
+        {totalPages > 1 && (
+          <div className="p-3 border-t border-border/50 flex items-center justify-between bg-card text-xs">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="h-8 text-[10px]"
+            >
+              Prev
+            </Button>
+            <span className="text-muted-foreground font-medium">Page {page + 1} of {totalPages}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="h-8 text-[10px]"
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Right Content: Detail View */}
