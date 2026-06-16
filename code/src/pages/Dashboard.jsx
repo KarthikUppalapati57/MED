@@ -1054,6 +1054,14 @@ function useDashboardData(scope) {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const enabled = !!organization?.id;
+  const now = new Date();
+  const periodStart = startOfMonth(now).toISOString().split('T')[0];
+  const periodEnd = endOfMonth(now).toISOString().split('T')[0];
+  const dashboardSummaryEnabled = enabled && (
+    scope === 'org'
+    || (scope === 'brand' && !!brand?.id)
+    || ((scope === 'location' || scope === 'staff') && !!location?.id)
+  );
   const context = React.useMemo(() => {
     if (scope === 'org') return { organization, brand: null, location: null };
     if (scope === 'brand') return { organization, brand, location: null };
@@ -1070,67 +1078,7 @@ function useDashboardData(scope) {
     return scoped;
   }, [brand?.id, context, location?.id, scope]);
 
-  const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['dashboard-invoices', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: payments = [] } = useAuthQuery({
-    queryKey: ['dashboard-payments', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.Payment.list('-created_at'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['dashboard-inventory', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.Inventory.list(),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: products = [] } = useAuthQuery({
-    queryKey: ['dashboard-products', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.Product.list(),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: salesData = [] } = useAuthQuery({
-    queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.PosSalesData.list('-sale_date'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: shifts = [] } = useAuthQuery({
-    queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: orders = [] } = useAuthQuery({
-    queryKey: ['dashboard-orders', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.AutoOrder.list('-created_at'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const { data: wastageLogs = [] } = useAuthQuery({
-    queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.WastageLog.list('-created_at'),
-    select: selectByScope,
-    enabled,
-  });
-
-  const now = new Date();
-  const periodStart = startOfMonth(now).toISOString().split('T')[0];
-  const periodEnd = endOfMonth(now).toISOString().split('T')[0];
-
-  const { data: dashboardSummary = null } = useAuthQuery({
+  const { data: dashboardSummary = null, isError: dashboardSummaryFailed } = useAuthQuery({
     queryKey: ['dashboard-summary', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_role_dashboard_summary', {
@@ -1144,15 +1092,74 @@ function useDashboardData(scope) {
       if (error) throw error;
       return data;
     },
-    enabled: enabled && (scope === 'org' || (scope === 'brand' && !!brand?.id) || ((scope === 'location' || scope === 'staff') && !!location?.id)),
+    enabled: dashboardSummaryEnabled,
     retry: false,
+    staleTime: 60 * 1000,
+  });
+
+  const rawFallbackEnabled = enabled && dashboardSummaryFailed;
+
+  const { data: invoices = [] } = useAuthQuery({
+    queryKey: ['dashboard-invoices', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Invoice.list('-created_at'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: payments = [] } = useAuthQuery({
+    queryKey: ['dashboard-payments', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Payment.list('-created_at'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: inventory = [] } = useAuthQuery({
+    queryKey: ['dashboard-inventory', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Inventory.list(),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: products = [] } = useAuthQuery({
+    queryKey: ['dashboard-products', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.Product.list(),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: salesData = [] } = useAuthQuery({
+    queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.PosSalesData.list('-sale_date'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: shifts = [] } = useAuthQuery({
+    queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.EmployeeShift.list('-shift_start'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: orders = [] } = useAuthQuery({
+    queryKey: ['dashboard-orders', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.AutoOrder.list('-created_at'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
+  });
+
+  const { data: wastageLogs = [] } = useAuthQuery({
+    queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
+    queryFn: () => api.entities.WastageLog.list('-created_at'),
+    select: selectByScope,
+    enabled: rawFallbackEnabled,
   });
 
   const { data: budgetTargets = [] } = useAuthQuery({
     queryKey: ['dashboard-budget-targets', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
     queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
     select: React.useCallback((data) => selectByScope(data).filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [periodEnd, periodStart, selectByScope]),
-    enabled,
+    enabled: rawFallbackEnabled,
   });
 
   const { data: orgUsers = [] } = useAuthQuery({
@@ -1168,11 +1175,11 @@ function useDashboardData(scope) {
   useEffect(() => {
     if (!enabled) return undefined;
     const channel = supabase.channel(`dashboard-${scope}-realtime`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-invoices'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-inventory'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-budget-targets'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-shifts'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
       .subscribe();
 
     return () => supabase.removeChannel(channel);
@@ -3503,7 +3510,7 @@ function GroundStaffDashboard() {
         scopeLabel="Ground Staff"
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="My Uploads" value={data.invoices.length} icon={Upload} tone="blue" linkTo="Invoices" linkText="Upload invoice" />
+        <StatCard label="My Uploads" value={workflowCounts.invoices ?? data.invoices.length} icon={Upload} tone="blue" linkTo="Invoices" linkText="Upload invoice" />
         <StatCard label="Pending Invoices" value={metrics.pendingInvoices.length} icon={Clock} tone="orange" linkTo="Invoices" linkText="View invoices" />
         <StatCard label="Assigned Modules" value={tasks.length} icon={Shield} tone="brand" />
       </div>

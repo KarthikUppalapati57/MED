@@ -55,45 +55,66 @@ export default function Performance() {
   const todayKey = now.toISOString().slice(0, 10);
 
   const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
+  const needsSalesData = ['overview', 'pnl', 'category', 'sales_report', 'sales_forecast', 'variance'].includes(activeTab);
+  const needsInvoices = ['overview', 'pnl', 'category'].includes(activeTab);
+  const needsShifts = ['overview', 'pnl'].includes(activeTab);
+  const needsAllocations = ['overview', 'pnl', 'category'].includes(activeTab);
+  const needsLineItems = ['overview', 'movers'].includes(activeTab);
+  const needsBudgetTargets = ['overview', 'pnl', 'budget'].includes(activeTab);
   
   const results = useAuthQueries({
     queries: [
       {
         queryKey: ['pos_sales_data', organization?.id],
-        queryFn: () => api.entities.PosSalesData.list(),
+        queryFn: () => api.entities.PosSalesData.list('-sale_date', {
+          limit: 500,
+          select: 'id, organization_id, brand_id, location_id, sale_date, date, created_at, revenue, total_sales',
+        }),
         select: filterCb,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsSalesData,
       },
       {
         queryKey: ['invoices', organization?.id],
-        queryFn: () => api.entities.Invoice.list(),
+        queryFn: () => api.entities.Invoice.list('-created_at', {
+          limit: 500,
+          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status, category, line_items',
+        }),
         select: filterCb,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsInvoices,
       },
       {
         queryKey: ['employee_shifts', organization?.id],
-        queryFn: () => api.entities.EmployeeShift.list(),
+        queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
+          limit: 500,
+          select: 'id, organization_id, location_id, shift_start, start_time, created_at, labor_cost',
+        }),
         select: filterCb,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsShifts,
       },
       {
         queryKey: ['invoice_allocations', organization?.id],
-        queryFn: () => api.entities.InvoiceAllocation.list(),
+        queryFn: () => api.entities.InvoiceAllocation.list('-created_at', {
+          limit: 500,
+          select: 'id, organization_id, location_id, allocation_type, category_name, amount, created_at',
+        }),
         select: filterCb,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsAllocations,
       },
       {
         queryKey: ['invoice_line_items', organization?.id],
-        queryFn: () => api.entities.InvoiceLineItem.list('-created_at'),
+        queryFn: () => api.entities.InvoiceLineItem.list('-created_at', {
+          limit: 500,
+          select: 'id, organization_id, item_name, description, unit_price, created_at',
+        }),
         select: filterCb,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsLineItems,
       },
       {
         queryKey: ['budget_targets', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
         queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
         select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
           .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && needsBudgetTargets,
       }
     ]
   });
@@ -501,7 +522,7 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="daily_pnl" className="space-y-6 m-0">
-            <DailyPnLTab />
+            {activeTab === 'daily_pnl' && <DailyPnLTab />}
           </TabsContent>
 
           <TabsContent value="pnl" className="space-y-6 m-0">
@@ -726,27 +747,27 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="sales_report" className="space-y-6 m-0">
-            <SalesReportWidget salesData={salesData} />
+            {activeTab === 'sales_report' && <SalesReportWidget salesData={salesData} />}
           </TabsContent>
 
           <TabsContent value="sales_forecast" className="space-y-6 m-0">
-            <SalesForecastWidget salesData={salesData} />
+            {activeTab === 'sales_forecast' && <SalesForecastWidget salesData={salesData} />}
           </TabsContent>
 
           <TabsContent value="usage_report" className="space-y-6 m-0">
-            <UsageReportWidget />
+            {activeTab === 'usage_report' && <UsageReportWidget />}
           </TabsContent>
 
           <TabsContent value="avt" className="space-y-0 m-0">
-            <AvTCosting />
+            {activeTab === 'avt' && <AvTCosting />}
           </TabsContent>
 
           <TabsContent value="variance" className="space-y-6 m-0">
-            <ExplainableVarianceWidget varianceTotal={totalSales - budget} />
+            {activeTab === 'variance' && <ExplainableVarianceWidget varianceTotal={totalSales - budget} />}
           </TabsContent>
 
           <TabsContent value="action_center" className="space-y-6 m-0">
-            <ActionCenterWidget />
+            {activeTab === 'action_center' && <ActionCenterWidget />}
           </TabsContent>
 
 
