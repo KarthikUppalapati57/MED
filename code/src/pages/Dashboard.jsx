@@ -1141,9 +1141,9 @@ function useDashboardData(scope) {
 
   const { data: salesData = [] } = useAuthQuery({
     queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
-    queryFn: () => api.entities.PosSalesData.list('-sale_date', {
+    queryFn: () => api.entities.PosSalesData.list('-date', {
       limit: 50,
-      select: 'id, organization_id, brand_id, location_id, sale_date, date, revenue, total_sales',
+      select: 'id, organization_id, location_id, date, revenue',
     }),
     select: selectByScope,
     enabled: rawFallbackEnabled,
@@ -1153,7 +1153,7 @@ function useDashboardData(scope) {
     queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
       limit: 50,
-      select: 'id, organization_id, brand_id, location_id, shift_start, status, labor_cost',
+      select: 'id, organization_id, location_id, shift_start, status, labor_cost',
     }),
     select: selectByScope,
     enabled: rawFallbackEnabled,
@@ -1173,7 +1173,7 @@ function useDashboardData(scope) {
     queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
     queryFn: () => api.entities.WastageLog.list('-created_at', {
       limit: 50,
-      select: 'id, organization_id, brand_id, location_id, total_cost, created_at',
+      select: 'id, organization_id, brand_id, location_id, value, created_at',
     }),
     select: selectByScope,
     enabled: rawFallbackEnabled,

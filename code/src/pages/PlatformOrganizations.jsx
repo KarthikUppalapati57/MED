@@ -56,7 +56,7 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_organizations_paginated', page, searchTerm],
     queryFn: async () => {
       let query = supabase.from('organizations')
-        .select('id, name, slug, subscription_status, plan_id, admin_email, created_at, status', { count: 'exact' });
+        .select('id, name, slug, subscription_status, plan_id, admin_email:primary_contact_email, created_at, status', { count: 'exact' });
       
       if (searchTerm) {
         query = query.ilike('name', `%${searchTerm}%`);
@@ -101,7 +101,7 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_org_users', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
-      const { data, error } = await supabase.from('users').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status').eq('organization_id', selectedOrgId);
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status').eq('organization_id', selectedOrgId);
       if (error) throw error;
       return data;
     },
@@ -111,7 +111,7 @@ export default function PlatformOrganizations() {
   const { data: plans = [] } = useAuthQuery({
     queryKey: ['platform_plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('id, name, price_monthly, max_users, max_locations').order('price_monthly');
+      const { data, error } = await supabase.from('plans').select('id, name, price_monthly').order('price_monthly');
       if (error) throw error;
       return data;
     }

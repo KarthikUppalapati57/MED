@@ -31,7 +31,7 @@ export default function MenuEngineering() {
         queryKey: ['pos_items', organization?.id],
         queryFn: () => api.entities.PosItem.list(null, {
           limit: 1000,
-          select: 'id, organization_id, brand_id, location_id, name, category, price, quantity_sold, revenue',
+          select: 'id, organization_id, location_id, pos_item_id, item_name, pos_provider, price',
         }),
         select: filterCb,
         enabled: !!organization?.id,
@@ -49,7 +49,7 @@ export default function MenuEngineering() {
         queryKey: ['pos_menu_mapping', organization?.id],
         queryFn: () => api.entities.PosMenuMapping.list(null, {
           limit: 1000,
-          select: 'id, organization_id, brand_id, location_id, pos_item_id, recipe_id',
+          select: 'id, organization_id, pos_item_id, recipe_id',
         }),
         select: filterCb,
         enabled: !!organization?.id,

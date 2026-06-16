@@ -133,7 +133,7 @@ export default function AutoOrdering() {
     queryKey: ['inventory', organization?.id],
     queryFn: () => api.entities.Inventory.list('product_name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, product_id, product_name, current_quantity, current_unit, unit_cost, reorder_point, par_level, vendor_name',
+      select: 'id, organization_id, brand_id, location_id, product_id, product_name, current_quantity, current_unit, unit_cost, reorder_point, par_level',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsInventory,
@@ -141,7 +141,7 @@ export default function AutoOrdering() {
 
   const { data: vendors = [] } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
-    queryFn: () => api.entities.Vendor.list('name', { limit: 300, select: 'id, organization_id, brand_id, location_id, name, vendor_name' }),
+    queryFn: () => api.entities.Vendor.list('name', { limit: 300, select: 'id, organization_id, brand_id, location_id, name' }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsVendors,
   });
@@ -157,7 +157,7 @@ export default function AutoOrdering() {
     queryKey: ['order-invoice-approval', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', {
       limit: 300,
-      select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, purchase_order_id, matched_order_id, po_number',
+      select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, purchase_order, purchase_order_id, matched_order_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsInvoices,
@@ -165,9 +165,9 @@ export default function AutoOrdering() {
 
   const { data: vendorPrices = [] } = useAuthQuery({
     queryKey: ['vendor_item_prices', organization?.id],
-    queryFn: () => api.entities.VendorItemPrice.list('-created_at', {
+    queryFn: () => api.entities.VendorItemPrice.list('-last_updated', {
       limit: 500,
-      select: 'id, organization_id, vendor_id, product_name, price, is_approved_supplier, created_at',
+      select: 'id, organization_id, vendor_id, product_name, price, is_approved_supplier, last_updated',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsVendorPrices,
@@ -246,8 +246,7 @@ export default function AutoOrdering() {
         organizationId: organization?.id,
         fromLocationId: location?.id || inventoryItem?.location_id || null,
         toLocationId: transferForm.toLocationId,
-        inventoryItem,
-        quantity: transferForm.quantity,
+        items: [{ inventoryItem, quantity: transferForm.quantity }],
         userId: userProfile?.id || null,
       });
     },
@@ -335,7 +334,7 @@ export default function AutoOrdering() {
         
         // Find cheapest vendor for this item
         let bestPrice = item.unit_cost || 0;
-        let bestVendorName = item.vendor_name || 'Preferred Vendor';
+        let bestVendorName = 'Preferred Vendor';
         
         const itemPrices = vendorPrices.filter(vp => 
           vp.product_name.toLowerCase() === item.product_name.toLowerCase() && vp.is_approved_supplier
@@ -487,7 +486,7 @@ export default function AutoOrdering() {
       const order = orders.find((item) =>
         item.id === invoice.purchase_order_id ||
         item.id === invoice.matched_order_id ||
-        item.order_number === invoice.po_number ||
+        item.order_number === invoice.purchase_order ||
         (
           vendorName &&
           item.vendor_name?.toLowerCase() === vendorName &&

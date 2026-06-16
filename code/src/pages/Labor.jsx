@@ -39,7 +39,7 @@ export default function Labor() {
     queryKey: ['employees', organization?.id],
     queryFn: () => api.entities.Employee.list('-created_at', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, first_name, last_name, name, email, phone, role, status, hourly_rate, created_at',
+      select: 'id, organization_id, location_id, full_name, role, status, hourly_rate, created_at',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsEmployees,
@@ -49,7 +49,7 @@ export default function Labor() {
     queryKey: ['employee_shifts', organization?.id],
     queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, employee_id, shift_start, shift_end, start_time, end_time, status, labor_cost, created_at',
+      select: 'id, organization_id, location_id, employee_id, shift_start, shift_end, start_time, end_time, status, labor_cost, created_at',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsShifts,

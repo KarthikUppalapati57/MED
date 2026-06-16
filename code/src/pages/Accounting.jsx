@@ -44,9 +44,9 @@ export default function Accounting() {
 
   const { data: integrations = [], isLoading: loadingIntegrations } = useAuthQuery({
     queryKey: ['integrations'],
-    queryFn: () => api.entities.Integration.list('-created_at', {
+    queryFn: () => api.entities.Integration.list('-updated_at', {
       limit: 50,
-      select: 'id, organization_id, provider, is_active, connected_at, created_at',
+      select: 'id, organization_id, provider, is_active, connected_at, updated_at',
     }),
   });
 
@@ -75,7 +75,7 @@ export default function Accounting() {
     queryKey: ['accounting-payments'],
     queryFn: () => api.entities.Payment.list('-payment_date', {
       limit: 500,
-      select: 'id, invoice_id, payment_date, created_at, vendor_name, invoice_number, payment_method, method, amount, status, organization_id, brand_id, location_id',
+      select: 'id, invoice_id, payment_date, created_at, vendor_name, invoice_number, payment_method, amount, status, organization_id, brand_id, location_id',
     }),
     enabled: needsPayments,
   });
@@ -84,16 +84,16 @@ export default function Accounting() {
     queryKey: ['accounting-vendors'],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, name, vendor_name, accounting_name, external_name, accounting_vendor_id, external_id, qbo_vendor_id, status, organization_id, brand_id, location_id',
+      select: 'id, name, accounting_vendor_id, accounting_vendor_name, status, organization_id, brand_id, location_id',
     }),
     enabled: needsVendors,
   });
 
   const { data: salesData = [], isLoading: loadingSalesData } = useAuthQuery({
     queryKey: ['accounting-pos-sales-data'],
-    queryFn: () => api.entities.PosSalesData.list('-sale_date', {
+    queryFn: () => api.entities.PosSalesData.list('-date', {
       limit: 500,
-      select: 'id, pos_provider, source, category, menu_category, item_category, item_name, menu_item_name, product_name, quantity, units_sold, net_sales, sales_amount, total_sales, organization_id, location_id',
+      select: 'id, pos_item_id, quantity_sold, revenue, date, organization_id, location_id',
     }),
     enabled: needsSalesData,
   });
@@ -168,31 +168,31 @@ export default function Accounting() {
       payment_date: payment.payment_date || payment.created_at,
       vendor_name: payment.vendor_name || invoice?.vendor_name || '-',
       invoice_number: payment.invoice_number || invoice?.invoice_number || '-',
-      method: payment.payment_method || payment.method || '-',
+      method: payment.payment_method || '-',
       amount: payment.amount,
       status: payment.status || 'recorded',
     };
   });
 
   const salesMappingRows = salesData.slice(0, 25).map(item => ({
-    source: item.pos_provider || item.source || 'POS',
-    category: item.category || item.menu_category || item.item_category || 'Unmapped',
-    revenue: item.net_sales || item.sales_amount || item.total_sales || 0,
-    gl_code: glMappings.find(mapping => mapping.category === (item.category || item.menu_category || item.item_category))?.gl_code || 'Unmapped',
+    source: 'POS',
+    category: 'Sales',
+    revenue: item.revenue || 0,
+    gl_code: glMappings.find(mapping => mapping.category === 'Sales')?.gl_code || 'Unmapped',
   }));
 
   const vendorMappingRows = vendors.map(vendor => ({
-    vendor_name: vendor.name || vendor.vendor_name,
-    accounting_name: vendor.accounting_name || vendor.external_name || vendor.name || vendor.vendor_name,
-    accounting_id: vendor.accounting_vendor_id || vendor.external_id || vendor.qbo_vendor_id || '-',
+    vendor_name: vendor.name,
+    accounting_name: vendor.accounting_vendor_name || vendor.name,
+    accounting_id: vendor.accounting_vendor_id || '-',
     status: vendor.status || 'active',
   }));
 
   const pmixRows = salesData.slice(0, 25).map(item => ({
-    item_name: item.item_name || item.menu_item_name || item.product_name || 'Unmapped item',
-    category: item.category || item.menu_category || 'Unmapped',
-    quantity: item.quantity || item.units_sold || 0,
-    revenue: item.net_sales || item.sales_amount || item.total_sales || 0,
+    item_name: item.pos_item_id || 'Unmapped item',
+    category: 'POS',
+    quantity: item.quantity_sold || 0,
+    revenue: item.revenue || 0,
   }));
 
   const handleClosePeriod = async () => {

@@ -66,9 +66,9 @@ export default function Performance() {
     queries: [
       {
         queryKey: ['pos_sales_data', organization?.id],
-        queryFn: () => api.entities.PosSalesData.list('-sale_date', {
+        queryFn: () => api.entities.PosSalesData.list('-date', {
           limit: 500,
-          select: 'id, organization_id, brand_id, location_id, sale_date, date, created_at, revenue, total_sales',
+          select: 'id, organization_id, location_id, date, created_at, revenue',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsSalesData,
@@ -77,7 +77,7 @@ export default function Performance() {
         queryKey: ['invoices', organization?.id],
         queryFn: () => api.entities.Invoice.list('-created_at', {
           limit: 500,
-          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status, category, line_items',
+          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status, line_items',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsInvoices,
@@ -104,7 +104,7 @@ export default function Performance() {
         queryKey: ['invoice_line_items', organization?.id],
         queryFn: () => api.entities.InvoiceLineItem.list('-created_at', {
           limit: 500,
-          select: 'id, organization_id, item_name, description, unit_price, created_at',
+          select: 'id, organization_id, item_name, unit_price, created_at',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsLineItems,
@@ -173,7 +173,7 @@ export default function Performance() {
   });
 
   // --- CORE CALCULATIONS ---
-  const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue || record.total_sales || 0), 0);
+  const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue || 0), 0);
   const totalLaborCost = shifts.reduce((sum, shift) => sum + (Number(shift.labor_cost) || 0), 0);
 
   const lineItemAllocations = allocations.filter(a => a.allocation_type === 'line_items');
@@ -194,10 +194,10 @@ export default function Performance() {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const trendMap = Object.fromEntries(days.map(d => [d, { name: d, actual: 0, budget: 0, forecast: 0 }]));
   salesData.forEach(sale => {
-    const d = new Date(sale.sale_date || sale.created_at);
+    const d = new Date(sale.date || sale.created_at);
     if (!isNaN(d)) {
       const dayName = days[d.getDay()];
-      const rev = Number(sale.revenue || sale.total_sales || 0);
+      const rev = Number(sale.revenue || 0);
       trendMap[dayName].actual += rev;
       trendMap[dayName].budget += budget > 0 ? budget / 7 : rev * 0.95; 
       trendMap[dayName].forecast += rev * 1.05;
@@ -209,7 +209,7 @@ export default function Performance() {
   const moversData = useMemo(() => {
     const map = {};
     lineItems.forEach(item => {
-      const name = item.item_name || item.description || 'Unknown';
+      const name = item.item_name || 'Unknown';
       if (!map[name]) map[name] = [];
       map[name].push({ price: Number(item.unit_price), date: new Date(item.created_at || new Date()).getTime() });
     });
@@ -285,8 +285,8 @@ export default function Performance() {
 
   const dailyPnl = useMemo(() => {
     const todaysSales = salesData.reduce((sum, record) => {
-      const dateValue = record.sale_date || record.date || record.created_at;
-      return sameDate(dateValue, todayKey) ? sum + Number(record.revenue || record.total_sales || 0) : sum;
+      const dateValue = record.date || record.created_at;
+      return sameDate(dateValue, todayKey) ? sum + Number(record.revenue || 0) : sum;
     }, 0);
 
     const todaysInvoices = invoices.filter((invoice) => sameDate(invoice.invoice_date || invoice.created_at, todayKey));
