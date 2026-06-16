@@ -86,7 +86,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   list: async (orderBy, options = {}) => {
-    let query = supabase.from(table).select('*');
+    let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }

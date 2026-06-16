@@ -198,7 +198,9 @@ export default function Invoices() {
 
   const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
     queryKey: ['invoices-dashboard', organization?.id],
-    queryFn: () => api.entities.Invoice.list('-created_at'),
+    queryFn: () => api.entities.Invoice.list('-created_at', { 
+      select: 'id, invoice_number, vendor_name, total_amount, status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, location_id, file_url, source' 
+    }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
   });
