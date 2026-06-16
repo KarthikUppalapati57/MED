@@ -84,6 +84,18 @@ export default function Inventory() {
   const activeTab = searchParams.get('tab') || 'inventory';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0); // reset page on new search
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -105,9 +117,25 @@ export default function Inventory() {
   const { organization, brand, location, userProfile } = useAuth();
 
   const { data: inventory = [], isLoading } = useAuthQuery({
-    queryKey: ['inventory', organization?.id],
-    queryFn: () => api.entities.Inventory.list(),
+    queryKey: ['inventory', organization?.id, location?.id, page, debouncedSearch, categoryFilter],
+    queryFn: () => {
+      const conditions = {};
+      if (categoryFilter !== 'all') conditions.accounting_category = categoryFilter;
+      return api.entities.Inventory.filter(conditions, {
+        page,
+        pageSize,
+        search: debouncedSearch,
+        searchColumn: 'product_name',
+        orderBy: '-product_name'
+      });
+    },
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  const { data: inventoryMetrics } = useAuthQuery({
+    queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
+    queryFn: () => api.metrics.getInventoryTotals(organization?.id, debouncedSearch, location?.id),
     enabled: !!organization?.id,
   });
 
@@ -318,12 +346,13 @@ export default function Inventory() {
 
   // Stats
   const { totalItems, totalValue, lowStock, totalWastageValue } = React.useMemo(() => {
-    const items = inventory.length;
-    const value = inventory.reduce((sum, i) => sum + (i.current_value || 0), 0);
-    const low = inventory.filter(i => i.current_quantity <= (i.reorder_point || 5)).length;
-    const wastage = wastageLogs.reduce((sum, w) => sum + (w.value || 0), 0);
-    return { totalItems: items, totalValue: value, lowStock: low, totalWastageValue: wastage };
-  }, [inventory, wastageLogs]);
+    return {
+      totalItems: inventoryMetrics?.totalItems || 0,
+      totalValue: inventoryMetrics?.totalValue || 0,
+      lowStock: inventoryMetrics?.lowStock || 0,
+      totalWastageValue: inventoryMetrics?.totalWastageValue || 0
+    };
+  }, [inventoryMetrics]);
 
   // Group by category
   const byCategory = inventory.reduce((acc, item) => {
@@ -507,14 +536,8 @@ export default function Inventory() {
   };
 
   const filteredInventory = React.useMemo(() => {
-    const searchLower = search.toLowerCase();
-    return inventory.filter(item => {
-      const matchesSearch = !search || 
-        item.product_name?.toLowerCase().includes(searchLower);
-      const matchesCategory = categoryFilter === 'all' || item.accounting_category === categoryFilter;
-      return matchesSearch && matchesCategory;
-    });
-  }, [inventory, search, categoryFilter]);
+    return inventory; // Data is now filtered server-side
+  }, [inventory]);
 
   return (
     <div className="space-y-6">
@@ -852,6 +875,30 @@ export default function Inventory() {
                     )}
                   </TableBody>
                 </Table>
+                
+                <div className="flex items-center justify-between px-4 py-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing page {page + 1}
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => p + 1)}
+                      disabled={inventory.length < pageSize}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

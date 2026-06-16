@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 
 /**
@@ -59,4 +59,42 @@ export function useAuthQuery(options) {
     gcTime: options.gcTime ?? 10 * 60 * 1000, // 10 minutes
     placeholderData: options.placeholderData,
   });
+}
+
+/**
+ * A wrapper around react-query's useQueries that parallelizes multiple queries
+ * while enforcing auth and tenant scope.
+ */
+export function useAuthQueries({ queries }) {
+  const { user, isLoadingAuth, contextScope } = useAuth();
+  const authReady = !isLoadingAuth && !!user;
+
+  const authQueries = queries.map(query => {
+    const scopeAware = query.scopeAware !== false;
+    const scopedQueryKey = scopeAware
+      ? [
+          ...query.queryKey,
+          {
+            scope: {
+              organizationId: contextScope?.organizationId || null,
+              brandId: contextScope?.brandId || null,
+              locationId: contextScope?.locationId || null,
+            },
+          },
+        ]
+      : query.queryKey;
+
+    const queryOptions = { ...query };
+    delete queryOptions.scopeAware;
+
+    return {
+      ...queryOptions,
+      queryKey: scopedQueryKey,
+      enabled: authReady && (query.enabled !== undefined ? query.enabled : true),
+      staleTime: query.staleTime ?? 5 * 60 * 1000,
+      gcTime: query.gcTime ?? 10 * 60 * 1000,
+    };
+  });
+
+  return useQueries({ queries: authQueries });
 }

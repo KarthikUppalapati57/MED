@@ -61,7 +61,7 @@ export default function OrgManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
-        .select('*')
+        .select('id, name, slug, subscription_status, plan_id, admin_email, created_at, stripe_customer_id, logo_url')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -75,7 +75,7 @@ export default function OrgManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('brands')
-        .select('*')
+        .select('id, name, organization_id, created_at')
         .order('name');
       if (error) throw error;
       return data || [];
@@ -89,7 +89,7 @@ export default function OrgManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('locations')
-        .select('*')
+        .select('id, name, brand_id, organization_id, address, is_commissary, created_at')
         .order('name');
       if (error) throw error;
       return data || [];

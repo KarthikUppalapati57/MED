@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,55 +49,57 @@ export default function PlatformOrganizations() {
     selectedBrandId: ''
   });
   
-  const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
-    queryKey: ['platform_organizations_full'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('organizations').select('*').order('name');
-      if (error) throw error;
-      return data;
-    },
-    enabled: true
+  const results = useAuthQueries({
+    queries: [
+      {
+        queryKey: ['platform_organizations_full'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('organizations').select('id, name, slug, subscription_status, plan_id, admin_email, created_at').order('name');
+          if (error) throw error;
+          return data;
+        }
+      },
+      {
+        queryKey: ['platform_brands_all'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('brands').select('id, name, organization_id, created_at');
+          if (error) throw error;
+          return data;
+        }
+      },
+      {
+        queryKey: ['platform_locations_all'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at');
+          if (error) throw error;
+          return data;
+        }
+      },
+      {
+        queryKey: ['platform_users_all'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('users').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status');
+          if (error) throw error;
+          return data;
+        }
+      },
+      {
+        queryKey: ['platform_plans'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from('plans').select('id, name, price_monthly, max_users, max_locations').order('price_monthly');
+          if (error) throw error;
+          return data;
+        }
+      }
+    ]
   });
 
-  const { data: brands = [] } = useAuthQuery({
-    queryKey: ['platform_brands_all'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('brands').select('*');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgs.length
-  });
-
-  const { data: locations = [] } = useAuthQuery({
-    queryKey: ['platform_locations_all'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('locations').select('*');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!brands.length
-  });
-
-  const { data: users = [] } = useAuthQuery({
-    queryKey: ['platform_users_all'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('users').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!orgs.length
-  });
-
-  const { data: plans = [] } = useAuthQuery({
-    queryKey: ['platform_plans'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').order('price_monthly');
-      if (error) throw error;
-      return data;
-    },
-    enabled: true
-  });
+  const isLoadingOrgs = results[0].isLoading;
+  const orgs = results[0].data || [];
+  const brands = results[1].data || [];
+  const locations = results[2].data || [];
+  const users = results[3].data || [];
+  const plans = results[4].data || [];
 
   React.useEffect(() => {
     const channel = supabase.channel('platform-orgs-realtime')

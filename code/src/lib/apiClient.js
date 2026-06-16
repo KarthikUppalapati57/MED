@@ -90,6 +90,16 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
+    
+    // Add automatic tenant scoping for performance
+    Object.entries(withActiveScope(table, {})).forEach(([key, value]) => {
+      query = query.eq(key, value);
+    });
+
+    if (options.search && options.searchColumn) {
+      query = query.ilike(options.searchColumn, `%${options.search}%`);
+    }
+
     if (orderBy) {
       const ascending = !orderBy.startsWith('-');
       const column = ascending ? orderBy : orderBy.slice(1);
@@ -98,18 +108,41 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     if (options.limit) {
       query = query.limit(options.limit);
     }
+    if (options.page !== undefined && options.pageSize !== undefined) {
+      const from = options.page * options.pageSize;
+      const to = from + options.pageSize - 1;
+      query = query.range(from, to);
+    }
+    
     const { data, error } = await query;
     if (error) throw error;
     return data ?? [];
   },
-  filter: async (conditions) => {
-    let query = supabase.from(table).select('*');
+  filter: async (conditions, options = {}) => {
+    let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
     Object.entries(withActiveScope(table, conditions)).forEach(([key, value]) => {
       query = query.eq(key, value);
     });
+
+    if (options.search && options.searchColumn) {
+      query = query.ilike(options.searchColumn, `%${options.search}%`);
+    }
+
+    if (options.orderBy) {
+      const ascending = !options.orderBy.startsWith('-');
+      const column = ascending ? options.orderBy : options.orderBy.slice(1);
+      query = query.order(column, { ascending });
+    }
+
+    if (options.page !== undefined && options.pageSize !== undefined) {
+      const from = options.page * options.pageSize;
+      const to = from + options.pageSize - 1;
+      query = query.range(from, to);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
     return data ?? [];
@@ -246,6 +279,17 @@ export const api = {
         throw error || new Error('Not authenticated');
       }
       return user;
+    },
+  },
+  metrics: {
+    getInventoryTotals: async (orgId, searchTerm = null, locationId = null) => {
+      const { data, error } = await supabase.rpc('get_inventory_totals', {
+        p_org_id: orgId,
+        p_search_term: searchTerm,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data;
     },
   },
   admin: {

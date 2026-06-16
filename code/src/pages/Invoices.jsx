@@ -334,7 +334,7 @@ export default function Invoices() {
     if (!organizationId || !name) return null;
     let query = api.client
       .from('vendor_items')
-      .select('*')
+      .select('id, last_price, default_price, price_variance_threshold_percent, mapping_status, match_confidence')
       .eq('organization_id', organizationId)
       .eq('vendor_item_name', name);
 

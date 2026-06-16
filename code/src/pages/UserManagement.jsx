@@ -963,7 +963,7 @@ export default function UserManagement() {
       if (!activeOrgId) return [];
       const { data, error } = await supabase
         .from('roles')
-        .select('*')
+        .select('id, name, color, description, default_page_permissions, default_signing_privileges')
         .eq('organization_id', activeOrgId)
         .eq('is_system', false);
       if (error) throw error;
@@ -1019,7 +1019,7 @@ export default function UserManagement() {
         // Fallback: profiles table (Restops-style)
         let q = supabase
           .from('profiles')
-          .select('*')
+          .select('id, email, full_name, updated_at, location_id, brand_id, role, capabilities')
           .eq('organization_id', activeOrgId);
           
         const { data, error } = await q;
@@ -1035,7 +1035,7 @@ export default function UserManagement() {
       // Merge pending invitations
       try {
         const { data: invs } = await supabase.from('invitations')
-          .select('*')
+          .select('id, email, role, token, created_at')
           .eq('organization_id', activeOrgId)
           .is('accepted_at', null);
           

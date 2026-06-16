@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
@@ -17,32 +18,47 @@ export default function MenuEngineering() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('matrix');
   
-  const { data: matrixData = [], isLoading: isLoadingMatrix } = useQuery({
-    queryKey: ['menu-engineering', organization?.id, location?.id],
-    queryFn: () => api.reports.getMenuEngineering(organization?.id),
-    enabled: !!organization?.id
+  const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
+  
+  const results = useAuthQueries({
+    queries: [
+      {
+        queryKey: ['menu-engineering', organization?.id, location?.id],
+        queryFn: () => api.reports.getMenuEngineering(organization?.id),
+        enabled: !!organization?.id
+      },
+      {
+        queryKey: ['pos_items', organization?.id],
+        queryFn: () => api.entities.PosItem.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['recipes', organization?.id],
+        queryFn: () => api.entities.Recipe.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['pos_menu_mapping', organization?.id],
+        queryFn: () => api.entities.PosMenuMapping.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      }
+    ]
   });
 
-  const { data: posItems = [], isLoading: isLoadingPos } = useQuery({
-    queryKey: ['pos_items', organization?.id],
-    queryFn: () => api.entities.PosItem.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
-
-  const { data: recipes = [], isLoading: isLoadingRecipes } = useQuery({
-    queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
-
-  const { data: mappings = [], isLoading: isLoadingMappings } = useQuery({
-    queryKey: ['pos_menu_mapping', organization?.id],
-    queryFn: () => api.entities.PosMenuMapping.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
+  const isLoadingMatrix = results[0].isLoading;
+  const matrixData = results[0].data || [];
+  
+  const isLoadingPos = results[1].isLoading;
+  const posItems = results[1].data || [];
+  
+  const isLoadingRecipes = results[2].isLoading;
+  const recipes = results[2].data || [];
+  
+  const isLoadingMappings = results[3].isLoading;
+  const mappings = results[3].data || [];
 
   const createMapping = useMutation({
     mutationFn: async (payload) => {

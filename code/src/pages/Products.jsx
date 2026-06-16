@@ -144,7 +144,7 @@ export default function Products() {
   const { data: globalItems = [] } = useAuthQuery({
     queryKey: ['global_vendor_items'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('global_vendor_items').select('*');
+      const { data, error } = await supabase.from('global_vendor_items').select('id, item_name, mapping_count, most_common_category, confidence_score');
       if (error) {
         console.warn('global_vendor_items error', error);
         return [];

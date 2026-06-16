@@ -17,7 +17,7 @@ export default function PlatformInvoices() {
   const { data: plans = [], isLoading: isLoadingPlans } = useAuthQuery({
     queryKey: ['plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*');
+      const { data, error } = await supabase.from('plans').select('id, name, price_monthly');
       if (error) throw error;
       return data || [];
     },
@@ -27,7 +27,7 @@ export default function PlatformInvoices() {
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('organizations').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('organizations').select('id, name, plan_id, admin_email').order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },

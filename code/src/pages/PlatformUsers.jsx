@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,47 +52,54 @@ export default function PlatformUsers() {
     }
   };
 
-  const { data: profiles = [], isLoading: isLoadingProfiles } = useAuthQuery({
-    queryKey: ['platform-all-users'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: authChecked && userRole === 'platform_admin',
+  const results = useAuthQueries({
+    queries: [
+      {
+        queryKey: ['platform-all-users'],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("id, email, full_name, role, created_at, updated_at, organization_id, brand_id, location_id");
+          if (error) throw error;
+          return data || [];
+        },
+        enabled: authChecked && userRole === 'platform_admin',
+      },
+      {
+        queryKey: ['platform-orgs-lookup'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from("organizations").select("id, name, subscription_status");
+          if (error) throw error;
+          return data || [];
+        },
+        enabled: authChecked && userRole === 'platform_admin',
+      },
+      {
+        queryKey: ['platform-brands-lookup'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from("brands").select("id, name");
+          if (error) throw error;
+          return data || [];
+        },
+        enabled: authChecked && userRole === 'platform_admin',
+      },
+      {
+        queryKey: ['platform-locations-lookup'],
+        queryFn: async () => {
+          const { data, error } = await supabase.from("locations").select("id, name");
+          if (error) throw error;
+          return data || [];
+        },
+        enabled: authChecked && userRole === 'platform_admin',
+      }
+    ]
   });
 
-  const { data: orgs = [] } = useAuthQuery({
-    queryKey: ['platform-orgs-lookup'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("organizations").select("id, name, subscription_status");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: authChecked && userRole === 'platform_admin',
-  });
-
-  const { data: brands = [] } = useAuthQuery({
-    queryKey: ['platform-brands-lookup'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("brands").select("id, name");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: authChecked && userRole === 'platform_admin',
-  });
-
-  const { data: locations = [] } = useAuthQuery({
-    queryKey: ['platform-locations-lookup'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("locations").select("id, name");
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: authChecked && userRole === 'platform_admin',
-  });
+  const isLoadingProfiles = results[0].isLoading;
+  const profiles = results[0].data || [];
+  const orgs = results[1].data || [];
+  const brands = results[2].data || [];
+  const locations = results[3].data || [];
 
   const orgMap = useMemo(() => {
     return orgs.reduce((acc, org) => {

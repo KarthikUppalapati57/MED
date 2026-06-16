@@ -7,7 +7,7 @@ import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
@@ -52,53 +52,68 @@ export default function Performance() {
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   const todayKey = now.toISOString().slice(0, 10);
 
-  const { data: rawSalesData, isLoading: loadingSales } = useAuthQuery({
-    queryKey: ['pos_sales_data', organization?.id],
-    queryFn: () => api.entities.PosSalesData.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+  const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
+  
+  const results = useAuthQueries({
+    queries: [
+      {
+        queryKey: ['pos_sales_data', organization?.id],
+        queryFn: () => api.entities.PosSalesData.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['invoices', organization?.id],
+        queryFn: () => api.entities.Invoice.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['employee_shifts', organization?.id],
+        queryFn: () => api.entities.EmployeeShift.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['invoice_allocations', organization?.id],
+        queryFn: () => api.entities.InvoiceAllocation.list(),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['invoice_line_items', organization?.id],
+        queryFn: () => api.entities.InvoiceLineItem.list('-created_at'),
+        select: filterCb,
+        enabled: !!organization?.id,
+      },
+      {
+        queryKey: ['budget_targets', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
+        queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
+        select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
+          .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
+        enabled: !!organization?.id,
+      }
+    ]
   });
+
+  const loadingSales = results[0].isLoading;
+  const rawSalesData = results[0].data;
   const salesData = rawSalesData || [];
 
-  const { data: rawInvoices, isLoading: loadingInvoices } = useAuthQuery({
-    queryKey: ['invoices', organization?.id],
-    queryFn: () => api.entities.Invoice.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
+  const loadingInvoices = results[1].isLoading;
+  const rawInvoices = results[1].data;
   const invoices = rawInvoices || [];
 
-  const { data: rawShifts } = useAuthQuery({
-    queryKey: ['employee_shifts', organization?.id],
-    queryFn: () => api.entities.EmployeeShift.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
+  const rawShifts = results[2].data;
   const shifts = rawShifts || [];
 
-  const { data: rawAllocations } = useAuthQuery({
-    queryKey: ['invoice_allocations', organization?.id],
-    queryFn: () => api.entities.InvoiceAllocation.list(),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
+  const rawAllocations = results[3].data;
   const allocations = rawAllocations || [];
 
-  const { data: rawLineItems } = useAuthQuery({
-    queryKey: ['invoice_line_items', organization?.id],
-    queryFn: () => api.entities.InvoiceLineItem.list('-created_at'),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
-  });
+  const rawLineItems = results[4].data;
   const lineItems = rawLineItems || [];
 
-  const { data: rawBudgetTargets } = useAuthQuery({
-    queryKey: ['budget_targets', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
-    queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
-      .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
-    enabled: !!organization?.id,
-  });
+  const rawBudgetTargets = results[5].data;
   const budgetTargets = rawBudgetTargets || [];
 
   const budgetByCategory = useMemo(() => {

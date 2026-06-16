@@ -43,7 +43,7 @@ export default function Commissary() {
   const { data: locations = [] } = useQuery({
     queryKey: ['locations', organization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('locations').select('*').eq('organization_id', organization?.id);
+      const { data, error } = await supabase.from('locations').select('id, name, is_commissary, organization_id').eq('organization_id', organization?.id);
       if (error) throw error;
       return data || [];
     },
@@ -76,7 +76,7 @@ export default function Commissary() {
   const { data: recipes = [] } = useQuery({
     queryKey: ['recipes', organization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('recipes').select('*').eq('organization_id', organization?.id);
+      const { data, error } = await supabase.from('recipes').select('id, is_batch, name, yield_unit, cost_per_serving, total_cost, category, organization_id').eq('organization_id', organization?.id);
       if (error) throw error;
       return data || [];
     },

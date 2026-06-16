@@ -28,7 +28,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const fetchPlans = async () => {
-      const { data } = await supabase.from('plans').select('*').eq('is_active', true).order('price_monthly', { ascending: true });
+      const { data } = await supabase.from('plans').select('id, name, price_monthly, features, max_locations, max_users').eq('is_active', true).order('price_monthly', { ascending: true });
       if (data) setPlans(data);
     };
     fetchPlans();
