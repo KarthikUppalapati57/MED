@@ -157,9 +157,10 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('access_requests')
-        .select('*')
+        .select('id, full_name, email, company_name, request_type, status, created_at')
         .neq('request_type', 'demo')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data || [];
     },
@@ -171,8 +172,9 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('demo_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, full_name, email, company_name, phone, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data || [];
     },
@@ -184,8 +186,9 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contact_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, full_name, email, company_name, message, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data || [];
     },
@@ -195,8 +198,8 @@ export default function PlatformAdmin() {
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['organizations'],
     queryFn: async () => {
-      let q = supabase.from('organizations').select('*');
-      const { data, error } = await q.order('created_at', { ascending: false });
+      let q = supabase.from('organizations').select('id, name, slug, status, subscription_status, plan_id, primary_contact_email, enabled_modules, created_at');
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
       return data || [];
     },
@@ -206,7 +209,7 @@ export default function PlatformAdmin() {
   const { data: allBrands = [] } = useAuthQuery({
     queryKey: ['all-brands'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('brands').select('*');
+      const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at').limit(500);
       if (error) throw error;
       return data || [];
     },
@@ -216,7 +219,7 @@ export default function PlatformAdmin() {
   const { data: allLocations = [] } = useAuthQuery({
     queryKey: ['all-locations'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('locations').select('*');
+      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, is_commissary, created_at').limit(1000);
       if (error) throw error;
       return data || [];
     },
@@ -250,9 +253,10 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invitations')
-        .select('*')
+        .select('id, email, role, organization_id, brand_id, location_id, token, accepted_at, expires_at, created_at')
         .eq('role', 'owner')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
       if (error) throw error;
       return data || [];
     },

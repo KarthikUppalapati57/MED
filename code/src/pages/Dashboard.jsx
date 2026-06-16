@@ -1197,17 +1197,18 @@ function useDashboardData(scope) {
   });
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled || !organization?.id) return undefined;
+    const orgFilter = `organization_id=eq.${organization.id}`;
     const channel = supabase.channel(`dashboard-${scope}-realtime`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts' }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: orgFilter }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: orgFilter }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_sales_data', filter: orgFilter }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_targets', filter: orgFilter }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_shifts', filter: orgFilter }, () => queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] }))
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [enabled, queryClient, scope]);
+  }, [enabled, organization?.id, queryClient, scope]);
 
   return {
     budgetTargets,
