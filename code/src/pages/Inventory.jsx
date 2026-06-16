@@ -325,7 +325,7 @@ export default function Inventory() {
         }
       }
 
-      return api.entities.CountSession.create({
+      const countSession = await api.entities.CountSession.create({
         organization_id: organization?.id,
         count_sheet_id: sheet.id,
         status: 'completed',
@@ -334,10 +334,49 @@ export default function Inventory() {
         completed_at: new Date().toISOString(),
         counted_by: userProfile?.id || null,
       });
+
+      // Update Inventory Quantities and generate Movements
+      const promises = [];
+      for (const invId in countedData) {
+        const itemData = countedData[invId];
+        const varianceVal = itemData.variance || 0;
+        const countedQty = itemData.counted_quantity;
+        const expectedQty = itemData.expected_quantity;
+        
+        if (countedQty !== expectedQty) {
+          const invItem = inventory.find(i => i.id === invId);
+          if (invItem) {
+            promises.push(api.entities.Inventory.update(invId, {
+              current_quantity: countedQty,
+              current_value: countedQty * (invItem.unit_cost || 0),
+              previous_quantity: expectedQty,
+              previous_value: invItem.current_value || 0,
+              last_counted_date: new Date().toISOString().split('T')[0]
+            }));
+            promises.push(api.entities.InventoryMovement.create({
+              organization_id: organization?.id,
+              location_id: invItem.location_id || location?.id || null,
+              inventory_id: invId,
+              movement_type: 'count_variance',
+              quantity: countedQty - expectedQty,
+              source_type: 'count_session',
+              source_id: countSession.id,
+              previous_quantity: expectedQty,
+              new_quantity: countedQty,
+              created_by: userProfile?.id || null,
+            }));
+          }
+        }
+      }
+      await Promise.allSettled(promises);
+
+      return countSession;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
-      toast.success('Count session completed');
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
+      toast.success('Count session completed and inventory updated');
       setSelectedCountSheetId('');
       setActiveSessionOpen(false);
     },

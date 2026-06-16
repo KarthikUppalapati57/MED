@@ -15,11 +15,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
+import { createTransferWorkflow, completeTransferWorkflow } from '@/lib/workflowService';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function InventoryTransfers({ inventory, updateInventoryMutation, organization }) {
   const [search, setSearch] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
   const [destination, setDestination] = useState('');
+  const { userProfile, location } = useAuth();
   
   const { data: locations = [] } = useAuthQuery({
     queryKey: ['locations', organization?.id],
@@ -59,48 +62,32 @@ export default function InventoryTransfers({ inventory, updateInventoryMutation,
     }
 
     try {
-      // 1. Deduct from current location (our `inventory`)
-      for (const item of selectedItems) {
-        const newQty = (item.current_quantity || 0) - item.transfer_quantity;
-        await updateInventoryMutation.mutateAsync({
-          id: item.id,
-          data: {
-            current_quantity: newQty,
-            previous_quantity: item.current_quantity
-          }
-        });
+      const itemsToTransfer = selectedItems.map(item => ({
+        inventoryItem: item,
+        quantity: item.transfer_quantity
+      }));
 
-        // 2. Update destination location
-        const destInventoryList = await api.entities.Inventory.list();
-        const destItem = destInventoryList.find(i => i.product_id === item.product_id && i.location_id === destination);
-        
-        if (destItem) {
-          await updateInventoryMutation.mutateAsync({
-            id: destItem.id,
-            data: {
-              current_quantity: (destItem.current_quantity || 0) + item.transfer_quantity,
-            }
-          });
-        } else {
-          // If the item doesn't exist at the destination, create it
-          await api.entities.Inventory.create({
-            organization_id: organization?.id,
-            location_id: destination,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            current_quantity: item.transfer_quantity,
-            current_unit: item.current_unit,
-            accounting_category: item.accounting_category,
-            unit_cost: item.unit_cost,
-          });
-        }
-      }
+      const transfer = await createTransferWorkflow({
+        organizationId: organization?.id,
+        fromLocationId: location?.id || null,
+        toLocationId: destination,
+        items: itemsToTransfer,
+        userId: userProfile?.id || null,
+      });
 
+      await completeTransferWorkflow({
+        transfer,
+        inventoryRecords: inventory,
+        userId: userProfile?.id || null,
+      });
+
+      // Refetch inventory automatically handled by parent query invalidation if needed, or we just rely on parent
+      // Note: we can also manually invalidate the query here if we imported queryClient
       toast.success(`Transfer Complete! Sent ${selectedItems.length} items to ${locations.find(l=>l.id === destination)?.name || 'Destination'}`);
       setSelectedItems([]);
       setDestination('');
     } catch (error) {
-      toast.error("Failed to process transfer.");
+      toast.error(error.message || "Failed to process transfer.");
     }
   };
 

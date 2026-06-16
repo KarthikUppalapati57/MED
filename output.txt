@@ -1,0 +1,349 @@
+IMPLEMENTATION ROADMAP
+Invoice and Accounts Payable Operations
+Closing the operational gaps between RestOps and MarginEdge
+Prepared for
+RestOps Product and Engineering
+Prepared on
+June 14, 2026
+Document status
+Implementation planning baseline
+Primary objective
+Build a unified, production-ready invoice/AP lifecycle
+Executive Summary
+RestOps already contains meaningful invoice, purchasing, receiving, inventory, and ledger capabilities. However, those capabilities are fragmented across the Invoices and Orders modules and do not yet provide the unified, accountant-ready operating experience visible in MarginEdge.
+Recommendation: Make the Invoices module the unified AP system of record, connect it tightly to purchase orders, receiving, payment accounts, and ledger activity, and deliver the work in eight controlled phases.
+Current Position
+RestOps is stronger in proactive purchasing automation: par-level replenishment, vendor price comparison, receiving, and inventory movement logic.
+MarginEdge is stronger in daily invoice/AP execution: invoice ledger, document review, reconciliation, payment-account visibility, approval, and bill-pay readiness.
+The largest RestOps weakness is not the absence of all functionality; it is fragmentation, shallow reconciliation, and limited operational visibility.
+Priority Outcomes
+Create one unified invoice/AP ledger for the complete invoice lifecycle.
+Provide side-by-side invoice document review with trustworthy ingestion and duplicate controls.
+Implement durable vendor/item mappings and line-level three-way reconciliation.
+Introduce policy-driven approvals, payment accounts, and a clear bill-pay lifecycle.
+Add exports, reporting, auditability, and operational monitoring.
+1. Gap Assessment
+The following assessment distinguishes between capabilities that are absent, partially implemented, or materially weaker than the target MarginEdge-style operating model.
+Capability
+RestOps status
+Primary weakness
+Invoice ledger
+Partial
+Invoice table exists, but lacks AP status buckets, aging, action reasons, payment-account state, and batch actions.
+Upload intake
+Partial
+OCR upload exists; ingestion history, retry controls, multi-document review, and duplicate resolution need depth.
+Email intake
+Partial / risky
+IMAP configuration exists, but credential handling and ingestion monitoring require production hardening.
+Invoice approval
+Partial
+Approve/reject exists; configurable chains, escalation, comments, delegation, and batch approval are missing.
+Bill-pay linkage
+Partial
+Approval can create ledger bills, but the user-facing invoice-to-payment lifecycle is incomplete.
+Payment accounts
+Missing
+No invoice-level selection of AP, bank, credit card, petty cash, transfer, or custom accounts.
+Invoice photo review
+Weak
+Files can be accessed, but there is no integrated multi-page viewer with zoom, rotate, or field verification.
+CSV export
+Missing
+No operational invoice ledger, line-item, variance, or payment CSV exports.
+Category summary
+Missing
+No invoice-level category/GL summary or split-coding review experience.
+Line-item reconciliation
+Weak
+Matching is primarily total-level; true PO-receipt-invoice line reconciliation is absent.
+Vendor/item matching
+Weak
+Matching relies heavily on names; durable aliases, SKUs, packaging, and confirmed mappings are absent.
+Structural Weaknesses
+Invoices and order-based approval are split across separate user experiences.
+Invoice matching lacks a durable vendor-item identity layer.
+Operational statuses do not clearly communicate why an invoice requires action.
+Approval and payment steps are implemented as actions, not as a governed workflow.
+Accounting review is line-item heavy because category summary and split coding are missing.
+The platform lacks a complete audit trail that connects source document, PO, receipt, approval, bill, and payment.
+2. Target Operating Model
+Target state: Every invoice enters one processing queue, is validated and matched, resolves exceptions, passes the correct approval policy, creates an AP bill, and closes through a traceable payment event.
+End-to-End Workflow
+Step
+Stage
+System behavior
+Primary status
+1
+Intake
+Upload, email, EDI, recurring invoice, or manual entry
+Processing
+2
+Extract and validate
+OCR, field validation, duplicate detection, source preservation
+Processing / Action Required
+3
+Match
+Vendor, item, PO, receipt, price, quantity, packaging
+Matched / Variance
+4
+Resolve
+User fixes missing mappings, mismatches, and coding exceptions
+Action Required
+5
+Approve
+Policy-driven approval, comments, delegation, and escalation
+Pending Approval / Approved
+6
+Create bill
+Create or update AP bill and accounting coding
+Approved / Ready for Payment
+7
+Pay
+Choose payment account, schedule, record, or reconcile payment
+Scheduled / Paid
+8
+Close
+Finalize audit trail, export, and reporting
+Closed
+Unified Ledger Views
+Processing: invoices being extracted, validated, or matched.
+Action Required: duplicates, missing vendor/item mapping, missing PO/receipt, or reconciliation variance.
+Pending Approval: invoices waiting for one or more required approvers.
+Approved: approved invoices with AP bills created.
+Scheduled for Payment: bills assigned to payment accounts and dates.
+Paid and Closed: completed invoices retained for audit, reporting, and export.
+Required Invoice Detail Tabs
+Tab
+Purpose
+Documents
+Original invoice photos/PDFs, thumbnails, source metadata, and review tools.
+Line Items
+Extracted invoice lines, product mappings, quantities, units, packaging, and prices.
+Category Summary
+Category, GL account, allocation, taxes, fees, credits, and split coding.
+Reconciliation
+PO-receipt-invoice comparison and explainable variance resolution.
+Approval History
+Policy, approvers, comments, decisions, reminders, and escalation.
+Payment History
+AP bill, payment account, schedule, payment events, failures, and reconciliation.
+Audit Trail
+Complete record of user, timestamp, old value, new value, reason, and source.
+3. Phased Implementation Plan
+Delivery should prioritize operational coherence before advanced automation. Each phase must be usable independently while establishing the foundation for the next phase.
+Phase 1: Unified Invoice/AP Ledger
+Objective. Create one operational workspace that becomes the system of record for the complete invoice lifecycle.
+Consolidate invoice approval and AP status management into the Invoices module.
+Add status buckets: Processing, Action Required, Pending Approval, Approved, Scheduled, Paid, Closed, and Rejected.
+Add filters for dates, vendor, PO, match status, approval status, payment status, payment account, location, and aging.
+Add batch actions for approval, reviewer assignment, payment-account assignment, export, close, and bill-pay routing.
+Add action-required reason codes and clear next-action guidance.
+Phase deliverable. An accountant-ready invoice ledger that provides complete operational visibility.
+Key dependencies. Canonical invoice statuses, permissions, tenant scoping, and migration of existing invoice/order approval behavior.
+Phase 2: Document Intake and Photo Review
+Objective. Make invoice intake reliable and allow reviewers to validate invoices without leaving the application.
+Support drag-and-drop PDFs/images, mobile photos, multi-page documents, and multiple attachments.
+Add dedicated invoice email intake, attachment processing, ingestion job history, retries, and source tracking.
+Implement duplicate detection using vendor, invoice number, date, amount, and document fingerprint.
+Build a side-by-side document viewer with zoom, rotate, page navigation, thumbnails, and OCR confidence indicators.
+Preserve original documents, extraction versions, and reviewer corrections.
+Replace raw IMAP password storage with encrypted secrets or provider OAuth.
+Phase deliverable. A secure, observable intake pipeline and a production-ready invoice review workspace.
+Key dependencies. Object storage, secret management, processing-job monitoring, OCR metadata, and mobile upload behavior.
+Phase 3: Vendor and Item Matching
+Objective. Create durable product identity and continuously improve future invoice processing.
+Add vendor aliases, vendor account identifiers, vendor items, product packaging, and mapping history.
+Match by vendor account number, alias, vendor SKU, UPC/external ID, packaging/unit, then normalized description.
+Display match suggestions and confidence scores.
+Allow users to confirm a match, search products, or create a new product.
+Persist confirmed mappings and flag packaging, unit, and price changes.
+Phase deliverable. A reusable vendor-item mapping layer that reduces manual review over time.
+Key dependencies. Vendor master quality, product master quality, normalization rules, and mapping permissions.
+Phase 4: Three-Way Line-Item Reconciliation
+Objective. Reconcile purchase order, physical receipt, and invoice at line-item level.
+Calculate ordered, received, and invoiced quantities for every matched item.
+Compare PO price, invoice price, quantity, packaging, and extended totals.
+Assign statuses: exact match, within tolerance, price variance, quantity variance, missing receipt, missing PO, unexpected item, duplicate item, and packaging mismatch.
+Support tolerances by organization, vendor, category, and item.
+Require resolution notes or approval overrides for exceptions.
+Phase deliverable. Explainable line-level reconciliation that supports safe automation and faster approvals.
+Key dependencies. Stable PO and receiving line identities, vendor-item mappings, and tolerance configuration.
+Phase 5: Category Summary and Accounting Review
+Objective. Enable efficient invoice coding and review without editing every individual line.
+Add category and GL summaries for subtotal, taxes, delivery/fuel charges, credits, and other charges.
+Support inventory category, accounting category, GL account, and location allocation.
+Allow split coding across categories, GL accounts, and locations.
+Expose uncategorized totals and coding exceptions.
+Propagate approved coding to ledger bills and accounting exports.
+Phase deliverable. A concise accounting review surface with complete coding visibility.
+Key dependencies. Chart of accounts, category mappings, allocation rules, and accounting permissions.
+Phase 6: Configurable Approval Workflow
+Objective. Replace simple approve/reject actions with governed, policy-driven approvals.
+Create approval rules based on total, vendor, category, location, variance, missing PO/receipt, and payment account.
+Support single-step, sequential, and parallel approvals.
+Add batch approval, comments, request changes, delegation, reminders, and escalation.
+Record the policy evaluation and every approval event in the audit trail.
+Auto-approve invoices only when matching and policy requirements are satisfied.
+Phase deliverable. Configurable approval chains with clear accountability and escalation.
+Key dependencies. Role/permission model, notification services, workflow event logging, and audit history.
+Example Approval Policy
+Condition
+Required action
+Under $250 and fully matched
+Auto-approve
+$250 to $2,500
+Location manager approval
+Over $2,500
+Location manager plus organization owner
+Variance above 5%
+Accounting review
+Missing PO or receipt
+Action Required; cannot auto-approve
+Phase 7: Payment Accounts and Bill Pay
+Objective. Provide a clear, traceable invoice-to-payment lifecycle.
+Add payment-account management for AP, checking, credit card, petty cash, internal transfer, vendor auto-pay, and custom accounts.
+Show bill-pay eligibility, payment account, method, due date, scheduled date, partial payment, reference, status, and failure reason.
+Create or update an AP bill on invoice approval.
+Support scheduling, marking externally paid, partial payments, and payment reconciliation.
+Create ledger entries and close invoices only after valid payment events.
+Phase deliverable. A complete bill-pay workflow connected to invoices, AP bills, payment accounts, and ledger entries.
+Key dependencies. Payment provider strategy, banking/security controls, ledger model, and reconciliation rules.
+Phase 8: Exports, Reporting, and Audit
+Objective. Make AP operations measurable, portable, and defensible.
+Add CSV exports for ledger, line items, category summary, approval history, reconciliation variance, payments, and vendor price history.
+Add AP aging, upcoming payments, vendor spend, variance, unmatched invoice, approval-cycle, and ingestion-failure reports.
+Record user, timestamp, old/new values, reason, source, and all related entities for every material action.
+Add operational dashboards for processing failures, queue aging, and unresolved exceptions.
+Phase deliverable. Complete reporting, export, and audit coverage for operations and accounting.
+Key dependencies. Unified workflow events, consistent identifiers, data retention policy, and export permissions.
+4. Proposed Data Model Additions
+The existing invoices, auto_orders, receivings, transfers, ledger bills, and payments should remain, but the following entities are needed to support production-grade AP operations.
+Entity
+Purpose
+invoice_documents
+Original documents, pages, thumbnails, storage paths, hashes, source, and versions.
+invoice_ingestion_jobs
+Email/upload processing state, attempts, errors, timing, and retry metadata.
+invoice_action_reasons
+Structured reasons that place an invoice in Action Required.
+vendor_aliases
+Normalized names and identifiers that resolve to canonical vendors.
+vendor_items
+Vendor-specific SKU, description, packaging, unit, and latest pricing.
+vendor_item_mappings
+Durable vendor-item-to-product relationships with confidence and confirmation history.
+invoice_line_matches
+Invoice line, PO line, receiving line, mapping confidence, and match status.
+reconciliation_variances
+Price, quantity, packaging, total variance, tolerance, resolution, and approver.
+approval_policies
+Policy conditions, scope, priority, and activation state.
+approval_instances
+Evaluated workflow for a specific invoice.
+approval_steps
+Approvers, order, decision, comment, delegation, reminder, and escalation.
+payment_accounts
+Account type, provider reference, display details, eligibility, and tenant scope.
+invoice_allocations
+Category, GL account, location, amount, percentage, and source.
+invoice_audit_events
+Immutable invoice-related workflow and data-change history.
+Security and Integrity Requirements
+Apply organization, brand, and location scoping consistently through RLS and service-layer checks.
+Encrypt email and payment integration secrets; never store raw credentials in general metadata.
+Use immutable audit events for approvals, coding overrides, payment changes, and reconciliation resolutions.
+Require idempotency for ingestion, bill creation, payment creation, and ledger posting.
+Prevent invoice closure when required approval, payment, or reconciliation conditions remain incomplete.
+5. UX and Navigation Recommendation
+Product decision: Use Invoices as the unified AP workspace. Keep Orders focused on purchase orders, receiving, and transfers, while linking directly into the corresponding invoice/AP records.
+Area
+Recommended responsibility
+Invoices / AP
+Invoice ledger, intake, document review, matching, reconciliation, approvals, coding, bills, payment status, exports, and audit.
+Orders
+Purchase-order generation, approval, vendor sending, receiving, and internal transfers.
+Payments
+Payment execution, account management, payment history, failures, and reconciliation.
+Accounting
+GL mappings, exports, close controls, and ledger-level reconciliation.
+6. Delivery Roadmap
+Release
+Timing
+Scope
+Outcome
+Release 1
+Weeks 1-3
+Unified AP ledger, canonical statuses, filters, action reasons, batch foundations
+Operational visibility
+Release 2
+Weeks 4-6
+Document viewer, multi-page intake, email hardening, ingestion history, duplicates
+Reliable intake and review
+Release 3
+Weeks 7-10
+Vendor/item mappings and three-way line reconciliation
+Core differentiation
+Release 4
+Weeks 11-13
+Category summary, split coding, configurable approvals
+Accounting and governance
+Release 5
+Weeks 14-16
+Payment accounts, bill-pay lifecycle, exports, reporting, audit refinement
+End-to-end AP completion
+Recommended Team Shape
+Product lead: owns AP operating model, workflow policy, and release acceptance.
+Frontend engineer: ledger, document review, reconciliation, coding, and approval experiences.
+Backend/data engineer: schema, RLS, ingestion, matching, reconciliation, workflow, and ledger integrity.
+Integration engineer: email intake, object storage, payment providers, and accounting exports.
+QA/operations partner: fixture design, role testing, accounting validation, and production-readiness checks.
+Implementation Principles
+Build one canonical workflow rather than duplicating invoice behavior across modules.
+Make every exception explainable and actionable.
+Automate only when matching confidence and policy allow it.
+Preserve the original source document and every material decision.
+Use idempotent workflow services for bills, payments, ledger entries, and ingestion.
+Deliver complete vertical slices and test them with realistic invoice, PO, receipt, and payment fixtures.
+7. Risks and Mitigations
+Risk
+Impact
+Mitigation
+Fragmented ownership
+Features continue to diverge across Orders, Invoices, Payments, and Accounting.
+Define Invoices/AP as system of record and publish module contracts.
+Poor master data
+Vendor/item matching confidence remains low.
+Introduce aliases, confirmed mappings, packaging identity, and correction history.
+Unsafe automation
+Incorrect invoices are auto-approved or paid.
+Gate automation on reconciliation, policy, tolerances, and audit checks.
+Duplicate financial events
+Repeated jobs create duplicate bills, payments, or ledger entries.
+Use idempotency keys and unique source references.
+Credential exposure
+Email/payment secrets are stored insecurely.
+Use encrypted secrets, OAuth, provider tokens, and limited service access.
+Migration inconsistency
+Existing invoice/order statuses do not map cleanly.
+Create canonical status mapping, backfill scripts, and migration reports.
+8. Definition of Done
+The program should be considered complete only when the workflow is operationally coherent, financially safe, and testable end to end.
+An invoice from upload or email appears in the unified ledger with source, processing state, original document, and ingestion history.
+A reviewer can compare the document with extracted fields and line items without downloading it.
+Vendor and item matches persist and improve future invoice processing.
+Every matched invoice line displays ordered, received, invoiced, and variance values.
+Action Required clearly identifies the problem and the exact resolution path.
+Approval policies select the correct approvers and retain a complete decision history.
+Approved invoices create idempotent AP bills with category/GL allocations.
+Payment accounts and payment states are visible from invoice detail.
+Valid payments create ledger entries and transition invoices to paid/closed.
+CSV exports, reports, and audit records are accurate and permission-scoped.
+Role, RLS, migration, retry, duplicate, and failure-path tests pass with realistic fixtures.
+9. Immediate Next Actions
+Approve the unified AP operating model and make Invoices the canonical AP workspace.
+Finalize canonical statuses, action-required reason codes, and the invoice lifecycle state machine.
+Create schema migrations for document intake, vendor/item matching, reconciliation, approval policies, payment accounts, and audit events.
+Build the unified ledger and side-by-side invoice review experience as the first production release.
+Create realistic end-to-end fixtures covering upload, email, duplicate, PO match, receipt variance, approval, bill creation, and payment.
+Highest-value first release: Unified AP ledger + side-by-side document review + durable vendor/item matching + line-level three-way reconciliation.

@@ -302,43 +302,48 @@ export async function createTransferWorkflow({
   organizationId,
   fromLocationId,
   toLocationId,
-  inventoryItem,
-  quantity,
+  items = [], // Array of { inventoryItem, quantity }
   userId,
 }) {
   if (!organizationId) throw new Error('Organization is required.');
-  if (!inventoryItem?.id) throw new Error('Select an inventory item.');
   if (!toLocationId) throw new Error('Select a destination location.');
-  const transferQuantity = Number(quantity || 0);
-  if (transferQuantity <= 0) throw new Error('Transfer quantity must be greater than zero.');
-  if (Number(inventoryItem.current_quantity || 0) < transferQuantity) {
-    throw new Error('Transfer quantity exceeds available stock.');
-  }
+  if (!items || items.length === 0) throw new Error('Add items to transfer.');
 
-  const transfer = await api.entities.Transfer.create({
-    organization_id: organizationId,
-    from_location_id: fromLocationId || inventoryItem.location_id || null,
-    to_location_id: toLocationId,
-    status: 'pending',
-    items: [{
+  const transferItems = items.map(({ inventoryItem, quantity }) => {
+    const transferQuantity = Number(quantity || 0);
+    if (transferQuantity <= 0) throw new Error(`Transfer quantity for ${inventoryItem.product_name} must be greater than zero.`);
+    if (Number(inventoryItem.current_quantity || 0) < transferQuantity) {
+      throw new Error(`Transfer quantity for ${inventoryItem.product_name} exceeds available stock.`);
+    }
+    return {
       inventory_id: inventoryItem.id,
       product_id: inventoryItem.product_id || null,
       product_name: inventoryItem.product_name,
       quantity: transferQuantity,
       unit: inventoryItem.current_unit || 'ea',
       unit_cost: Number(inventoryItem.unit_cost || 0),
-    }],
+      location_id: inventoryItem.location_id
+    };
+  });
+
+  const transfer = await api.entities.Transfer.create({
+    organization_id: organizationId,
+    from_location_id: fromLocationId || transferItems[0]?.location_id || null,
+    to_location_id: toLocationId,
+    status: 'pending',
+    items: transferItems,
     created_by: userId || null,
   });
 
   await emitWorkflowEvent('transfer.created', 'transfer', transfer.id, {
-    from_location_id: fromLocationId || inventoryItem.location_id || null,
+    from_location_id: transfer.from_location_id,
     to_location_id: toLocationId,
     items: transfer.items,
   });
 
   return transfer;
 }
+
 
 export async function completeTransferWorkflow({ transfer, inventoryRecords = [], userId }) {
   if (!transfer?.id) throw new Error('Select a transfer to complete.');
