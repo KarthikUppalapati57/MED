@@ -571,7 +571,7 @@ export default function Performance() {
                         <div key={idx} className="flex items-center justify-between bg-secondary/30 p-3 rounded-lg border border-border/40">
                           <div className="overflow-hidden">
                             <p className="font-medium text-sm truncate pr-2">{item.item}</p>
-                            <p className="text-xs text-muted-foreground">${item.previousPrice} â†’ ${item.currentPrice}</p>
+                            <p className="text-xs text-muted-foreground">${item.previousPrice} to ${item.currentPrice}</p>
                           </div>
                           <Badge variant="outline" className={item.change > 0 ? 'bg-resend-red/10 text-resend-red border-resend-red/20' : 'bg-resend-green/10 text-resend-green border-resend-green/20'}>
                             {item.change > 0 ? '+' : ''}{item.change}%

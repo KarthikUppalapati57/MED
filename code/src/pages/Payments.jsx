@@ -750,7 +750,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Vendor
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'vendor_name' ? 'â†‘' : sortBy === '-vendor_name' ? 'â†“' : 'â†•'}
+                            {sortBy === 'vendor_name' ? '^' : sortBy === '-vendor_name' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
@@ -761,7 +761,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Invoice #
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'invoice_number' ? 'â†‘' : sortBy === '-invoice_number' ? 'â†“' : 'â†•'}
+                            {sortBy === 'invoice_number' ? '^' : sortBy === '-invoice_number' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
@@ -772,7 +772,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Due Date
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'due_date' ? 'â†‘' : sortBy === '-due_date' ? 'â†“' : 'â†•'}
+                            {sortBy === 'due_date' ? '^' : sortBy === '-due_date' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
@@ -783,7 +783,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Amount
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'total_amount' ? 'â†‘' : sortBy === '-total_amount' ? 'â†“' : 'â†•'}
+                            {sortBy === 'total_amount' ? '^' : sortBy === '-total_amount' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
@@ -843,7 +843,7 @@ export default function Payments() {
                                 isOverdue && 'text-resend-red font-medium',
                                 isDueSoon && 'text-resend-orange font-medium'
                               )}>
-                                {dueDate ? format(dueDate, 'MMM d, yyyy') : 'â€”'}
+                                {dueDate ? format(dueDate, 'MMM d, yyyy') : '-'}
                               </span>
                             </TableCell>
                             <TableCell className="font-semibold">
@@ -1182,7 +1182,7 @@ export default function Payments() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '-'}
                             </TableCell>
                             <TableCell>
                               <Badge className="bg-resend-green/10 text-resend-green">Paid</Badge>

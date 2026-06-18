@@ -568,7 +568,7 @@ export const AuthProvider = ({ children }) => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
           if (current) {
-            console.debug('[AuthContext] Safety timeout ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â completing auth init with cached profile');
+            console.debug('[AuthContext] Safety timeout - completing auth init with cached profile');
             setIsMfaReady(true); // Ensure MFA is also marked ready to prevent stuck screen
             return false;
           }

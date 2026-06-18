@@ -643,7 +643,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Order #
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'order_number' ? 'â†‘' : sortOrders === '-order_number' ? 'â†“' : 'â†•'}
+                          {sortOrders === 'order_number' ? '^' : sortOrders === '-order_number' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -654,7 +654,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Vendor
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'vendor_name' ? 'â†‘' : sortOrders === '-vendor_name' ? 'â†“' : 'â†•'}
+                          {sortOrders === 'vendor_name' ? '^' : sortOrders === '-vendor_name' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -666,7 +666,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Total
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'total_amount' ? 'â†‘' : sortOrders === '-total_amount' ? 'â†“' : 'â†•'}
+                          {sortOrders === 'total_amount' ? '^' : sortOrders === '-total_amount' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -678,7 +678,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Created
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'created_at' ? 'â†‘' : sortOrders === '-created_at' ? 'â†“' : 'â†•'}
+                          {sortOrders === 'created_at' ? '^' : sortOrders === '-created_at' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -712,7 +712,7 @@ export default function AutoOrdering() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'â€”'}
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '-'}
                           </TableCell>
                           <TableCell className="text-right">
                             {order.status === 'pending_approval' && (
@@ -1147,7 +1147,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         To Location
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortTransfers === 'destination_name' ? 'â†‘' : sortTransfers === '-destination_name' ? 'â†“' : 'â†•'}
+                          {sortTransfers === 'destination_name' ? '^' : sortTransfers === '-destination_name' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -1160,7 +1160,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Date
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortTransfers === 'created_at' ? 'â†‘' : sortTransfers === '-created_at' ? 'â†“' : 'â†•'}
+                          {sortTransfers === 'created_at' ? '^' : sortTransfers === '-created_at' ? 'v' : '-'}
                         </span>
                       </div>
                     </TableHead>
@@ -1241,7 +1241,7 @@ export default function AutoOrdering() {
                         <TableCell>{order?.vendor_name || 'Vendor'}</TableCell>
                         <TableCell>{receiving.items?.length || 0}</TableCell>
                         <TableCell><Badge variant="secondary">{receiving.status}</Badge></TableCell>
-                        <TableCell>{receiving.received_date ? new Date(receiving.received_date).toLocaleDateString() : 'â€”'}</TableCell>
+                        <TableCell>{receiving.received_date ? new Date(receiving.received_date).toLocaleDateString() : '-'}</TableCell>
                       </TableRow>
                     );
                   })}
