@@ -48,15 +48,28 @@ serve(async (req) => {
       console.warn("Could not log POS webhook event. Proceeding.", insertError)
     }
 
-    // Handle POS specific logic
+    // Extract line items based on provider
+    let lineItems: any[] = []
+    const orgId = payload.organization_id;
+    const locationId = payload.location_id;
+
+    if (!orgId) {
+      throw new Error("Missing organization_id in payload");
+    }
+
     switch (provider) {
       case 'toast':
-        // e.g. process Toast order
-        console.log('Processing Toast webhook:', payload)
-        break;
       case 'square':
-        // e.g. process Square payment
-        console.log('Processing Square webhook:', payload)
+        // For test/mock purposes, we expect normalized data in payload.order.line_items
+        if (payload.type === 'order.completed' || payload.event_type === 'order.completed') {
+          const items = payload.order?.line_items || [];
+          lineItems = items.map((item: any) => ({
+            pos_item_id: item.id || item.item_id,
+            item_name: item.name,
+            quantity: item.quantity || 1,
+            price: item.total_money?.amount ? item.total_money.amount / 100 : item.price || 0,
+          }));
+        }
         break;
       case 'clover':
         console.log('Processing Clover webhook:', payload)
@@ -66,6 +79,53 @@ serve(async (req) => {
         break;
       default:
         throw new Error(`Unsupported provider: ${provider}`)
+    }
+
+    // Process line items
+    if (lineItems.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+
+      for (const item of lineItems) {
+        // 1. Upsert into pos_items
+        const { data: posItem, error: itemError } = await supabaseClient
+          .from('pos_items')
+          .upsert(
+            {
+              organization_id: orgId,
+              location_id: locationId || null,
+              pos_provider: provider,
+              pos_item_id: item.pos_item_id,
+              item_name: item.item_name,
+              price: item.price
+            },
+            { onConflict: 'organization_id, pos_provider, pos_item_id' }
+          )
+          .select()
+          .single();
+
+        if (itemError) {
+          console.error('Failed to upsert pos_item:', itemError);
+          continue;
+        }
+
+        // 2. Insert into pos_sales_data
+        if (posItem) {
+          const { error: saleError } = await supabaseClient
+            .from('pos_sales_data')
+            .insert({
+              organization_id: orgId,
+              location_id: locationId || null,
+              date: today,
+              pos_item_id: posItem.id,
+              quantity_sold: item.quantity,
+              revenue: item.quantity * item.price
+            });
+
+          if (saleError) {
+            console.error('Failed to insert pos_sales_data:', saleError);
+          }
+        }
+      }
     }
 
     return new Response(

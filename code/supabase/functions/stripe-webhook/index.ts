@@ -70,7 +70,7 @@ serve(async (req) => {
               subscription_status: 'active'
             })
             .eq('id', orgId);
-            
+
           await capturePostHogEvent('billing_subscription_created', {
             org_id: orgId,
             customer_id: session.customer,
@@ -84,7 +84,7 @@ serve(async (req) => {
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         const customerId = subscription.customer as string;
-        
+
         // Find org by customer ID and update status
         await supabase
           .from('organizations')
@@ -94,7 +94,7 @@ serve(async (req) => {
             plan_id: subscription.items.data[0]?.price.id
           })
           .eq('stripe_customer_id', customerId);
-          
+
         await capturePostHogEvent('billing_subscription_updated', {
           customer_id: customerId,
           subscription_id: subscription.id,
@@ -107,7 +107,7 @@ serve(async (req) => {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
         const customerId = subscription.customer as string;
-        
+
         await supabase
           .from('organizations')
           .update({
@@ -115,14 +115,14 @@ serve(async (req) => {
             plan_id: null
           })
           .eq('stripe_customer_id', customerId);
-          
+
         await capturePostHogEvent('billing_subscription_canceled', {
           customer_id: customerId,
           subscription_id: subscription.id
         });
         break;
       }
-      
+
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object;
         if (invoice.subscription) {
@@ -139,12 +139,12 @@ serve(async (req) => {
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
         const customerId = invoice.customer as string;
-        
+
         await supabase
           .from('organizations')
           .update({ subscription_status: 'past_due' })
           .eq('stripe_customer_id', customerId);
-          
+
         await capturePostHogEvent('billing_payment_failed', {
           customer_id: customerId,
           invoice_id: invoice.id,
@@ -153,19 +153,57 @@ serve(async (req) => {
         break;
       }
 
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object;
+        const orgId = paymentIntent.metadata?.organization_id;
+        const invoiceId = paymentIntent.metadata?.invoice_id;
+
+        if (orgId && invoiceId) {
+          // Update Invoice
+          await supabase
+            .from('invoices')
+            .update({ payment_status: 'paid', status: 'paid' })
+            .eq('id', invoiceId)
+            .eq('organization_id', orgId);
+
+          // Insert into Payments table
+          await supabase
+            .from('payments')
+            .insert({
+              invoice_id: invoiceId,
+              organization_id: orgId,
+              vendor_name: paymentIntent.metadata?.vendor_name,
+              invoice_number: paymentIntent.metadata?.invoice_number,
+              amount: paymentIntent.amount_received / 100, // Convert from cents
+              status: 'completed',
+              payment_method: 'stripe',
+              payment_date: new Date().toISOString().split('T')[0],
+              transaction_id: paymentIntent.id
+            });
+
+          await capturePostHogEvent('bill_pay_completed', {
+            org_id: orgId,
+            invoice_id: invoiceId,
+            amount: paymentIntent.amount_received / 100,
+            transaction_id: paymentIntent.id
+          });
+        }
+        break;
+      }
+
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
 
-    return new Response(JSON.stringify({ received: true }), { 
-      status: 200, 
+    return new Response(JSON.stringify({ received: true }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
     console.error(`Webhook error: ${err.message}`);
-    return new Response(`Internal Server Error: ${err.message}`, { 
+    return new Response(`Internal Server Error: ${err.message}`, {
       status: 500,
-      headers: corsHeaders 
+      headers: corsHeaders
     });
   }
 });

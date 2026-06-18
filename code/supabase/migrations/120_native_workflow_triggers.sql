@@ -14,16 +14,22 @@ AS $$
 DECLARE
   function_name TEXT := TG_ARGV[0];
   v_url TEXT;
+  v_service_role_key TEXT;
   v_headers JSONB;
   v_payload JSONB;
 BEGIN
   -- Construct the Edge Function URL. 
   -- We default to the known production URL, but allow overrides via custom settings if needed.
   v_url := COALESCE(current_setting('app.settings.functions_url', true), 'https://gsupqfmwlsmwoybphimx.supabase.co/functions/v1') || '/' || function_name;
+  v_service_role_key := current_setting('app.settings.service_role_key', true);
+
+  IF v_service_role_key IS NULL OR length(trim(v_service_role_key)) = 0 THEN
+    RAISE EXCEPTION 'app.settings.service_role_key is required for invoke_edge_function';
+  END IF;
   
   v_headers := jsonb_build_object(
     'Content-Type', 'application/json',
-    'Authorization', 'Bearer ' || COALESCE(current_setting('app.settings.service_role_key', true), 'sb_secret_OEGt5rGA8uLwCaST9M4SuA_m3CPyA0C')
+    'Authorization', 'Bearer ' || v_service_role_key
   );
 
   v_payload := jsonb_build_object(
@@ -98,9 +104,16 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 DO $$
 DECLARE
   v_url TEXT;
+  v_service_role_key TEXT;
   v_job_id INT;
 BEGIN
   v_url := COALESCE(current_setting('app.settings.functions_url', true), 'https://gsupqfmwlsmwoybphimx.supabase.co/functions/v1') || '/webhook-dispatcher';
+  v_service_role_key := current_setting('app.settings.service_role_key', true);
+
+  IF v_service_role_key IS NULL OR length(trim(v_service_role_key)) = 0 THEN
+    RAISE NOTICE 'Skipping process-webhook-queue cron schedule: app.settings.service_role_key is not configured';
+    RETURN;
+  END IF;
   
   -- Create the cron job if it doesn't exist
   SELECT jobid INTO v_job_id FROM cron.job WHERE jobname = 'process-webhook-queue';
@@ -109,7 +122,11 @@ BEGIN
     PERFORM cron.schedule(
       'process-webhook-queue',
       '* * * * *', -- Every minute
-      format('SELECT net.http_post(''%s'', ''{}''::jsonb, ''{"Content-Type": "application/json"}'');', v_url)
+      format(
+        'SELECT net.http_post(''%s'', ''{}''::jsonb, ''{"Content-Type": "application/json", "Authorization": "Bearer %s"}''::jsonb);',
+        v_url,
+        replace(v_service_role_key, '''', '''''')
+      )
     );
   END IF;
 END $$;

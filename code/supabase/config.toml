@@ -1,0 +1,13 @@
+project_id = "gsupqfmwlsmwoybphimx"
+
+[functions.dashboard-report-scheduler]
+verify_jwt = false
+
+[functions.process-email-invoices]
+verify_jwt = false
+
+[functions.webhook-dispatcher]
+verify_jwt = false
+
+[functions.pos-webhook]
+verify_jwt = false
