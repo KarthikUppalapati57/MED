@@ -366,16 +366,7 @@ export default function Layout({ children, currentPageName }) {
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = role || 'loading';
-  const explicitAiInsightsPerm = userPermissions.AiInsights;
-  const canUseAiInsights = !isPlatformAdmin && (
-    explicitAiInsightsPerm === 'read' ||
-    explicitAiInsightsPerm === 'full' ||
-    (
-      explicitAiInsightsPerm !== 'none' &&
-      hasMinRole('manager') &&
-      isPageInEnabledModules('AiInsights', enabledModules, userRole)
-    )
-  );
+  const canUseAiInsights = !isPlatformAdmin && hasMinRole('manager') && isPageInEnabledModules('AiInsights', enabledModules, userRole);
 
   return (
     <div className="min-h-screen bg-background">
