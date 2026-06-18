@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabaseClient';
+
+const InteractiveScene = lazy(() => import('@/components/InteractiveScene'));
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -40,8 +42,19 @@ export default function LandingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <nav className="border-b border-border bg-background/95">
+    <main className="min-h-screen bg-transparent text-foreground relative overflow-hidden">
+      {/* 3D Interactive Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 flex items-center justify-center opacity-60">
+          <div className="w-full h-full">
+            <Suspense fallback={null}>
+              <InteractiveScene />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+
+      <nav className="border-b border-border bg-background/60 backdrop-blur-md relative z-10">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link to="/" className="text-lg font-bold tracking-wide">Restops</Link>
           <div className="flex items-center gap-3">
@@ -51,7 +64,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 relative z-10">
         <div className="space-y-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
             <CheckCircle2 className="h-4 w-4 text-primary" />
@@ -74,7 +87,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-lg border border-border bg-card/60 backdrop-blur-sm p-6 shadow-sm">
           <div className="space-y-5">
             {[
               ['Invoice AP', 'Upload, validate, approve, schedule, and pay invoices.'],
