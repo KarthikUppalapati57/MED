@@ -38,6 +38,10 @@ function applyScope(query: unknown, { orgId, brandId, locationId }: Record<strin
   return scoped;
 }
 
+function applyOrgScope(query: unknown, { orgId }: Record<string, string | null>) {
+  return query.eq('organization_id', orgId);
+}
+
 function applyLocationScope(query: unknown, { orgId, locationId, locationIds }: Record<string, unknown>) {
   let scoped = query.eq('organization_id', orgId);
   if (locationId) return scoped.eq('location_id', locationId);
@@ -80,7 +84,7 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
     applyScope(
       supabase
         .from('products')
-        .select('id, name, category, latest_price, base_unit, vendor_name, updated_at')
+        .select('id, name, category, latest_price, base_unit, updated_at')
         .order('updated_at', { ascending: false })
         .limit(35),
       scope,
@@ -117,7 +121,7 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
         .limit(25),
       scope,
     ),
-    applyScope(
+    applyOrgScope(
       supabase
         .from('ai_insights')
         .select('id, title, description, severity, insight_type, resolved, created_at, metadata')
@@ -255,13 +259,13 @@ serve(async (req) => {
     if (brandId) {
       const { data, error } = await admin
         .from('brands')
-        .select('id, name, organization_id')
-        .eq('id', brandId)
+        .select('brand_id, name, organization_id')
+        .eq('brand_id', brandId)
         .eq('organization_id', orgId)
         .maybeSingle();
       if (error) throw error;
       if (!data) return jsonResponse({ error: 'Requested brand is outside your organization.' }, 403);
-      brand = data;
+      brand = { id: data.brand_id, name: data.name, organization_id: data.organization_id };
     }
 
     let location = null;

@@ -48,6 +48,24 @@ const severityIcons = {
   low: CheckCircle2,
 };
 
+async function getFunctionErrorMessage(error) {
+  const response = error?.context;
+  if (response && typeof response.json === 'function') {
+    try {
+      const body = await response.clone().json();
+      return body?.error || body?.message || error.message;
+    } catch {
+      try {
+        const text = await response.clone().text();
+        if (text) return text;
+      } catch {
+        return error.message;
+      }
+    }
+  }
+  return error?.message || 'AI Insights Copilot could not answer right now.';
+}
+
 export default function AiInsights() {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
@@ -140,7 +158,7 @@ export default function AiInsights() {
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await getFunctionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       setChatHistory(prev => [...prev, {
