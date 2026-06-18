@@ -8,7 +8,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, role, org_id, page_permissions, signing_privileges, onboarding_type } = await req.json()
+    const { email, role, org_id, onboarding_type } = await req.json()
 
     if (!email || !org_id) {
       return new Response(JSON.stringify({ error: 'Missing email or org_id' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
@@ -26,8 +26,6 @@ serve(async (req) => {
         email,
         role: role || 'ground_staff',
         organization_id: org_id,
-        permissions: page_permissions || [],
-        signing_privileges: signing_privileges || false,
         onboarding_type: onboarding_type || 'invited',
         status: 'pending'
       })

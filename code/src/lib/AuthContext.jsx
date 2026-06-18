@@ -138,27 +138,6 @@ export const AuthProvider = ({ children }) => {
         // Use secure RPC to accept invitation (bypasses RLS on profiles update)
         const { error } = await supabase.rpc('accept_invitation', { p_token: invite.token });
         if (error) throw error;
-
-        // Apply pre-provisioned permissions from invitation metadata if available
-        const metadata = invite.metadata || {};
-        const permissions = metadata.page_permissions || invite.page_permissions;
-        const privileges = metadata.signing_privileges || invite.signing_privileges;
-
-        if (permissions || privileges) {
-          try {
-            // Update profile with the invited permissions
-            await supabase
-              .from('profiles')
-              .update({
-                permissions: permissions || {},
-                signing_privileges: privileges || {},
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', userId);
-          } catch (updateErr) {
-            console.warn('Failed to auto-provision permissions (non-fatal):', updateErr);
-          }
-        }
         return true;
       }
     } catch (err) {
@@ -589,7 +568,7 @@ export const AuthProvider = ({ children }) => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
           if (current) {
-            console.debug('[AuthContext] Safety timeout — completing auth init with cached profile');
+            console.debug('[AuthContext] Safety timeout â€” completing auth init with cached profile');
             setIsMfaReady(true); // Ensure MFA is also marked ready to prevent stuck screen
             return false;
           }

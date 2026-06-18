@@ -7,21 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Shield, Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 
-const PERMISSION_MODULES = [
-  { id: 'can_view_invoices', label: 'View Invoices', description: 'Can see invoices and bill payments.' },
-  { id: 'can_edit_invoices', label: 'Edit/Approve Invoices', description: 'Can modify and approve invoices for payment.' },
-  { id: 'can_view_inventory', label: 'View Inventory', description: 'Can view stock counts and inventory movements.' },
-  { id: 'can_manage_inventory', label: 'Manage Inventory', description: 'Can perform counts, waste logs, and transfers.' },
-  { id: 'can_schedule_labor', label: 'Schedule Labor', description: 'Can create and publish employee shift schedules.' },
-  { id: 'can_view_reports', label: 'View Analytics', description: 'Can access the dashboard, P&L, and AvT costing reports.' },
-  { id: 'can_manage_org', label: 'Manage Organization', description: 'Can manage users, locations, and organization settings.' }
-];
 
 export default function CustomRolesTab() {
   const { organization, role: authRole } = useAuth();
@@ -32,7 +22,6 @@ export default function CustomRolesTab() {
   // Form State
   const [roleName, setRoleName] = useState('');
   const [roleDesc, setRoleDesc] = useState('');
-  const [permissions, setPermissions] = useState({});
 
   const { data: roles, isLoading } = useQuery({
     queryKey: ['roles', organization?.id],
@@ -49,14 +38,12 @@ export default function CustomRolesTab() {
       if (roleData.id) {
         return api.client.from('roles').update({
           name: roleData.name,
-          description: roleData.description,
-          default_page_permissions: roleData.permissions
+          description: roleData.description
         }).eq('id', roleData.id);
       } else {
         return api.client.from('roles').insert({
           name: roleData.name,
           description: roleData.description,
-          default_page_permissions: roleData.permissions,
           organization_id: organization.id,
           is_system: false
         });
@@ -93,7 +80,6 @@ export default function CustomRolesTab() {
     setSelectedRole(role);
     setRoleName(role ? role.name : '');
     setRoleDesc(role ? (role.description || '') : '');
-    setPermissions(role ? (role.default_page_permissions || {}) : {});
     setIsDialogOpen(true);
   };
 
@@ -105,16 +91,8 @@ export default function CustomRolesTab() {
     saveRoleMutation.mutate({
       id: selectedRole?.id,
       name: roleName.trim(),
-      description: roleDesc.trim(),
-      permissions
+      description: roleDesc.trim()
     });
-  };
-
-  const togglePermission = (permId) => {
-    setPermissions(prev => ({
-      ...prev,
-      [permId]: !prev[permId]
-    }));
   };
 
   if (isLoading) return <Skeleton className="h-[400px] w-full rounded-xl" />;
@@ -126,10 +104,10 @@ export default function CustomRolesTab() {
           <div>
             <CardTitle className="text-xl flex items-center gap-2">
               <Shield className="h-5 w-5 text-indigo-500" />
-              Roles & Permissions
+              Custom Roles
             </CardTitle>
             <CardDescription className="mt-1">
-              Manage system roles and configure custom granular roles for your organization.
+              Manage system roles and custom organization roles.
             </CardDescription>
           </div>
           <Button onClick={() => handleOpenDialog()} className="bg-indigo-600 hover:bg-indigo-700 text-white">
@@ -208,28 +186,7 @@ export default function CustomRolesTab() {
                 />
               </div>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-semibold text-foreground border-b border-border/50 pb-2 mb-4">Module Permissions</h4>
-                <div className="space-y-4">
-                  {PERMISSION_MODULES.map(module => (
-                    <div key={module.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-muted/50 transition-colors">
-                      <div className="space-y-0.5">
-                        <Label className="text-base cursor-pointer" htmlFor={`perm-${module.id}`}>{module.label}</Label>
-                        <p className="text-sm text-muted-foreground">{module.description}</p>
-                      </div>
-                      <Switch 
-                        id={`perm-${module.id}`}
-                        checked={!!permissions[module.id]}
-                        onCheckedChange={() => togglePermission(module.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
-          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

@@ -25,7 +25,6 @@ serve(async (req) => {
       .insert({
         email,
         role: 'org_owner',
-        permissions: modules || [],
         onboarding_type: 'client_invite',
         status: 'pending'
       })

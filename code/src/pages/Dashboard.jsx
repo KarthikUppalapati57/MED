@@ -120,10 +120,6 @@ function createCanAccessPage({ organization, userProfile, hasMinRole, isPlatform
     if (!pageName) return true;
     if (isPlatformAdmin) return true;
 
-    const explicit = userProfile?.permissions?.[pageName];
-    if (explicit === 'none') return false;
-    if (explicit === 'read' || explicit === 'full') return true;
-
     const moduleInfo = getModuleForPage(pageName);
     const roleAllowed = !moduleInfo || hasMinRole(moduleInfo.minRole);
     return roleAllowed && isPageInEnabledModules(pageName, organization?.enabled_modules, userProfile?.role);
@@ -2978,7 +2974,6 @@ function GroundStaffDashboard() {
   const data = useDashboardData('staff');
   const metrics = useDashboardMetrics(data);
   const enabledModules = organization?.enabled_modules || [];
-  const permissions = userProfile?.permissions || {};
   const canAccessPage = React.useMemo(
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
     [hasMinRole, isPlatformAdmin, organization, userProfile]
@@ -2990,12 +2985,7 @@ function GroundStaffDashboard() {
     { module: 'Inventory', href: 'Inventory', label: 'Check inventory and counts', value: workflowCounts.lowStock ?? metrics.lowStock.length, icon: Warehouse },
     { module: 'Products', href: 'Products', label: 'Review products', value: workflowCounts.products ?? data.products.length, icon: Package },
     { module: 'AutoOrdering', href: 'AutoOrdering', label: 'Receive or place orders', value: workflowCounts.openOrders ?? metrics.openOrders.length, icon: ShoppingCart },
-  ].filter((task) => {
-    const explicit = permissions[task.module];
-    if (explicit === 'none') return false;
-    if (explicit === 'read' || explicit === 'full') return true;
-    return isPageInEnabledModules(task.module, enabledModules, userProfile?.role);
-  });
+  ].filter((task) => isPageInEnabledModules(task.module, enabledModules, userProfile?.role));
 
   return (
     <div className="space-y-6">
@@ -3009,7 +2999,7 @@ function GroundStaffDashboard() {
         <StatCard label="Pending Invoices" value={metrics.pendingInvoices.length} icon={Clock} tone="orange" linkTo="Invoices" linkText="View invoices" />
         <StatCard label="Assigned Modules" value={tasks.length} icon={Shield} tone="brand" />
       </div>
-      <SectionCard title="My Module Tasks" description="Only actions available to your role and permissions are shown here.">
+      <SectionCard title="My Module Tasks" description="Only actions available to your role are shown here.">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {tasks.map((task) => (
             <Link key={task.href} to={createPageUrl(task.href)} className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/60">

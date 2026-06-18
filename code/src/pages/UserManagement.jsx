@@ -19,9 +19,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
-  CheckCircle2, X, Loader2, Building2, Globe, ChevronDown, ChevronRight,
-  FileText, Settings, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, LayoutDashboard, Package, Receipt, ShoppingCart, Upload, AlertCircle, Key
+  CheckCircle2, X, Loader2, Building2, Globe, FileText, ShieldCheck,
+  UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -43,74 +42,6 @@ const ROLE_COLOR_CLASSES = {
   slate:  { badge: "bg-secondary text-muted-foreground border-border",    dot: "bg-slate-400" },
 };
 
-// Restops Permission Groups 
-const PAGE_PERMISSION_GROUPS = [
-  {
-    key: "core", label: "General", icon: <LayoutDashboard className="w-4 h-4" />,
-    pages: [
-      { key: "Dashboard", label: "Main Dashboard" },
-      { key: "AuditLogs", label: "Audit Logs" },
-      { key: "Performance", label: "Performance" },
-    ],
-  },
-  {
-    key: "inventory", label: "Inventory & Products", icon: <Package className="w-4 h-4" />,
-    pages: [
-      { key: "Inventory", label: "Stock Management" },
-      { key: "Products", label: "Product Master" },
-      { key: "Recipes", label: "Recipe Costing" },
-      { key: "MenuEngineering", label: "Menu Engineering" },
-      { key: "AvTCosting", label: "AvT Costing" },
-    ],
-  },
-  {
-    key: "finance", label: "Finance", icon: <Receipt className="w-4 h-4" />,
-    pages: [
-      { key: "Invoices", label: "Invoice Processing" },
-      { key: "Payments", label: "Vendor Payments" },
-      { key: "Accounting", label: "Accounting" },
-    ],
-  },
-  {
-    key: "supply", label: "Supply Chain", icon: <ShoppingCart className="w-4 h-4" />,
-    pages: [
-      { key: "Vendors", label: "Vendor Management" },
-      { key: "AutoOrdering", label: "Intelligent Ordering" },
-    ],
-  },
-  {
-    key: "admin", label: "Administration", icon: <Settings className="w-4 h-4" />,
-    pages: [
-      { key: "UserManagement", label: "Team Members" },
-      { key: "Labor", label: "Labor & Scheduling" },
-      { key: "Integrations", label: "Integrations" },
-      { key: "RestaurantSetup", label: "Restaurant Setup" },
-    ],
-  },
-];
-
-const ACCESS_LEVELS = {
-  full: { label: "Full", chipClass: "bg-resend-green/10 text-resend-green border-resend-green/20", btnActive: "bg-emerald-600 text-white border-transparent" },
-  read: { label: "Read", chipClass: "bg-sky-100 text-sky-700 border-sky-200",             btnActive: "bg-sky-600 text-white border-transparent" },
-  none: { label: "None", chipClass: "bg-secondary text-muted-foreground border-border",       btnActive: "bg-secondary text-muted-foreground border-transparent" },
-};
-
-// Signing Authority Levels (Adapted for Restops) 
-const SIGNING_LEVELS = [
-  { value: 0, label: "None",         badgeClass: "bg-secondary text-muted-foreground border-border" },
-  { value: 1, label: "L1 – Review",  badgeClass: "bg-sky-100 text-sky-700 border-sky-200" },
-  { value: 2, label: "L2 – Approve", badgeClass: "bg-resend-blue/10 text-resend-blue border-resend-blue/20" },
-  { value: 3, label: "L3 – Execute", badgeClass: "bg-violet-100 text-violet-700 border-violet-200" },
-  { value: 4, label: "L4 – Final",   badgeClass: "bg-rose-100 text-rose-700 border-rose-200" },
-];
-
-const DOCUMENT_TYPES = [
-  { key: "invoices",         label: "Invoices" },
-  { key: "purchase_orders",  label: "Purchase Orders" },
-  { key: "inventory_counts", label: "Inventory Counts" },
-  { key: "payments",         label: "Payments" },
-  { key: "expense_reports",  label: "Expense Reports" },
-];
 
 const STATUS_CONFIG = {
   active:   { label: "Active",   badgeClass: "bg-resend-green/10 text-resend-green", icon: CheckCircle2 },
@@ -144,136 +75,6 @@ function formatLastActive(dateStr) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// PagePermissionMatrix 
-function PagePermissionMatrix({ permissions, onChange, readonly = false }) {
-  const [expanded, setExpanded] = useState({ core: true, inventory: true, finance: true });
-
-  const toggleGroup = (key) => setExpanded(e => ({ ...e, [key]: !e[key] }));
-
-  const groupAccess = (group) => {
-    const levels = group.pages.map(p => permissions?.[p.key] || "none");
-    if (levels.every(l => l === "full")) return "full";
-    if (levels.every(l => l === "none")) return "none";
-    return "mixed";
-  };
-
-  const setGroupAccess = (group, level) => {
-    group.pages.forEach(p => onChange(p.key, level));
-  };
-
-  return (
-    <div className="space-y-1">
-      {PAGE_PERMISSION_GROUPS.map(group => {
-        const isOpen = expanded[group.key];
-        const groupLevel = groupAccess(group);
-        return (
-          <div key={group.key} className="border border-border rounded-xl overflow-hidden mb-2">
-            <div
-              className={cn(
-                "flex items-center justify-between px-3 py-2.5 bg-secondary cursor-pointer hover:bg-secondary transition-colors",
-                !isOpen && "bg-card"
-              )}
-              onClick={() => toggleGroup(group.key)}
-            >
-              <div className="flex items-center gap-2">
-                {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
-                <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                  {group.icon}
-                  {group.label}
-                </span>
-                {groupLevel === "mixed" && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-resend-yellow/10 text-resend-yellow font-semibold border border-resend-yellow/20">Mixed Access</span>}
-              </div>
-              {!readonly && (
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  {Object.entries(ACCESS_LEVELS).map(([l, cfg]) => (
-                    <button
-                      key={l}
-                      onClick={() => setGroupAccess(group, l)}
-                      className={`text-[9px] px-2 py-0.5 rounded-lg font-semibold border transition-all ${
-                        groupLevel === l ? cfg.btnActive : "bg-card border-border text-muted-foreground hover:border-border"
-                      }`}
-                    >
-                      {cfg.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {isOpen && (
-              <div className="divide-y divide-slate-100 px-1 pb-1">
-                {group.pages.map(page => {
-                  const current = permissions?.[page.key] || "none";
-                  return (
-                    <div key={page.key} className="flex items-center justify-between px-3 py-2">
-                      <span className="text-xs text-muted-foreground">{page.label}</span>
-                      {readonly ? (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ACCESS_LEVELS[current]?.chipClass}`}>
-                          {ACCESS_LEVELS[current]?.label}
-                        </span>
-                      ) : (
-                        <div className="flex gap-1">
-                          {Object.entries(ACCESS_LEVELS).map(([l, cfg]) => (
-                            <button
-                              key={l}
-                              onClick={() => onChange(page.key, l)}
-                              className={`text-[9px] px-2.5 py-1 rounded-lg font-semibold border transition-all ${
-                                current === l ? cfg.btnActive : "bg-card border-border text-muted-foreground hover:border-border shadow-sm"
-                              }`}
-                            >
-                              {cfg.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// SigningPrivilegesMatrix 
-function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }) {
-  return (
-    <div className="space-y-2">
-      {DOCUMENT_TYPES.map(doc => {
-        const current = privileges[doc.key] || 0;
-        const lvl = SIGNING_LEVELS.find(s => s.value === current) || SIGNING_LEVELS[0];
-        return (
-          <div key={doc.key} className="flex items-center justify-between px-3 py-2 rounded-xl border border-border hover:bg-secondary transition-colors">
-            <div className="flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{doc.label}</span>
-            </div>
-            {readonly ? (
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-semibold ${lvl.badgeClass}`}>{lvl.label}</span>
-            ) : (
-              <div className="flex gap-1">
-                {SIGNING_LEVELS.map(sl => (
-                  <button
-                    key={sl.value}
-                    onClick={() => onChange(doc.key, sl.value)}
-                    className={`text-[9px] px-2 py-0.5 rounded-lg font-semibold border transition-all ${
-                      current === sl.value ? sl.badgeClass + ' ring-1 ring-offset-1' : 'bg-card border-border text-muted-foreground hover:border-border'
-                    }`}
-                  >
-                    {sl.value === 0 ? '—' : `L${sl.value}`}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // RoleBadges 
 function RoleBadges({ member, maxVisible = 2 }) {
@@ -289,36 +90,17 @@ function RoleBadges({ member, maxVisible = 2 }) {
   );
 }
 
-// PageAccessChips 
-function PageAccessChips({ pagePerms = {}, maxVisible = 3 }) {
-  const entries = Object.entries(pagePerms).filter(([, v]) => v !== 'none');
-  if (entries.length === 0) return <span className="text-[10px] text-muted-foreground italic">Default</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {entries.slice(0, maxVisible).map(([key, level]) => (
-        <span key={key} className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${ACCESS_LEVELS[level]?.chipClass || ''}`}>
-          {key}
-        </span>
-      ))}
-      {entries.length > maxVisible && (
-        <span className="text-[9px] text-muted-foreground">+{entries.length - maxVisible}</span>
-      )}
-    </div>
-  );
-}
 
 // UserDetailDrawer 
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
   const { role: currentUserRole, userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState("permissions");
+  const [activeTab, setActiveTab] = useState("role");
   const [form, setForm] = useState({
     role: member.role || member.capabilities?.role || 'ground_staff',
     department: member.department || '',
     location: member.location || '',
     status: member.status || 'active',
-    permissions: member.page_permissions || member.permissions || {},
-    signingPrivileges: member.signing_privileges || member.capabilities?.signing_privileges || {},
   });
   const [saving, setSaving] = useState(false);
 
@@ -334,16 +116,14 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Use secure RPC to update role and privileges
+      // Use secure RPC to update role and account status
       const userId = member.user_id || member.profiles?.id || member.id;
       const { error } = await supabase.rpc('admin_update_user_role', {
         target_user_id: userId,
         new_role: form.role,
         new_status: form.status,
         new_department: form.department,
-        new_location: form.location,
-        new_permissions: form.permissions,
-        new_signing_privileges: form.signingPrivileges
+        new_location: form.location
       });
       if (error) throw error;
 
@@ -360,10 +140,10 @@ function UserDetailDrawer({ member, orgId, onClose }) {
       // Audit
       try {
         await logAudit({
-          action: 'update_user_permissions',
+          action: 'update_user_role',
           entityType: 'User',
           entityId: member.user_id || member.id,
-          details: { role: form.role, permissions: form.permissions },
+          details: { role: form.role, status: form.status },
         });
       } catch { /* audit is non-critical */ }
 
@@ -426,8 +206,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
         {/* Custom Tabs */}
         <div className="flex border-b border-border px-6 bg-card sticky top-0 z-10">
           {[
-            { id: 'permissions', label: 'Access Rights', icon: ShieldCheck },
-            { id: 'signing', label: 'Signing Authority', icon: FileText },
+            { id: 'role', label: 'Role & Status', icon: ShieldCheck },
             { id: 'profile', label: 'Organization Info', icon: Building2 },
           ].map(tab => (
             <button
@@ -448,7 +227,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          {activeTab === 'permissions' ? (
+          {activeTab === 'role' ? (
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">System Role</Label>
@@ -481,32 +260,6 @@ function UserDetailDrawer({ member, orgId, onClose }) {
                 </div>
               </div>
 
-              <div className="space-y-3 pt-6 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Granular Page Access</Label>
-                  <Button variant="ghost" size="sm" className="h-7 text-[10px] text-primary font-bold" onClick={() => setForm({...form, permissions: {}})}>Reset All</Button>
-                </div>
-                <PagePermissionMatrix
-                  permissions={form.permissions}
-                  onChange={(page, level) => setForm({
-                    ...form,
-                    permissions: { ...form.permissions, [page]: level }
-                  })}
-                />
-              </div>
-            </div>
-          ) : activeTab === 'signing' ? (
-            <div className="space-y-4">
-              <div className="p-3 rounded-xl bg-resend-blue/5 border border-blue-100">
-                <p className="text-xs text-resend-blue font-medium">Signing authority determines what level of approval a user can provide for each document type.</p>
-              </div>
-              <SigningPrivilegesMatrix
-                privileges={form.signingPrivileges}
-                onChange={(docKey, level) => setForm({
-                  ...form,
-                  signingPrivileges: { ...form.signingPrivileges, [docKey]: level }
-                })}
-              />
             </div>
           ) : (
             <div className="space-y-6">
@@ -584,10 +337,7 @@ function InviteDialog({ open, onClose, orgId }) {
   const { user: currentUser, role: currentUserRole, userProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('ground_staff');
-  const [permissions, setPermissions] = useState({});
-  const [signingPrivileges, setSigningPrivileges] = useState({});
   const [sending, setSending] = useState(false);
-  const [step, setStep] = useState(0); // 0=email, 1=role, 2=permissions, 3=signing
   const [generatedLink, setGeneratedLink] = useState('');
 
   const { data: dbRoles } = useQuery({
@@ -609,8 +359,6 @@ function InviteDialog({ open, onClose, orgId }) {
           email,
           role,
           org_id: orgId || userProfile?.organization_id,
-          page_permissions: permissions,
-          signing_privileges: signingPrivileges,
           onboarding_type: 'invited',
         }
       });
@@ -689,7 +437,7 @@ function InviteDialog({ open, onClose, orgId }) {
       } else {
         posthog.capture('team_member_invited', { role, method: 'email' });
         toast.success(`Invitation sent to ${email}`);
-        setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
+        setEmail(''); setRole('ground_staff');
         onClose();
       }
     } catch (err) {
@@ -731,7 +479,7 @@ function InviteDialog({ open, onClose, orgId }) {
             <Button 
               className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-12"
               onClick={() => {
-                setGeneratedLink(''); setEmail(''); setRole('ground_staff'); setPermissions({}); setSigningPrivileges({}); setStep(0);
+                setGeneratedLink(''); setEmail(''); setRole('ground_staff');
                 onClose();
               }}
             >
@@ -755,7 +503,7 @@ function InviteDialog({ open, onClose, orgId }) {
 
           {/* Step 1: Role */}
           <div className="space-y-2">
-            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Default Access Level</Label>
+            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Role</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger className="h-12 rounded-2xl border-border">
                 <SelectValue />
@@ -775,34 +523,6 @@ function InviteDialog({ open, onClose, orgId }) {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Page Permissions (Collapsed) */}
-          <details className="group">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-primary uppercase tracking-wider pl-1">
-              <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-              Custom Page Access (optional)
-            </summary>
-            <div className="mt-3">
-              <PagePermissionMatrix
-                permissions={permissions}
-                onChange={(page, level) => setPermissions(prev => ({ ...prev, [page]: level }))}
-              />
-            </div>
-          </details>
-
-          {/* Signing Privileges (Collapsed) */}
-          <details className="group">
-            <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-primary uppercase tracking-wider pl-1">
-              <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-              Signing Authority (optional)
-            </summary>
-            <div className="mt-3">
-              <SigningPrivilegesMatrix
-                privileges={signingPrivileges}
-                onChange={(docKey, level) => setSigningPrivileges(prev => ({ ...prev, [docKey]: level }))}
-              />
-            </div>
-          </details>
         </div>
 
         <div className="flex gap-3 pt-4">
@@ -990,7 +710,7 @@ export default function UserManagement() {
       if (!activeOrgId) return [];
       const { data, error } = await supabase
         .from('roles')
-        .select('id, name, color, description, default_page_permissions, default_signing_privileges')
+        .select('id, name, color, description')
         .eq('organization_id', activeOrgId)
         .eq('is_system', false);
       if (error) throw error;
@@ -1010,8 +730,6 @@ export default function UserManagement() {
         description: r.description || 'Custom organization role',
         icon: Key,
         isCustom: true,
-        default_page_permissions: r.default_page_permissions,
-        default_signing_privileges: r.default_signing_privileges
       };
     });
     return merged;
@@ -1023,7 +741,7 @@ export default function UserManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, updated_at, location_id, brand_id, role, signing_privileges, status')
+        .select('id, email, full_name, updated_at, location_id, brand_id, role, status')
         .eq('organization_id', activeOrgId);
 
       if (error) throw error;
@@ -1128,7 +846,7 @@ export default function UserManagement() {
             </div>
             <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Team Members</h1>
           </div>
-          <p className="text-muted-foreground font-medium pl-14">Manage organization team members, signing authority, and local access.</p>
+          <p className="text-muted-foreground font-medium pl-14">Manage organization team members, roles, and account status.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setShowCSV(true)}>
@@ -1198,7 +916,7 @@ export default function UserManagement() {
                 </div>
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border shadow-xl">
-                <SelectItem value="all">All Access Levels</SelectItem>
+                <SelectItem value="all">All Roles</SelectItem>
                 {Object.entries(Restops_ROLES).map(([r, def]) => (
                   <SelectItem key={r} value={r}>{def.label}</SelectItem>
                 ))}
@@ -1223,9 +941,7 @@ export default function UserManagement() {
               <TableHeader className="bg-secondary/50 border-b border-border">
                 <TableRow className="hover:bg-transparent border-0 h-14">
                   <TableHead className="pl-8 text-xs font-bold text-muted-foreground uppercase">Identity</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Access Level</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Page Access</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Signing Authority</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Role</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground uppercase">Status</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground uppercase">Last Active</TableHead>
                   <TableHead className="w-20 pr-8"></TableHead>
@@ -1234,7 +950,7 @@ export default function UserManagement() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-64 text-center">
+                    <TableCell colSpan={5} className="h-64 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="w-12 h-12 border-4 border-teal-50 border-t-teal-600 rounded-full animate-spin"></div>
                         <p className="text-sm font-bold text-muted-foreground">Syncing user database...</p>
@@ -1243,7 +959,7 @@ export default function UserManagement() {
                   </TableRow>
                 ) : filteredMembers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-64 text-center">
+                    <TableCell colSpan={5} className="h-64 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-secondary rounded-full">
                           <UserX className="w-8 h-8 text-muted-foreground" />
@@ -1259,11 +975,6 @@ export default function UserManagement() {
                     const status = member.status || 'active';
                     const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
                     const StatusIcon = statusCfg.icon;
-                    const pagePerms = member.page_permissions || member.permissions || {};
-                    const signingPrivs = member.signing_privileges || member.capabilities?.signing_privileges || {};
-                    const privValues = Object.values(signingPrivs).map(Number);
-                    const highestSigning = privValues.length > 0 ? Math.max(0, ...privValues) : 0;
-                    const highestSlvl = SIGNING_LEVELS.find(s => s.value === highestSigning) || SIGNING_LEVELS[0];
 
                     return (
                       <TableRow 
@@ -1289,18 +1000,6 @@ export default function UserManagement() {
                           <RoleBadges member={member} />
                         </TableCell>
                         <TableCell>
-                          <PageAccessChips pagePerms={pagePerms} />
-                        </TableCell>
-                        <TableCell>
-                          {highestSigning === 0 ? (
-                            <span className="text-xs text-muted-foreground italic">None</span>
-                          ) : (
-                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-semibold ${highestSlvl.badgeClass}`}>
-                              {highestSlvl.label}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
                           <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${statusCfg.badgeClass}`}>
                             <StatusIcon className="w-3 h-3" />{statusCfg.label}
                           </span>
@@ -1320,7 +1019,7 @@ export default function UserManagement() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="rounded-2xl border-border shadow-xl p-2 w-48">
                                 <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-foreground">
-                                  <Edit2 className="h-4 w-4 mr-3 text-primary" /> Advanced Settings
+                                  <Edit2 className="h-4 w-4 mr-3 text-primary" /> Edit Member
                                 </DropdownMenuItem>
                                 {member.token && (
                                   <>

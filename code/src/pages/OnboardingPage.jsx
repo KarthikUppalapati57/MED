@@ -349,23 +349,6 @@ export default function OnboardingPage() {
               .update({ enabled_modules: meta.modules })
               .eq('id', primaryOrgId);
           }
-
-          if (meta.access) {
-            const access = meta.access;
-            const level = (access.update || access.write) ? 'full' : (access.read ? 'read' : 'none');
-            
-            const allPages = ['Dashboard', 'Inventory', 'Products', 'Recipes', 'Invoices', 'Payments', 'Vendors', 'AutoOrdering', 'UserManagement', 'AuditLogs', 'RestaurantSetup'];
-            const perms = {};
-            allPages.forEach(p => perms[p] = level);
-
-            await supabase
-              .from('profiles')
-              .update({ 
-                permissions: perms,
-                access_level: level 
-              })
-              .eq('id', user.id);
-          }
         }
       } catch (err) {
         console.warn('Failed to apply invitation metadata:', err);

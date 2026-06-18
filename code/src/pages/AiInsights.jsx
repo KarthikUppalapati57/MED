@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/lib/AuthContext';
+import AiInsightsCopilotChat from '@/components/AiInsightsCopilotChat';
 import {
   Sparkles,
   AlertTriangle,
@@ -12,14 +11,9 @@ import {
   CheckCircle2,
   TrendingUp,
   Search,
-  Check,
-  Bot,
-  Loader2,
-  Send,
-  User
+  Check
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,39 +42,12 @@ const severityIcons = {
   low: CheckCircle2,
 };
 
-async function getFunctionErrorMessage(error) {
-  const response = error?.context;
-  if (response && typeof response.json === 'function') {
-    try {
-      const body = await response.clone().json();
-      return body?.error || body?.message || error.message;
-    } catch {
-      try {
-        const text = await response.clone().text();
-        if (text) return text;
-      } catch {
-        return error.message;
-      }
-    }
-  }
-  return error?.message || 'AI Insights Copilot could not answer right now.';
-}
-
 export default function AiInsights() {
-  const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('unresolved');
   const [activeTab, setActiveTab] = useState('insights');
-  const [chatInput, setChatInput] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    {
-      role: 'assistant',
-      content: 'I can help analyze the restaurant data in your current context. Switch organization, brand, or location to change what I can see.',
-    },
-  ]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const {
     data = {},
@@ -124,57 +91,6 @@ export default function AiInsights() {
       return matchesSearch && matchesFilter;
     });
   }, [insights, search, filter]);
-
-  const scopeLabel = location?.name || brand?.name || organization?.name || 'Current context';
-
-  const handleSendChatMessage = async (e) => {
-    e.preventDefault();
-    const message = chatInput.trim();
-    if (!message || isChatLoading) return;
-    if (!organization?.id) {
-      toast.error('Select an organization before using AI Insights Copilot');
-      return;
-    }
-
-    const nextHistory = [...chatHistory, { role: 'user', content: message }];
-    setChatHistory(nextHistory);
-    setChatInput('');
-    setIsChatLoading(true);
-
-    try {
-      const historyForFunction = nextHistory
-        .filter((item) => item.role === 'user' || item.role === 'assistant')
-        .slice(-8);
-
-      const { data, error } = await supabase.functions.invoke('ai-insights-chat', {
-        body: {
-          message,
-          history: historyForFunction,
-          context: {
-            organizationId: organization.id,
-            brandId: brand?.id || null,
-            locationId: location?.id || null,
-          },
-        },
-      });
-
-      if (error) throw new Error(await getFunctionErrorMessage(error));
-      if (data?.error) throw new Error(data.error);
-
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: data?.reply || 'I could not generate an answer from the available context.',
-      }]);
-    } catch (err) {
-      console.error('AI Insights Copilot error:', err);
-      setChatHistory(prev => [...prev, {
-        role: 'assistant',
-        content: err.message || 'AI Insights Copilot could not answer right now.',
-      }]);
-    } finally {
-      setIsChatLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -338,71 +254,7 @@ export default function AiInsights() {
         </TabsContent>
 
         <TabsContent value="copilot">
-          <Card className="glass-card border border-border/50 shadow-sm">
-            <CardContent className="p-0">
-              <div className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="h-9 w-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                    <Bot className="h-5 w-5 text-brand" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-foreground leading-tight">AI Insights Copilot</p>
-                    <p className="text-xs text-muted-foreground truncate">Scope: {scopeLabel}</p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="bg-brand/10 text-brand border-0">Scoped</Badge>
-              </div>
-
-              <ScrollArea className="h-[520px] p-4">
-                <div className="space-y-4 pb-4">
-                  {chatHistory.map((msg, index) => (
-                    <div key={`${msg.role}-${index}`} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      {msg.role === 'assistant' && (
-                        <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                          <Bot className="h-4 w-4 text-brand" />
-                        </div>
-                      )}
-                      <div className={`max-w-[82%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                          : 'bg-secondary text-secondary-foreground rounded-tl-sm'
-                      }`}>
-                        {msg.content}
-                      </div>
-                      {msg.role === 'user' && (
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {isChatLoading && (
-                    <div className="flex gap-3 justify-start">
-                      <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                        <Bot className="h-4 w-4 text-brand" />
-                      </div>
-                      <div className="bg-secondary text-secondary-foreground rounded-xl rounded-tl-sm px-3 py-2 text-sm flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-brand" />
-                        Reviewing scoped data
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-
-              <form onSubmit={handleSendChatMessage} className="flex gap-2 border-t border-border/50 p-4">
-                <Input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask about invoices, sales, prep, inventory, vendors, or labor..."
-                  className="flex-1 bg-background/60"
-                />
-                <Button type="submit" size="icon" disabled={!chatInput.trim() || isChatLoading}>
-                  {isChatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          <AiInsightsCopilotChat storageKey="restops_ai_insights_page_history" />
         </TabsContent>
       </Tabs>
     </div>

@@ -39,23 +39,6 @@ export default function ProtectedModule({ pageName, children }) {
   // If the page isn't in any module definition, allow it through
   // (handles pages like OnboardingPage, PaymentVerification that aren't module-gated)
   if (!moduleInfo) return <>{children}</>;
-
-  const userPermissions = userProfile?.page_permissions || userProfile?.permissions || {};
-  const explicitPerm = userPermissions[pageName];
-
-  // If explicitly denied, block immediately
-  if (explicitPerm === 'none') {
-    return <AccessDenied reason="role" requiredRole={moduleInfo.minRole || 'explicit_grant'} />;
-  }
-
-  // If explicitly granted, bypass plan/module checks but never platform-only routes.
-  if (explicitPerm === 'read' || explicitPerm === 'full') {
-    if (moduleInfo.minRole === 'platform_admin') {
-      return <AccessDenied reason="role" requiredRole={moduleInfo.minRole} />;
-    }
-    return <>{children}</>;
-  }
-
   // Check 1: Role requirement
   if (moduleInfo.minRole && !hasMinRole(moduleInfo.minRole)) {
     return <AccessDenied reason="role" requiredRole={moduleInfo.minRole} />;

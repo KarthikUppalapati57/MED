@@ -315,9 +315,8 @@ export default function Layout({ children, currentPageName }) {
     navigate('/');
   };
 
-  // Filter navigation based on user role, explicit permissions, AND enabled modules (FAIL-CLOSED)
+  // Filter navigation based on user role and enabled modules (FAIL-CLOSED)
   const enabledModules = organization?.enabled_modules;
-  const userPermissions = userProfile?.permissions || {};
   const userRole = userProfile?.role;
 
   const filteredNavigation = navigation.reduce((acc, item) => {
@@ -334,14 +333,6 @@ export default function Layout({ children, currentPageName }) {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter(sub => {
         const pageKey = sub.href.split('?')[0];
-        const explicitPerm = userPermissions[pageKey];
-        
-        // If explicitly granted
-        if (explicitPerm === 'read' || explicitPerm === 'full') return true;
-        // If explicitly denied
-        if (explicitPerm === 'none') return false;
-        
-        // Fallback to role + module
         if (!isParentRoleValid) return false;
         return isPageInEnabledModules(pageKey, enabledModules, userRole);
       });
@@ -351,17 +342,7 @@ export default function Layout({ children, currentPageName }) {
       }
     } else {
       const pageKey = item.href?.split('?')[0];
-      const explicitPerm = userPermissions[pageKey];
-      
-      let isVisible = false;
-      if (explicitPerm === 'read' || explicitPerm === 'full') {
-        isVisible = true;
-      } else if (explicitPerm === 'none') {
-        isVisible = false;
-      } else {
-        isVisible = isParentRoleValid && isPageInEnabledModules(pageKey, enabledModules, userRole);
-      }
-      
+      const isVisible = isParentRoleValid && isPageInEnabledModules(pageKey, enabledModules, userRole);
       if (isVisible) acc.push(item);
     }
     

@@ -317,7 +317,6 @@ export const api = {
       newStatus = null,
       newDepartment = null,
       newLocation = null,
-      newPermissions = null,
       newBrandId = null,
       newLocationId = null,
       newAccessLevel = null,
@@ -328,7 +327,6 @@ export const api = {
         new_status: newStatus,
         new_department: newDepartment,
         new_location: newLocation,
-        new_permissions: newPermissions,
         new_brand_id: newBrandId,
         new_location_id: newLocationId,
         new_access_level: newAccessLevel,
@@ -376,4 +374,3 @@ export const api = {
     }
   }
 };
-
