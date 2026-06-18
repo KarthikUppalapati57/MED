@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -9,7 +10,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Sparkles } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { AlertTriangle, Sparkles, Search, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,8 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
+import LaborScheduler from '@/components/LaborScheduler';
+import ShiftDialog from '@/components/ShiftDialog';
 
 export default function Labor() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,25 +39,77 @@ export default function Labor() {
   const needsShifts = ['summary', 'shifts'].includes(activeTab);
   const needsForecast = activeTab === 'summary';
 
-  const { data: employees = [], isLoading: loadingEmployees } = useAuthQuery({
-    queryKey: ['employees', organization?.id],
-    queryFn: () => api.entities.Employee.list('-created_at', {
-      limit: 500,
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+  const [sortEmployees, setSortEmployees] = useState('full_name');
+  const [sortShifts, setSortShifts] = useState('-shift_start');
+
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [selectedShift, setSelectedShift] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+
+  const handleCreateShift = (empId, date) => {
+    setSelectedEmployeeId(empId);
+    setSelectedDate(date);
+    setSelectedShift(null);
+    setShiftDialogOpen(true);
+  };
+
+  const handleEditShift = (shift) => {
+    setSelectedShift(shift);
+    setShiftDialogOpen(true);
+  };
+
+  const {
+    data: employeesData,
+    isLoading: loadingEmployees,
+    fetchNextPage: fetchNextEmployeesPage,
+    hasNextPage: hasNextEmployeesPage,
+    isFetchingNextPage: isFetchingNextEmployeesPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['employees', organization?.id, debouncedSearch, sortEmployees],
+    queryFn: ({ pageParam = 0 }) => api.entities.Employee.list(sortEmployees, {
+      page: pageParam,
+      pageSize: 50,
+      search: debouncedSearch,
+      searchColumn: 'first_name',
       select: 'id, organization_id, location_id, full_name, role, status, hourly_rate, created_at',
     }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    select: React.useCallback((data) => ({
+      pages: data.pages.map(page => filterByContext(page.data || page, { organization, brand, location })),
+      pageParams: data.pageParams,
+    }), [organization, brand, location]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsEmployees,
   });
 
-  const { data: shifts = [], isLoading: loadingShifts } = useAuthQuery({
-    queryKey: ['employee_shifts', organization?.id],
-    queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
-      limit: 500,
+  const employees = React.useMemo(() => employeesData?.pages.flat() || [], [employeesData]);
+
+  const {
+    data: shiftsData,
+    isLoading: loadingShifts,
+    fetchNextPage: fetchNextShiftsPage,
+    hasNextPage: hasNextShiftsPage,
+    isFetchingNextPage: isFetchingNextShiftsPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['employee_shifts', organization?.id, sortShifts],
+    queryFn: ({ pageParam = 0 }) => api.entities.EmployeeShift.list(sortShifts, {
+      page: pageParam,
+      pageSize: 50,
       select: 'id, organization_id, location_id, employee_id, shift_start, shift_end, start_time, end_time, status, labor_cost, created_at',
     }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    select: React.useCallback((data) => ({
+      pages: data.pages.map(page => filterByContext(page.data || page, { organization, brand, location })),
+      pageParams: data.pageParams,
+    }), [organization, brand, location]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsShifts,
   });
+
+  const shifts = React.useMemo(() => shiftsData?.pages.flat() || [], [shiftsData]);
 
   useEffect(() => {
     const channel = supabase.channel('labor-realtime')
@@ -64,7 +120,7 @@ export default function Labor() {
         queryClient.invalidateQueries({ queryKey: ['employee_shifts', organization?.id] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -176,7 +232,7 @@ export default function Labor() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {shifts.slice(0, 5).map(shift => (
+                      {shifts.map(shift => (
                         <TableRow key={shift.id}>
                           <TableCell>{format(new Date(shift.shift_start), 'MMM dd, yyyy')}</TableCell>
                           <TableCell>{format(new Date(shift.shift_start), 'h:mm a')}</TableCell>
@@ -187,6 +243,14 @@ export default function Labor() {
                     </TableBody>
                   </Table>
                 )}
+                {hasNextShiftsPage && (
+                  <div className="flex justify-center mt-4">
+                    <Button variant="outline" onClick={() => fetchNextShiftsPage()} disabled={isFetchingNextShiftsPage}>
+                      {isFetchingNextShiftsPage ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Load More
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -194,6 +258,15 @@ export default function Labor() {
 
         <TabsContent value="shifts" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-3">
+              <LaborScheduler
+                employees={employees}
+                shifts={shifts}
+                forecastData={forecastData}
+                onCreateShift={handleCreateShift}
+                onEditShift={handleEditShift}
+              />
+            </div>
             <div className="lg:col-span-2">
               <Card className="glass-card border-border/50 shadow-sm h-full">
                 <CardHeader>
@@ -215,7 +288,7 @@ export default function Labor() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <RechartsTooltip 
+                      <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                       />
                       <Legend />
@@ -279,8 +352,17 @@ export default function Labor() {
 
         <TabsContent value="employees">
           <Card className="glass-card border-border/50 shadow-sm">
-            <CardHeader>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-lg">Staff Roster</CardTitle>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search first name..."
+                  className="pl-8"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {loadingEmployees ? (
@@ -291,8 +373,28 @@ export default function Labor() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Role</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortEmployees(sortEmployees === 'full_name' ? '-full_name' : 'full_name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Name
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortEmployees === 'full_name' ? '↑' : sortEmployees === '-full_name' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortEmployees(sortEmployees === 'role' ? '-role' : 'role')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Role
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortEmployees === 'role' ? '↑' : sortEmployees === '-role' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
                       <TableHead>Hourly Rate</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -313,6 +415,14 @@ export default function Labor() {
                   </TableBody>
                 </Table>
               )}
+              {hasNextEmployeesPage && (
+                <div className="flex justify-center mt-6">
+                  <Button variant="outline" onClick={() => fetchNextEmployeesPage()} disabled={isFetchingNextEmployeesPage}>
+                    {isFetchingNextEmployeesPage ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Load More Employees
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -323,6 +433,14 @@ export default function Labor() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ShiftDialog
+        open={shiftDialogOpen}
+        onOpenChange={setShiftDialogOpen}
+        shift={selectedShift}
+        employeeId={selectedEmployeeId}
+        date={selectedDate}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
@@ -60,10 +61,26 @@ export default function AiInsights() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const { data: insights = [], isLoading } = useQuery({
+  const {
+    data = {},
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading
+  } = useAuthInfiniteQuery({
     queryKey: ['ai_insights'],
-    queryFn: () => api.entities.AiInsight.list('-created_at'),
+    queryFn: async ({ pageParam = 0 }) => {
+      return await api.entities.AiInsight.list('-created_at', {
+        page: pageParam,
+        pageSize: 50
+      });
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === 50 ? allPages.length : undefined;
+    }
   });
+
+  const insights = useMemo(() => data.pages ? data.pages.flat() : [], [data.pages]);
 
   const resolveMutation = useMutation({
     mutationFn: (id) => api.entities.AiInsight.update(id, { resolved: true }),
@@ -281,6 +298,24 @@ export default function AiInsights() {
           })}
         </div>
       )}
+          {hasNextPage && !search && (
+            <div className="flex justify-center mt-8">
+              <Button
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Insights'
+                )}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="chat" className="h-[600px] flex flex-col">

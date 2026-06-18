@@ -4,12 +4,17 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-const password = process.env.ROLE_QA_PASSWORD || 'RestopsQA!2026';
+const password = process.env.ROLE_QA_PASSWORD;
 const today = new Date().toISOString().slice(0, 10);
 const runKey = `qa-smoke-${today}`;
 
 if (!supabaseUrl || !anonKey) {
   console.error('Missing VITE_SUPABASE_URL/SUPABASE_URL or VITE_SUPABASE_ANON_KEY/SUPABASE_ANON_KEY.');
+  process.exit(1);
+}
+
+if (!password) {
+  console.error('Missing ROLE_QA_PASSWORD.');
   process.exit(1);
 }
 
@@ -284,7 +289,7 @@ async function assertCrossOrgIsolation() {
   const owner = await signIn({ email: 'qa.owner.bistro@restops.test' });
   const coastalBrands = await owner.supabase
     .from('brands')
-    .select('id,name', { count: 'exact' })
+    .select('brand_id,name', { count: 'exact' })
     .eq('organization_id', coastal.id);
   await owner.supabase.auth.signOut();
   expectNoError('cross-org brand read', coastalBrands.error);

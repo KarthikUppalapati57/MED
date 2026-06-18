@@ -66,13 +66,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-import InvoiceUploader from '../components/invoices/InvoiceUploader';
-import InvoiceEditor from '../components/invoices/InvoiceEditor';
-import DocumentViewer from '../components/invoices/DocumentViewer';
-import ValidationDialog from '../components/invoices/ValidationDialog';
-import EmailIngestionDialog from '../components/invoices/EmailIngestionDialog';
-import CreditRequestDialog from '../components/invoices/CreditRequestDialog';
-import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import {
   ACTION_REASON_LABELS,
   AP_STATUS_LABELS,
@@ -82,8 +75,25 @@ import {
   invoicesToCsv,
 } from '@/lib/invoiceAp';
 
+const InvoiceUploader = React.lazy(() => import('../components/invoices/InvoiceUploader'));
+const InvoiceEditor = React.lazy(() => import('../components/invoices/InvoiceEditor'));
+const DocumentViewer = React.lazy(() => import('../components/invoices/DocumentViewer'));
+const ValidationDialog = React.lazy(() => import('../components/invoices/ValidationDialog'));
+const EmailIngestionDialog = React.lazy(() => import('../components/invoices/EmailIngestionDialog'));
+const CreditRequestDialog = React.lazy(() => import('../components/invoices/CreditRequestDialog'));
+const MobileReceiptCapture = React.lazy(() => import('../components/invoices/MobileReceiptCapture'));
+
+function InlineLoader({ label = 'Loading...' }) {
+  return (
+    <div className="min-h-[180px] w-full flex items-center justify-center text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
+}
+
 const statusColors = {
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
+  pending_match_approval: 'bg-amber-500/10 text-amber-500',
   validated: 'bg-resend-blue/10 text-resend-blue',
   approved: 'bg-resend-green/10 text-resend-green',
   rejected: 'bg-resend-red/10 text-resend-red',
@@ -110,6 +120,10 @@ const intakeMethods = [
   { label: 'EDI', detail: 'Vendor import', icon: Link2 },
 ];
 
+const INVOICE_ROW_HEIGHT = 76;
+const INVOICE_TABLE_VIEWPORT_HEIGHT = 684;
+const INVOICE_ROW_OVERSCAN = 8;
+
 const workflowStages = [
   { key: 'pending_review', label: 'Review', icon: Eye },
   { key: 'action_required', label: 'Action', icon: AlertTriangle },
@@ -126,6 +140,7 @@ const formatMoney = (value) => `$${Number(value || 0).toLocaleString(undefined, 
 
 export default function Invoices() {
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [mobileCaptureOpen, setMobileCaptureOpen] = useState(false);
   const [emailConfigOpen, setEmailConfigOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -137,6 +152,8 @@ export default function Invoices() {
   const [batchScheduleDate, setBatchScheduleDate] = useState(
     new Date(Date.now() + 86400000).toISOString().split('T')[0]
   );
+  const invoiceTableRef = useRef(null);
+  const [invoiceTableScrollTop, setInvoiceTableScrollTop] = useState(0);
   
   // Credit Request State
   const [creditRequestInvoice, setCreditRequestInvoice] = useState(null);
@@ -603,6 +620,7 @@ export default function Invoices() {
 
   const finalizeApprovedInvoiceWorkflow = async (invoice) => {
     await syncInvoiceToProductsAndInventory(invoice);
+    const { ensureLedgerBill, recordPaymentLedger } = await import('@/lib/workflowService');
 
     if (!isPaidInvoice(invoice)) {
       await ensureLedgerBill(invoice, { status: 'pending' });
@@ -1121,6 +1139,36 @@ export default function Invoices() {
     });
   }, [invoices, search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter]);
 
+  useEffect(() => {
+    setInvoiceTableScrollTop(0);
+    if (invoiceTableRef.current) invoiceTableRef.current.scrollTop = 0;
+  }, [search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter, organization?.id, brand?.id, location?.id]);
+
+  const invoiceWindow = React.useMemo(() => {
+    const total = filteredInvoices.length;
+    if (total === 0) {
+      return {
+        visibleInvoices: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(INVOICE_TABLE_VIEWPORT_HEIGHT / INVOICE_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(invoiceTableScrollTop / INVOICE_ROW_HEIGHT) - INVOICE_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (INVOICE_ROW_OVERSCAN * 2));
+
+    return {
+      visibleInvoices: filteredInvoices.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * INVOICE_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * INVOICE_ROW_HEIGHT),
+    };
+  }, [filteredInvoices, invoiceTableScrollTop]);
+
   const stats = React.useMemo(() => {
     let validatedCount = 0;
     let approvedCount = 0;
@@ -1176,11 +1224,15 @@ export default function Invoices() {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={() => setEmailConfigOpen(true)}>
+          <Button variant="outline" className="hidden sm:flex" onClick={() => setEmailConfigOpen(true)}>
             <Mail className="h-4 w-4 mr-2 text-brand" />
             Email Settings
           </Button>
-          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary">
+          <Button onClick={() => setMobileCaptureOpen(true)} className="bg-primary hover:bg-primary sm:hidden">
+            <Camera className="h-4 w-4 mr-2" />
+            Scan Receipt
+          </Button>
+          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary hidden sm:flex">
             <Upload className="h-4 w-4 mr-2" />
             Upload Invoice
           </Button>
@@ -1297,6 +1349,7 @@ export default function Invoices() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending_review">Pending Review</SelectItem>
+                <SelectItem value="pending_match_approval">Match Approval</SelectItem>
                 <SelectItem value="validated">Validated</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
@@ -1434,9 +1487,13 @@ export default function Invoices() {
       {/* Table */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div
+            ref={invoiceTableRef}
+            className="max-h-[684px] overflow-auto"
+            onScroll={(event) => setInvoiceTableScrollTop(event.currentTarget.scrollTop)}
+          >
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow>
                   <TableHead className="w-[50px]">
                     <Checkbox 
@@ -1475,7 +1532,13 @@ export default function Invoices() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredInvoices.map((invoice) => {
+                  <>
+                  {invoiceWindow.paddingTop > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={10} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
+                    </TableRow>
+                  )}
+                  {invoiceWindow.visibleInvoices.map((invoice) => {
                     const currentApStatus = deriveApStatus(invoice);
                     const actionReason = deriveActionReason(invoice);
                     const aging = getInvoiceAging(invoice);
@@ -1581,28 +1644,57 @@ export default function Invoices() {
                         </TableCell>
                       </TableRow>
                     );
-                  })
+                  })}
+                  {invoiceWindow.paddingBottom > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={10} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
+                    </TableRow>
+                  )}
+                  </>
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="flex items-center justify-center px-4 py-4 border-t text-sm text-muted-foreground sm:justify-between">
+            <span>
+              Showing rows {filteredInvoices.length === 0 ? 0 : invoiceWindow.startIndex + 1}
+              -{invoiceWindow.endIndex} of {filteredInvoices.length} invoices
+            </span>
           </div>
         </CardContent>
       </Card>
 
       {/* Upload Dialog */}
-      <InvoiceUploader
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        onInvoiceExtracted={handleInvoiceExtracted}
-      />
+      {uploadOpen && (
+        <React.Suspense fallback={null}>
+          <InvoiceUploader
+            open={uploadOpen}
+            onOpenChange={setUploadOpen}
+            onInvoiceExtracted={handleInvoiceExtracted}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Mobile Receipt Capture Dialog */}
+      {mobileCaptureOpen && (
+        <React.Suspense fallback={null}>
+          <MobileReceiptCapture
+            open={mobileCaptureOpen}
+            onOpenChange={setMobileCaptureOpen}
+            onInvoiceExtracted={handleInvoiceExtracted}
+          />
+        </React.Suspense>
+      )}
 
       {/* Credit Request Dialog */}
       {creditRequestInvoice && (
-        <CreditRequestDialog
-          invoice={creditRequestInvoice}
-          open={!!creditRequestInvoice}
-          onOpenChange={(open) => !open && setCreditRequestInvoice(null)}
-        />
+        <React.Suspense fallback={null}>
+          <CreditRequestDialog
+            invoice={creditRequestInvoice}
+            open={!!creditRequestInvoice}
+            onOpenChange={(open) => !open && setCreditRequestInvoice(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* Editor Sheet */}
@@ -1630,20 +1722,24 @@ export default function Invoices() {
               </SheetTitle>
             </SheetHeader>
             {editingInvoice && (
-              <div className="mt-6 flex flex-1 overflow-hidden gap-6 h-[calc(100vh-140px)]">
+              <div className="mt-6 flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden gap-6 h-[calc(100vh-140px)]">
                 {/* Left Pane: Document Viewer */}
                 {editingInvoice.file_url && (
-                  <div className="w-1/2 h-full hidden lg:block rounded-xl overflow-hidden border bg-slate-50">
-                    <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                  <div className="w-full lg:w-1/2 h-[400px] lg:h-full rounded-xl overflow-hidden border bg-slate-50 shrink-0">
+                    <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
+                      <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                    </React.Suspense>
                   </div>
                 )}
                 
                 {/* Right Pane: Editor */}
-                <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'lg:w-1/2' : 'w-full'}`}>
-                  <InvoiceEditor
-                    invoice={editingInvoice}
-                    onChange={setEditingInvoice}
-                  />
+                <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'w-full lg:w-1/2' : 'w-full'}`}>
+                  <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
+                    <InvoiceEditor
+                      invoice={editingInvoice}
+                      onChange={setEditingInvoice}
+                    />
+                  </React.Suspense>
                   <div className="flex flex-wrap gap-3 mt-6 pb-6">
                     <Button
                       variant="outline"
@@ -1692,19 +1788,27 @@ export default function Invoices() {
       </Sheet>
 
       {/* Validation Dialog */}
-      <ValidationDialog
-        open={validationOpen}
-        onOpenChange={setValidationOpen}
-        invoice={editingInvoice}
-        onSave={handleSaveValidated}
-        onCancel={() => setValidationOpen(false)}
-      />
+      {validationOpen && (
+        <React.Suspense fallback={null}>
+          <ValidationDialog
+            open={validationOpen}
+            onOpenChange={setValidationOpen}
+            invoice={editingInvoice}
+            onSave={handleSaveValidated}
+            onCancel={() => setValidationOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* Email Ingestion Dialog */}
-      <EmailIngestionDialog 
-        open={emailConfigOpen} 
-        onClose={() => setEmailConfigOpen(false)} 
-      />
+      {emailConfigOpen && (
+        <React.Suspense fallback={null}>
+          <EmailIngestionDialog
+            open={emailConfigOpen}
+            onClose={() => setEmailConfigOpen(false)}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

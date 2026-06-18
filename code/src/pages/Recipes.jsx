@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -112,15 +113,36 @@ export default function Recipes() {
   const { organization, brand, location } = useAuth();
   const needsProducts = ['recipes', 'prepared-items', 'menu-analysis', 'recipe-viewer'].includes(activeTab) || dialogOpen;
 
-  const { data: recipes = [], isLoading } = useAuthQuery({
-    queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list('-created_at', {
-      limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, category, status, yield_quantity, yield_unit, cost_per_serving, selling_price, target_margin_percent, ingredients, labor_rate_per_hour, labor_time_minutes, created_at',
+  const [sortRecipes, setSortRecipes] = useState('-created_at');
+  const debouncedSearch = useDebounce(search, 500);
+
+  const {
+    data: recipesData,
+    isLoading,
+    fetchNextPage: fetchNextRecipesPage,
+    hasNextPage: hasNextRecipesPage,
+    isFetchingNextPage: isFetchingNextRecipesPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['recipes', organization?.id, debouncedSearch, sortRecipes],
+    queryFn: ({ pageParam = 0 }) => api.entities.Recipe.list(sortRecipes, {
+      page: pageParam,
+      pageSize: 50,
+      search: debouncedSearch,
+      searchColumn: 'name',
+      select: 'id, organization_id, brand_id, location_id, name, category, status, yield_quantity, yield_unit, cost_per_serving, selling_price, target_margin_percent, ingredients, labor_rate_per_hour, labor_time_minutes, created_at, total_cost',
     }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    select: React.useCallback((data) => ({
+      pages: data.pages.map(page => filterByContext(page.data || page, { organization, brand, location })),
+      pageParams: data.pageParams,
+    }), [organization, brand, location]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id,
   });
+
+  const recipes = React.useMemo(() => {
+    return recipesData?.pages.flat() || [];
+  }, [recipesData]);
 
   const { data: products = [] } = useAuthQuery({
     queryKey: ['products', organization?.id],
@@ -153,7 +175,7 @@ export default function Recipes() {
     const totalCostPerServing = recipes.reduce((sum, r) => sum + (r.cost_per_serving || 0), 0);
     const avgCostPerServing = totalRecipes > 0 ? totalCostPerServing / totalRecipes : 0;
     const activeCount = recipes.filter(r => r.status === 'active').length;
-    
+
     // category counts
     const categoryCounts = {};
     for (let i = 0; i < recipes.length; i++) {
@@ -161,7 +183,7 @@ export default function Recipes() {
       categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     }
     const categoriesCount = Object.keys(categoryCounts).length;
-    
+
     return {
       totalRecipes,
       avgCostPerServing,
@@ -182,24 +204,24 @@ export default function Recipes() {
       acc[cat].avgPlateCost += r.cost_per_serving || 0;
       return acc;
     }, {});
-    
+
     Object.values(byCategory).forEach(v => {
       if (v.count > 0) v.avgPlateCost = v.avgPlateCost / v.count;
     });
-    
+
     const sortedCategories = Object.entries(byCategory).sort((a, b) => b[1].totalCost - a[1].totalCost);
     const maxCost = sortedCategories.length > 0 ? sortedCategories[0][1].totalCost : 1;
-    
+
     const expensiveRecipesCount = recipes.filter(r => (r.cost_per_serving || 0) > 5).length;
-    
+
     const lowMarginRecipesCount = recipes.filter(r => {
       if (!r.selling_price || r.selling_price <= 0) return false;
       const margin = ((r.selling_price - (r.cost_per_serving || 0)) / r.selling_price) * 100;
       return margin < (r.target_margin_percent || 70);
     }).length;
-    
+
     const rankedRecipes = recipes.slice().sort((a, b) => (b.cost_per_serving || 0) - (a.cost_per_serving || 0)).slice(0, 8);
-    
+
     return {
       sortedCategories,
       maxCost,
@@ -267,7 +289,7 @@ export default function Recipes() {
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ['recipes', organization?.id, location?.id] });
       const previousData = queryClient.getQueryData(['recipes', organization?.id, location?.id]);
-      queryClient.setQueryData(['recipes', organization?.id, location?.id], (old) => 
+      queryClient.setQueryData(['recipes', organization?.id, location?.id], (old) =>
         old ? old.filter(item => item.id !== deletedId) : []
       );
       return { previousData };
@@ -350,7 +372,7 @@ export default function Recipes() {
 
   const updateIngredient = (index, field, value) => {
     const newIngredients = [...formData.ingredients];
-    
+
     if (field === 'item_id') {
       if (value.startsWith('product_')) {
         const id = value.replace('product_', '');
@@ -377,11 +399,11 @@ export default function Recipes() {
       newIngredients[index][field] = value;
       // Update total cost
       if (field === 'quantity' || field === 'unit_cost') {
-        newIngredients[index].total_cost = 
+        newIngredients[index].total_cost =
           (newIngredients[index].quantity || 0) * (newIngredients[index].unit_cost || 0);
       }
     }
-    
+
     setFormData({ ...formData, ingredients: newIngredients });
   };
 
@@ -578,7 +600,7 @@ export default function Recipes() {
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-44">
+              <SelectTrigger className="w-full sm:w-44 shrink-0">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -589,6 +611,19 @@ export default function Recipes() {
                 <SelectItem value="beverage">Beverage</SelectItem>
                 <SelectItem value="side">Side</SelectItem>
                 <SelectItem value="sauce">Sauce</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortRecipes} onValueChange={setSortRecipes}>
+              <SelectTrigger className="w-full sm:w-44 shrink-0">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="-created_at">Newest First</SelectItem>
+                <SelectItem value="created_at">Oldest First</SelectItem>
+                <SelectItem value="name">Name (A-Z)</SelectItem>
+                <SelectItem value="-name">Name (Z-A)</SelectItem>
+                <SelectItem value="-cost_per_serving">Highest Cost</SelectItem>
+                <SelectItem value="cost_per_serving">Lowest Cost</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -630,7 +665,7 @@ export default function Recipes() {
                       <DropdownMenuItem onClick={() => handleCalculateWithAI(recipe)}>
                         <Calculator className="h-4 w-4 mr-2" /> Calculate Cost
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={() => deleteMutation.mutate(recipe.id)}
                         className="text-resend-red"
                       >
@@ -664,6 +699,14 @@ export default function Recipes() {
           ))
         )}
       </div>
+      {hasNextRecipesPage && (
+        <div className="flex justify-center mt-6">
+          <Button variant="outline" onClick={() => fetchNextRecipesPage()} disabled={isFetchingNextRecipesPage}>
+            {isFetchingNextRecipesPage ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            {isFetchingNextRecipesPage ? 'Loading more...' : 'Load More Recipes'}
+          </Button>
+        </div>
+      )}
         </TabsContent>
 
  {/* Prepared Items Tab */}
@@ -746,9 +789,9 @@ export default function Recipes() {
                   </CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">Powered by AI analysis of your menu data, costs, and sales trends</p>
                 </div>
-                <Button 
-                  size="sm" 
-                  onClick={handleGenerateInsights} 
+                <Button
+                  size="sm"
+                  onClick={handleGenerateInsights}
                   disabled={isGeneratingInsights}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
@@ -1079,8 +1122,8 @@ export default function Recipes() {
               </div>
               <div className="space-y-2 flex flex-col justify-center pt-6">
                 <Label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 rounded border-gray-300"
                     checked={formData.is_batch}
                     onChange={(e) => setFormData({ ...formData, is_batch: e.target.checked })}

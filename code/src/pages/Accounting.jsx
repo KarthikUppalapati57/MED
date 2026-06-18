@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,9 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Link2, AlertCircle, CheckCircle2, ArrowRightLeft, Lock, FileText, Calendar } from 'lucide-react';
+import { Link2, AlertCircle, CheckCircle2, ArrowRightLeft, Lock, FileText, Calendar, Search } from 'lucide-react';
 import { toast } from "sonner";
 import { format } from 'date-fns';
+import { useAuthInfiniteQuery, useAuthQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useInView } from '@/hooks/useInView';
 import PaymentAccountsSettings from '@/components/invoices/PaymentAccountsSettings';
 import StripePayPalPayouts from '@/components/accounting/StripePayPalPayouts';
 import PeriodBudgetsTab from '@/components/accounting/PeriodBudgetsTab';
@@ -56,47 +58,115 @@ export default function Accounting() {
     enabled: needsClosedPeriods,
   });
 
+  const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebounce(search, 500);
+
   const { data: glMappings = [], isLoading: loadingGlMappings, refetch: refetchGlMappings } = useAuthQuery({
     queryKey: ['gl_mappings'],
     queryFn: () => api.entities.GlMapping.list('category'),
     enabled: needsGlMappings,
   });
 
-  const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
-    queryKey: ['accounting-invoices'],
-    queryFn: () => api.entities.Invoice.list('-created_at', {
-      limit: 500,
+  const {
+    data: invoicesData,
+    isLoading: loadingInvoices,
+    fetchNextPage: fetchNextInvoices,
+    hasNextPage: hasNextInvoices,
+    isFetchingNextPage: isFetchingNextInvoices,
+  } = useAuthInfiniteQuery({
+    queryKey: ['accounting-invoices', debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.Invoice.list('-created_at', {
+      page: pageParam,
+      pageSize: 50,
+      search: needsInvoices ? debouncedSearch || undefined : undefined,
+      searchColumn: 'invoice_number',
       select: 'id, invoice_number, vendor_name, invoice_date, due_date, status, total_amount, organization_id, brand_id, location_id',
     }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: needsInvoices,
   });
+  const invoices = React.useMemo(() => invoicesData?.pages?.flat() || [], [invoicesData]);
 
-  const { data: payments = [], isLoading: loadingPayments } = useAuthQuery({
-    queryKey: ['accounting-payments'],
-    queryFn: () => api.entities.Payment.list('-payment_date', {
-      limit: 500,
+  const {
+    data: paymentsData,
+    isLoading: loadingPayments,
+    fetchNextPage: fetchNextPayments,
+    hasNextPage: hasNextPayments,
+    isFetchingNextPage: isFetchingNextPayments,
+  } = useAuthInfiniteQuery({
+    queryKey: ['accounting-payments', debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.Payment.list('-payment_date', {
+      page: pageParam,
+      pageSize: 50,
+      search: needsPayments ? debouncedSearch || undefined : undefined,
+      searchColumn: 'invoice_number',
       select: 'id, invoice_id, payment_date, created_at, vendor_name, invoice_number, payment_method, amount, status, organization_id, brand_id, location_id',
     }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: needsPayments,
   });
+  const payments = React.useMemo(() => paymentsData?.pages?.flat() || [], [paymentsData]);
 
-  const { data: vendors = [], isLoading: loadingVendors } = useAuthQuery({
-    queryKey: ['accounting-vendors'],
-    queryFn: () => api.entities.Vendor.list('name', {
-      limit: 500,
+  const {
+    data: vendorsData,
+    isLoading: loadingVendors,
+    fetchNextPage: fetchNextVendors,
+    hasNextPage: hasNextVendors,
+    isFetchingNextPage: isFetchingNextVendors,
+  } = useAuthInfiniteQuery({
+    queryKey: ['accounting-vendors', debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.Vendor.list('name', {
+      page: pageParam,
+      pageSize: 50,
+      search: needsVendors ? debouncedSearch || undefined : undefined,
+      searchColumn: 'name',
       select: 'id, name, accounting_vendor_id, accounting_vendor_name, status, organization_id, brand_id, location_id',
     }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: needsVendors,
   });
+  const vendors = React.useMemo(() => vendorsData?.pages?.flat() || [], [vendorsData]);
 
-  const { data: salesData = [], isLoading: loadingSalesData } = useAuthQuery({
-    queryKey: ['accounting-pos-sales-data'],
-    queryFn: () => api.entities.PosSalesData.list('-date', {
-      limit: 500,
+  const {
+    data: salesDataPages,
+    isLoading: loadingSalesData,
+    fetchNextPage: fetchNextSalesData,
+    hasNextPage: hasNextSalesData,
+    isFetchingNextPage: isFetchingNextSalesData,
+  } = useAuthInfiniteQuery({
+    queryKey: ['accounting-pos-sales-data', debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.PosSalesData.list('-date', {
+      page: pageParam,
+      pageSize: 50,
+      search: needsSalesData ? debouncedSearch || undefined : undefined,
+      searchColumn: 'pos_item_id',
       select: 'id, pos_item_id, quantity_sold, revenue, date, organization_id, location_id',
     }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: needsSalesData,
   });
+  const salesData = React.useMemo(() => salesDataPages?.pages?.flat() || [], [salesDataPages]);
+
+  const { ref: loadMoreRef, isIntersecting } = useInView({ rootMargin: '100px' });
+
+  React.useEffect(() => {
+    if (isIntersecting) {
+      if (needsInvoices && hasNextInvoices && !isFetchingNextInvoices) fetchNextInvoices();
+      if (needsPayments && hasNextPayments && !isFetchingNextPayments) fetchNextPayments();
+      if (needsVendors && hasNextVendors && !isFetchingNextVendors) fetchNextVendors();
+      if (needsSalesData && hasNextSalesData && !isFetchingNextSalesData) fetchNextSalesData();
+    }
+  }, [
+    isIntersecting,
+    needsInvoices, hasNextInvoices, isFetchingNextInvoices, fetchNextInvoices,
+    needsPayments, hasNextPayments, isFetchingNextPayments, fetchNextPayments,
+    needsVendors, hasNextVendors, isFetchingNextVendors, fetchNextVendors,
+    needsSalesData, hasNextSalesData, isFetchingNextSalesData, fetchNextSalesData
+  ]);
 
   useEffect(() => {
     const channel = supabase.channel('accounting-realtime')
@@ -113,7 +183,7 @@ export default function Accounting() {
         queryClient.invalidateQueries({ queryKey: ['gl_mappings'] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -127,8 +197,8 @@ export default function Accounting() {
 
   const activeIntegrations = integrations.filter(i => i.is_active).length;
   const recentErrors = logs.filter(l => l.sync_status === 'failed').length;
-  const syncSuccessRate = logs.length > 0 
-    ? ((logs.filter(l => l.sync_status === 'success').length / logs.length) * 100).toFixed(1) 
+  const syncSuccessRate = logs.length > 0
+    ? ((logs.filter(l => l.sync_status === 'success').length / logs.length) * 100).toFixed(1)
     : 100;
 
   const formatCurrency = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -270,7 +340,7 @@ export default function Accounting() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="glass-card border-border/50 shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-6 flex flex-row items-center gap-4">
             <div className="p-3 bg-resend-green/10 rounded-xl">
@@ -297,20 +367,33 @@ export default function Accounting() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 flex flex-wrap gap-2 h-auto bg-transparent border-b rounded-none w-full justify-start">
-          <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Dashboard</TabsTrigger>
-          <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export</TabsTrigger>
-          <TabsTrigger value="bill-pay" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-indigo-600 font-semibold">Bill Pay</TabsTrigger>
-          <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
-          <TabsTrigger value="gl-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">GL Mapping</TabsTrigger>
-          <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
-          <TabsTrigger value="export-queue" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export Queue</TabsTrigger>
-          <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
-          <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
-          <TabsTrigger value="payment-accounts" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Payment Accounts</TabsTrigger>
-          <TabsTrigger value="budgets" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-teal-600 font-semibold">Budgets</TabsTrigger>
-          <TabsTrigger value="close-books" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Close Books</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col lg:flex-row gap-4 mb-6 items-start lg:items-center justify-between border-b pb-2">
+          <TabsList className="flex flex-wrap gap-2 h-auto bg-transparent rounded-none justify-start">
+            <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Dashboard</TabsTrigger>
+            <TabsTrigger value="export" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export</TabsTrigger>
+            <TabsTrigger value="bill-pay" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-indigo-600 font-semibold">Bill Pay</TabsTrigger>
+            <TabsTrigger value="reconciliation" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Reconciliation</TabsTrigger>
+            <TabsTrigger value="gl-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">GL Mapping</TabsTrigger>
+            <TabsTrigger value="sales-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Mapping</TabsTrigger>
+            <TabsTrigger value="export-queue" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Export Queue</TabsTrigger>
+            <TabsTrigger value="vendor-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Vendor Mapping</TabsTrigger>
+            <TabsTrigger value="pmix-mapping" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">PMIX Mapping</TabsTrigger>
+            <TabsTrigger value="payment-accounts" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Payment Accounts</TabsTrigger>
+            <TabsTrigger value="budgets" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent text-teal-600 font-semibold">Budgets</TabsTrigger>
+            <TabsTrigger value="close-books" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Close Books</TabsTrigger>
+          </TabsList>
+          {['export', 'reconciliation', 'vendor-mapping', 'sales-mapping', 'pmix-mapping'].includes(activeTab) && (
+            <div className="relative w-full lg:w-64 shrink-0">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
 
         <TabsContent value="dashboard" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-3">
@@ -384,8 +467,8 @@ export default function Accounting() {
                             <TableCell className="capitalize">{log.entity_type}</TableCell>
                             <TableCell>
                               <span className={`px-2 py-1 rounded-full text-xs ${
-                                log.sync_status === 'success' ? 'bg-resend-green/10 text-resend-green' : 
-                                log.sync_status === 'failed' ? 'bg-resend-red/10 text-resend-red' : 
+                                log.sync_status === 'success' ? 'bg-resend-green/10 text-resend-green' :
+                                log.sync_status === 'failed' ? 'bg-resend-red/10 text-resend-red' :
                                 'bg-resend-yellow/10 text-resend-yellow'
                               }`}>
                                 {log.sync_status}

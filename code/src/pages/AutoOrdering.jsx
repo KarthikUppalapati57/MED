@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
@@ -22,7 +23,8 @@ import {
   FileText,
   ArrowRightLeft,
   Package,
-  Settings
+  Settings,
+  Search
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +83,12 @@ export default function AutoOrdering() {
   const [suggestions, setSuggestions] = useState([]);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendMethod, setSendMethod] = useState('email');
+
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+  const [sortOrders, setSortOrders] = useState('-created_at');
+  const [sortTransfers, setSortTransfers] = useState('-created_at');
+  const [sortReceiving, setSortReceiving] = useState('-received_date');
   const [newTransferOpen, setNewTransferOpen] = useState(false);
   const [receiveOrderOpen, setReceiveOrderOpen] = useState(false);
   const [receivingOrderId, setReceivingOrderId] = useState('');
@@ -110,12 +118,29 @@ export default function AutoOrdering() {
   const needsReceivings = ['invoice-approval', 'receiving'].includes(activeTab);
   const needsOrderingSettings = activeTab === 'order-setup';
 
-  const { data: orders = [], isLoading } = useAuthQuery({
-    queryKey: ['auto-orders', organization?.id],
-    queryFn: () => api.entities.AutoOrder.list('-created_at', { limit: 300 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const {
+    data: autoOrdersData,
+    isLoading,
+    fetchNextPage: fetchNextOrdersPage,
+    hasNextPage: hasNextOrdersPage,
+    isFetchingNextPage: isFetchingNextOrdersPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['auto-orders', organization?.id, debouncedSearch, sortOrders],
+    queryFn: ({ pageParam = 0 }) => api.entities.AutoOrder.list(sortOrders, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'all-orders' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'vendor_name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsOrderList,
   });
+
+  const orders = React.useMemo(() => {
+    if (!autoOrdersData?.pages) return [];
+    return filterByContext(autoOrdersData.pages.flat(), { organization, brand, location });
+  }, [autoOrdersData, organization, brand, location]);
 
   useEffect(() => {
     const channel = supabase.channel('auto-orders-realtime')
@@ -123,7 +148,7 @@ export default function AutoOrdering() {
         queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -173,19 +198,51 @@ export default function AutoOrdering() {
     enabled: !!organization?.id && needsVendorPrices,
   });
 
-  const { data: transfers = [] } = useAuthQuery({
-    queryKey: ['transfers', organization?.id],
-    queryFn: () => api.entities.Transfer.list('-created_at', { limit: 300 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const {
+    data: transfersData,
+    fetchNextPage: fetchNextTransfersPage,
+    hasNextPage: hasNextTransfersPage,
+    isFetchingNextPage: isFetchingNextTransfersPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['transfers', organization?.id, debouncedSearch, sortTransfers],
+    queryFn: ({ pageParam = 0 }) => api.entities.Transfer.list(sortTransfers, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'transfers' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'destination_name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsTransfers,
   });
 
-  const { data: receivings = [] } = useAuthQuery({
-    queryKey: ['receivings', organization?.id],
-    queryFn: () => api.entities.Receiving.list('-received_date', { limit: 300 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const transfers = React.useMemo(() => {
+    if (!transfersData?.pages) return [];
+    return filterByContext(transfersData.pages.flat(), { organization, brand, location });
+  }, [transfersData, organization, brand, location]);
+
+  const {
+    data: receivingsData,
+    fetchNextPage: fetchNextReceivingsPage,
+    hasNextPage: hasNextReceivingsPage,
+    isFetchingNextPage: isFetchingNextReceivingsPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['receivings', organization?.id, debouncedSearch, sortReceiving],
+    queryFn: ({ pageParam = 0 }) => api.entities.Receiving.list(sortReceiving, {
+      page: pageParam,
+      pageSize: 50,
+      search: ['receiving', 'invoice-approval'].includes(activeTab) ? debouncedSearch || undefined : undefined,
+      searchColumn: 'vendor_name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsReceivings,
   });
+
+  const receivings = React.useMemo(() => {
+    if (!receivingsData?.pages) return [];
+    return filterByContext(receivingsData.pages.flat(), { organization, brand, location });
+  }, [receivingsData, organization, brand, location]);
 
   const { data: settingsRows = [] } = useAuthQuery({
     queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'],
@@ -308,7 +365,7 @@ export default function AutoOrdering() {
     setGenerating(true);
     try {
       // Find items at or below reorder point (threshold)
-      const lowItems = inventory.filter(i => 
+      const lowItems = inventory.filter(i =>
         i.reorder_point != null
           ? (i.current_quantity || 0) <= i.reorder_point
           : (i.current_quantity || 0) < (i.par_level || 10)
@@ -331,12 +388,12 @@ export default function AutoOrdering() {
 
       lowItems.forEach(item => {
         const smartQuantity = Math.ceil(((item.par_level || 10) - (item.current_quantity || 0)) * 1.2);
-        
+
         // Find cheapest vendor for this item
         let bestPrice = item.unit_cost || 0;
         let bestVendorName = 'Preferred Vendor';
-        
-        const itemPrices = vendorPrices.filter(vp => 
+
+        const itemPrices = vendorPrices.filter(vp =>
           vp.product_name.toLowerCase() === item.product_name.toLowerCase() && vp.is_approved_supplier
         );
 
@@ -347,7 +404,7 @@ export default function AutoOrdering() {
           if (v) {
             bestVendorName = v.name;
           }
-          
+
           if (!generatedSuggestions.some(s => s.description.includes(item.product_name))) {
             generatedSuggestions.push({
               type: 'price_comparison',
@@ -406,7 +463,7 @@ export default function AutoOrdering() {
   const handleApprove = async (order) => {
     await updateMutation.mutateAsync({
       id: order.id,
-      data: { 
+      data: {
         status: 'approved',
         approved_date: new Date().toISOString(),
         last_workflow_step: 'approved',
@@ -447,8 +504,8 @@ export default function AutoOrdering() {
       { role: 'user', message: chatMessage, timestamp: new Date().toISOString() }
     ];
 
-    newHistory.push({ 
-      role: 'assistant', 
+    newHistory.push({
+      role: 'assistant',
       message: 'Thanks, your request has been noted. Please adjust quantities directly in the table as needed.',
       timestamp: new Date().toISOString()
     });
@@ -459,7 +516,7 @@ export default function AutoOrdering() {
 
     await updateMutation.mutateAsync({
       id: selectedOrder.id,
-      data: { 
+      data: {
         chat_history: newHistory,
         items: updatedItems,
         total_amount: updatedItems.reduce((sum, i) => sum + i.total_price, 0)
@@ -529,8 +586,8 @@ export default function AutoOrdering() {
           <h1 className="text-2xl font-bold text-foreground">Orders</h1>
           <p className="text-muted-foreground mt-1">Manage purchase orders and vendor communications</p>
         </div>
-        <Button 
-          onClick={generateOrder} 
+        <Button
+          onClick={generateOrder}
           disabled={generating}
           className="bg-primary hover:bg-primary"
         >
@@ -538,23 +595,40 @@ export default function AutoOrdering() {
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
             <Sparkles className="h-4 w-4 mr-2" />
+
+
           )}
           Generate Smart Order
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-6 mb-6">
-          <TabsTrigger value="all-orders">Purchase Orders</TabsTrigger>
-          <TabsTrigger value="place-order">Place Order</TabsTrigger>
-          <TabsTrigger value="invoice-approval">Invoice Approval</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
-          <TabsTrigger value="receiving">Receiving</TabsTrigger>
-          <TabsTrigger value="order-setup">Settings</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
+            <TabsTrigger value="all-orders">Purchase Orders</TabsTrigger>
+            <TabsTrigger value="place-order">Place Order</TabsTrigger>
+            <TabsTrigger value="invoice-approval">Invoice Approval</TabsTrigger>
+            <TabsTrigger value="transfers">Transfers</TabsTrigger>
+            <TabsTrigger value="receiving">Receiving</TabsTrigger>
+            <TabsTrigger value="order-setup">Settings</TabsTrigger>
+          </TabsList>
+          {['all-orders', 'transfers', 'receiving', 'invoice-approval'].includes(activeTab) && (
+            <div className="relative w-full md:w-64 shrink-0">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
  {/* All Orders Tab */}
         <TabsContent value="all-orders">
           <Card className="border-0 shadow-sm">
+
+
             <CardHeader>
               <CardTitle className="text-base">All Orders</CardTitle>
             </CardHeader>
@@ -562,14 +636,53 @@ export default function AutoOrdering() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Vendor</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortOrders(sortOrders === 'order_number' ? '-order_number' : 'order_number')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Order #
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortOrders === 'order_number' ? '↑' : sortOrders === '-order_number' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortOrders(sortOrders === 'vendor_name' ? '-vendor_name' : 'vendor_name')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Vendor
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortOrders === 'vendor_name' ? '↑' : sortOrders === '-vendor_name' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Items</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortOrders(sortOrders === 'total_amount' ? '-total_amount' : 'total_amount')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Total
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortOrders === 'total_amount' ? '↑' : sortOrders === '-total_amount' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortOrders(sortOrders === 'created_at' ? '-created_at' : 'created_at')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Created
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortOrders === 'created_at' ? '↑' : sortOrders === '-created_at' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -601,7 +714,7 @@ export default function AutoOrdering() {
                           <TableCell className="text-sm text-muted-foreground">
                             {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-right">
                             {order.status === 'pending_approval' && (
                               <div className="flex gap-1">
                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleApprove(order)}>
@@ -624,6 +737,13 @@ export default function AutoOrdering() {
                   )}
                 </TableBody>
               </Table>
+              <div className="flex justify-center px-4 py-4 border-t">
+                {hasNextOrdersPage && (
+                  <Button variant="outline" onClick={() => fetchNextOrdersPage()} disabled={isFetchingNextOrdersPage}>
+                    {isFetchingNextOrdersPage ? 'Loading more...' : 'Load More Orders'}
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -687,7 +807,7 @@ export default function AutoOrdering() {
                       <Badge className="bg-resend-orange/10 text-resend-orange">Pending</Badge>
                     </div>
                   </div>
-                  
+
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -723,7 +843,7 @@ export default function AutoOrdering() {
 
                                 updateMutation.mutate({
                                   id: order.id,
-                                  data: { 
+                                  data: {
                                     items: newItems,
                                     total_amount: newItems.reduce((s, i) => s + i.total_price, 0)
                                   }
@@ -903,8 +1023,6 @@ export default function AutoOrdering() {
             </CardContent>
           </Card>
         </TabsContent>
-
- {/* Order Setup Tab */}
         <TabsContent value="order-setup">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">
@@ -1022,10 +1140,30 @@ export default function AutoOrdering() {
                   <TableRow>
                     <TableHead>Transfer ID</TableHead>
                     <TableHead>From Location</TableHead>
-                    <TableHead>To Location</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortTransfers(sortTransfers === 'destination_name' ? '-destination_name' : 'destination_name')}
+                    >
+                      <div className="flex items-center gap-1">
+                        To Location
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortTransfers === 'destination_name' ? '↑' : sortTransfers === '-destination_name' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Items</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortTransfers(sortTransfers === 'created_at' ? '-created_at' : 'created_at')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Date
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortTransfers === 'created_at' ? '↑' : sortTransfers === '-created_at' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1033,7 +1171,6 @@ export default function AutoOrdering() {
                   {transfers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        No active transfers.
                       </TableCell>
                     </TableRow>
                   ) : transfers.map((transfer) => (
@@ -1121,15 +1258,15 @@ export default function AutoOrdering() {
           <DialogHeader>
             <DialogTitle>Revise Order - {selectedOrder?.order_number}</DialogTitle>
           </DialogHeader>
-          
+
           <div className="h-64 overflow-y-auto border rounded-lg p-4 space-y-3">
             {(selectedOrder?.chat_history || []).map((msg, idx) => (
               <div
                 key={msg.timestamp || idx}
                 className={cn(
                   "p-3 rounded-lg max-w-[80%]",
-                  msg.role === 'user' 
-                    ? "bg-primary/10 ml-auto" 
+                  msg.role === 'user'
+                    ? "bg-primary/10 ml-auto"
                     : "bg-secondary"
                 )}
               >
@@ -1163,12 +1300,12 @@ export default function AutoOrdering() {
           <DialogHeader>
             <DialogTitle>Send Order to Vendor</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
               Choose how to send this order to the vendor
             </p>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => setSendMethod('email')}

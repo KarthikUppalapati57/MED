@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from '@/lib/moduleConfig';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
 import { toast } from "sonner";
 import Papa from 'papaparse';
 import posthog from '@/lib/posthog';
@@ -51,6 +52,11 @@ export default function PlatformOrganizations() {
   
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
+  const invalidateOrganizations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_organizations_paginated']], []), 1500);
+  const invalidateBrands = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_brands']], []), 1500);
+  const invalidateLocations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_locations']], []), 1500);
+  const invalidateUsers = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_users']], []), 1500);
+  const invalidatePlans = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_plans']], []), 1500);
 
   const { data: orgsData, isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['platform_organizations_paginated', page, searchTerm],
@@ -119,27 +125,17 @@ export default function PlatformOrganizations() {
 
   React.useEffect(() => {
     const channel = supabase.channel('platform-orgs-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform_plans'] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, invalidateOrganizations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, invalidateBrands)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, invalidateLocations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateUsers)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [invalidateBrands, invalidateLocations, invalidateOrganizations, invalidatePlans, invalidateUsers]);
 
   React.useEffect(() => {
     const org = orgs.find(o => o.id === selectedOrgId);

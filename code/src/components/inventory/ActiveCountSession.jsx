@@ -106,7 +106,7 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             <Button variant="ghost" className="text-white/70 hover:text-white z-10 mt-2" onClick={() => setIsScanning(false)}>
               Cancel Scanning
             </Button>
-            <style jsx>{`
+            <style>{`
               @keyframes scan {
                 0% { top: 0; }
                 50% { top: 100%; }

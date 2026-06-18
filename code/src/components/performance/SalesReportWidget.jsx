@@ -2,10 +2,17 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, TrendingDown, Calendar, DollarSign } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts';
 import { startOfWeek, startOfMonth, startOfYear, isAfter, subWeeks, subYears, format, parseISO } from 'date-fns';
+
+const SalesDayOfWeekBarChart = React.lazy(() => import('@/components/performance/PerformanceCharts').then((module) => ({ default: module.SalesDayOfWeekBarChart })));
+
+function ChartFallback() {
+  return (
+    <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading chart...
+    </div>
+  );
+}
 
 export function SalesReportWidget({ salesData }) {
   const now = new Date();
@@ -139,19 +146,9 @@ export function SalesReportWidget({ salesData }) {
             <CardDescription>Average sales by day of week over all time</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dayTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dx={-10} tickFormatter={(val) => `$${val/1000}k`} />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value) => [`$${value.toFixed(2)}`, 'Avg Sales']}
-                />
-                <Bar dataKey="avgSales" fill="#8884d8" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <React.Suspense fallback={<ChartFallback />}>
+              <SalesDayOfWeekBarChart data={dayTrends} />
+            </React.Suspense>
           </CardContent>
         </Card>
 

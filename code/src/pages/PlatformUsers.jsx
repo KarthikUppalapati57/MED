@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQueryClient } from '@tanstack/react-query';
+import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
 import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
 import { Users, Search, Loader2, ShieldAlert, Trash2, UserPlus } from "lucide-react";
@@ -20,20 +21,19 @@ export default function PlatformUsers() {
   const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState(null);
+  const invalidateUsers = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform-all-users']], []), 1500);
 
   useEffect(() => {
     if (!authChecked || userRole !== 'platform_admin') return;
 
     const channel = supabase.channel('platform-users-dir-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-all-users'] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateUsers)
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authChecked, userRole, queryClient]);
+  }, [authChecked, invalidateUsers, userRole]);
 
   const handleDelete = async (userId) => {
     if (!window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) return;

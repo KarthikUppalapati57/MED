@@ -13,6 +13,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { format, subDays } from 'date-fns';
+import { Download } from 'lucide-react';
 
 const trendData = [
   { day: 'Mon', theoretical: 850, actual: 920 },
@@ -90,6 +91,51 @@ export default function AvTCosting() {
 
   const totalVarianceCost = topBleeders.reduce((sum, item) => sum + item.varianceCost, 0);
 
+  const handleExportCSV = async () => {
+    if (!varianceData || varianceData.length === 0) return toast.error("No data to export");
+    const exportData = varianceData.map(d => {
+      const metrics = calculateMetrics(d);
+      return {
+        Ingredient: d.ingredient,
+        'Theoretical Qty': d.theoretical.toFixed(1) + ' ' + d.unit,
+        'Actual Qty': d.actual.toFixed(1) + ' ' + d.unit,
+        'Variance Qty': '+' + metrics.varianceQty.toFixed(1) + ' ' + d.unit,
+        'Variance %': metrics.variancePercent.toFixed(1) + '%',
+        'Variance Cost ($)': metrics.varianceCost.toFixed(2),
+        Status: d.status
+      };
+    });
+    const { exportToCSV } = await import('@/lib/exportUtils');
+    exportToCSV(exportData, `avt-report-${format(new Date(), 'yyyy-MM-dd')}`);
+  };
+
+  const handleExportPDF = async () => {
+    if (!varianceData || varianceData.length === 0) return toast.error("No data to export");
+    const columns = [
+      { header: 'Ingredient', dataKey: 'Ingredient' },
+      { header: 'Theo Qty', dataKey: 'Theoretical Qty' },
+      { header: 'Actual Qty', dataKey: 'Actual Qty' },
+      { header: 'Variance Qty', dataKey: 'Variance Qty' },
+      { header: 'Variance %', dataKey: 'Variance %' },
+      { header: 'Variance Cost ($)', dataKey: 'Variance Cost ($)' },
+      { header: 'Status', dataKey: 'Status' }
+    ];
+    const data = varianceData.map(d => {
+      const metrics = calculateMetrics(d);
+      return {
+        Ingredient: d.ingredient,
+        'Theoretical Qty': d.theoretical.toFixed(1) + ' ' + d.unit,
+        'Actual Qty': d.actual.toFixed(1) + ' ' + d.unit,
+        'Variance Qty': '+' + metrics.varianceQty.toFixed(1) + ' ' + d.unit,
+        'Variance %': metrics.variancePercent.toFixed(1) + '%',
+        'Variance Cost ($)': metrics.varianceCost.toFixed(2),
+        Status: d.status
+      };
+    });
+    const { exportToPDF } = await import('@/lib/exportUtils');
+    exportToPDF(columns, data, 'AvT Variance Report', `avt-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
   return (
     <div className="p-6 space-y-8 min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -103,12 +149,18 @@ export default function AvTCosting() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="w-4 h-4 mr-2" /> CSV
+          </Button>
+          <Button variant="outline" onClick={handleExportPDF}>
+            <Download className="w-4 h-4 mr-2" /> PDF
+          </Button>
           <Button 
             onClick={handleExplainVariance} 
             className="bg-brand text-primary-foreground hover:bg-brand/90"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Explain Variances
+            Explain
           </Button>
           <Button 
             onClick={handleRefresh} 

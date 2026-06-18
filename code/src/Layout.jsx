@@ -55,6 +55,7 @@ import ContextSwitcher from '@/components/ContextSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
+import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -528,8 +529,9 @@ export default function Layout({ children, currentPageName }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1 flex items-center px-4">
+          <div className="flex-1 flex items-center px-4 gap-4">
             {!isPlatformAdmin && <ContextSwitcher />}
+            <PwaInstallPrompt variant="outline" size="sm" className="hidden md:flex h-8 ml-auto" />
           </div>
 
           <div className="flex items-center gap-2">

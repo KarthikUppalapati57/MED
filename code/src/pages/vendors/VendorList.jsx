@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
-import VendorStatementsTab from './VendorStatementsTab';
 import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
@@ -63,11 +62,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
+const VendorStatementsTab = React.lazy(() => import('./VendorStatementsTab'));
+
 const statusColors = {
   active: 'bg-resend-green/10 text-resend-green',
   inactive: 'bg-secondary text-foreground',
   blacklisted: 'bg-resend-red/10 text-resend-red',
 };
+
+const VENDOR_ROW_HEIGHT = 76;
+const VENDOR_TABLE_VIEWPORT_HEIGHT = 608;
+const VENDOR_ROW_OVERSCAN = 8;
+
+function VendorTabFallback() {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
+        Loading vendor section...
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function VendorList() {
   const navigate = useNavigate();
@@ -82,6 +97,8 @@ export default function VendorList() {
   const [editingVendor, setEditingVendor] = useState(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const vendorTableRef = React.useRef(null);
+  const [vendorTableScrollTop, setVendorTableScrollTop] = useState(0);
   const [formData, setFormData] = useState({
     name: '',
     contact_name: '',
@@ -266,6 +283,36 @@ export default function VendorList() {
     });
   }, [vendors, search, statusFilter]);
 
+  useEffect(() => {
+    setVendorTableScrollTop(0);
+    if (vendorTableRef.current) vendorTableRef.current.scrollTop = 0;
+  }, [search, statusFilter, organization?.id, brand?.id, location?.id]);
+
+  const vendorWindow = React.useMemo(() => {
+    const total = filteredVendors.length;
+    if (total === 0) {
+      return {
+        visibleVendors: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(VENDOR_TABLE_VIEWPORT_HEIGHT / VENDOR_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(vendorTableScrollTop / VENDOR_ROW_HEIGHT) - VENDOR_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (VENDOR_ROW_OVERSCAN * 2));
+
+    return {
+      visibleVendors: filteredVendors.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * VENDOR_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * VENDOR_ROW_HEIGHT),
+    };
+  }, [filteredVendors, vendorTableScrollTop]);
+
   // Stats
   const { totalSpent, activeVendors, totalOrders } = React.useMemo(() => {
     const spent = vendors.reduce((sum, v) => sum + (v.total_spent || 0), 0);
@@ -377,9 +424,13 @@ export default function VendorList() {
       {/* Vendors Table */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div
+            ref={vendorTableRef}
+            className="max-h-[608px] overflow-auto"
+            onScroll={(event) => setVendorTableScrollTop(event.currentTarget.scrollTop)}
+          >
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Contact</TableHead>
@@ -404,7 +455,13 @@ export default function VendorList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredVendors.map((vendor) => (
+                  <>
+                  {vendorWindow.paddingTop > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={7} className="p-0" style={{ height: `${vendorWindow.paddingTop}px` }} />
+                    </TableRow>
+                  )}
+                  {vendorWindow.visibleVendors.map((vendor) => (
                     <TableRow 
                       key={vendor.id} 
                       className="cursor-pointer hover:bg-muted/50"
@@ -458,11 +515,11 @@ export default function VendorList() {
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" onClick={(event) => event.stopPropagation()}>
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
                             <DropdownMenuItem onClick={() => handleEdit(vendor)}>
                               <Edit2 className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
@@ -476,10 +533,22 @@ export default function VendorList() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                  ))}
+                  {vendorWindow.paddingBottom > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={7} className="p-0" style={{ height: `${vendorWindow.paddingBottom}px` }} />
+                    </TableRow>
+                  )}
+                  </>
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="flex items-center justify-center px-4 py-4 border-t text-sm text-muted-foreground sm:justify-between">
+            <span>
+              Showing rows {filteredVendors.length === 0 ? 0 : vendorWindow.startIndex + 1}
+              -{vendorWindow.endIndex} of {filteredVendors.length} vendors
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -550,7 +619,9 @@ export default function VendorList() {
 
         {/* Statements Tab */}
         <TabsContent value="statements">
-          <VendorStatementsTab vendors={vendors} />
+          <React.Suspense fallback={<VendorTabFallback />}>
+            <VendorStatementsTab vendors={vendors} />
+          </React.Suspense>
         </TabsContent>
       </Tabs>
 

@@ -1,0 +1,59 @@
+name: Release Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  release-gate:
+    name: Schema, build, latency, and UI smoke gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ROLE_QA_EMAIL: ${{ secrets.ROLE_QA_EMAIL }}
+      ROLE_QA_PASSWORD: ${{ secrets.ROLE_QA_PASSWORD }}
+      ROLE_QA_BASE_URL: ${{ secrets.ROLE_QA_BASE_URL }}
+      SUPABASE_LATENCY_TIMEOUT_MS: 8000
+      SUPABASE_LATENCY_WARN_MS: 1500
+      SUPABASE_LATENCY_SIGNIN_WARN_MS: 2500
+      SUPABASE_LATENCY_RPC_WARN_MS: 2500
+      SUPABASE_LATENCY_FUNCTION_WARN_MS: 2000
+      SUPABASE_LATENCY_EDGE_FUNCTIONS: dashboard-report-scheduler,process-email-invoices,webhook-dispatcher,pos-webhook
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate release-gate environment
+        run: npm run check:release-env
+
+      - name: Run release gate
+        run: npm run check:release-gate:ui:report
+
+      - name: Upload release-gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-report
+          path: reports/release-gate-latest.json
+          if-no-files-found: warn

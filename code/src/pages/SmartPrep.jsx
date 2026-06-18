@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Check, ChefHat, Clock, Flame, Plus, Search } from 'lucide-react';
+import { CalendarDays, Check, ChefHat, Clock, Flame, Plus, Search, Loader2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { filterByContext } from '@/lib/contextUtils';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useInView } from '@/hooks/useInView';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,26 +58,56 @@ export default function SmartPrep() {
   });
 
   const context = { organization, brand: scopedBrand, location: scopedLocation };
+  const debouncedSearch = useDebounce(search, 500);
 
-  const { data: plans = [] } = useAuthQuery({
-    queryKey: ['smart-prep-plans', organization?.id],
-    queryFn: () => api.entities.SmartPrepPlan.list('-prep_date', {
-      limit: 500,
+  const {
+    data: plansData,
+    fetchNextPage: fetchNextPlans,
+    hasNextPage: hasNextPlans,
+    isFetchingNextPage: isFetchingNextPlans
+  } = useAuthInfiniteQuery({
+    queryKey: ['smart-prep-plans', organization?.id, debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.SmartPrepPlan.list('-prep_date', {
+      page: pageParam,
+      pageSize: 50,
+      search: debouncedSearch || undefined,
+      searchColumn: 'name',
       select: 'id, organization_id, brand_id, location_id, name, recipe_id, prep_date, prep_quantity, on_hand_quantity, forecast_quantity, unit, priority, status, notes',
     }),
-    select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id,
   });
 
-  const { data: recipes = [] } = useAuthQuery({
+  const plans = useMemo(() => filterByContext(plansData?.pages?.flat() || [], context), [plansData, context]);
+
+  const {
+    data: recipesData,
+    fetchNextPage: fetchNextRecipes,
+    hasNextPage: hasNextRecipes,
+    isFetchingNextPage: isFetchingNextRecipes
+  } = useAuthInfiniteQuery({
     queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list('name', {
-      limit: 500,
+    queryFn: ({ pageParam = 0 }) => api.entities.Recipe.list('name', {
+      page: pageParam,
+      pageSize: 50,
       select: 'id, organization_id, brand_id, location_id, name, yield_quantity, yield_unit, cost_per_serving, status',
     }),
-    select: React.useCallback((data) => filterByContext(data, context), [organization, scopedBrand, scopedLocation]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id,
   });
+
+  const recipes = useMemo(() => filterByContext(recipesData?.pages?.flat() || [], context), [recipesData, context]);
+
+  const { ref: loadMoreRef, isIntersecting } = useInView({ rootMargin: '100px' });
+
+  useEffect(() => {
+    if (isIntersecting) {
+      if (hasNextPlans && !isFetchingNextPlans) fetchNextPlans();
+      if (hasNextRecipes && !isFetchingNextRecipes) fetchNextRecipes();
+    }
+  }, [isIntersecting, hasNextPlans, isFetchingNextPlans, fetchNextPlans, hasNextRecipes, isFetchingNextRecipes, fetchNextRecipes]);
 
   const recipeMap = useMemo(() => new Map(recipes.map((recipe) => [recipe.id, recipe])), [recipes]);
 
@@ -86,10 +118,7 @@ export default function SmartPrep() {
     return { open, urgent, totalPrep };
   }, [plans]);
 
-  const filteredPlans = useMemo(() => {
-    const term = search.toLowerCase();
-    return plans.filter((plan) => !term || plan.name?.toLowerCase().includes(term));
-  }, [plans, search]);
+
 
   const resetForm = () => setForm({
     name: '',
@@ -204,7 +233,7 @@ export default function SmartPrep() {
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        {filteredPlans.map((plan) => (
+        {plans.map((plan) => (
           <Card key={plan.id}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
@@ -234,7 +263,7 @@ export default function SmartPrep() {
             </CardContent>
           </Card>
         ))}
-        {filteredPlans.length === 0 && (
+        {plans.length === 0 && (
           <Card className="xl:col-span-2">
             <CardContent className="p-12 text-center text-muted-foreground">
               <ChefHat className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -243,6 +272,12 @@ export default function SmartPrep() {
           </Card>
         )}
       </div>
+
+      {hasNextPlans && (
+        <div ref={loadMoreRef} className="flex justify-center py-4 text-muted-foreground text-sm">
+          {isFetchingNextPlans ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Loading more...'}
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

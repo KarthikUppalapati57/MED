@@ -3,10 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-const password = process.env.ROLE_QA_PASSWORD || 'RestopsQA!2026';
+const password = process.env.ROLE_QA_PASSWORD;
 
 if (!supabaseUrl || !anonKey) {
   console.error('Missing VITE_SUPABASE_URL/SUPABASE_URL or VITE_SUPABASE_ANON_KEY/SUPABASE_ANON_KEY.');
+  process.exit(1);
+}
+
+if (!password) {
+  console.error('Missing ROLE_QA_PASSWORD.');
   process.exit(1);
 }
 
@@ -45,7 +50,7 @@ const accounts = [
 
 const tableChecks = [
   { name: 'organizations', select: 'id,name', roles: ['platform_admin', 'org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'brands', select: 'id,name,organization_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'brands', select: 'brand_id,name,organization_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
   { name: 'locations', select: 'id,name,organization_id,brand_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
   { name: 'invoices', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
   { name: 'payments', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager'] },

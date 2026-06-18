@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -278,7 +278,7 @@ function SigningPrivilegesMatrix({ privileges = {}, onChange, readonly = false }
 // RoleBadges 
 function RoleBadges({ member, maxVisible = 2 }) {
   const role = member.role || member.capabilities?.role || 'ground_staff';
-  const roleDef = Restops_ROLES[role] || Restops_ROLES.ground_staff;
+  const roleDef = Restops_ROLES[role] || { label: role.replace('_', ' '), color: 'teal', icon: Users };
   const colors = ROLE_COLOR_CLASSES[roleDef.color] || ROLE_COLOR_CLASSES.slate;
   const Icon = roleDef.icon;
   return (
@@ -322,6 +322,15 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   });
   const [saving, setSaving] = useState(false);
 
+  const { data: dbRoles } = useQuery({
+    queryKey: ['dbRoles', orgId],
+    queryFn: async () => {
+      const res = await supabase.from('roles').select('*');
+      return res.data || [];
+    },
+    enabled: !!orgId
+  });
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -337,6 +346,16 @@ function UserDetailDrawer({ member, orgId, onClose }) {
         new_signing_privileges: form.signingPrivileges
       });
       if (error) throw error;
+
+      // Update user_roles mapping if we selected a role
+      const selectedDbRole = dbRoles?.find(r => r.name === form.role);
+      if (selectedDbRole && orgId) {
+        await supabase.from('user_roles').upsert({
+          user_id: userId,
+          role_id: selectedDbRole.id,
+          organization_id: orgId
+        }, { onConflict: 'user_id, role_id' });
+      }
 
       // Audit
       try {
@@ -434,15 +453,16 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">System Role</Label>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(Restops_ROLES)
-                    .filter(([r]) => r !== 'platform_admin')
-                    .map(([r, def]) => {
-                    const isSelected = form.role === r;
-                    const Icon = def.icon;
+                  {[
+                    ...Object.entries(Restops_ROLES).filter(([r]) => r !== 'platform_admin').map(([r, def]) => ({ id: r, name: r, label: def.label, desc: def.description, icon: def.icon })),
+                    ...(dbRoles?.filter(r => !r.is_system).map(r => ({ id: r.name, name: r.name, label: r.name.replace('_', ' '), desc: r.description || 'Custom Role', icon: Users })) || [])
+                  ].map((r) => {
+                    const isSelected = form.role === r.id;
+                    const Icon = r.icon;
                     return (
                       <button
-                        key={r}
-                        onClick={() => setForm({ ...form, role: r })}
+                        key={r.id}
+                        onClick={() => setForm({ ...form, role: r.id })}
                         className={cn(
                           "flex flex-col items-start p-3 rounded-xl border text-left transition-all group",
                           isSelected 
@@ -453,8 +473,8 @@ function UserDetailDrawer({ member, orgId, onClose }) {
                         <div className={cn("p-1.5 rounded-lg mb-2 transition-colors", isSelected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground group-hover:bg-card")}>
                           <Icon className="w-4 h-4" />
                         </div>
-                        <span className={cn("text-xs font-bold", isSelected ? "text-teal-900" : "text-foreground")}>{def.label}</span>
-                        <span className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{def.description}</span>
+                        <span className={cn("text-xs font-bold capitalize", isSelected ? "text-teal-900" : "text-foreground")}>{r.label}</span>
+                        <span className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{r.desc}</span>
                       </button>
                     );
                   })}
@@ -569,6 +589,15 @@ function InviteDialog({ open, onClose, orgId }) {
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState(0); // 0=email, 1=role, 2=permissions, 3=signing
   const [generatedLink, setGeneratedLink] = useState('');
+
+  const { data: dbRoles } = useQuery({
+    queryKey: ['dbRoles', orgId],
+    queryFn: async () => {
+      const res = await supabase.from('roles').select('*');
+      return res.data || [];
+    },
+    enabled: !!orgId
+  });
 
   const handleSubmit = async () => {
     if (!email) { toast.error('Email is required'); return; }
@@ -732,13 +761,14 @@ function InviteDialog({ open, onClose, orgId }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-border">
-                {Object.entries(Restops_ROLES)
-                  .filter(([r]) => r !== 'platform_admin')
-                  .map(([r, def]) => (
-                  <SelectItem key={r} value={r} className="rounded-xl font-bold py-2.5">
+                {[
+                  ...Object.entries(Restops_ROLES).filter(([r]) => r !== 'platform_admin').map(([r, def]) => ({ id: r, name: r, label: def.label, icon: def.icon })),
+                  ...(dbRoles?.filter(r => !r.is_system).map(r => ({ id: r.name, name: r.name, label: r.name, icon: Users })) || [])
+                ].map((r) => (
+                  <SelectItem key={r.id} value={r.id} className="rounded-xl font-bold py-2.5">
                     <div className="flex items-center gap-2">
-                      <def.icon className="w-4 h-4 text-muted-foreground" />
-                      {def.label}
+                      <r.icon className="w-4 h-4 text-muted-foreground" />
+                      <span className="capitalize">{r.label.replace('_', ' ')}</span>
                     </div>
                   </SelectItem>
                 ))}

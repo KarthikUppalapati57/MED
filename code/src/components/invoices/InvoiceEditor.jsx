@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plus, Trash2, Bot } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,8 +24,10 @@ import ReconciliationVarianceTable from './ReconciliationVarianceTable';
 import { CategorySummaryTable } from './CategorySummaryTable';
 import { ApprovalWorkflowEngine } from './ApprovalWorkflowEngine';
 import { BillPayWidget } from './BillPayWidget';
+import AIEmailDrafter from '../vendors/AIEmailDrafter';
 
 export default function InvoiceEditor({ invoice, onChange }) {
+  const [emailDrafterOpen, setEmailDrafterOpen] = React.useState(false);
 
   const paidDetection = invoice.validation_results?.paid_status_detection;
   const hasPaidDetection = paidDetection?.detected;
@@ -124,6 +126,28 @@ export default function InvoiceEditor({ invoice, onChange }) {
           <CardTitle className="text-lg">Invoice Details</CardTitle>
         </CardHeader>
         <CardContent>
+          {invoice.validation_notes && (
+            <div className="mb-4 rounded-lg border p-3 text-sm border-amber-200 bg-amber-50 text-amber-800">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Validation Notice</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200 h-7"
+                      onClick={() => setEmailDrafterOpen(true)}
+                    >
+                      <Bot className="h-3.5 w-3.5 mr-1.5" />
+                      Draft Vendor Email
+                    </Button>
+                  </div>
+                  <p className="mt-1">{invoice.validation_notes}</p>
+                </div>
+              </div>
+            </div>
+          )}
           {hasPaidDetection && (
             <div className={`mb-4 rounded-lg border p-3 text-sm ${
               isHighConfidencePaid
@@ -466,6 +490,20 @@ export default function InvoiceEditor({ invoice, onChange }) {
             <CategorySummaryTable invoiceId={invoice.id} totalAmount={invoice.total_amount} />
           </CardContent>
         </Card>
+      )}
+
+      {/* AI Email Drafter */}
+      {emailDrafterOpen && (
+        <AIEmailDrafter
+          open={emailDrafterOpen}
+          onOpenChange={setEmailDrafterOpen}
+          invoice={invoice}
+          onSend={async (emailData) => {
+            // Simulated send; you would normally hook up `emailService.send...`
+            console.log('Sending drafted email', emailData);
+            return Promise.resolve();
+          }}
+        />
       )}
     </div>
   );

@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
-import { filterByContext } from '@/lib/contextUtils';
 import {
   Plus,
   Search,
@@ -80,6 +80,8 @@ export default function Products() {
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const { isGroundStaff } = usePermissions();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+  const [sortBy, setSortBy] = useState('name');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -135,15 +137,27 @@ export default function Products() {
   const { organization, brand, location } = useAuth();
   const needsGlobalItems = activeTab === 'ai-verification';
 
-  const { data: products = [], isLoading } = useAuthQuery({
-    queryKey: ['products', organization?.id],
-    queryFn: () => api.entities.Product.list('-created_at', {
-      limit: 1000,
-      select: 'id, product_id, name, description, category, accounting_category, is_inventoried, is_tax_exempt, report_by_unit, base_unit, latest_price, location_specific, organization_id, brand_id, location_id, created_at',
-    }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id,
+  const {
+    data = {},
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['products', debouncedSearch, sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await api.entities.Product.list(sortBy, {
+        page: pageParam,
+        pageSize: 50,
+        select: 'id, product_id, name, description, category, accounting_category, is_inventoried, is_tax_exempt, report_by_unit, base_unit, latest_price, location_specific, organization_id, brand_id, location_id, created_at',
+        search: debouncedSearch || undefined,
+        searchColumn: 'name'
+      });
+    },
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
   });
+
+  const products = React.useMemo(() => data.pages ? data.pages.flat() : [], [data.pages]);
 
   const { data: globalItems = [] } = useAuthQuery({
     queryKey: ['global_vendor_items'],
@@ -168,7 +182,7 @@ export default function Products() {
         queryClient.invalidateQueries({ queryKey: ['products'] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -199,7 +213,7 @@ export default function Products() {
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ['products'] });
       const previousData = queryClient.getQueryData(['products']);
-      queryClient.setQueryData(['products'], (old) => 
+      queryClient.setQueryData(['products'], (old) =>
         old ? old.filter(item => item.id !== deletedId) : []
       );
       return { previousData };
@@ -281,7 +295,7 @@ export default function Products() {
       p.report_by_unit,
       p.latest_price
     ]);
-    
+
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -292,15 +306,11 @@ export default function Products() {
   };
 
   const filteredProducts = React.useMemo(() => {
-    const searchLower = search.toLowerCase();
     return products.filter(p => {
-      const matchesSearch = !search || 
-        p.name?.toLowerCase().includes(searchLower) ||
-        p.product_id?.toLowerCase().includes(searchLower);
       const matchesCategory = categoryFilter === 'all' || p.accounting_category === categoryFilter;
-      return matchesSearch && matchesCategory;
+      return matchesCategory;
     });
-  }, [products, search, categoryFilter]);
+  }, [products, categoryFilter]);
 
   const { totalProducts, inventoriedCount, taxExemptCount, categoriesCount } = React.useMemo(() => {
     const total = products.length;
@@ -450,11 +460,41 @@ export default function Products() {
                       />
                     )}
                   </TableHead>
-                  <TableHead>Product ID</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'product_id' ? '-product_id' : 'product_id')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Product ID
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'product_id' ? '↑' : sortBy === '-product_id' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'name' ? '-name' : 'name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Description
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'name' ? '↑' : sortBy === '-name' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
                   <TableHead>On Inventory</TableHead>
                   <TableHead>Vendor</TableHead>
-                  <TableHead>Latest Price</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'latest_price' ? '-latest_price' : 'latest_price')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Latest Price
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'latest_price' ? '↑' : sortBy === '-latest_price' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -514,7 +554,7 @@ export default function Products() {
                               <DropdownMenuItem onClick={() => handleEdit(product)}>
                                 <Edit2 className="h-4 w-4 mr-2" /> Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => deleteMutation.mutate(product.id)}
                                 className="text-resend-red"
                               >
@@ -526,6 +566,19 @@ export default function Products() {
                       </TableCell>
                     </TableRow>
                   ))
+                )}
+                {hasNextPage && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center p-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                      >
+                        {isFetchingNextPage ? 'Loading more...' : 'Load More Products'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -582,7 +635,7 @@ export default function Products() {
                     ) : (
                       newProducts.map((p, idx) => {
                         // Mock AI confidence for demonstration
-                        const confidence = 95 - (idx * 15); 
+                        const confidence = 95 - (idx * 15);
                         const isLowConfidence = confidence < 90;
 
                         // Check if we have a global crowdsourced match
@@ -842,10 +895,10 @@ export default function Products() {
           <div className="py-4 space-y-4">
             <div className="space-y-2">
               <Label>Target Food COGS (%)</Label>
-              <Input 
-                type="number" 
-                value={targetCogs} 
-                onChange={(e) => setTargetCogs(e.target.value)} 
+              <Input
+                type="number"
+                value={targetCogs}
+                onChange={(e) => setTargetCogs(e.target.value)}
               />
             </div>
           </div>

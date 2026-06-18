@@ -4,27 +4,44 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DollarSign, TrendingUp, AlertTriangle, Package, Users, Upload, Link as LinkIcon, Target } from "lucide-react";
+import { DollarSign, TrendingUp, AlertTriangle, Package, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery, useAuthQueries } from '@/hooks/useAuthQuery';
+import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { toast } from "sonner";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
-import AvTCosting from './AvTCosting';
-import { SalesReportWidget } from '../components/performance/SalesReportWidget';
-import { SalesForecastWidget } from '../components/performance/SalesForecastWidget';
-import { UsageReportWidget } from '../components/performance/UsageReportWidget';
-import { ActionCenterWidget } from '../components/performance/ActionCenterWidget';
-import { ExplainableVarianceWidget } from '../components/performance/ExplainableVarianceWidget';
-import PredictiveAlerts from '../components/labor/PredictiveAlerts';
-import DailyPnLTab from '../components/performance/DailyPnLTab';
+import { format } from 'date-fns';
+
+const AvTCosting = React.lazy(() => import('./AvTCosting'));
+const SalesReportWidget = React.lazy(() => import('../components/performance/SalesReportWidget').then((module) => ({ default: module.SalesReportWidget })));
+const SalesForecastWidget = React.lazy(() => import('../components/performance/SalesForecastWidget').then((module) => ({ default: module.SalesForecastWidget })));
+const UsageReportWidget = React.lazy(() => import('../components/performance/UsageReportWidget').then((module) => ({ default: module.UsageReportWidget })));
+const ActionCenterWidget = React.lazy(() => import('../components/performance/ActionCenterWidget').then((module) => ({ default: module.ActionCenterWidget })));
+const ExplainableVarianceWidget = React.lazy(() => import('../components/performance/ExplainableVarianceWidget').then((module) => ({ default: module.ExplainableVarianceWidget })));
+const PredictiveAlerts = React.lazy(() => import('../components/labor/PredictiveAlerts'));
+const DailyPnLTab = React.lazy(() => import('../components/performance/DailyPnLTab'));
+const CrossLocationBenchmarking = React.lazy(() => import('../components/performance/CrossLocationBenchmarking'));
+const PerformanceTrendChart = React.lazy(() => import('@/components/performance/PerformanceCharts').then((module) => ({ default: module.PerformanceTrendChart })));
+const PerformanceCategoryPieChart = React.lazy(() => import('@/components/performance/PerformanceCharts').then((module) => ({ default: module.PerformanceCategoryPieChart })));
+
+function ChartFallback() {
+  return (
+    <div className="h-full min-h-[240px] w-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading chart...
+    </div>
+  );
+}
+
+function TabFallback() {
+  return (
+    <div className="min-h-[280px] w-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading report...
+    </div>
+  );
+}
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff7300', '#38bdf8', '#fbbf24'];
 
@@ -50,8 +67,14 @@ export default function Performance() {
 
   const { organization, brand, location, userProfile } = useAuth();
   const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  const [periodStart, setPeriodStart] = useState(
+    new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [periodEnd, setPeriodEnd] = useState(
+    new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+  );
+
   const todayKey = now.toISOString().slice(0, 10);
 
   const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
@@ -61,23 +84,25 @@ export default function Performance() {
   const needsAllocations = ['overview', 'pnl', 'category'].includes(activeTab);
   const needsLineItems = ['overview', 'movers'].includes(activeTab);
   const needsBudgetTargets = ['overview', 'pnl', 'budget'].includes(activeTab);
-  
+
   const results = useAuthQueries({
     queries: [
       {
-        queryKey: ['pos_sales_data', organization?.id],
-        queryFn: () => api.entities.PosSalesData.list('-date', {
+        queryKey: ['mv_daily_sales_summary', organization?.id],
+        queryFn: () => api.entities.MvDailySalesSummary.list('-date', {
           limit: 500,
-          select: 'id, organization_id, location_id, date, created_at, revenue',
+          select: 'organization_id, brand_id, location_id, date, total_revenue',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsSalesData,
       },
       {
         queryKey: ['invoices', organization?.id],
-        queryFn: () => api.entities.Invoice.list('-created_at', {
+        queryFn: () => api.entities.Invoice.list('-invoice_date', {
           limit: 500,
-          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status, line_items',
+          gte: { invoice_date: periodStart },
+          lte: { invoice_date: periodEnd },
+          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status',
         }),
         select: filterCb,
         enabled: !!organization?.id && needsInvoices,
@@ -86,6 +111,8 @@ export default function Performance() {
         queryKey: ['employee_shifts', organization?.id],
         queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
           limit: 500,
+          gte: { shift_start: periodStart },
+          lte: { shift_start: periodEnd },
           select: 'id, organization_id, location_id, shift_start, start_time, created_at, labor_cost',
         }),
         select: filterCb,
@@ -104,6 +131,8 @@ export default function Performance() {
         queryKey: ['invoice_line_items', organization?.id],
         queryFn: () => api.entities.InvoiceLineItem.list('-created_at', {
           limit: 500,
+          gte: { created_at: `${periodStart}T00:00:00.000Z` },
+          lte: { created_at: `${periodEnd}T23:59:59.999Z` },
           select: 'id, organization_id, item_name, unit_price, created_at',
         }),
         select: filterCb,
@@ -115,6 +144,11 @@ export default function Performance() {
         select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
           .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
         enabled: !!organization?.id && needsBudgetTargets,
+      },
+      {
+        queryKey: ['pnl_summary', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
+        queryFn: () => api.reports.getPnlSummary(organization?.id, periodStart, periodEnd, brand?.id, location?.id),
+        enabled: !!organization?.id && ['overview', 'pnl'].includes(activeTab),
       }
     ]
   });
@@ -132,12 +166,19 @@ export default function Performance() {
 
   const rawAllocations = results[3].data;
   const allocations = rawAllocations || [];
+  const lineItemAllocations = useMemo(
+    () => allocations.filter((allocation) => allocation.allocation_type === 'line_items'),
+    [allocations]
+  );
 
   const rawLineItems = results[4].data;
   const lineItems = rawLineItems || [];
 
   const rawBudgetTargets = results[5].data;
   const budgetTargets = rawBudgetTargets || [];
+
+  const rawPnlSummary = results[6].data;
+  const pnlSummary = rawPnlSummary || { total_revenue: 0, total_labor_cost: 0, total_cogs: 0, prime_cost: 0 };
 
   const budgetByCategory = useMemo(() => {
     const map = {};
@@ -173,18 +214,10 @@ export default function Performance() {
   });
 
   // --- CORE CALCULATIONS ---
-  const totalSales = salesData.reduce((sum, record) => sum + Number(record.revenue || 0), 0);
-  const totalLaborCost = shifts.reduce((sum, shift) => sum + (Number(shift.labor_cost) || 0), 0);
-
-  const lineItemAllocations = allocations.filter(a => a.allocation_type === 'line_items');
-  let totalCogs = 0;
-  if (lineItemAllocations.length > 0) {
-    totalCogs = lineItemAllocations.reduce((sum, a) => sum + Number(a.amount || 0), 0);
-  } else {
-    totalCogs = invoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
-  }
-
-  const primeCost = totalCogs + totalLaborCost;
+  const totalSales = Number(pnlSummary.total_revenue || 0);
+  const totalLaborCost = Number(pnlSummary.total_labor_cost || 0);
+  const totalCogs = Number(pnlSummary.total_cogs || 0);
+  const primeCost = Number(pnlSummary.prime_cost || 0);
 
   const salesBudgetTarget = Number(budgetByCategory.Sales?.target_amount || 0);
   const budget = salesBudgetTarget > 0 ? salesBudgetTarget : (totalSales > 0 ? totalSales * 0.95 : 0);
@@ -194,12 +227,12 @@ export default function Performance() {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const trendMap = Object.fromEntries(days.map(d => [d, { name: d, actual: 0, budget: 0, forecast: 0 }]));
   salesData.forEach(sale => {
-    const d = new Date(sale.date || sale.created_at);
+    const d = new Date(sale.date);
     if (!isNaN(d)) {
       const dayName = days[d.getDay()];
-      const rev = Number(sale.revenue || 0);
+      const rev = Number(sale.total_revenue || 0);
       trendMap[dayName].actual += rev;
-      trendMap[dayName].budget += budget > 0 ? budget / 7 : rev * 0.95; 
+      trendMap[dayName].budget += budget > 0 ? budget / 7 : rev * 0.95;
       trendMap[dayName].forecast += rev * 1.05;
     }
   });
@@ -226,7 +259,7 @@ export default function Performance() {
             break;
           }
         }
-        
+
         if (previousPrice > 0 && currentPrice !== previousPrice) {
           const change = ((currentPrice - previousPrice) / previousPrice) * 100;
           let status = 'neutral';
@@ -251,7 +284,7 @@ export default function Performance() {
       });
     } else {
       invoices.forEach(inv => {
-        const cat = inv.category || 'General';
+        const cat = 'General';
         map[cat] = (map[cat] || 0) + Number(inv.total_amount || 0);
       });
     }
@@ -259,7 +292,7 @@ export default function Performance() {
     return Object.entries(map)
       .map(([name, spend]) => ({ name, spend, pct: totalCogs > 0 ? (spend / totalCogs) * 100 : 0 }))
       .sort((a, b) => b.spend - a.spend);
-  }, [allocations, invoices, totalCogs]);
+  }, [lineItemAllocations, invoices, totalCogs]);
 
   const categoryPieData = categoryReportData.map((d, i) => ({
     name: d.name,
@@ -283,10 +316,40 @@ export default function Performance() {
     variance: row.budget > 0 ? ((row.actual - row.budget) / row.budget) * 100 : 0,
   }));
 
+  const handleExportPnlCSV = async () => {
+    if (!pnlData || pnlData.length === 0) return toast.error("No data to export");
+    const exportData = pnlData.map(d => ({
+      Category: d.category,
+      Actual: d.actual.toFixed(2),
+      Budget: d.budget.toFixed(2),
+      'Variance %': d.variance.toFixed(1) + '%'
+    }));
+    const { exportToCSV } = await import('@/lib/exportUtils');
+    exportToCSV(exportData, `controllable-pnl-${format(new Date(), 'yyyy-MM-dd')}`);
+  };
+
+  const handleExportPnlPDF = async () => {
+    if (!pnlData || pnlData.length === 0) return toast.error("No data to export");
+    const columns = [
+      { header: 'Category', dataKey: 'Category' },
+      { header: 'Actual ($)', dataKey: 'Actual' },
+      { header: 'Budget ($)', dataKey: 'Budget' },
+      { header: 'Variance %', dataKey: 'Variance %' }
+    ];
+    const data = pnlData.map(d => ({
+      Category: d.category,
+      Actual: d.actual.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      Budget: d.budget.toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      'Variance %': d.variance.toFixed(1) + '%'
+    }));
+    const { exportToPDF } = await import('@/lib/exportUtils');
+    exportToPDF(columns, data, 'Controllable P&L', `controllable-pnl-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+  };
+
   const dailyPnl = useMemo(() => {
     const todaysSales = salesData.reduce((sum, record) => {
-      const dateValue = record.date || record.created_at;
-      return sameDate(dateValue, todayKey) ? sum + Number(record.revenue || 0) : sum;
+      const dateValue = record.date;
+      return sameDate(dateValue, todayKey) ? sum + Number(record.total_revenue || 0) : sum;
     }, 0);
 
     const todaysInvoices = invoices.filter((invoice) => sameDate(invoice.invoice_date || invoice.created_at, todayKey));
@@ -304,7 +367,7 @@ export default function Performance() {
     const dailyPrimeTarget = Number(budgetByCategory['Prime Cost']?.target_amount || 0) / periodDaysElapsed || (todaysSales * 0.6);
     const prime = todaysInvoiceSpend + todaysLabor;
 
-    const pendingInvoices = invoices.filter((invoice) => ['pending_review', 'validated', 'flagged'].includes(invoice.status));
+    const pendingInvoicesCount = invoices.filter((invoice) => ['pending_review', 'validated', 'flagged'].includes(invoice.status)).length;
     const missingInvoiceRisk = todaysSales > 0 && todaysInvoiceSpend === 0;
     const highPriceMovers = moversData.filter((item) => item.status === 'critical' || item.status === 'warning').slice(0, 5);
 
@@ -312,7 +375,7 @@ export default function Performance() {
     if (missingInvoiceRisk) alerts.push({ tone: 'orange', title: 'Sales without invoice spend', body: 'Today has POS sales but no same-day invoice spend. Confirm vendor documents are uploaded.' });
     if (todaysSales > 0 && (todaysInvoiceSpend / todaysSales) * 100 > 32) alerts.push({ tone: 'red', title: 'COGS above target', body: `Today COGS is ${pct((todaysInvoiceSpend / todaysSales) * 100)} against a 32.0% guardrail.` });
     if (todaysSales > 0 && (todaysLabor / todaysSales) * 100 > 28) alerts.push({ tone: 'red', title: 'Labor above target', body: `Today labor is ${pct((todaysLabor / todaysSales) * 100)} against a 28.0% guardrail.` });
-    if (pendingInvoices.length > 0) alerts.push({ tone: 'blue', title: `${pendingInvoices.length} invoices need review`, body: 'Clear invoice review so AP, inventory, and P&L stay current.' });
+    if (pendingInvoicesCount > 0) alerts.push({ tone: 'blue', title: `${pendingInvoicesCount} invoices need review`, body: 'Clear invoice review so AP, inventory, and P&L stay current.' });
     if (highPriceMovers.length > 0) alerts.push({ tone: 'orange', title: `${highPriceMovers.length} price movers`, body: 'Review vendor item price increases before they distort food cost.' });
 
     return {
@@ -334,7 +397,7 @@ export default function Performance() {
       grossProfit: todaysSales - todaysInvoiceSpend,
       estimatedControllableProfit: todaysSales - prime,
       invoicesCaptured: todaysInvoices.length,
-      pendingInvoices,
+      pendingInvoices: pendingInvoicesCount,
       highPriceMovers,
       alerts,
       coverage: [
@@ -354,10 +417,25 @@ export default function Performance() {
 
   return (
     <div className="space-y-6 animate-fade-in-scale flex flex-col h-full w-full">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Performance Analytics</h1>
           <p className="text-muted-foreground mt-1 text-lg">High-level KPIs, actual vs budget, and trend analysis.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-card border border-border/50 p-1.5 rounded-lg shadow-sm">
+          <Input
+            type="date"
+            value={periodStart}
+            onChange={(e) => setPeriodStart(e.target.value)}
+            className="w-[140px] h-9 border-none bg-transparent"
+          />
+          <span className="text-muted-foreground">to</span>
+          <Input
+            type="date"
+            value={periodEnd}
+            onChange={(e) => setPeriodEnd(e.target.value)}
+            className="w-[140px] h-9 border-none bg-transparent"
+          />
         </div>
       </div>
 
@@ -397,6 +475,7 @@ export default function Performance() {
           <TabsTrigger value="sales_forecast" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Sales Forecast</TabsTrigger>
           <TabsTrigger value="usage_report" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Usage Report</TabsTrigger>
           <TabsTrigger value="avt" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Theoretical Usage (AvT)</TabsTrigger>
+          <TabsTrigger value="benchmarking" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Benchmarking</TabsTrigger>
           <TabsTrigger value="variance" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Variance Breakdown</TabsTrigger>
           <TabsTrigger value="action_center" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Action Center</TabsTrigger>
           <TabsTrigger value="budget" className="data-[state=active]:border-b-2 data-[state=active]:border-brand rounded-none bg-transparent">Budget Setup</TabsTrigger>
@@ -457,8 +536,10 @@ export default function Performance() {
               </Card>
             </div>
 
-            <PredictiveAlerts />
-            
+            <React.Suspense fallback={null}>
+              <PredictiveAlerts />
+            </React.Suspense>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Sales Trend Chart */}
               <Card className="lg:col-span-2 glass-card shadow-sm border-border/50 flex flex-col min-h-[400px]">
@@ -467,26 +548,9 @@ export default function Performance() {
                   <CardDescription>Daily actual sales compared to budget and forecast</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 w-full min-h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dx={-10} tickFormatter={(val) => `$${val/1000}k`} />
-                      <RechartsTooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        formatter={(value) => [`$${value}`, 'Sales']}
-                      />
-                      <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                      <Area type="monotone" dataKey="actual" name="Actual Sales" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" />
-                      <Area type="monotone" dataKey="budget" name="Budget" stroke="#9ca3af" strokeWidth={2} strokeDasharray="5 5" fill="none" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <React.Suspense fallback={<ChartFallback />}>
+                    <PerformanceTrendChart data={trendData} />
+                  </React.Suspense>
                 </CardContent>
               </Card>
 
@@ -522,14 +586,24 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="daily_pnl" className="space-y-6 m-0">
-            {activeTab === 'daily_pnl' && <DailyPnLTab />}
+            {activeTab === 'daily_pnl' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <DailyPnLTab />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="pnl" className="space-y-6 m-0">
             <Card className="glass-card shadow-sm border-border/50">
-              <CardHeader>
-                <CardTitle>Controllable P&L</CardTitle>
-                <CardDescription>Period-to-date performance against budget</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle>Controllable P&L</CardTitle>
+                  <CardDescription>Period-to-date performance against budget</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleExportPnlCSV}>Export CSV</Button>
+                  <Button variant="outline" size="sm" onClick={handleExportPnlPDF}>Export PDF</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto w-full">
@@ -615,25 +689,9 @@ export default function Performance() {
                   <CardTitle>Distribution</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 w-full min-h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {categoryPieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Spend']} />
-                      <Legend layout="vertical" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 12, paddingTop: 20 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <React.Suspense fallback={<ChartFallback />}>
+                    <PerformanceCategoryPieChart data={categoryPieData} />
+                  </React.Suspense>
                 </CardContent>
               </Card>
             </div>
@@ -747,27 +805,59 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="sales_report" className="space-y-6 m-0">
-            {activeTab === 'sales_report' && <SalesReportWidget salesData={salesData} />}
+            {activeTab === 'sales_report' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <SalesReportWidget salesData={salesData} />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="sales_forecast" className="space-y-6 m-0">
-            {activeTab === 'sales_forecast' && <SalesForecastWidget salesData={salesData} />}
+            {activeTab === 'sales_forecast' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <SalesForecastWidget salesData={salesData} />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="usage_report" className="space-y-6 m-0">
-            {activeTab === 'usage_report' && <UsageReportWidget />}
+            {activeTab === 'usage_report' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <UsageReportWidget />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="avt" className="space-y-0 m-0">
-            {activeTab === 'avt' && <AvTCosting />}
+            {activeTab === 'avt' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <AvTCosting />
+              </React.Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent value="benchmarking" className="space-y-0 m-0">
+            {activeTab === 'benchmarking' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <CrossLocationBenchmarking />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="variance" className="space-y-6 m-0">
-            {activeTab === 'variance' && <ExplainableVarianceWidget varianceTotal={totalSales - budget} />}
+            {activeTab === 'variance' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <ExplainableVarianceWidget varianceTotal={totalSales - budget} />
+              </React.Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="action_center" className="space-y-6 m-0">
-            {activeTab === 'action_center' && <ActionCenterWidget />}
+            {activeTab === 'action_center' && (
+              <React.Suspense fallback={<TabFallback />}>
+                <ActionCenterWidget />
+              </React.Suspense>
+            )}
           </TabsContent>
 
 

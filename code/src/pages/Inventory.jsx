@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import LoadingDockReceiving from '@/components/inventory/LoadingDockReceiving';
-import ActiveCountSession from '@/components/inventory/ActiveCountSession';
-import POSSyncEngine from '@/components/inventory/POSSyncEngine';
-import InventoryTransfers from '@/components/inventory/InventoryTransfers';
-import AvTDashboard from '@/components/inventory/AvTDashboard';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { api } from '@/lib/apiClient';
@@ -77,6 +73,56 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 
+const LoadingDockReceiving = React.lazy(() => import('@/components/inventory/LoadingDockReceiving'));
+const ActiveCountSession = React.lazy(() => import('@/components/inventory/ActiveCountSession'));
+const POSSyncEngine = React.lazy(() => import('@/components/inventory/POSSyncEngine'));
+const InventoryTransfers = React.lazy(() => import('@/components/inventory/InventoryTransfers'));
+const AvTDashboard = React.lazy(() => import('@/components/inventory/AvTDashboard'));
+
+const INVENTORY_ROW_HEIGHT = 72;
+const INVENTORY_TABLE_VIEWPORT_HEIGHT = 640;
+const INVENTORY_ROW_OVERSCAN = 8;
+
+function InventorySectionFallback({ label = 'Loading inventory section...' }) {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
+        {label}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LazyInventorySection({ children, label }) {
+  return (
+    <React.Suspense fallback={<InventorySectionFallback label={label} />}>
+      {children}
+    </React.Suspense>
+  );
+}
+
+function useDebouncedQueryInvalidation(queryClient, queryKeys, delay = 1000) {
+  const timeoutRef = React.useRef(null);
+  const queryKeysRef = React.useRef(queryKeys);
+
+  React.useEffect(() => {
+    queryKeysRef.current = queryKeys;
+  }, [queryKeys]);
+
+  React.useEffect(() => () => {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+  }, []);
+
+  return React.useCallback(() => {
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+    timeoutRef.current = window.setTimeout(() => {
+      queryKeysRef.current.forEach((queryKey) => {
+        queryClient.invalidateQueries({ queryKey });
+      });
+    }, delay);
+  }, [delay, queryClient]);
+}
+
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
   const navigate = useNavigate();
@@ -84,17 +130,13 @@ export default function Inventory() {
   const activeTab = searchParams.get('tab') || 'inventory';
   const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const pageSize = 50;
+  const debouncedSearch = useDebounce(search, 500);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(0); // reset page on new search
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const [sortInventory, setSortInventory] = useState('-product_name');
+  const [sortWastage, setSortWastage] = useState('-created_at');
+  const [sortCountSheets, setSortCountSheets] = useState('-created_at');
+  const [sortCountSessions, setSortCountSessions] = useState('-started_at');
+  const [sortRecipes, setSortRecipes] = useState('name');
 
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -112,31 +154,63 @@ export default function Inventory() {
   const [activeSessionOpen, setActiveSessionOpen] = useState(false);
   const [countTemplateName, setCountTemplateName] = useState('');
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
+  const inventoryTableRef = React.useRef(null);
+  const [inventoryTableScrollTop, setInventoryTableScrollTop] = useState(0);
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
+  const inventoryInvalidationKeys = React.useMemo(() => [
+    ['inventory', organization?.id],
+    ['inventoryMetrics', organization?.id],
+  ], [organization?.id]);
+  const wastageInvalidationKeys = React.useMemo(() => [
+    ['wastage', organization?.id],
+  ], [organization?.id]);
+  const countSheetsInvalidationKeys = React.useMemo(() => [
+    ['count_sheets', organization?.id],
+  ], [organization?.id]);
+  const countSessionsInvalidationKeys = React.useMemo(() => [
+    ['count_sessions', organization?.id],
+  ], [organization?.id]);
+  const invalidateInventoryRealtime = useDebouncedQueryInvalidation(queryClient, inventoryInvalidationKeys, 1500);
+  const invalidateWastageRealtime = useDebouncedQueryInvalidation(queryClient, wastageInvalidationKeys, 1500);
+  const invalidateCountSheetsRealtime = useDebouncedQueryInvalidation(queryClient, countSheetsInvalidationKeys, 1500);
+  const invalidateCountSessionsRealtime = useDebouncedQueryInvalidation(queryClient, countSessionsInvalidationKeys, 1500);
   const needsInventory = ['inventory', 'summary', 'daily-snapshot', 'counts', 'count-sheets'].includes(activeTab) || editDialogOpen || addDialogOpen || convertDialogOpen || wastageDialogOpen || scannerDialogOpen || activeSessionOpen;
   const needsWastage = ['wastage', 'waste-summary', 'daily-snapshot', 'summary'].includes(activeTab) || wastageDialogOpen;
   const needsCountSheets = ['counts', 'count-sheets'].includes(activeTab) || activeSessionOpen || newTemplateOpen;
   const needsCountSessions = activeTab === 'counts' || activeSessionOpen;
   const needsRecipes = activeTab === 'pos-sync';
 
-  const { data: inventory = [], isLoading } = useAuthQuery({
-    queryKey: ['inventory', organization?.id, location?.id, page, debouncedSearch, categoryFilter],
-    queryFn: () => {
+  const {
+    data: inventoryData,
+    isLoading,
+    fetchNextPage: fetchNextInventoryPage,
+    hasNextPage: hasNextInventoryPage,
+    isFetchingNextPage: isFetchingNextInventoryPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['inventory', organization?.id, location?.id, debouncedSearch, categoryFilter, sortInventory],
+    queryFn: ({ pageParam = 0 }) => {
       const conditions = {};
       if (categoryFilter !== 'all') conditions.accounting_category = categoryFilter;
       return api.entities.Inventory.filter(conditions, {
-        page,
-        pageSize,
-        search: debouncedSearch,
+        page: pageParam,
+        pageSize: 50,
+        search: debouncedSearch || undefined,
         searchColumn: 'product_name',
-        orderBy: '-product_name'
+        orderBy: sortInventory
       });
     },
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsInventory,
   });
+
+  const inventory = React.useMemo(() => {
+    if (!inventoryData?.pages) return [];
+    const flat = inventoryData.pages.flat();
+    return filterByContext(flat, { organization, brand, location });
+  }, [inventoryData, organization, brand, location]);
 
   const { data: inventoryMetrics } = useAuthQuery({
     queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
@@ -144,54 +218,112 @@ export default function Inventory() {
     enabled: !!organization?.id && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
   });
 
-  const { data: wastageLogs = [] } = useAuthQuery({
-    queryKey: ['wastage', organization?.id],
-    queryFn: () => api.entities.WastageLog.list('-created_at', { limit: 300 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const {
+    data: wastageData,
+    fetchNextPage: fetchNextWastagePage,
+    hasNextPage: hasNextWastagePage,
+    isFetchingNextPage: isFetchingNextWastagePage
+  } = useAuthInfiniteQuery({
+    queryKey: ['wastage', organization?.id, debouncedSearch, sortWastage],
+    queryFn: ({ pageParam = 0 }) => api.entities.WastageLog.list(sortWastage, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'wastage' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'product_name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsWastage,
   });
 
-  const { data: countSheets = [] } = useAuthQuery({
-    queryKey: ['count_sheets', organization?.id],
-    queryFn: () => api.entities.CountSheet.list('-created_at', { limit: 200 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const wastageLogs = React.useMemo(() => {
+    if (!wastageData?.pages) return [];
+    return filterByContext(wastageData.pages.flat(), { organization, brand, location });
+  }, [wastageData, organization, brand, location]);
+
+  const {
+    data: countSheetsData,
+    fetchNextPage: fetchNextCountSheetsPage,
+    hasNextPage: hasNextCountSheetsPage,
+    isFetchingNextPage: isFetchingNextCountSheetsPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['count_sheets', organization?.id, debouncedSearch, sortCountSheets],
+    queryFn: ({ pageParam = 0 }) => api.entities.CountSheet.list(sortCountSheets, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'count-sheets' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsCountSheets,
   });
 
-  const { data: countSessions = [] } = useAuthQuery({
-    queryKey: ['count_sessions', organization?.id],
-    queryFn: () => api.entities.CountSession.list('-started_at', { limit: 200 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const countSheets = React.useMemo(() => {
+    if (!countSheetsData?.pages) return [];
+    return filterByContext(countSheetsData.pages.flat(), { organization, brand, location });
+  }, [countSheetsData, organization, brand, location]);
+
+  const {
+    data: countSessionsData,
+    fetchNextPage: fetchNextCountSessionsPage,
+    hasNextPage: hasNextCountSessionsPage,
+    isFetchingNextPage: isFetchingNextCountSessionsPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['count_sessions', organization?.id, debouncedSearch, sortCountSessions],
+    queryFn: ({ pageParam = 0 }) => api.entities.CountSession.list(sortCountSessions, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'counts' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'notes'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsCountSessions,
   });
 
-  const { data: recipes = [] } = useAuthQuery({
-    queryKey: ['recipes', organization?.id],
-    queryFn: () => api.entities.Recipe.list('name', { limit: 300 }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const countSessions = React.useMemo(() => {
+    if (!countSessionsData?.pages) return [];
+    return filterByContext(countSessionsData.pages.flat(), { organization, brand, location });
+  }, [countSessionsData, organization, brand, location]);
+
+  const {
+    data: recipesData,
+    fetchNextPage: fetchNextRecipesPage,
+    hasNextPage: hasNextRecipesPage,
+    isFetchingNextPage: isFetchingNextRecipesPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['recipes', organization?.id, debouncedSearch, sortRecipes],
+    queryFn: ({ pageParam = 0 }) => api.entities.Recipe.list(sortRecipes, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'pos-sync' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'name'
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organization?.id && needsRecipes,
   });
 
+  const recipes = React.useMemo(() => {
+    if (!recipesData?.pages) return [];
+    return filterByContext(recipesData.pages.flat(), { organization, brand, location });
+  }, [recipesData, organization, brand, location]);
+
   useEffect(() => {
-    const channel = supabase.channel('inventory-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['wastage', organization?.id] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sheets' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['count_sheets', organization?.id] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sessions' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
-      })
+    if (!organization?.id) return undefined;
+    const orgFilter = `organization_id=eq.${organization.id}`;
+    const channel = supabase.channel(`inventory-realtime-${organization.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory', filter: orgFilter }, invalidateInventoryRealtime)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wastage_logs', filter: orgFilter }, invalidateWastageRealtime)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sheets', filter: orgFilter }, invalidateCountSheetsRealtime)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'count_sessions', filter: orgFilter }, invalidateCountSessionsRealtime)
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, organization?.id]);
+  }, [invalidateCountSessionsRealtime, invalidateCountSheetsRealtime, invalidateInventoryRealtime, invalidateWastageRealtime, organization?.id]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),
@@ -217,7 +349,7 @@ export default function Inventory() {
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ['inventory'] });
       const previousData = queryClient.getQueryData(['inventory']);
-      queryClient.setQueryData(['inventory'], (old) => 
+      queryClient.setQueryData(['inventory'], (old) =>
         old ? old.filter(item => item.id !== deletedId) : []
       );
       return { previousData };
@@ -281,7 +413,7 @@ export default function Inventory() {
 
       const countedData = Object.fromEntries((sheet.items || []).map((item) => {
         const countedQty = counts[item.inventory_id] !== undefined && counts[item.inventory_id] !== '' ? parseFloat(counts[item.inventory_id]) : item.expected_quantity || 0;
-        
+
         // Match with full inventory record to calculate dollar variance
         const invItem = inventory.find(i => i.id === item.inventory_id);
         const unitCost = invItem?.unit_cost || 0;
@@ -310,7 +442,7 @@ export default function Inventory() {
       if (Math.abs(totalVarianceValue) > 0.01) {
         try {
           const isFavorable = totalVarianceValue > 0; // We have MORE stock than theoretical
-          
+
           // Real API call to insert into General Ledger
           await api.entities.GeneralLedgerEntry.create({
             organization_id: organization?.id,
@@ -322,7 +454,7 @@ export default function Inventory() {
             amount: Math.abs(totalVarianceValue),
             created_by: userProfile?.id || null
           });
-          
+
           toast.success(`Automated GL Entry Generated: ${isFavorable ? 'Credited' : 'Debited'} COGS for $${Math.abs(totalVarianceValue).toFixed(2)}`);
         } catch (e) {
           console.error("Failed to generate GL entry", e);
@@ -347,7 +479,7 @@ export default function Inventory() {
         const varianceVal = itemData.variance || 0;
         const countedQty = itemData.counted_quantity;
         const expectedQty = itemData.expected_quantity;
-        
+
         if (countedQty !== expectedQty) {
           const invItem = inventory.find(i => i.id === invId);
           if (invItem) {
@@ -469,11 +601,11 @@ export default function Inventory() {
       'lb_to_ea': 16,
       'case_to_ea': 24,
     };
-    
+
     const key = `${convertForm.fromUnit}_to_${convertForm.toUnit}`;
     const rate = conversionRates[key] || 1;
     const newQty = convertForm.quantity * rate;
-    
+
     updateMutation.mutate({
       id: selectedItem.id,
       data: {
@@ -583,6 +715,36 @@ export default function Inventory() {
     return inventory; // Data is now filtered server-side
   }, [inventory]);
 
+  useEffect(() => {
+    setInventoryTableScrollTop(0);
+    if (inventoryTableRef.current) inventoryTableRef.current.scrollTop = 0;
+  }, [debouncedSearch, categoryFilter, sortInventory, location?.id]);
+
+  const inventoryWindow = React.useMemo(() => {
+    const total = filteredInventory.length;
+    if (total === 0) {
+      return {
+        visibleItems: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(INVENTORY_TABLE_VIEWPORT_HEIGHT / INVENTORY_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(inventoryTableScrollTop / INVENTORY_ROW_HEIGHT) - INVENTORY_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (INVENTORY_ROW_OVERSCAN * 2));
+
+    return {
+      visibleItems: filteredInventory.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * INVENTORY_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * INVENTORY_ROW_HEIGHT),
+    };
+  }, [filteredInventory, inventoryTableScrollTop]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -609,7 +771,7 @@ export default function Inventory() {
       {/* 24-Hour Pending Review Banner */}
       {(() => {
         const now = new Date();
-        const pendingItems = inventory.filter(item => 
+        const pendingItems = inventory.filter(item =>
           item.pending_until && new Date(item.pending_until) > now
         );
         if (pendingItems.length === 0) return null;
@@ -714,19 +876,27 @@ export default function Inventory() {
         </TabsList>
 
         <TabsContent value="receiving" className="space-y-4">
-          <LoadingDockReceiving />
+          <LazyInventorySection label="Loading receiving workflow...">
+            <LoadingDockReceiving />
+          </LazyInventorySection>
         </TabsContent>
 
         <TabsContent value="avt" className="space-y-4">
-          <AvTDashboard />
+          <LazyInventorySection label="Loading AvT dashboard...">
+            <AvTDashboard />
+          </LazyInventorySection>
         </TabsContent>
 
         <TabsContent value="pos-sync" className="space-y-4">
-          <POSSyncEngine inventory={inventory} recipes={recipes} updateInventoryMutation={updateMutation} />
+          <LazyInventorySection label="Loading POS sync...">
+            <POSSyncEngine inventory={inventory} recipes={recipes} updateInventoryMutation={updateMutation} />
+          </LazyInventorySection>
         </TabsContent>
 
         <TabsContent value="transfers" className="space-y-4">
-          <InventoryTransfers inventory={inventory} updateInventoryMutation={updateMutation} organization={organization} />
+          <LazyInventorySection label="Loading transfers workflow...">
+            <InventoryTransfers inventory={inventory} updateInventoryMutation={updateMutation} organization={organization} />
+          </LazyInventorySection>
         </TabsContent>
 
         <TabsContent value="inventory" className="space-y-4">
@@ -797,9 +967,13 @@ export default function Inventory() {
           {/* Inventory Table */}
           <Card className="border-0 shadow-sm">
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div
+                ref={inventoryTableRef}
+                className="max-h-[640px] overflow-auto"
+                onScroll={(event) => setInventoryTableScrollTop(event.currentTarget.scrollTop)}
+              >
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                    <TableRow>
                      <TableHead className="w-[40px]">
                        {!isGroundStaff && (
@@ -835,10 +1009,16 @@ export default function Inventory() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredInventory.map((item) => {
+                      <>
+                      {inventoryWindow.paddingTop > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={11} className="p-0" style={{ height: `${inventoryWindow.paddingTop}px` }} />
+                        </TableRow>
+                      )}
+                      {inventoryWindow.visibleItems.map((item) => {
                         const change = (item.current_value || 0) - (item.previous_value || 0);
                         const isLow = item.current_quantity <= (item.reorder_point || 5);
-                        
+
                         return (
                           <TableRow key={item.id} className={cn(isLow && "bg-resend-red/5", selectedIds.has(item.id) && "bg-primary/5")}>
                              <TableCell>
@@ -915,34 +1095,32 @@ export default function Inventory() {
                             </TableCell>
                           </TableRow>
                         );
-                      })
+                      })}
+                      {inventoryWindow.paddingBottom > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={11} className="p-0" style={{ height: `${inventoryWindow.paddingBottom}px` }} />
+                        </TableRow>
+                      )}
+                      </>
                     )}
                   </TableBody>
                 </Table>
-                
-                <div className="flex items-center justify-between px-4 py-4 border-t">
-                  <div className="text-sm text-muted-foreground">
-                    Showing page {page + 1}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      disabled={page === 0}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => p + 1)}
-                      disabled={inventory.length < pageSize}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-2 px-4 py-4 border-t text-sm text-muted-foreground sm:flex-row sm:justify-between">
+                <span>
+                  Showing rows {filteredInventory.length === 0 ? 0 : inventoryWindow.startIndex + 1}
+                  -{inventoryWindow.endIndex} of {filteredInventory.length} loaded
+                </span>
+                {hasNextInventoryPage && (
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchNextInventoryPage()}
+                    disabled={isFetchingNextInventoryPage}
+                  >
+                    {isFetchingNextInventoryPage ? 'Loading more...' : 'Load More Inventory Items'}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -978,10 +1156,40 @@ export default function Inventory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Product</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortWastage(sortWastage === 'created_at' ? '-created_at' : 'created_at')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Date
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortWastage === 'created_at' ? '↑' : sortWastage === '-created_at' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortWastage(sortWastage === 'product_name' ? '-product_name' : 'product_name')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Product
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortWastage === 'product_name' ? '↑' : sortWastage === '-product_name' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Quantity</TableHead>
-                    <TableHead>Value</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortWastage(sortWastage === 'value' ? '-value' : 'value')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Value
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortWastage === 'value' ? '↑' : sortWastage === '-value' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Notes</TableHead>
                   </TableRow>
@@ -1009,6 +1217,13 @@ export default function Inventory() {
                   )}
                 </TableBody>
               </Table>
+              <div className="flex justify-center px-4 py-4 border-t">
+                {hasNextWastagePage && (
+                  <Button variant="outline" onClick={() => fetchNextWastagePage()} disabled={isFetchingNextWastagePage}>
+                    {isFetchingNextWastagePage ? 'Loading more...' : 'Load More Waste Records'}
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1086,10 +1301,30 @@ export default function Inventory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Template Name</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortCountSheets(sortCountSheets === 'name' ? '-name' : 'name')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Template Name
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortCountSheets === 'name' ? '↑' : sortCountSheets === '-name' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Items</TableHead>
-                    <TableHead>Last Count</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:text-foreground group"
+                      onClick={() => setSortCountSheets(sortCountSheets === 'last_count_date' ? '-last_count_date' : 'last_count_date')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Last Count
+                        <span className="opacity-0 group-hover:opacity-100 text-xs">
+                          {sortCountSheets === 'last_count_date' ? '↑' : sortCountSheets === '-last_count_date' ? '↓' : '↕'}
+                        </span>
+                      </div>
+                    </TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1115,6 +1350,13 @@ export default function Inventory() {
                   )}
                 </TableBody>
               </Table>
+              <div className="flex justify-center px-4 py-4 border-t">
+                {hasNextCountSheetsPage && (
+                  <Button variant="outline" onClick={() => fetchNextCountSheetsPage()} disabled={isFetchingNextCountSheetsPage}>
+                    {isFetchingNextCountSheetsPage ? 'Loading more...' : 'Load More Count Sheets'}
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1371,7 +1613,7 @@ export default function Inventory() {
                     </div>
                     <Badge variant="outline" className="bg-cyan-50 text-cyan-700">Active</Badge>
                   </div>
-                  
+
                   <div className="rounded-lg border bg-card p-4 flex items-center justify-between opacity-60">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
@@ -1675,30 +1917,32 @@ export default function Inventory() {
 
       {/* Active Count Session (Full Screen Wizard) */}
       {activeSessionOpen && countSheets.length > 0 && (
-        <ActiveCountSession
-          sheet={countSheets.find(s => s.id === selectedCountSheetId) || countSheets[0]}
-          inventory={inventory}
-          onComplete={(counts) => {
-             completeCountSessionMutation.mutate(counts);
-          }}
-          onCancel={() => setActiveSessionOpen(false)}
-        />
+        <React.Suspense fallback={<InventorySectionFallback label="Loading count session..." />}>
+          <ActiveCountSession
+            sheet={countSheets.find(s => s.id === selectedCountSheetId) || countSheets[0]}
+            inventory={inventory}
+            onComplete={(counts) => {
+               completeCountSessionMutation.mutate(counts);
+            }}
+            onCancel={() => setActiveSessionOpen(false)}
+          />
+        </React.Suspense>
       )}
       {/* Scanner Dialog */}
       <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
         <DialogContent className="sm:max-w-md overflow-hidden p-0 bg-black border-none">
           <div className="flex flex-col items-center justify-center p-8 space-y-6 text-center relative h-[400px]">
             <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
-            
+
             <Camera className="h-16 w-16 text-white/50 animate-pulse mb-4 z-10" />
             <div className="w-64 h-64 border-2 border-primary/50 relative z-10">
                <div className="absolute top-0 left-0 w-full h-1 bg-resend-green animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(40,167,69,0.8)]"></div>
             </div>
-            
+
             <p className="text-white font-medium z-10">Point camera at a product barcode to quickly find and edit it.</p>
-            
-            <Button 
-              className="mt-8 z-10 bg-primary hover:bg-primary text-white w-full" 
+
+            <Button
+              className="mt-8 z-10 bg-primary hover:bg-primary text-white w-full"
               onClick={() => {
                 if (inventory.length > 0) {
                   const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
@@ -1717,7 +1961,7 @@ export default function Inventory() {
             <Button variant="ghost" className="text-white/70 hover:text-white z-10 absolute top-2 right-2" onClick={() => setScannerDialogOpen(false)}>
               <X className="h-5 w-5" />
             </Button>
-            <style jsx>{`
+            <style>{`
               @keyframes scan {
                 0% { top: 0; }
                 50% { top: 100%; }

@@ -28,7 +28,7 @@ export function deriveApStatus(invoice) {
   if (invoice?.status === 'paid' || invoice?.payment_status === 'paid') return 'paid';
   if (invoice?.status === 'approved') return 'approved';
   if (
-    ['flagged', 'duplicate'].includes(invoice?.status) ||
+    ['flagged', 'duplicate', 'pending_match_approval'].includes(invoice?.status) ||
     ['needs_review', 'variance', 'missing_receipt', 'unmatched'].includes(invoice?.match_status)
   ) return 'action_required';
   if (invoice?.status === 'validated') return 'pending_approval';
@@ -39,6 +39,7 @@ export function deriveActionReason(invoice) {
   if (invoice?.action_required_reason) return invoice.action_required_reason;
   if (invoice?.status === 'duplicate') return 'possible_duplicate';
   if (invoice?.status === 'flagged') return 'validation_flag';
+  if (invoice?.status === 'pending_match_approval') return 'reconciliation_variance';
   if (invoice?.match_status === 'missing_receipt') return 'missing_receipt';
   if (invoice?.match_status === 'unmatched') return 'missing_purchase_order';
   if (['needs_review', 'variance'].includes(invoice?.match_status)) return 'reconciliation_variance';

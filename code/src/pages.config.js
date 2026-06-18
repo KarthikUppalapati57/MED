@@ -8,7 +8,7 @@
  * This controls which page is the landing page (shown when users visit the app).
  */
 import React from 'react';
-import __Layout from './Layout.jsx';
+const __Layout = React.lazy(() => import('./Layout.jsx'));
 
 // Dynamically import pages using React.lazy for code-splitting
 const AutoOrdering = React.lazy(() => import('./pages/AutoOrdering'));

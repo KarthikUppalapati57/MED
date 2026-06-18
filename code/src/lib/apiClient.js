@@ -100,18 +100,25 @@ const createEntityClient = (table, useSoftDelete = false) => ({
       query = query.ilike(options.searchColumn, `%${options.search}%`);
     }
 
+    Object.entries(options.gte || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.gte(key, value);
+    });
+    Object.entries(options.lte || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.lte(key, value);
+    });
+
     if (orderBy) {
       const ascending = !orderBy.startsWith('-');
       const column = ascending ? orderBy : orderBy.slice(1);
       query = query.order(column, { ascending });
     }
-    if (options.limit) {
-      query = query.limit(options.limit);
-    }
-    if (options.page !== undefined && options.pageSize !== undefined) {
-      const from = options.page * options.pageSize;
-      const to = from + options.pageSize - 1;
+    if (options.page !== undefined) {
+      const pageSize = options.pageSize || options.limit || 50;
+      const from = options.page * pageSize;
+      const to = from + pageSize - 1;
       query = query.range(from, to);
+    } else if (options.limit) {
+      query = query.limit(options.limit);
     }
     
     const { data, error } = await query;
@@ -131,16 +138,26 @@ const createEntityClient = (table, useSoftDelete = false) => ({
       query = query.ilike(options.searchColumn, `%${options.search}%`);
     }
 
+    Object.entries(options.gte || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.gte(key, value);
+    });
+    Object.entries(options.lte || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.lte(key, value);
+    });
+
     if (options.orderBy) {
       const ascending = !options.orderBy.startsWith('-');
       const column = ascending ? options.orderBy : options.orderBy.slice(1);
       query = query.order(column, { ascending });
     }
 
-    if (options.page !== undefined && options.pageSize !== undefined) {
-      const from = options.page * options.pageSize;
-      const to = from + options.pageSize - 1;
+    if (options.page !== undefined) {
+      const pageSize = options.pageSize || options.limit || 50;
+      const from = options.page * pageSize;
+      const to = from + pageSize - 1;
       query = query.range(from, to);
+    } else if (options.limit) {
+      query = query.limit(options.limit);
     }
 
     const { data, error } = await query;
@@ -227,6 +244,7 @@ export const api = {
     PosSalesData: createEntityClient('pos_sales_data'),
     Transfer: createEntityClient('transfers'),
     Receiving: createEntityClient('receivings'),
+    ReceivingItem: createEntityClient('receiving_items'),
     CountSheet: createEntityClient('count_sheets'),
     CountSession: createEntityClient('count_sessions'),
     ClosedPeriod: createEntityClient('closed_periods'),
@@ -236,6 +254,7 @@ export const api = {
     OperationalSetting: createEntityClient('operational_settings'),
     BudgetTarget: createEntityClient('budget_targets'),
     SmartPrepPlan: createEntityClient('smart_prep_plans'),
+    MvDailySalesSummary: createEntityClient('mv_daily_sales_summary'),
 
     AskTomThread: createEntityClient('ask_tom_threads'),
     AskTomMessage: createEntityClient('ask_tom_messages'),
@@ -321,11 +340,38 @@ export const api = {
     },
   },
   reports: {
+    getPnlSummary: async (orgId, startDate, endDate, brandId = null, locationId = null) => {
+      const { data, error } = await supabase.rpc('get_pnl_summary', {
+        p_org_id: orgId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_brand_id: brandId,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data;
+    },
+    getLaborScheduleVariance: async (startDate, endDate, locationId = null) => {
+      const { data, error } = await supabase.rpc('get_labor_schedule_variance', {
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data;
+    },
     getMenuEngineering: async (orgId, startDate = null, endDate = null) => {
       const { data, error } = await supabase.rpc('get_menu_engineering_data', {
         p_org_id: orgId,
         p_start_date: startDate,
         p_end_date: endDate
+      });
+      if (error) throw error;
+      return data;
+    },
+    getThreeWayMatchStatus: async (poId) => {
+      const { data, error } = await supabase.rpc('get_three_way_match_status', {
+        p_purchase_order_id: poId
       });
       if (error) throw error;
       return data;

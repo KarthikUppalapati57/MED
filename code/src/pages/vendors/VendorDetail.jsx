@@ -8,15 +8,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity } from 'lucide-react';
-import VendorItemsTab from './VendorItemsTab';
-import OrderGuideTab from './OrderGuideTab';
-import CommunicationHub from './CommunicationHub';
-import AccountingControls from './AccountingControls';
-import AIVendorAnalyst from './AIVendorAnalyst';
-import DocumentVault from './DocumentVault';
-import VendorReconciliation from './VendorReconciliation';
-import VendorAuditTrail from './VendorAuditTrail';
-import VendorBulkTools from './VendorBulkTools';
+
+const VendorItemsTab = React.lazy(() => import('./VendorItemsTab'));
+const OrderGuideTab = React.lazy(() => import('./OrderGuideTab'));
+const CommunicationHub = React.lazy(() => import('./CommunicationHub'));
+const AccountingControls = React.lazy(() => import('./AccountingControls'));
+const AIVendorAnalyst = React.lazy(() => import('./AIVendorAnalyst'));
+const DocumentVault = React.lazy(() => import('./DocumentVault'));
+const VendorReconciliation = React.lazy(() => import('./VendorReconciliation'));
+const VendorAuditTrail = React.lazy(() => import('./VendorAuditTrail'));
+const VendorBulkTools = React.lazy(() => import('./VendorBulkTools'));
+const VendorReceivingTab = React.lazy(() => import('./VendorReceivingTab'));
 
 // Helper for unimplemented tabs linking out to master modules
 const LinkedTabPlaceholder = ({ title, description, linkText, linkPath }) => {
@@ -43,7 +45,24 @@ const OverviewTab = () => (
 const InvoicesTab = () => <LinkedTabPlaceholder title="Vendor Invoices" description="Manage and process all invoices for this vendor from the centralized Accounts Payable hub." linkText="Go to AP Hub" linkPath="/Invoices" />;
 const OrdersTab = () => <LinkedTabPlaceholder title="Vendor Orders" description="Create and track purchase orders for this vendor from the main Inventory module." linkText="Go to Orders" linkPath="/Orders" />;
 const PaymentsTab = () => <LinkedTabPlaceholder title="Vendor Payments" description="Schedule and execute bill payments for this vendor from the centralized Bill Pay module." linkText="Go to Payments" linkPath="/Payments" />;
-const ReceivingTab = () => <LinkedTabPlaceholder title="Receiving Logs" description="Track receiving logs and delivery exceptions for this vendor." linkText="Go to Receiving" linkPath="/Receiving" />;
+
+function VendorDetailTabFallback() {
+  return (
+    <Card className="border-0 shadow-sm">
+      <CardContent className="flex min-h-48 items-center justify-center text-sm text-muted-foreground">
+        Loading vendor section...
+      </CardContent>
+    </Card>
+  );
+}
+
+function LazyVendorTab({ children }) {
+  return (
+    <React.Suspense fallback={<VendorDetailTabFallback />}>
+      {children}
+    </React.Suspense>
+  );
+}
 
 export default function VendorDetail() {
   const { id } = useParams();
@@ -263,19 +282,19 @@ export default function VendorDetail() {
             </div>
 
             <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab /></TabsContent>
-            <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorItemsTab vendorId={id} /></TabsContent>
-            <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OrderGuideTab vendorId={id} /></TabsContent>
-            {isElevatedUser && <TabsContent value="bulk_tools" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorBulkTools vendorId={id} /></TabsContent>}
+            <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorItemsTab vendorId={id} /></LazyVendorTab></TabsContent>
+            <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><OrderGuideTab vendorId={id} /></LazyVendorTab></TabsContent>
+            {isElevatedUser && <TabsContent value="bulk_tools" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorBulkTools vendorId={id} /></LazyVendorTab></TabsContent>}
             <TabsContent value="invoices" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><InvoicesTab /></TabsContent>
             <TabsContent value="orders" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OrdersTab /></TabsContent>
             <TabsContent value="payments" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><PaymentsTab /></TabsContent>
-            <TabsContent value="receiving" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><ReceivingTab /></TabsContent>
-            <TabsContent value="reconciliation" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorReconciliation vendorId={id} /></TabsContent>
-            <TabsContent value="vault" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><DocumentVault vendorId={id} /></TabsContent>
-            {isElevatedUser && <TabsContent value="accounting" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><AccountingControls vendorId={id} /></TabsContent>}
-            <TabsContent value="hub" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><CommunicationHub vendorId={id} /></TabsContent>
-            <TabsContent value="ai_analyst" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><AIVendorAnalyst vendorId={id} /></TabsContent>
-            {isElevatedUser && <TabsContent value="audit_trail" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><VendorAuditTrail vendorId={id} /></TabsContent>}
+            <TabsContent value="receiving" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorReceivingTab vendorId={id} /></LazyVendorTab></TabsContent>
+            <TabsContent value="reconciliation" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorReconciliation vendorId={id} /></LazyVendorTab></TabsContent>
+            <TabsContent value="vault" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><DocumentVault vendorId={id} /></LazyVendorTab></TabsContent>
+            {isElevatedUser && <TabsContent value="accounting" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><AccountingControls vendorId={id} /></LazyVendorTab></TabsContent>}
+            <TabsContent value="hub" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><CommunicationHub vendorId={id} /></LazyVendorTab></TabsContent>
+            <TabsContent value="ai_analyst" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><AIVendorAnalyst vendorId={id} /></LazyVendorTab></TabsContent>
+            {isElevatedUser && <TabsContent value="audit_trail" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorAuditTrail vendorId={id} /></LazyVendorTab></TabsContent>}
           </Tabs>
         </div>
       </div>

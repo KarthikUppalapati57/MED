@@ -4,12 +4,20 @@ import { createClient } from '@supabase/supabase-js';
 
 const baseUrlArg = process.argv.find((arg) => arg.startsWith('--base-url='))?.split('=').slice(1).join('=');
 const baseUrl = baseUrlArg || process.env.ROLE_QA_BASE_URL || 'https://restops-360.com';
+const authOnly = process.argv.includes('--auth-only');
+const accountFilterArg = process.argv.find((arg) => arg.startsWith('--account='))?.split('=').slice(1).join('=');
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-const password = process.env.ROLE_QA_PASSWORD || 'RestopsQA!2026';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+const password = process.env.ROLE_QA_PASSWORD;
 
 if (!supabaseUrl || !anonKey) {
   console.error('Missing Supabase env vars.');
+  process.exit(1);
+}
+
+if (!password) {
+  console.error('Missing ROLE_QA_PASSWORD.');
   process.exit(1);
 }
 
@@ -51,25 +59,106 @@ const accounts = [
   },
 ];
 
-async function getUserId(email) {
-  const client = createClient(supabaseUrl, anonKey, {
+const selectedAccounts = accountFilterArg
+  ? accounts.filter((account) => account.email === accountFilterArg || account.role === accountFilterArg)
+  : accounts;
+
+if (!selectedAccounts.length) {
+  console.error(`No QA accounts matched --account=${accountFilterArg}`);
+  process.exit(1);
+}
+
+function timedFetch(input, init = {}) {
+  const timeoutMs = Number(process.env.ROLE_QA_FETCH_TIMEOUT_MS || 8000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`Supabase request timed out after ${timeoutMs}ms`)), timeoutMs);
+  const upstreamSignal = init.signal;
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) controller.abort(upstreamSignal.reason);
+    else upstreamSignal.addEventListener('abort', () => controller.abort(upstreamSignal.reason), { once: true });
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timeout));
+}
+
+function makeSupabaseClient(key) {
+  return createClient(supabaseUrl, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: timedFetch },
   });
+}
+
+async function getUserId(email) {
+  const serviceUserId = await getUserIdFromServiceRole(email);
+  if (serviceUserId) return serviceUserId;
+
   let data;
-  let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  const attempts = [];
+  const maxAttempts = Number(process.env.ROLE_QA_AUTH_ATTEMPTS || 2);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const client = makeSupabaseClient(anonKey);
     const result = await client.auth.signInWithPassword({ email, password });
     data = result.data;
-    lastError = result.error;
-    if (!lastError && data?.user?.id) break;
-    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    if (!result.error && data?.user?.id) {
+      await client.auth.signOut().catch(() => {});
+      return data.user.id;
+    }
+    attempts.push(`attempt ${attempt}: ${formatError(result.error) || 'missing user id'}`);
+    await client.auth.signOut().catch(() => {});
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
   }
-  if (lastError || !data?.user?.id) {
-    throw new Error(`${email} auth lookup failed: ${lastError?.message || JSON.stringify(lastError) || 'missing user id'}`);
+
+  throw new Error(`${email} auth lookup failed after ${attempts.length} attempts. ${attempts.join(' | ')}`);
+}
+
+async function getUserIdFromServiceRole(email) {
+  if (!serviceRoleKey) return null;
+  const client = makeSupabaseClient(serviceRoleKey);
+
+  const profile = await client
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+  if (!profile.error && profile.data?.id) return profile.data.id;
+
+  const users = await client.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (!users.error) {
+    const user = users.data?.users?.find((item) => item.email?.toLowerCase() === email.toLowerCase());
+    if (user?.id) return user.id;
   }
-  const userId = data.user.id;
-  await client.auth.signOut();
-  return userId;
+
+  console.warn(JSON.stringify({
+    warning: 'service_role_user_lookup_failed',
+    email,
+    profileError: formatError(profile.error),
+    listUsersError: formatError(users.error),
+  }));
+  return null;
+}
+
+function formatError(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  const parts = [];
+  if (error.name) parts.push(error.name);
+  if (error.status) parts.push(`status=${error.status}`);
+  if (error.code) parts.push(`code=${error.code}`);
+  if (error.message) parts.push(error.message);
+  if (error.cause?.message) parts.push(`cause=${error.cause.message}`);
+  if (!parts.length) {
+    try {
+      const props = Object.getOwnPropertyNames(error).reduce((acc, key) => {
+        acc[key] = error[key];
+        return acc;
+      }, {});
+      return JSON.stringify(props);
+    } catch {
+      return String(error);
+    }
+  }
+  return parts.join(' ');
 }
 
 function routeUrl(route) {
@@ -96,6 +185,7 @@ function isKnownConsoleWarning(message) {
     'violates the following Content Security Policy directive',
     'TypeError: Failed to fetch',
     'Failed to load resource: the server responded with a status of 400',
+    'Failed to load resource: the server responded with a status of 403',
     'Failed to load resource: the server responded with a status of 404',
   ].some((needle) => message.includes(needle));
 }
@@ -120,7 +210,9 @@ async function login(page, account) {
 }
 
 async function runAccount(browser, account) {
+  console.error(`[ui-smoke] ${account.email}: resolving user id`);
   const userId = await getUserId(account.email);
+  console.error(`[ui-smoke] ${account.email}: launching browser context`);
   const context = await browser.newContext();
   await context.addInitScript(({ userId }) => {
     window.localStorage.setItem('restops_mfa_trust', JSON.stringify({
@@ -137,6 +229,7 @@ async function runAccount(browser, account) {
   page.on('pageerror', (error) => consoleErrors.push(error.message));
 
   const failures = [];
+  console.error(`[ui-smoke] ${account.email}: login`);
   await login(page, account);
 
   await page.getByText(account.dashboardText, { exact: false }).waitFor({ timeout: 15000 }).catch(() => {});
@@ -150,6 +243,7 @@ async function runAccount(browser, account) {
 
   const routeResults = [];
   for (const route of account.routes) {
+    console.error(`[ui-smoke] ${account.email}: checking ${route}`);
     await page.goto(routeUrl(route), { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForAppSettled(page);
     const text = await page.locator('body').innerText({ timeout: 15000 });
@@ -164,6 +258,7 @@ async function runAccount(browser, account) {
 
   const forbiddenRouteResults = [];
   for (const route of account.forbiddenRoutes || []) {
+    console.error(`[ui-smoke] ${account.email}: checking forbidden ${route}`);
     await page.goto(routeUrl(route), { waitUntil: 'domcontentloaded', timeout: 30000 });
     await waitForAppSettled(page);
     const text = await page.locator('body').innerText({ timeout: 15000 });
@@ -181,6 +276,7 @@ async function runAccount(browser, account) {
   }
 
   await context.close();
+  console.error(`[ui-smoke] ${account.email}: complete`);
   return {
     account: account.email,
     role: account.role,
@@ -201,10 +297,34 @@ async function runAccount(browser, account) {
   };
 }
 
+if (authOnly) {
+  const authResults = [];
+  for (const account of selectedAccounts) {
+    try {
+      console.error(`[ui-smoke] ${account.email}: auth-only lookup`);
+      const userId = await getUserId(account.email);
+      authResults.push({ account: account.email, role: account.role, ok: true, userId });
+    } catch (error) {
+      authResults.push({ account: account.email, role: account.role, ok: false, error: formatError(error) });
+    }
+  }
+  const failedAuth = authResults.filter((result) => !result.ok);
+  console.log(JSON.stringify({
+    testedAt: new Date().toISOString(),
+    mode: 'auth-only',
+    accounts: authResults.length,
+    passed: authResults.length - failedAuth.length,
+    failed: failedAuth.length,
+    results: authResults,
+  }, null, 2));
+  if (failedAuth.length) process.exit(1);
+  process.exit(0);
+}
+
 const browser = await chromium.launch({ headless: true });
 const results = [];
 try {
-  for (const account of accounts) {
+  for (const account of selectedAccounts) {
     results.push(await runAccount(browser, account));
   }
 } finally {

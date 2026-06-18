@@ -1,9 +1,16 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sparkles, AlertTriangle, ShieldCheck } from "lucide-react";
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts';
+
+const SalesForecastAreaChart = React.lazy(() => import('@/components/performance/PerformanceCharts').then((module) => ({ default: module.SalesForecastAreaChart })));
+
+function ChartFallback() {
+  return (
+    <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading chart...
+    </div>
+  );
+}
 
 export function SalesForecastWidget({ salesData }) {
   // Simple mock forecast generation based on historical variance
@@ -139,25 +146,9 @@ export function SalesForecastWidget({ salesData }) {
           {forecastData.length === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground">Not enough data for forecasting</div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={forecastData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(val) => `$${val/1000}k`} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value) => [`$${value.toFixed(2)}`, 'Sales']}
-                />
-                <Area type="monotone" dataKey="actual" name="Actual" stroke="#3b82f6" strokeWidth={3} fillOpacity={0} />
-                <Area type="monotone" dataKey="forecast" name="Forecast" stroke="#a855f7" strokeWidth={3} strokeDasharray="5 5" fill="url(#colorForecast)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <React.Suspense fallback={<ChartFallback />}>
+              <SalesForecastAreaChart data={forecastData} />
+            </React.Suspense>
           )}
         </CardContent>
       </Card>

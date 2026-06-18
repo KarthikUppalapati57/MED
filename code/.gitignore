@@ -43,6 +43,7 @@ tmp/
 tmp_*
 *.pdf
 folder_structure.txt
+reports/*.json
 
 # Python files (backend-only, not part of Vite build)
 *.pyc

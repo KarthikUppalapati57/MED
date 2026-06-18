@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { api } from '@/lib/apiClient';
 import { clearAllQueries, removeOrgScopedQueries } from '@/lib/query-client';
 import { queryClientInstance } from '@/lib/query-client';
 import posthog from '@/lib/posthog';
@@ -137,7 +136,8 @@ export const AuthProvider = ({ children }) => {
       
       if (invite) {
         // Use secure RPC to accept invitation (bypasses RLS on profiles update)
-        await api.onboarding.acceptInvitation(invite.token);
+        const { error } = await supabase.rpc('accept_invitation', { p_token: invite.token });
+        if (error) throw error;
 
         // Apply pre-provisioned permissions from invitation metadata if available
         const metadata = invite.metadata || {};

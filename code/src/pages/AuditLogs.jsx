@@ -1,7 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import { Search, ShieldAlert, Database, User } from 'lucide-react';
@@ -16,23 +17,49 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+const AUDIT_ROW_HEIGHT = 72;
+const AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
+const AUDIT_ROW_OVERSCAN = 8;
 
 export default function AuditLogs() {
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+  const [sortBy, setSortBy] = useState('-created_at');
+  const tableRef = React.useRef(null);
+  const [tableScrollTop, setTableScrollTop] = useState(0);
 
   const queryClient = useQueryClient();
 
-  const { data: logs = [], isLoading, isError } = useAuthQuery({
-    queryKey: ['audit_logs'],
-    queryFn: async () => {
+  const {
+    data = {},
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError
+  } = useAuthInfiniteQuery({
+    queryKey: ['audit_logs', debouncedSearch, sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
       try {
-        return await api.entities.AuditLog.list('-created_at', { limit: 500 });
+        return await api.entities.AuditLog.list(sortBy, {
+          page: pageParam,
+          pageSize: 50,
+          search: debouncedSearch || undefined,
+          searchColumn: 'action'
+        });
       } catch (err) {
         console.error('Error fetching audit logs:', err);
         throw err;
       }
     },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === 50 ? allPages.length : undefined;
+    }
   });
+
+  const logs = React.useMemo(() => data.pages ? data.pages.flat() : [], [data.pages]);
 
   useEffect(() => {
     const channel = supabase.channel('audit-logs-realtime')
@@ -40,22 +67,45 @@ export default function AuditLogs() {
         queryClient.invalidateQueries({ queryKey: ['audit_logs'] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
   const filteredLogs = React.useMemo(() => {
-    const term = search.toLowerCase();
-    return logs.filter(log => {
-      return (
-        log.action?.toLowerCase().includes(term) ||
-        log.table_name?.toLowerCase().includes(term) ||
-        log.user_id?.toLowerCase().includes(term)
-      );
-    });
-  }, [logs, search]);
+    return logs;
+  }, [logs]);
+
+  useEffect(() => {
+    setTableScrollTop(0);
+    if (tableRef.current) tableRef.current.scrollTop = 0;
+  }, [debouncedSearch, sortBy]);
+
+  const logWindow = React.useMemo(() => {
+    const total = filteredLogs.length;
+    if (total === 0) {
+      return {
+        visibleLogs: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(AUDIT_TABLE_VIEWPORT_HEIGHT / AUDIT_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(tableScrollTop / AUDIT_ROW_HEIGHT) - AUDIT_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (AUDIT_ROW_OVERSCAN * 2));
+
+    return {
+      visibleLogs: filteredLogs.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * AUDIT_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * AUDIT_ROW_HEIGHT),
+    };
+  }, [filteredLogs, tableScrollTop]);
 
   const getActionColor = (action) => {
     switch (action?.toUpperCase()) {
@@ -94,13 +144,47 @@ export default function AuditLogs() {
 
       <Card className="border-0 shadow-sm">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div
+            ref={tableRef}
+            className="max-h-[648px] overflow-auto"
+            onScroll={(event) => setTableScrollTop(event.currentTarget.scrollTop)}
+          >
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Resource</TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'created_at' ? '-created_at' : 'created_at')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Timestamp
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'created_at' ? '↑' : sortBy === '-created_at' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'action' ? '-action' : 'action')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Action
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'action' ? '↑' : sortBy === '-action' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:text-foreground group"
+                    onClick={() => setSortBy(sortBy === 'table_name' ? '-table_name' : 'table_name')}
+                  >
+                    <div className="flex items-center gap-1">
+                      Resource
+                      <span className="opacity-0 group-hover:opacity-100 text-xs">
+                        {sortBy === 'table_name' ? '↑' : sortBy === '-table_name' ? '↓' : '↕'}
+                      </span>
+                    </div>
+                  </TableHead>
                   <TableHead>User ID</TableHead>
                   <TableHead>Details</TableHead>
                 </TableRow>
@@ -128,7 +212,13 @@ export default function AuditLogs() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((log) => (
+                  <>
+                  {logWindow.paddingTop > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={5} className="p-0" style={{ height: `${logWindow.paddingTop}px` }} />
+                    </TableRow>
+                  )}
+                  {logWindow.visibleLogs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {log.created_at ? format(new Date(log.created_at), 'MMM d, yyyy HH:mm:ss') : 'N/A'}
@@ -161,10 +251,38 @@ export default function AuditLogs() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                  ))}
+                  {logWindow.paddingBottom > 0 && (
+                    <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={5} className="p-0" style={{ height: `${logWindow.paddingBottom}px` }} />
+                    </TableRow>
+                  )}
+                  </>
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="flex flex-col items-center gap-2 p-4 border-t border-border/50 text-sm text-muted-foreground sm:flex-row sm:justify-between">
+            <span>
+              Showing rows {filteredLogs.length === 0 ? 0 : logWindow.startIndex + 1}
+              -{logWindow.endIndex} of {filteredLogs.length} loaded audit logs
+            </span>
+            {hasNextPage && (
+              <Button
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Logs'
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

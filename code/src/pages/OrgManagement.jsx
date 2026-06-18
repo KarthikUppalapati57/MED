@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
 import ApprovalPolicySettings from '@/components/invoices/ApprovalPolicySettings';
+import CustomRolesTab from '@/components/org/CustomRolesTab';
 
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
@@ -405,6 +406,7 @@ export default function OrgManagement() {
         <TabsList>
           <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
           <TabsTrigger value="groups">Location Groups</TabsTrigger>
+          <TabsTrigger value="roles">Custom Roles</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
         </TabsList>
@@ -690,6 +692,10 @@ export default function OrgManagement() {
 
         <TabsContent value="approvals" className="mt-6">
           <ApprovalPolicySettings />
+        </TabsContent>
+
+        <TabsContent value="roles" className="mt-6">
+          <CustomRolesTab />
         </TabsContent>
       </Tabs>
 

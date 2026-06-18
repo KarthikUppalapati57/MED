@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,8 @@ export default function PlatformUserManagement() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
   const authChecked = !!user;
+  const invalidateAdmins = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform-admins']], []), 1500);
+  const invalidateInvites = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform-admin-invites']], []), 1500);
 
   // Platform Admin Invite State
   const [showPlatformInviteModal, setShowPlatformInviteModal] = useState(false);
@@ -38,19 +41,16 @@ export default function PlatformUserManagement() {
 
   // -- Realtime subscription for platform users --
   useEffect(() => {
+    if (!authChecked || userRole !== 'platform_admin') return undefined;
     const channel = supabase.channel('platform-users-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-admins'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-admin-invites'] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateAdmins)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, invalidateInvites)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [authChecked, invalidateAdmins, invalidateInvites, userRole]);
 
  // Platform Admins Query 
   const { data: platformAdmins = [], isLoading: isLoadingAdmins, error: adminQueryError } = useAuthQuery({

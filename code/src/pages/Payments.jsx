@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
@@ -98,13 +99,23 @@ const invoiceStatusColors = {
   flagged: 'bg-resend-yellow/10 text-resend-yellow',
 };
 
+const PAYMENT_ROW_HEIGHT = 72;
+const PAYMENT_TABLE_VIEWPORT_HEIGHT = 648;
+const PAYMENT_ROW_OVERSCAN = 8;
+
 export default function Payments() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+  const [sortBy, setSortBy] = useState('-created_at');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const invoiceTableRef = React.useRef(null);
+  const paymentHistoryTableRef = React.useRef(null);
+  const [invoiceTableScrollTop, setInvoiceTableScrollTop] = useState(0);
+  const [paymentHistoryTableScrollTop, setPaymentHistoryTableScrollTop] = useState(0);
   const [scheduleDialogInvoice, setScheduleDialogInvoice] = useState(null);
   const [recordDialogInvoice, setRecordDialogInvoice] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({
@@ -131,25 +142,61 @@ export default function Payments() {
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
 
-  const { data: invoices = [], isLoading: invoicesLoading } = useAuthQuery({
-    queryKey: ['invoices-payments', organization?.id],
-    queryFn: () => api.entities.Invoice.list('-created_at', {
-      limit: 500,
-      select: 'id, invoice_number, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
-    }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const {
+    data = {},
+    isLoading: invoicesLoading,
+    fetchNextPage: fetchNextInvoicesPage,
+    hasNextPage: hasNextInvoicesPage,
+    isFetchingNextPage: isFetchingNextInvoicesPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['invoices-payments', organization?.id, brand?.id, location?.id, activeTab, debouncedSearch, statusFilter, sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await api.entities.Invoice.list(sortBy, {
+        page: pageParam,
+        pageSize: 50,
+        select: 'id, invoice_number, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
+        search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
+        searchColumn: 'invoice_number'
+      });
+    },
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!(organization?.id),
   });
 
-  const { data: payments = [], isLoading: paymentsLoading } = useAuthQuery({
-    queryKey: ['payments', organization?.id],
-    queryFn: () => api.entities.Payment.list('-created_at', {
-      limit: 500,
-      select: 'id, invoice_id, invoice_number, vendor_name, amount, status, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
-    }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+  const invoicesData = data;
+
+  const invoices = React.useMemo(() => {
+    if (!invoicesData?.pages) return [];
+    return filterByContext(invoicesData.pages.flat(), { organization, brand, location });
+  }, [invoicesData, organization, brand, location]);
+
+  const {
+    data: pData = {},
+    isLoading: paymentsLoading,
+    fetchNextPage: fetchNextPaymentsPage,
+    hasNextPage: hasNextPaymentsPage,
+    isFetchingNextPage: isFetchingNextPaymentsPage
+  } = useAuthInfiniteQuery({
+    queryKey: ['payments', organization?.id, brand?.id, location?.id, activeTab, debouncedSearch, sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await api.entities.Payment.list(sortBy, {
+        page: pageParam,
+        pageSize: 50,
+        select: 'id, invoice_id, invoice_number, vendor_name, amount, status, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
+        search: activeTab === 'history' ? debouncedSearch || undefined : undefined,
+        searchColumn: 'invoice_number'
+      });
+    },
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!(organization?.id),
   });
+
+  const paymentsData = pData;
+
+  const payments = React.useMemo(() => {
+    if (!paymentsData?.pages) return [];
+    return filterByContext(paymentsData.pages.flat(), { organization, brand, location });
+  }, [paymentsData, organization, brand, location]);
 
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts', organization?.id],
@@ -206,13 +253,13 @@ export default function Payments() {
   useEffect(() => {
     const channel = supabase.channel('payments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
+        queryClient.invalidateQueries({ queryKey: ['payments'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -220,12 +267,12 @@ export default function Payments() {
 
   const createPayment = useMutation({
     mutationFn: (data) => api.entities.Payment.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payments'] }),
   });
 
   const updateInvoice = useMutation({
     mutationFn: (params) => api.entities.Invoice.update(params.id, params.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments'] }),
   });
 
   const savePaymentSettings = useMutation({
@@ -260,7 +307,7 @@ export default function Payments() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
       setScheduleDialogInvoice(null);
       toast.success('Payment scheduled');
@@ -280,8 +327,8 @@ export default function Payments() {
       return data;
     },
     onSuccess: async (result) => {
-      queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
-      queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-payments'] });
       setRecordDialogInvoice(null);
@@ -351,11 +398,11 @@ export default function Payments() {
 
   const handleBulkSchedule = async () => {
     if (selectedInvoiceIds.length === 0) return;
-    
+
     // Group selected invoices by vendor, as a single scheduled_payment should ideally be per-vendor
     const selected = invoices.filter(i => selectedInvoiceIds.includes(i.id));
     const vendors = [...new Set(selected.map(i => i.vendor_id))];
-    
+
     if (vendors.length > 1) {
       toast.error('Please select invoices from a single vendor to schedule a batch payment.');
       return;
@@ -378,7 +425,7 @@ export default function Payments() {
         const selected = invoices.filter(i => selectedInvoiceIds.includes(i.id));
         const amounts = selected.map(i => Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)));
         const vendorId = selected[0].vendor_id;
-        
+
         const { error } = await supabase.rpc('schedule_payment_batch', {
           p_vendor_id: vendorId,
           p_payment_account_id: scheduleForm.payment_account_id,
@@ -386,10 +433,10 @@ export default function Payments() {
           p_invoice_ids: selected.map(i => i.id),
           p_amounts: amounts
         });
-        
+
         if (error) throw error;
-        
-        queryClient.invalidateQueries({ queryKey: ['invoices-payments', organization?.id] });
+
+        queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
         setScheduleDialogInvoice(null);
         setSelectedInvoiceIds([]);
         toast.success(`Scheduled payment for ${selected.length} invoices`);
@@ -434,7 +481,7 @@ export default function Payments() {
           });
         }
       }
-      queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
       toast.success('Bank transfer confirmed!');
     } catch (err) {
       toast.error('Failed to confirm: ' + err.message);
@@ -442,26 +489,75 @@ export default function Payments() {
   };
 
   const filteredInvoices = React.useMemo(() => {
-    const searchLower = search.toLowerCase();
     return invoices.filter(inv => {
-      const matchesSearch = !search ||
-        inv.vendor_name?.toLowerCase().includes(searchLower) ||
-        inv.invoice_number?.toLowerCase().includes(searchLower);
       const matchesStatus = statusFilter === 'all' || inv.payment_status === statusFilter || inv.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      return matchesStatus;
     });
-  }, [invoices, search, statusFilter]);
+  }, [invoices, statusFilter]);
 
   const filteredPayments = React.useMemo(() => {
-    const searchLower = search.toLowerCase();
-    return payments.filter(p => {
-      const matchesSearch = !search ||
-        p.vendor_name?.toLowerCase().includes(searchLower) ||
-        p.invoice_number?.toLowerCase().includes(searchLower) ||
-        p.transaction_id?.toLowerCase().includes(searchLower);
-      return matchesSearch;
-    });
-  }, [payments, search]);
+    return payments;
+  }, [payments]);
+
+  useEffect(() => {
+    setInvoiceTableScrollTop(0);
+    if (invoiceTableRef.current) invoiceTableRef.current.scrollTop = 0;
+  }, [debouncedSearch, statusFilter, sortBy, organization?.id, brand?.id, location?.id]);
+
+  useEffect(() => {
+    setPaymentHistoryTableScrollTop(0);
+    if (paymentHistoryTableRef.current) paymentHistoryTableRef.current.scrollTop = 0;
+  }, [debouncedSearch, sortBy, organization?.id, brand?.id, location?.id]);
+
+  const invoiceWindow = React.useMemo(() => {
+    const total = filteredInvoices.length;
+    if (total === 0) {
+      return {
+        visibleInvoices: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(PAYMENT_TABLE_VIEWPORT_HEIGHT / PAYMENT_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(invoiceTableScrollTop / PAYMENT_ROW_HEIGHT) - PAYMENT_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (PAYMENT_ROW_OVERSCAN * 2));
+
+    return {
+      visibleInvoices: filteredInvoices.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * PAYMENT_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * PAYMENT_ROW_HEIGHT),
+    };
+  }, [filteredInvoices, invoiceTableScrollTop]);
+
+  const paymentHistoryWindow = React.useMemo(() => {
+    const total = filteredPayments.length;
+    if (total === 0) {
+      return {
+        visiblePayments: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(PAYMENT_TABLE_VIEWPORT_HEIGHT / PAYMENT_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(paymentHistoryTableScrollTop / PAYMENT_ROW_HEIGHT) - PAYMENT_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (PAYMENT_ROW_OVERSCAN * 2));
+
+    return {
+      visiblePayments: filteredPayments.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * PAYMENT_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * PAYMENT_ROW_HEIGHT),
+    };
+  }, [filteredPayments, paymentHistoryTableScrollTop]);
 
   return (
     <div className="space-y-6">
@@ -627,12 +723,16 @@ export default function Payments() {
               )}
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div
+                ref={invoiceTableRef}
+                className="max-h-[648px] overflow-auto"
+                onScroll={(event) => setInvoiceTableScrollTop(event.currentTarget.scrollTop)}
+              >
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                     <TableRow>
                       <TableHead className="w-12">
-                        <Checkbox 
+                        <Checkbox
                           checked={filteredInvoices.length > 0 && selectedInvoiceIds.length === filteredInvoices.length}
                           onCheckedChange={(checked) => {
                             if (checked) {
@@ -643,10 +743,50 @@ export default function Payments() {
                           }}
                         />
                       </TableHead>
-                      <TableHead>Vendor</TableHead>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Amount</TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortBy(sortBy === 'vendor_name' ? '-vendor_name' : 'vendor_name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Vendor
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortBy === 'vendor_name' ? '↑' : sortBy === '-vendor_name' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortBy(sortBy === 'invoice_number' ? '-invoice_number' : 'invoice_number')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Invoice #
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortBy === 'invoice_number' ? '↑' : sortBy === '-invoice_number' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortBy(sortBy === 'due_date' ? '-due_date' : 'due_date')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Due Date
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortBy === 'due_date' ? '↑' : sortBy === '-due_date' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:text-foreground group"
+                        onClick={() => setSortBy(sortBy === 'total_amount' ? '-total_amount' : 'total_amount')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Amount
+                          <span className="opacity-0 group-hover:opacity-100 text-xs">
+                            {sortBy === 'total_amount' ? '↑' : sortBy === '-total_amount' ? '↓' : '↕'}
+                          </span>
+                        </div>
+                      </TableHead>
                       <TableHead>Invoice Status</TableHead>
                       <TableHead>Payment Status</TableHead>
                       <TableHead>Actions</TableHead>
@@ -655,18 +795,24 @@ export default function Payments() {
                   <TableBody>
                     {invoicesLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No invoices found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredInvoices.map((invoice) => {
+                      <>
+                      {invoiceWindow.paddingTop > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={8} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
+                        </TableRow>
+                      )}
+                      {invoiceWindow.visibleInvoices.map((invoice) => {
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
                         const isOverdue = dueDate && dueDate < new Date() && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && !['paid', 'auto_pay'].includes(invoice.payment_status);
@@ -678,7 +824,7 @@ export default function Payments() {
                           <TableRow key={invoice.id}>
                             <TableCell>
                               {['approved', 'partially_paid', 'pending_review'].includes(invoice.status) && (
-                                <Checkbox 
+                                <Checkbox
                                   checked={selectedInvoiceIds.includes(invoice.id)}
                                   onCheckedChange={(checked) => {
                                     if (checked) {
@@ -775,14 +921,31 @@ export default function Payments() {
                             </TableCell>
                           </TableRow>
                         );
-                      })
+                      })}
+                      {invoiceWindow.paddingBottom > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={8} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
+                        </TableRow>
+                      )}
+                      </>
                     )}
                   </TableBody>
-                </Table>
+              </Table>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="flex flex-col items-center gap-2 px-4 py-4 border-t text-sm text-muted-foreground sm:flex-row sm:justify-between">
+                <span>
+                  Showing rows {filteredInvoices.length === 0 ? 0 : invoiceWindow.startIndex + 1}
+                  -{invoiceWindow.endIndex} of {filteredInvoices.length} invoices
+                </span>
+                {hasNextInvoicesPage && (
+                  <Button variant="outline" onClick={() => fetchNextInvoicesPage()} disabled={isFetchingNextInvoicesPage}>
+                    {isFetchingNextInvoicesPage ? 'Loading more...' : 'Load More Invoices'}
+                  </Button>
+                )}
+              </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
 
         {/* Scheduled Payments Tab */}
         <TabsContent value="schedule" className="mt-4">
@@ -794,9 +957,13 @@ export default function Payments() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div
+                ref={paymentHistoryTableRef}
+                className="max-h-[648px] overflow-auto"
+                onScroll={(event) => setPaymentHistoryTableScrollTop(event.currentTarget.scrollTop)}
+              >
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                     <TableRow>
                       <TableHead>Scheduled Date</TableHead>
                       <TableHead>Vendor</TableHead>
@@ -897,7 +1064,13 @@ export default function Payments() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredPayments.map((p) => {
+                      <>
+                      {paymentHistoryWindow.paddingTop > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={8} className="p-0" style={{ height: `${paymentHistoryWindow.paddingTop}px` }} />
+                        </TableRow>
+                      )}
+                      {paymentHistoryWindow.visiblePayments.map((p) => {
                         const MethodIcon = paymentMethodIcons[p.payment_method] || Banknote;
                         return (
                           <TableRow key={p.id}>
@@ -936,10 +1109,27 @@ export default function Payments() {
                             </TableCell>
                           </TableRow>
                         );
-                      })
+                      })}
+                      {paymentHistoryWindow.paddingBottom > 0 && (
+                        <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                          <TableCell colSpan={8} className="p-0" style={{ height: `${paymentHistoryWindow.paddingBottom}px` }} />
+                        </TableRow>
+                      )}
+                      </>
                     )}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="flex flex-col items-center gap-2 px-4 py-4 border-t text-sm text-muted-foreground sm:flex-row sm:justify-between">
+                <span>
+                  Showing rows {filteredPayments.length === 0 ? 0 : paymentHistoryWindow.startIndex + 1}
+                  -{paymentHistoryWindow.endIndex} of {filteredPayments.length} payments
+                </span>
+                {hasNextPaymentsPage && (
+                  <Button variant="outline" onClick={() => fetchNextPaymentsPage()} disabled={isFetchingNextPaymentsPage}>
+                    {isFetchingNextPaymentsPage ? 'Loading more...' : 'Load More Payments'}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1162,8 +1352,8 @@ export default function Payments() {
                       Update your payment methods, view past invoices, or change your subscription plan securely via Stripe.
                     </p>
                   </div>
-                  <Button 
-                    onClick={handleManageBilling} 
+                  <Button
+                    onClick={handleManageBilling}
                     disabled={portalLoading}
                     className="bg-primary hover:bg-primary text-primary-foreground min-w-[180px] h-12 rounded-xl shadow-lg shadow-teal-600/20"
                   >
@@ -1174,10 +1364,10 @@ export default function Payments() {
                     )}
                   </Button>
                 </div>
-                
+
                 <div className="bg-primary/5 border border-teal-100 rounded-xl p-4 text-sm text-teal-800">
                   <p className="font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary" /> 
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
                     Secure Payment Processing
                   </p>
                   <p className="mt-1 text-primary/80">
@@ -1196,7 +1386,7 @@ export default function Payments() {
           <DialogHeader>
             <DialogTitle>Schedule Payment</DialogTitle>
             <DialogDescription>
-              {scheduleDialogInvoice 
+              {scheduleDialogInvoice
                 ? `Schedule payment for ${scheduleDialogInvoice?.vendor_name} invoice #${scheduleDialogInvoice?.invoice_number}`
                 : `Schedule batch payment for ${selectedInvoiceIds.length} invoices`
               }
@@ -1231,7 +1421,7 @@ export default function Payments() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
-            <Button 
+            <Button
               onClick={submitSchedulePayment}
               className="bg-primary hover:bg-primary"
             >

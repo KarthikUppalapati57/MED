@@ -196,7 +196,7 @@ export default function Integrations() {
         queryClient.invalidateQueries({ queryKey: ['integrations'] });
       })
       .subscribe();
-      
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -208,8 +208,8 @@ export default function Integrations() {
   };
 
   const isConnected = (integrationId) => {
-    const dbInt = dbIntegrations.find(i => 
-      (i.provider === integrationId) || 
+    const dbInt = dbIntegrations.find(i =>
+      (i.provider === integrationId) ||
       (i.provider === 'other' && i.metadata?.originalId === integrationId)
     );
     return dbInt?.is_active || false;
@@ -223,7 +223,7 @@ export default function Integrations() {
   const handleConnect = async () => {
     setConnecting(true);
     const toastId = toast.loading(`Connecting to ${selectedIntegration.name}...`);
-    
+
     try {
       await api.entities.Integration.create({
         provider: getProviderKey(selectedIntegration.id),
@@ -242,8 +242,8 @@ export default function Integrations() {
   };
 
   const handleDisconnect = async (integrationId, name) => {
-    const dbInt = dbIntegrations.find(i => 
-      (i.provider === integrationId) || 
+    const dbInt = dbIntegrations.find(i =>
+      (i.provider === integrationId) ||
       (i.provider === 'other' && i.metadata?.originalId === integrationId)
     );
     if (dbInt) {
@@ -255,6 +255,61 @@ export default function Integrations() {
       } catch (error) {
         toast.error(`Failed to disconnect: ${error.message}`);
       }
+    }
+  };
+
+  const { organization } = useAuthQuery({
+    queryKey: ['org-auth'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return { id: data?.user?.user_metadata?.organization_id };
+    }
+  }).data || {};
+
+  const handleTestWebhook = async (integration) => {
+    if (integration.type !== INTEGRATION_TYPES.POS) return;
+    const toastId = toast.loading(`Simulating ${integration.name} webhook...`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Usually, webhook endpoint does not require auth, but our test payload needs org_id
+      const payload = {
+        organization_id: organization?.id,
+        type: 'order.completed',
+        order: {
+          id: `mock-order-${Date.now()}`,
+          line_items: [
+            { id: 'item-burger-1', name: 'Cheeseburger', quantity: 2, price: 12.50 },
+            { id: 'item-fries-1', name: 'Large Fries', quantity: 1, price: 4.50 }
+          ]
+        }
+      };
+
+      const res = await supabase.functions.invoke('pos-webhook', {
+        body: payload,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      // Need to pass provider via query string natively
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pos-webhook?provider=${integration.id}`;
+      const manualRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!manualRes.ok) {
+        const err = await manualRes.text();
+        throw new Error(err);
+      }
+
+      toast.success(`${integration.name} webhook processed successfully!`, { id: toastId });
+    } catch (e) {
+      toast.error(`Webhook test failed: ${e.message}`, { id: toastId });
     }
   };
 
@@ -284,18 +339,29 @@ export default function Integrations() {
           </div>
           <h3 className="font-bold text-foreground">{integration.name}</h3>
           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{integration.description}</p>
-          
-          <div className="mt-6">
+
+          <div className="mt-6 flex gap-2">
             {connected ? (
-              <Button 
-                variant="outline" 
-                className="w-full text-resend-red hover:text-resend-red hover:bg-resend-red/10"
-                onClick={() => handleDisconnect(integration.id, integration.name)}
-              >
-                Disconnect
-              </Button>
+              <>
+                {integration.type === INTEGRATION_TYPES.POS && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-brand text-brand hover:bg-brand/10"
+                    onClick={() => handleTestWebhook(integration)}
+                  >
+                    Test Webhook
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className={cn(integration.type === INTEGRATION_TYPES.POS ? "w-auto" : "w-full", "text-resend-red hover:text-resend-red hover:bg-resend-red/10")}
+                  onClick={() => handleDisconnect(integration.id, integration.name)}
+                >
+                  Disconnect
+                </Button>
+              </>
             ) : (
-              <Button 
+              <Button
                 className="w-full bg-primary hover:bg-primary"
                 onClick={() => openConnectDialog(integration)}
               >
@@ -352,7 +418,7 @@ export default function Integrations() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center gap-4 border-b border-border mb-6">
-          <button 
+          <button
             onClick={() => setActiveTab(INTEGRATION_TYPES.MCP)}
             className={cn(
               "px-4 py-3 text-sm font-bold border-b-2 transition-all",
@@ -361,7 +427,7 @@ export default function Integrations() {
           >
             MCP Servers (Infrastructure)
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab(INTEGRATION_TYPES.POS)}
             className={cn(
               "px-4 py-3 text-sm font-bold border-b-2 transition-all",
@@ -370,7 +436,7 @@ export default function Integrations() {
           >
             POS Systems (Front-of-House)
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab(INTEGRATION_TYPES.ACCOUNTING)}
             className={cn(
               "px-4 py-3 text-sm font-bold border-b-2 transition-all",
@@ -379,7 +445,7 @@ export default function Integrations() {
           >
             Accounting Systems (Back-Office)
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab(INTEGRATION_TYPES.EDI)}
             className={cn(
               "px-4 py-3 text-sm font-bold border-b-2 transition-all",
@@ -465,7 +531,7 @@ export default function Integrations() {
                   <Label className="text-xs font-bold text-foreground">{field}</Label>
                   <div className="relative mt-1.5">
                     <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
+                    <Input
                       type={field.toLowerCase().includes('secret') || field.toLowerCase().includes('token') || field.toLowerCase().includes('key') ? 'password' : 'text'}
                       className="pl-9 bg-secondary/50 border-border h-11"
                       placeholder={`Enter ${field}`}
@@ -479,7 +545,7 @@ export default function Integrations() {
 
             <DialogFooter className="mt-8 sm:justify-end gap-2">
               <Button variant="ghost" onClick={() => setSelectedIntegration(null)}>Cancel</Button>
-              <Button 
+              <Button
                 className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6"
                 onClick={handleConnect}
                 disabled={connecting || selectedIntegration.fields.some(f => !formValues[f])}

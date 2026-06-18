@@ -1,4 +1,4 @@
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQuery, useQueries, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 
 /**
@@ -97,4 +97,38 @@ export function useAuthQueries({ queries }) {
   });
 
   return useQueries({ queries: authQueries });
+}
+
+/**
+ * A wrapper around react-query's useInfiniteQuery that automatically waits for
+ * the auth session to be ready before firing any queries, and injects context scope.
+ */
+export function useAuthInfiniteQuery(options) {
+  const { user, isLoadingAuth, contextScope } = useAuth();
+  const authReady = !isLoadingAuth && !!user;
+
+  const scopeAware = options.scopeAware !== false;
+  const scopedQueryKey = scopeAware
+    ? [
+        ...options.queryKey,
+        {
+          scope: {
+            organizationId: contextScope?.organizationId || null,
+            brandId: contextScope?.brandId || null,
+            locationId: contextScope?.locationId || null,
+          },
+        },
+      ]
+    : options.queryKey;
+
+  const queryOptions = { ...options };
+  delete queryOptions.scopeAware;
+
+  return useInfiniteQuery({
+    ...queryOptions,
+    queryKey: scopedQueryKey,
+    enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
+    gcTime: options.gcTime ?? 10 * 60 * 1000,
+  });
 }

@@ -8,33 +8,57 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Activity, Star, HelpCircle, Frown, Link2, Trash2 } from 'lucide-react';
+import { Loader2, Activity, Star, HelpCircle, Frown, Link2, Trash2, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useDebounce } from '@/hooks/useDebounce';
+import { useInView } from '@/hooks/useInView';
 
 export default function MenuEngineering() {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('matrix');
-  
-  const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
-  
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 500);
+
+  const {
+    data: posItemsData,
+    isLoading: isLoadingPos,
+    fetchNextPage: fetchNextPosItems,
+    hasNextPage: hasNextPosItems,
+    isFetchingNextPage: isFetchingNextPosItems
+  } = useAuthInfiniteQuery({
+    queryKey: ['pos_items', organization?.id, debouncedSearch],
+    queryFn: ({ pageParam = 0 }) => api.entities.PosItem.list(null, {
+      page: pageParam,
+      pageSize: 50,
+      search: activeTab === 'mapping' ? debouncedSearch || undefined : undefined,
+      searchColumn: 'item_name',
+      select: 'id, organization_id, location_id, pos_item_id, item_name, pos_provider, price',
+    }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
+    enabled: !!organization?.id,
+  });
+
+  const posItems = useMemo(() => filterByContext(posItemsData?.pages?.flat() || [], { organization, brand, location }), [posItemsData, organization, brand, location]);
+
+  const { ref: loadMoreRef, isIntersecting } = useInView({ rootMargin: '100px' });
+
+  React.useEffect(() => {
+    if (isIntersecting && hasNextPosItems && !isFetchingNextPosItems) {
+      fetchNextPosItems();
+    }
+  }, [isIntersecting, hasNextPosItems, isFetchingNextPosItems, fetchNextPosItems]);
+
   const results = useAuthQueries({
     queries: [
       {
         queryKey: ['menu-engineering', organization?.id, location?.id],
         queryFn: () => api.reports.getMenuEngineering(organization?.id),
         enabled: !!organization?.id
-      },
-      {
-        queryKey: ['pos_items', organization?.id],
-        queryFn: () => api.entities.PosItem.list(null, {
-          limit: 1000,
-          select: 'id, organization_id, location_id, pos_item_id, item_name, pos_provider, price',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id,
       },
       {
         queryKey: ['recipes', organization?.id],
@@ -59,15 +83,12 @@ export default function MenuEngineering() {
 
   const isLoadingMatrix = results[0].isLoading;
   const matrixData = results[0].data || [];
-  
-  const isLoadingPos = results[1].isLoading;
-  const posItems = results[1].data || [];
-  
-  const isLoadingRecipes = results[2].isLoading;
-  const recipes = results[2].data || [];
-  
-  const isLoadingMappings = results[3].isLoading;
-  const mappings = results[3].data || [];
+
+  const isLoadingRecipes = results[1].isLoading;
+  const recipes = results[1].data || [];
+
+  const isLoadingMappings = results[2].isLoading;
+  const mappings = results[2].data || [];
 
   const createMapping = useMutation({
     mutationFn: async (payload) => {
@@ -98,20 +119,20 @@ export default function MenuEngineering() {
 
   const analyzedData = useMemo(() => {
     if (!matrixData.length) return { items: [], avgVolume: 0, avgProfit: 0 };
-    
+
     const totalVolume = matrixData.reduce((sum, item) => sum + Number(item.total_quantity_sold || 0), 0);
     const totalProfit = matrixData.reduce((sum, item) => sum + Number(item.total_profit || 0), 0);
-    
+
     const avgVolume = totalVolume / matrixData.length;
     const avgProfit = totalProfit / matrixData.length;
 
     const items = matrixData.map(item => {
       const volume = Number(item.total_quantity_sold || 0);
       const profit = Number(item.total_profit || 0);
-      let category = 'Dog'; 
+      let category = 'Dog';
       let icon = Frown;
       let colorClass = 'bg-resend-red/10 text-resend-red';
-      
+
       if (volume >= avgVolume && profit >= avgProfit) {
         category = 'Star';
         icon = Star;
@@ -243,14 +264,25 @@ export default function MenuEngineering() {
 
         <TabsContent value="mapping" className="space-y-6">
           <Card className="glass-card shadow-sm border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Link2 className="w-5 h-5 mr-2 text-brand" /> 
-                Map POS Items to Recipes
-              </CardTitle>
-              <CardDescription>
-                Link incoming POS sales data to your recipe catalog to automatically deplete theoretical inventory.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center">
+                  <Link2 className="w-5 h-5 mr-2 text-brand" />
+                  Map POS Items to Recipes
+                </CardTitle>
+                <CardDescription>
+                  Link incoming POS sales data to your recipe catalog to automatically deplete theoretical inventory.
+                </CardDescription>
+              </div>
+              <div className="relative w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search POS items..."
+                  className="pl-8"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -272,7 +304,7 @@ export default function MenuEngineering() {
                   ) : (
                     posItems.map(item => {
                       const mapping = mappings.find(m => m.pos_item_id === item.id);
-                      
+
                       return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{item.item_name}</TableCell>
@@ -301,9 +333,9 @@ export default function MenuEngineering() {
                           </TableCell>
                           <TableCell className="text-right">
                             {mapping && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                                 onClick={() => deleteMapping.mutate(mapping.id)}
                                 disabled={deleteMapping.isPending}
@@ -318,6 +350,11 @@ export default function MenuEngineering() {
                   )}
                 </TableBody>
               </Table>
+              {hasNextPosItems && (
+                <div ref={loadMoreRef} className="flex justify-center py-4 text-muted-foreground text-sm">
+                  {isFetchingNextPosItems ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Loading more...'}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

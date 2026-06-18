@@ -17,7 +17,11 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 });
 
-const PASSWORD = process.env.ROLE_QA_PASSWORD || 'RestopsQA!2026';
+const PASSWORD = process.env.ROLE_QA_PASSWORD;
+if (!PASSWORD) {
+  console.error('Missing ROLE_QA_PASSWORD.');
+  process.exit(1);
+}
 const MODULES = [
   'dashboard',
   'invoices',
@@ -151,14 +155,14 @@ async function seedOrganization(tenant) {
   for (const brandDef of tenant.brands) {
     const existingBrand = await must(`find brand ${brandDef.name}`, supabase
       .from('brands')
-      .select('id, name')
+      .select('brand_id, name')
       .eq('organization_id', org.id)
       .eq('name', brandDef.name)
       .maybeSingle());
     const brand = existingBrand || await must(`insert brand ${brandDef.name}`, supabase
       .from('brands')
       .insert({ name: brandDef.name, organization_id: org.id })
-      .select('id, name')
+      .select('brand_id, name')
       .single());
     brands.push(brand);
 
@@ -173,7 +177,7 @@ async function seedOrganization(tenant) {
       const location = existingLocation
         ? await must(`update location ${locationName}`, supabase
           .from('locations')
-          .update({ address: '100 QA Test Way', brand_id: brand.id, organization_id: org.id })
+          .update({ address: '100 QA Test Way', brand_id: brand.brand_id, organization_id: org.id })
           .eq('id', existingLocation.id)
           .select('id, name')
           .single())
@@ -181,7 +185,7 @@ async function seedOrganization(tenant) {
           .from('locations')
           .insert({
             address: '100 QA Test Way',
-            brand_id: brand.id,
+            brand_id: brand.brand_id,
             name: locationName,
             organization_id: org.id,
           })
@@ -263,10 +267,10 @@ async function seedReportPreferences(userId, tenantContext) {
       .from('dashboard_report_preferences')
       .upsert({
         ...orgPayload,
-        brand_id: brand.id,
+        brand_id: brand.brand_id,
         location_id: null,
         scope: 'brand',
-        scope_key: brand.id,
+        scope_key: brand.brand_id,
       }, { onConflict: 'organization_id,scope,scope_key' })
       .select('id')
       .single());
@@ -276,7 +280,7 @@ async function seedReportPreferences(userId, tenantContext) {
       .from('dashboard_report_preferences')
       .upsert({
         ...orgPayload,
-        brand_id: brand.id,
+        brand_id: brand.brand_id,
         location_id: location.id,
         scope: 'location',
         scope_key: location.id,
@@ -297,7 +301,7 @@ for (const account of accounts) {
   const brand = tenantContext && Number.isInteger(account.brand) ? tenantContext.brands[account.brand] : null;
   const location = tenantContext && Number.isInteger(account.location) ? tenantContext.locationsByBrand[account.brand][account.location] : null;
   const context = {
-    brandId: brand?.id || null,
+    brandId: brand?.brand_id || null,
     locationId: location?.id || null,
     organizationId: tenantContext?.org.id || null,
   };
@@ -326,5 +330,5 @@ for (const [index, tenantContext] of tenantContexts.entries()) {
 }
 
 console.log('\nRole QA seed complete.\n');
-console.table(credentialRows);
-console.log(`Shared password: ${PASSWORD}`);
+console.table(credentialRows.map(({ password: _password, ...row }) => row));
+console.log('Shared password: configured from ROLE_QA_PASSWORD.');

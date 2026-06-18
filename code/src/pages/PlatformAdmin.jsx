@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +98,14 @@ export default function PlatformAdmin() {
   const [confirmDeleteOrg, setConfirmDeleteOrg] = useState(null); // stores { id, name }
 
   const authChecked = !!user;
+  const invalidateDemoRequests = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['demo-requests']], []), 1500);
+  const invalidateContactRequests = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['contact-requests']], []), 1500);
+  const invalidateAccessRequests = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['access-requests']], []), 1500);
+  const invalidateOrganizations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['organizations']], []), 1500);
+  const invalidateBrands = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['all-brands']], []), 1500);
+  const invalidateLocations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['all-locations']], []), 1500);
+  const invalidateProfiles = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['all-profiles']], []), 1500);
+  const invalidateClientInvites = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['client-invites']], []), 1500);
 
  // Real-Time Subscriptions 
   React.useEffect(() => {
@@ -104,27 +113,13 @@ export default function PlatformAdmin() {
 
     const channel = supabase
       .channel('platform-admin-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'demo_requests' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['contact-requests'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'access_requests' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['access-requests'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['organizations'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['all-brands'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['all-locations'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'demo_requests' }, invalidateDemoRequests)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_requests' }, invalidateContactRequests)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'access_requests' }, invalidateAccessRequests)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizations' }, invalidateOrganizations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'brands' }, invalidateBrands)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, invalidateLocations)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateProfiles)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invitations' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           queryClient.setQueryData(['client-invites'], (old) => {
@@ -139,7 +134,7 @@ export default function PlatformAdmin() {
             return old.map(i => i.id === payload.new.id ? payload.new : i);
           });
         } else {
-          queryClient.invalidateQueries({ queryKey: ['client-invites'] });
+          invalidateClientInvites();
         }
       })
       .subscribe();
@@ -147,7 +142,7 @@ export default function PlatformAdmin() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authChecked, userRole, queryClient]);
+  }, [authChecked, invalidateAccessRequests, invalidateBrands, invalidateClientInvites, invalidateContactRequests, invalidateDemoRequests, invalidateLocations, invalidateOrganizations, invalidateProfiles, queryClient, userRole]);
 
   const jwtRole = user?.app_metadata?.role;
   const isReadyAdmin = authChecked && userRole === 'platform_admin' && jwtRole === 'platform_admin';

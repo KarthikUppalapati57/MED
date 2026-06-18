@@ -1,9 +1,16 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TrendingDown } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
-} from 'recharts';
+
+const VarianceWaterfallChart = React.lazy(() => import('@/components/performance/PerformanceCharts').then((module) => ({ default: module.VarianceWaterfallChart })));
+
+function ChartFallback() {
+  return (
+    <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+      Loading chart...
+    </div>
+  );
+}
 
 export function ExplainableVarianceWidget({ varianceTotal = -1250.00 }) {
   // Mock data to demonstrate the breakdown of variance
@@ -15,22 +22,6 @@ export function ExplainableVarianceWidget({ varianceTotal = -1250.00 }) {
     { category: 'Labor Pacing', value: -480, desc: 'Over-staffing during slow periods (Tue/Wed)', color: '#ef4444' },
     { category: 'Theft / Unlogged', value: -150, desc: 'AvT variance not accounted for by waste logs', color: '#f59e0b' }, // amber-500
   ];
-
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-3 border rounded shadow-md text-sm">
-          <p className="font-semibold mb-1">{data.category}</p>
-          <p className={`font-bold ${data.value > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-            ${Math.abs(data.value).toFixed(2)} {data.value > 0 ? 'Favorable' : 'Unfavorable'}
-          </p>
-          <p className="text-muted-foreground mt-1 text-xs">{data.desc}</p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="space-y-6">
@@ -79,23 +70,9 @@ export function ExplainableVarianceWidget({ varianceTotal = -1250.00 }) {
           <CardDescription>Visual breakdown of exactly where margin was gained or lost this period</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={varianceBreakdown}
-              margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
-              <XAxis type="number" tickFormatter={(val) => `$${val}`} />
-              <YAxis dataKey="category" type="category" width={120} tick={{fontSize: 12}} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={30}>
-                {varianceBreakdown.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <React.Suspense fallback={<ChartFallback />}>
+            <VarianceWaterfallChart data={varianceBreakdown} />
+          </React.Suspense>
         </CardContent>
       </Card>
     </div>

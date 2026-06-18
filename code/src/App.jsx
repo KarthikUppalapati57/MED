@@ -1,27 +1,16 @@
-import { Toaster } from "@/components/ui/toaster"
-import { Toaster as SonnerToaster, toast } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { queryClientInstance } from '@/lib/query-client'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import LandingPage from './pages/LandingPage';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { supabase } from '@/lib/supabaseClient';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
-import MFASetupPage from './pages/MFASetupPage';
-import TermsOfService from './pages/TermsOfService';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import CookiePolicy from './pages/CookiePolicy';
-import Documentation from './pages/Documentation';
 import ProtectedModule from '@/components/ProtectedModule';
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { ThemeProvider } from '@/components/ThemeProvider';
 import { Card } from '@/components/ui/card';
 import RestopsLogo from '@/components/RestopsLogo';
 // Initialize global error monitoring
@@ -32,28 +21,71 @@ const { OnboardingPage, PaymentVerification } = Pages;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 
-const pageVariants = {
-  initial: { opacity: 0, y: 16, filter: 'blur(8px)', scale: 0.98 },
-  in: { opacity: 1, y: 0, filter: 'blur(0px)', scale: 1 },
-  out: { opacity: 0, y: -16, filter: 'blur(8px)', scale: 1.02 }
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const MFASetupPage = React.lazy(() => import('./pages/MFASetupPage'));
+const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'));
+const Documentation = React.lazy(() => import('./pages/Documentation'));
+const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
+
+const notify = async (type, message, options) => {
+  const { toast } = await import('sonner');
+  toast[type](message, options);
 };
+
+function DeferredAppSonnerToaster() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(() => setReady(true), { timeout: 2000 });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(() => setReady(true), 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  if (!ready) return null;
+
+  return (
+    <React.Suspense fallback={null}>
+      <AppSonnerToaster />
+    </React.Suspense>
+  );
+}
+
+const PageLoader = ({ label = 'Loading...' }) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="w-8 h-8 text-foreground animate-spin" />
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
+  </div>
+);
+
+const lazyElement = (element, label) => (
+  <React.Suspense fallback={<PageLoader label={label} />}>
+    {element}
+  </React.Suspense>
+);
 
 const LayoutWrapper = ({ children, currentPageName }) => {
   const location = useLocation();
   const content = (
-    <motion.div
+    <div
       key={location.pathname}
-      initial="initial"
-      animate="in"
-      exit="out"
-      variants={pageVariants}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="w-full h-full"
+      className="w-full h-full route-fade-in"
     >
       {children}
-    </motion.div>
+    </div>
   );
-  return Layout ? <Layout currentPageName={currentPageName}>{content}</Layout> : content;
+  return Layout ? (
+    <React.Suspense fallback={<PageLoader label="Loading workspace..." />}>
+      <Layout currentPageName={currentPageName}>{content}</Layout>
+    </React.Suspense>
+  ) : content;
 };
 
 // Signup Page for Invited Users 
@@ -265,7 +297,6 @@ function LoginPage() {
     setIsSubmitting(true);
     
     try {
-      const { supabase } = await import('@/lib/supabaseClient');
       const { data: exists, error: checkError } = await supabase
         .rpc('check_email_exists', { email_to_check: email.trim().toLowerCase() });
       
@@ -294,7 +325,7 @@ function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
-      toast.success('Email verified successfully! You can now sign in.', {
+      notify('success', 'Email verified successfully! You can now sign in.', {
         duration: 5000,
       });
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -444,9 +475,9 @@ function PendingAssignmentPage() {
     setRefreshing(true);
     try {
       await refreshProfile();
-      toast.success("Assignment status refreshed!");
+      notify('success', "Assignment status refreshed!");
     } catch (e) {
-      toast.error("Failed to refresh status");
+      notify('error', "Failed to refresh status");
     } finally {
       setRefreshing(false);
     }
@@ -544,7 +575,7 @@ function UpdatePasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       
-      toast.success('Password updated successfully!');
+      notify('success', 'Password updated successfully!');
       navigate('/');
     } catch (err) {
       setError(err.message || 'Failed to update password');
@@ -728,26 +759,26 @@ const AuthenticatedApp = () => {
 
   // Show MFA setup if user is authenticated but has no factors enrolled
   if (needsMFASetup) {
-    return <MFASetupPage />;
+    return lazyElement(<MFASetupPage />, 'Loading MFA setup...');
   }
 
   return (
     <>
       <Routes>
         {/* Public routes */}
-        <Route path="/terms" element={<TermsOfService />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route path="/cookies" element={<CookiePolicy />} />
-      <Route path="/docs" element={<Documentation />} />
+        <Route path="/terms" element={lazyElement(<TermsOfService />, 'Loading terms...')} />
+      <Route path="/privacy" element={lazyElement(<PrivacyPolicy />, 'Loading privacy policy...')} />
+      <Route path="/cookies" element={lazyElement(<CookiePolicy />, 'Loading cookie policy...')} />
+      <Route path="/docs" element={lazyElement(<Documentation />, 'Loading documentation...')} />
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
-      <Route path="/mfa-setup" element={user ? <MFASetupPage /> : <Navigate to="/" />} />
+      <Route path="/mfa-setup" element={user ? lazyElement(<MFASetupPage />, 'Loading MFA setup...') : <Navigate to="/" />} />
       <Route path="/update-password" element={<UpdatePasswordPage />} />
 
  {/* Conditional route blocks each state gets ONLY its relevant routes */}
       {!user ? (
         <>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/" element={lazyElement(<LandingPage />, 'Loading...')} />
+          <Route path="/landing" element={lazyElement(<LandingPage />, 'Loading...')} />
           <Route path="/index.html" element={<Navigate to="/" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -827,12 +858,10 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <ReactQueryDevtools initialIsOpen={false} />
           <Router>
             <AuthenticatedApp />
           </Router>
-          <Toaster />
-          <SonnerToaster position="top-right" richColors />
+          <DeferredAppSonnerToaster />
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>

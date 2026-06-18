@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,33 +18,40 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const PLATFORM_AUDIT_ROW_HEIGHT = 72;
+const PLATFORM_AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
+const PLATFORM_AUDIT_ROW_OVERSCAN = 8;
+
 export default function PlatformAuditLogs() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
   const authChecked = !!user;
+  const invalidateAuditLogs = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform-wide-audit-logs']], []), 2000);
 
   const [logModuleFilter, setLogModuleFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [selectedLog, setSelectedLog] = useState(null);
+  const tableRef = React.useRef(null);
+  const [tableScrollTop, setTableScrollTop] = useState(0);
 
   // -- Realtime subscription for platform audit logs --
   useEffect(() => {
+    if (!authChecked || userRole !== 'platform_admin') return undefined;
     const channel = supabase.channel('platform-audit-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['platform-wide-audit-logs'] });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, invalidateAuditLogs)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [authChecked, invalidateAuditLogs, userRole]);
 
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
   const { data: logsData, isLoading: isLoadingLogs } = useAuthQuery({
-    queryKey: ['platform-wide-audit-logs', logModuleFilter, page, searchQuery],
+    queryKey: ['platform-wide-audit-logs', logModuleFilter, page, debouncedSearchQuery],
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
@@ -54,8 +63,8 @@ export default function PlatformAuditLogs() {
         q = q.in('table_name', ['organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations']);
       }
       
-      if (searchQuery) {
-        q = q.or(`action.ilike.%${searchQuery}%,table_name.ilike.%${searchQuery}%,record_id.ilike.%${searchQuery}%`);
+      if (debouncedSearchQuery) {
+        q = q.or(`action.ilike.%${debouncedSearchQuery}%,table_name.ilike.%${debouncedSearchQuery}%,record_id.ilike.%${debouncedSearchQuery}%`);
       }
 
       const { data, error, count } = await q
@@ -73,6 +82,40 @@ export default function PlatformAuditLogs() {
   const totalPages = Math.ceil(totalLogs / PAGE_SIZE);
 
   const filteredLogs = auditLogs;
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearchQuery, logModuleFilter]);
+
+  useEffect(() => {
+    setTableScrollTop(0);
+    if (tableRef.current) tableRef.current.scrollTop = 0;
+  }, [debouncedSearchQuery, logModuleFilter, page]);
+
+  const logWindow = React.useMemo(() => {
+    const total = filteredLogs.length;
+    if (total === 0) {
+      return {
+        visibleLogs: [],
+        startIndex: 0,
+        endIndex: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      };
+    }
+
+    const visibleCount = Math.ceil(PLATFORM_AUDIT_TABLE_VIEWPORT_HEIGHT / PLATFORM_AUDIT_ROW_HEIGHT);
+    const startIndex = Math.max(0, Math.floor(tableScrollTop / PLATFORM_AUDIT_ROW_HEIGHT) - PLATFORM_AUDIT_ROW_OVERSCAN);
+    const endIndex = Math.min(total, startIndex + visibleCount + (PLATFORM_AUDIT_ROW_OVERSCAN * 2));
+
+    return {
+      visibleLogs: filteredLogs.slice(startIndex, endIndex),
+      startIndex,
+      endIndex,
+      paddingTop: startIndex * PLATFORM_AUDIT_ROW_HEIGHT,
+      paddingBottom: Math.max(0, (total - endIndex) * PLATFORM_AUDIT_ROW_HEIGHT),
+    };
+  }, [filteredLogs, tableScrollTop]);
 
   // Stats
   const todayLogs = React.useMemo(() => {
@@ -249,8 +292,13 @@ export default function PlatformAuditLogs() {
               <p className="text-muted-foreground">No audit logs{logModuleFilter !== 'All' ? ` for "${logModuleFilter}"` : ''}{searchQuery ? ` matching "${searchQuery}"` : ''}</p>
             </div>
           ) : (
+            <div
+              ref={tableRef}
+              className="max-h-[648px] overflow-auto"
+              onScroll={(event) => setTableScrollTop(event.currentTarget.scrollTop)}
+            >
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow className="bg-secondary">
                   <TableHead className="text-[11px]">TIMESTAMP</TableHead>
                   <TableHead className="text-[11px]">USER</TableHead>
@@ -261,7 +309,12 @@ export default function PlatformAuditLogs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map(log => (
+                {logWindow.paddingTop > 0 && (
+                  <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                    <TableCell colSpan={6} className="p-0" style={{ height: `${logWindow.paddingTop}px` }} />
+                  </TableRow>
+                )}
+                {logWindow.visibleLogs.map(log => (
                   <TableRow key={log.id} className="hover:bg-secondary/50">
                     <TableCell className="text-xs text-muted-foreground">
                       {log.created_at ? new Date(log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '—'}
@@ -296,8 +349,20 @@ export default function PlatformAuditLogs() {
                     </TableCell>
                   </TableRow>
                 ))}
+                {logWindow.paddingBottom > 0 && (
+                  <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
+                    <TableCell colSpan={6} className="p-0" style={{ height: `${logWindow.paddingBottom}px` }} />
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
+            </div>
+          )}
+
+          {!isLoadingLogs && filteredLogs.length > 0 && (
+            <div className="pt-4 text-xs text-muted-foreground">
+              Showing rows {logWindow.startIndex + 1}-{logWindow.endIndex} of {filteredLogs.length} loaded audit logs on this page
+            </div>
           )}
           
           {totalPages > 1 && (
