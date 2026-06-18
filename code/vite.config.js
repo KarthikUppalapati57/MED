@@ -31,7 +31,7 @@ export default defineConfig({
         background_color: "#121212"
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 5000000,
+        maximumFileSizeToCacheInBytes: 10000000,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
         globIgnores: [
           '**/assets/InteractiveScene-*.js',
