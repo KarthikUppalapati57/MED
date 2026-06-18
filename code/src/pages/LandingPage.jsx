@@ -2,7 +2,9 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import scannerImg from '../assets/scanner.png';
+import logoImg from '../assets/name-3.png';
 import { 
   Menu, 
   X, 
@@ -120,7 +122,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdf8f1] text-black selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
+    <div className="min-h-screen bg-[#fdf8f1] dark:bg-background text-black dark:text-foreground selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
       
       {/* 3D BACKBONE (Sticky Backdrop) */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -135,26 +137,25 @@ export default function LandingPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-black/5 bg-[#fdf8f1]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/5 bg-[#fdf8f1]/80 dark:bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded-sm bg-[#ff5c35] flex items-center justify-center">
                 <Database className="h-4 w-4 text-white" />
               </div>
-              <span className="text-lg font-bold tracking-tighter uppercase">
-                EDGEOPS
-              </span>
+              <img src={logoImg} alt="Brand Logo" className="h-6 object-contain" />
             </div>
             
-            <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/40 uppercase">
+            <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/40 dark:text-white/40 uppercase">
               <a href="#features" className="hover:text-[#ff5c35] transition-colors">Infrastructure</a>
               <a href="#showcase" className="hover:text-[#ff5c35] transition-colors">Telemetry</a>
               <a href="#pricing" className="hover:text-[#ff5c35] transition-colors">Pricing</a>
-              <div className="h-4 w-[1px] bg-black/10 mx-2" />
-              <button className="hover:text-black transition-colors" onClick={() => navigate('/login')}>Log in</button>
+              <div className="h-4 w-[1px] bg-black/10 dark:bg-white/10 mx-2" />
+              <ThemeToggle />
+              <button className="hover:text-black dark:hover:text-white transition-colors" onClick={() => navigate('/login')}>Log in</button>
               <Button 
-                className="bg-black text-white hover:bg-[#ff5c35] font-bold text-[10px] tracking-[2px] h-8 px-4 rounded-sm transition-all uppercase"
+                className="bg-black dark:bg-white text-white dark:text-black hover:bg-[#ff5c35] dark:hover:bg-[#ff5c35] dark:hover:text-white font-bold text-[10px] tracking-[2px] h-8 px-4 rounded-sm transition-all uppercase"
                 onClick={() => setIsDemoModalOpen(true)}
               >
                 BOOK DEMO
@@ -184,11 +185,11 @@ export default function LandingPage() {
               Intelligence Orchestration
             </div>
             
-            <h1 className="text-fluid-h1 font-bold technical-tracking text-black mb-12">
+            <h1 className="text-fluid-h1 font-bold technical-tracking text-black dark:text-white mb-12">
               Building <br /> technical <br /> kitchens.
             </h1>
             
-            <p className="max-w-xl text-xl text-black/60 mb-16 leading-relaxed font-medium technical-tracking">
+            <p className="max-w-xl text-xl text-black/60 dark:text-white/60 mb-16 leading-relaxed font-medium technical-tracking">
               EdgeOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
             </p>
 
@@ -335,7 +336,7 @@ export default function LandingPage() {
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
                 <Database className="h-6 w-6 text-[#ff5c35]" />
-                <span className="text-2xl font-bold tracking-tighter uppercase leading-none">EdgeOps</span>
+                <img src={logoImg} alt="Brand Logo" className="h-8 object-contain" />
               </div>
               <p className="text-black/40 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Sovereign infrastructure for high-performance hospitality logistics and telemetry.
