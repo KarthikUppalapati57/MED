@@ -141,7 +141,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
-              <RestopsLogo className="h-8" origin="origin-left" />
+              <RestopsLogo className="h-16 ml-4 mt-2" origin="origin-left" />
             </div>
             
             <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/40 dark:text-white/40 uppercase">
@@ -332,7 +332,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-24 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
-                <RestopsLogo className="h-10" origin="origin-left" />
+                <RestopsLogo className="h-24" origin="origin-left" />
               </div>
               <p className="text-black/40 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Sovereign infrastructure for high-performance hospitality logistics and telemetry.
