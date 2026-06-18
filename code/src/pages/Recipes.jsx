@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/geminiService';
-import ProductsLiveDashboard from './ProductsLiveDashboard';
+import ProductsLiveDashboard from '@/components/ProductsLiveDashboard';
 import {
   Plus,
   Search,

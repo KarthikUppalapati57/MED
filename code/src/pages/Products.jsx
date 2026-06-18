@@ -62,7 +62,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
-import ProductsLiveDashboard from './ProductsLiveDashboard';
+import ProductsLiveDashboard from '@/components/ProductsLiveDashboard';
 
 const categoryColors = {
   food: 'bg-resend-green/10 text-resend-green',

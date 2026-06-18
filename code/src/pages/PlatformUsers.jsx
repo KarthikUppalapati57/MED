@@ -155,7 +155,7 @@ export default function PlatformUsers() {
           <ShieldAlert className="w-8 h-8 text-resend-red" />
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
-        <p className="text-muted-foreground max-w-md">Platform Users Management is restricted to platform administrators only.</p>
+        <p className="text-muted-foreground max-w-md">All Users is restricted to platform administrators only.</p>
       </div>
     );
   }
@@ -169,7 +169,7 @@ export default function PlatformUsers() {
             <Users className="w-5 h-5 text-brand" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Platform Users</h1>
+            <h1 className="text-2xl font-bold text-foreground">All Users</h1>
             <p className="text-sm text-muted-foreground">View all users across the entire platform</p>
           </div>
         </div>

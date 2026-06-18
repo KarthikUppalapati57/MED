@@ -81,7 +81,7 @@ const PAGE_PERMISSION_GROUPS = [
   {
     key: "admin", label: "Administration", icon: <Settings className="w-4 h-4" />,
     pages: [
-      { key: "UserManagement", label: "Team Management" },
+      { key: "UserManagement", label: "Team Members" },
       { key: "Labor", label: "Labor & Scheduling" },
       { key: "Integrations", label: "Integrations" },
       { key: "RestaurantSetup", label: "Restaurant Setup" },
@@ -1126,9 +1126,9 @@ export default function UserManagement() {
             <div className="p-2.5 bg-card rounded-2xl shadow-sm border border-border">
               <Users className="w-6 h-6 text-primary" />
             </div>
-            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Team Management</h1>
+            <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Team Members</h1>
           </div>
-          <p className="text-muted-foreground font-medium pl-14">Configure granular access, signing authority, and organizational roles for your staff.</p>
+          <p className="text-muted-foreground font-medium pl-14">Manage organization team members, signing authority, and local access.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-12 rounded-2xl" onClick={() => setShowCSV(true)}>

@@ -564,16 +564,16 @@ export default function Payments() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Payments</h1>
-        <p className="text-muted-foreground mt-1">Process and track invoice payments</p>
+        <p className="text-muted-foreground mt-1">Execute, schedule, and record vendor payments</p>
       </div>
 
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
           <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
             <div>
-              <p className="text-sm font-semibold text-foreground">Bill Pay command center</p>
+              <p className="text-sm font-semibold text-foreground">Bill Pay Execution</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Approve, schedule, record partial payments, and monitor cash timing from one AP queue.
+                Execute payments, schedule transfers, and monitor cash timing from one AP queue.
               </p>
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -701,7 +701,7 @@ export default function Payments() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="border-b border-border">
           <TabsList className="h-auto p-0 bg-transparent gap-6 justify-start w-full overflow-x-auto">
-            <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Vendor Invoices</TabsTrigger>
+            <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payable Queue</TabsTrigger>
             <TabsTrigger value="schedule" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Scheduled Payments</TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payment History</TabsTrigger>
             <TabsTrigger value="reconciliation" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Reconciliation</TabsTrigger>

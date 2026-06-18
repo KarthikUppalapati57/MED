@@ -324,8 +324,8 @@ export default function Accounting() {
   return (
     <div className="space-y-6 animate-fade-in-scale">
       <div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">Accounting Sync</h1>
-        <p className="text-muted-foreground mt-1 text-lg">Manage financial integrations and sync logs.</p>
+        <h1 className="text-3xl font-bold text-foreground tracking-tight">Accounting & Reconciliation</h1>
+        <p className="text-muted-foreground mt-1 text-lg">Manage financial integrations, sync logs, and accounting exports/reconciliation.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

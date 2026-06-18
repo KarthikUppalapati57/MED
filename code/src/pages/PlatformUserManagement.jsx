@@ -201,7 +201,7 @@ export default function PlatformUserManagement() {
           <Shield className="w-8 h-8 text-resend-red" />
         </div>
         <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
-        <p className="text-muted-foreground max-w-md">Platform User Management is restricted to platform administrators only.</p>
+        <p className="text-muted-foreground max-w-md">Platform Admins is restricted to platform administrators only.</p>
       </div>
     );
   }
@@ -215,8 +215,8 @@ export default function PlatformUserManagement() {
             <Users className="w-5 h-5 text-indigo-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Platform User Management</h1>
-            <p className="text-sm text-muted-foreground">Manage platform administrators and their access</p>
+            <h1 className="text-2xl font-bold text-foreground">Platform Admins</h1>
+            <p className="text-sm text-muted-foreground">Manage internal platform administrators and their access</p>
           </div>
         </div>
         <Button onClick={() => setShowPlatformInviteModal(true)} className="bg-resend-blue hover:bg-blue-700">
@@ -482,7 +482,7 @@ export default function PlatformUserManagement() {
             <DialogTitle>Remove Admin Access</DialogTitle>
             <DialogDescription>
               Are you sure you want to remove admin access for {confirmDeleteAdmin?.full_name || confirmDeleteAdmin?.email}? 
-              This will revoke their access to the Platform Admin Console.
+              This will revoke their access to the Platform Console.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -42,7 +42,7 @@ const OverviewTab = () => (
   </div>
 );
 
-const InvoicesTab = () => <LinkedTabPlaceholder title="Vendor Invoices" description="Manage and process all invoices for this vendor from the centralized Accounts Payable hub." linkText="Go to AP Hub" linkPath="/Invoices" />;
+const InvoicesTab = () => <LinkedTabPlaceholder title="AP Invoices" description="Manage and process this vendor's invoices from the centralized Accounts Payable hub." linkText="Go to AP Hub" linkPath="/Invoices" />;
 const OrdersTab = () => <LinkedTabPlaceholder title="Vendor Orders" description="Create and track purchase orders for this vendor from the main Inventory module." linkText="Go to Orders" linkPath="/Orders" />;
 const PaymentsTab = () => <LinkedTabPlaceholder title="Vendor Payments" description="Schedule and execute bill payments for this vendor from the centralized Bill Pay module." linkText="Go to Payments" linkPath="/Payments" />;
 

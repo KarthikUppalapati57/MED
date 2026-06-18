@@ -1172,7 +1172,7 @@ The Restops Platform Team
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">Platform Admin Console</h1>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Platform Console</h1>
               {pendingCount > 0 && (
                 <Badge className="bg-resend-yellow/10 text-resend-yellow hover:bg-resend-yellow/10 border-none font-bold px-3 py-1">
                   {pendingCount} Action Required

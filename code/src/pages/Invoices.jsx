@@ -1217,7 +1217,7 @@ export default function Invoices() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground mt-1">Manage and process vendor invoices</p>
+          <p className="text-muted-foreground mt-1">Upload, code, and approve vendor invoices</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleExportCsv}>
@@ -1243,9 +1243,9 @@ export default function Invoices() {
         <CardContent className="p-4">
           <div className="grid gap-3 md:grid-cols-[1.1fr_2fr]">
             <div>
-              <p className="text-sm font-semibold text-foreground">Invoice command center</p>
+              <p className="text-sm font-semibold text-foreground">Invoice Coding & Approval</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Capture, review, approve, schedule, and sync every vendor bill from one workflow.
+                Capture, review, and approve every vendor bill before payment execution.
               </p>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">

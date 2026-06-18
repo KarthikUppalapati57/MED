@@ -65,7 +65,7 @@ const navigation = [
   { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
   { name: 'Ask Tom', href: 'AskTom', icon: Bot, minRole: 'manager' },
   { 
-    name: 'Platform Admin', 
+    name: 'Platform Console', 
     icon: Shield, 
     minRole: 'platform_admin',
     subItems: [
@@ -74,12 +74,12 @@ const navigation = [
       { name: 'Accounting', href: 'PlatformAdmin?tab=accounting', icon: DollarSign }
     ]
   },
-  { name: 'Platform Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
+  { name: 'All Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
   { name: 'Platform Organizations', href: 'PlatformOrganizations', icon: Building2, minRole: 'platform_admin' },
   { name: 'Platform Plans', href: 'PlatformPlans', icon: Sparkles, minRole: 'platform_admin' },
-  { name: 'Platform Invoices', href: 'PlatformInvoices', icon: Receipt, minRole: 'platform_admin' },
-  { name: 'Admin Management', href: 'PlatformUserManagement', icon: ShieldAlert, minRole: 'platform_admin' },
-  { name: 'Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
+  { name: 'Platform Billing', href: 'PlatformInvoices', icon: Receipt, minRole: 'platform_admin' },
+  { name: 'Platform Admins', href: 'PlatformUserManagement', icon: ShieldAlert, minRole: 'platform_admin' },
+  { name: 'Platform Audit Logs', href: 'PlatformAuditLogs', icon: FileText, minRole: 'platform_admin' },
   { name: 'Invoices', href: 'Invoices', icon: FileText, minRole: 'ground_staff' },
   { 
     name: 'Payments', 
@@ -179,7 +179,7 @@ const navigation = [
     ]
   },
   { 
-    name: 'My Organization', 
+    name: 'Organization Settings', 
     icon: Building2, 
     minRole: 'org_owner',
     subItems: [
@@ -187,10 +187,10 @@ const navigation = [
       { name: 'Security & MFA', href: 'OrgManagement?tab=security', icon: ShieldCheck }
     ]
   },
-  { name: 'Users', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
+  { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
-  { name: 'Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
+  { name: 'Organization Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
 ];
 
 const roleBadgeColors = {

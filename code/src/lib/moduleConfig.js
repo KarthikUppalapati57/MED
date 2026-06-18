@@ -12,21 +12,21 @@
  */
 
 export const MODULE_DEFINITIONS = {
-  dashboard:  { label: "Dashboard",       pages: ["Dashboard"],                                  minRole: "ground_staff",     icon: "LayoutDashboard" },
+  dashboard:  { label: "Dashboard",       pages: ["Dashboard", "MobileApp", "Notifications"],     minRole: "ground_staff",     icon: "LayoutDashboard" },
   invoices:   { label: "Invoices",        pages: ["Invoices"],                                   minRole: "ground_staff",     icon: "FileText" },
   payments:   { label: "Bill Pay",        pages: ["Payments"],                                   minRole: "location_manager", icon: "CreditCard" },
   products:   { label: "Products",        pages: ["Products"],                                   minRole: "ground_staff",     icon: "Package" },
-  inventory:  { label: "Inventory",       pages: ["Inventory"],                                  minRole: "ground_staff",     icon: "Warehouse" },
+  inventory:  { label: "Inventory",       pages: ["Inventory", "Commissary"],                    minRole: "ground_staff",     icon: "Warehouse" },
   orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
   smartprep:  { label: "SmartPrep",       pages: ["SmartPrep"],                                  minRole: "location_manager", icon: "ChefHat" },
-  ask_tom:    { label: "Ask Tom",         pages: ["AskTom"],                                     minRole: "manager",          icon: "Bot" },
+  ask_tom:    { label: "Ask Tom",         pages: ["AskTom", "AiInsights"],                      minRole: "manager",          icon: "Bot" },
   recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering", "AvTCosting"], minRole: "location_manager", icon: "ChefHat" },
-  vendors:    { label: "Vendors",         pages: ["Vendors", "VendorBulkTools"],             minRole: "location_manager", icon: "Store" },
+  vendors:    { label: "Vendors",         pages: ["Vendors"],             minRole: "location_manager", icon: "Store" },
   labor:      { label: "Labor",           pages: ["Labor"],                                      minRole: "location_manager", icon: "Users" },
-  admin:      { label: "Admin",           pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "org_owner", icon: "Users" },
+  admin:      { label: "Organization Admin", pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "org_owner", icon: "Users" },
   integrations: { label: "Integrations",  pages: ["Integrations", "DeveloperPortal"], minRole: "org_owner", icon: "Settings" },
   performance:{ label: "Performance",     pages: ["Performance"], minRole: "location_manager", icon: "Activity" },
-  platform:   { label: "Platform Admin",  pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
+  platform:   { label: "Platform Console", pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
   accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
   setup:      { label: "Setup",            pages: ["RestaurantSetup"], minRole: "location_manager", icon: "Settings" },
 };
