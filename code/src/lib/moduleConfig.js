@@ -19,7 +19,7 @@ export const MODULE_DEFINITIONS = {
   inventory:  { label: "Inventory",       pages: ["Inventory", "Commissary"],                    minRole: "ground_staff",     icon: "Warehouse" },
   orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
   smartprep:  { label: "SmartPrep",       pages: ["SmartPrep"],                                  minRole: "location_manager", icon: "ChefHat" },
-  ask_tom:    { label: "Ask Tom",         pages: ["AskTom", "AiInsights"],                      minRole: "manager",          icon: "Bot" },
+  ai_insights:{ label: "AI Insights",     pages: ["AiInsights"],                                minRole: "manager",          icon: "Sparkles" },
   recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering", "AvTCosting"], minRole: "location_manager", icon: "ChefHat" },
   vendors:    { label: "Vendors",         pages: ["Vendors"],             minRole: "location_manager", icon: "Store" },
   labor:      { label: "Labor",           pages: ["Labor"],                                      minRole: "location_manager", icon: "Users" },

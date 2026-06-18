@@ -34,7 +34,6 @@ import {
   Plus,
   Receipt,
   ArrowLeft,
-  Bot,
   Smartphone
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -56,14 +55,13 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
+import AiInsightsAssistant from '@/components/AiInsightsAssistant';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
   { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
-  { name: 'AI Insights', href: 'AiInsights', icon: Sparkles, minRole: 'manager' },
-  { name: 'Ask Tom', href: 'AskTom', icon: Bot, minRole: 'manager' },
   { 
     name: 'Platform Console', 
     icon: Shield, 
@@ -387,6 +385,16 @@ export default function Layout({ children, currentPageName }) {
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = role || 'loading';
+  const explicitAiInsightsPerm = userPermissions.AiInsights;
+  const canUseAiInsights = !isPlatformAdmin && (
+    explicitAiInsightsPerm === 'read' ||
+    explicitAiInsightsPerm === 'full' ||
+    (
+      explicitAiInsightsPerm !== 'none' &&
+      hasMinRole('manager') &&
+      isPageInEnabledModules('AiInsights', enabledModules, userRole)
+    )
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -644,6 +652,7 @@ export default function Layout({ children, currentPageName }) {
           )}
           {children}
         </main>
+        {canUseAiInsights && <AiInsightsAssistant />}
       </div>
     </div>
   );

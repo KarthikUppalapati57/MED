@@ -12,7 +12,6 @@ const __Layout = React.lazy(() => import('./Layout.jsx'));
 
 // Dynamically import pages using React.lazy for code-splitting
 const AutoOrdering = React.lazy(() => import('./pages/AutoOrdering'));
-const AskTom = React.lazy(() => import('./pages/AskTom'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const Invoices = React.lazy(() => import('./pages/Invoices'));
@@ -49,7 +48,6 @@ const MobileApp = React.lazy(() => import('./pages/MobileApp'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
-    "AskTom": AskTom,
     "Dashboard": Dashboard,
     "Inventory": Inventory,
     "Invoices": Invoices,

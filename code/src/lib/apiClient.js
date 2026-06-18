@@ -256,8 +256,6 @@ export const api = {
     SmartPrepPlan: createEntityClient('smart_prep_plans'),
     MvDailySalesSummary: createEntityClient('mv_daily_sales_summary'),
 
-    AskTomThread: createEntityClient('ask_tom_threads'),
-    AskTomMessage: createEntityClient('ask_tom_messages'),
   },
   onboarding: {
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {

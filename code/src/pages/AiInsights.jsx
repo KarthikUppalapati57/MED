@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
-import { useAuth } from '@/lib/AuthContext';
-import { filterByContext } from '@/lib/contextUtils';
-import { sendGeminiMessage } from '@/lib/geminiService';
 import {
   Sparkles,
   AlertTriangle,
@@ -13,14 +10,9 @@ import {
   CheckCircle2,
   TrendingUp,
   Search,
-  Check,
-  Send,
-  User,
-  Bot
+  Check
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,17 +41,10 @@ const severityIcons = {
 };
 
 export default function AiInsights() {
-  const { userProfile, organization, activeBrand, activeLocation } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('unresolved');
-  const [activeTab, setActiveTab] = useState('insights');
-  const [chatInput, setChatInput] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'assistant', content: 'Hello! I am your Restops AI Assistant. Ask me anything about your restaurant\'s performance, inventory variances, or labor forecasts.' }
-  ]);
-  const [isTyping, setIsTyping] = useState(false);
 
   const {
     data = {},
@@ -104,59 +89,6 @@ export default function AiInsights() {
     });
   }, [insights, search, filter]);
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const userMsg = { role: 'user', content: chatInput };
-    const currentHistory = [...chatHistory, userMsg];
-    setChatHistory(currentHistory);
-    setChatInput('');
-    setIsTyping(true);
-
-    try {
-      // Step 1: Gather raw context data (limit size to prevent massive token payloads)
-      // We fetch all records for the org, then rely on filterByContext to strictly narrow to Brand/Location
-      const results = await Promise.allSettled([
-        api.entities.PosSalesData.list('-date', { limit: 100 }),
-        api.entities.Invoice.list('-created_at', { limit: 50 }),
-        api.entities.EmployeeShift.list('-created_at', { limit: 50 })
-      ]);
-
-      const rawSales = results[0].status === 'fulfilled' ? results[0].value : [];
-      const rawInvoices = results[1].status === 'fulfilled' ? results[1].value : [];
-      const rawLabor = results[2].status === 'fulfilled' ? results[2].value : [];
-
-      // Step 2: Strictly filter based on current context
-      const contextObj = { organization, brand: activeBrand, location: activeLocation };
-      const scopeType = activeLocation ? 'Location' : activeBrand ? 'Brand' : 'Organization';
-      const scopeName = activeLocation?.name || activeBrand?.name || organization?.name || 'Unknown';
-
-      const metrics = {
-        posSales: filterByContext(rawSales, contextObj),
-        recentInvoices: filterByContext(rawInvoices, contextObj),
-        laborShifts: filterByContext(rawLabor, contextObj),
-      };
-
-      const contextData = {
-        scopeType,
-        scopeName,
-        metrics
-      };
-
-      // Step 3: Send to Gemini
-      const aiResponse = await sendGeminiMessage(currentHistory, chatInput, contextData);
-      
-      setChatHistory(prev => [...prev, { role: 'assistant', content: aiResponse }]);
-    } catch (err) {
-      console.error(err);
-      const errMessage = err.message || "Sorry, I encountered an error connecting to the AI engine.";
-      setChatHistory(prev => [...prev, { role: 'assistant', content: errMessage }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -172,14 +104,7 @@ export default function AiInsights() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="insights">Automated Insights</TabsTrigger>
-          <TabsTrigger value="chat">Chat with Data <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand text-[10px]">Beta</Badge></TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="insights" className="space-y-6">
-          {/* Filters */}
+      {/* Filters */}
       <Card className="glass-card shadow-sm border-0">
         <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -316,68 +241,6 @@ export default function AiInsights() {
               </Button>
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="chat" className="h-[600px] flex flex-col">
-          <Card className="flex-1 flex flex-col overflow-hidden border-border/50 shadow-sm glass-card">
-            <CardHeader className="border-b border-border/40 pb-4 bg-secondary/20">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Bot className="h-5 w-5 text-brand" />
-                Restops Copilot
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">Ask questions about your sales, inventory variances, or labor forecasts in plain English.</p>
-            </CardHeader>
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4 pb-4">
-                {chatHistory.map((msg, i) => (
-                  <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {msg.role === 'assistant' && (
-                      <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                        <Bot className="h-4 w-4 text-brand" />
-                      </div>
-                    )}
-                    <div className={`p-3 rounded-xl text-sm max-w-[80%] ${
-                      msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-secondary rounded-tl-sm'
-                    }`}>
-                      {msg.content}
-                    </div>
-                    {msg.role === 'user' && (
-                      <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isTyping && (
-                  <div className="flex gap-3 justify-start">
-                    <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                      <Bot className="h-4 w-4 text-brand" />
-                    </div>
-                    <div className="p-3 rounded-xl bg-secondary rounded-tl-sm text-sm text-muted-foreground flex items-center gap-1">
-                      <span className="animate-bounce delay-75">.</span>
-                      <span className="animate-bounce delay-150">.</span>
-                      <span className="animate-bounce delay-300">.</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            <div className="p-4 bg-background border-t border-border/40">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <Input 
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  placeholder="e.g. What is my food cost variance today?" 
-                  className="flex-1 bg-secondary/50"
-                />
-                <Button type="submit" disabled={!chatInput.trim() || isTyping}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
