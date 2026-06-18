@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import RestopsLogo from '@/components/RestopsLogo';
 import scannerImg from '../assets/scanner.png';
-import logoImg from '../assets/name-3.png';
 import { 
   Menu, 
   X, 
@@ -141,10 +141,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-sm bg-[#ff5c35] flex items-center justify-center">
-                <Database className="h-4 w-4 text-white" />
-              </div>
-              <img src={logoImg} alt="Brand Logo" className="h-6 object-contain" />
+              <RestopsLogo className="h-8" origin="origin-left" />
             </div>
             
             <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/40 dark:text-white/40 uppercase">
@@ -335,8 +332,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-24 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
-                <Database className="h-6 w-6 text-[#ff5c35]" />
-                <img src={logoImg} alt="Brand Logo" className="h-8 object-contain" />
+                <RestopsLogo className="h-10" origin="origin-left" />
               </div>
               <p className="text-black/40 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Sovereign infrastructure for high-performance hospitality logistics and telemetry.
