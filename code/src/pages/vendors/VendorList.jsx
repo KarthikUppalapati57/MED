@@ -246,7 +246,7 @@ export default function VendorList() {
       createMutation.mutate({
         ...vendorPayload,
         organization_id: organization?.id,
-        brand_id: brand?.id || null,
+        brand_id: (brand?.brand_id || brand?.id) || null,
         location_id: location?.id || null,
       });
     }
@@ -286,7 +286,7 @@ export default function VendorList() {
   useEffect(() => {
     setVendorTableScrollTop(0);
     if (vendorTableRef.current) vendorTableRef.current.scrollTop = 0;
-  }, [search, statusFilter, organization?.id, brand?.id, location?.id]);
+  }, [search, statusFilter, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   const vendorWindow = React.useMemo(() => {
     const total = filteredVendors.length;
@@ -590,12 +590,12 @@ export default function VendorList() {
                         ? (vendor.items || []).map((item, idx) => (
                             <TableRow key={`${vendor.id}-${idx}`}>
                               <TableCell className="font-medium">{vendor.name}</TableCell>
-                              <TableCell>{item.vendor_item_name || item.name || '—'}</TableCell>
-                              <TableCell>{item.product_name || '—'}</TableCell>
-                              <TableCell><Badge variant="secondary">{item.category || '—'}</Badge></TableCell>
-                              <TableCell className="font-mono text-sm">{item.item_code || '—'}</TableCell>
+                              <TableCell>{item.vendor_item_name || item.name || 'â€”'}</TableCell>
+                              <TableCell>{item.product_name || 'â€”'}</TableCell>
+                              <TableCell><Badge variant="secondary">{item.category || 'â€”'}</Badge></TableCell>
+                              <TableCell className="font-mono text-sm">{item.item_code || 'â€”'}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '—'}
+                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : 'â€”'}
                               </TableCell>
                               <TableCell className="font-semibold">${Number(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
                               <TableCell>

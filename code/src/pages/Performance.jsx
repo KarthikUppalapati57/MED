@@ -139,15 +139,15 @@ export default function Performance() {
         enabled: !!organization?.id && needsLineItems,
       },
       {
-        queryKey: ['budget_targets', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
+        queryKey: ['budget_targets', organization?.id, (brand?.brand_id || brand?.id), location?.id, periodStart, periodEnd],
         queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
         select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
           .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
         enabled: !!organization?.id && needsBudgetTargets,
       },
       {
-        queryKey: ['pnl_summary', organization?.id, brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: () => api.reports.getPnlSummary(organization?.id, periodStart, periodEnd, brand?.id, location?.id),
+        queryKey: ['pnl_summary', organization?.id, (brand?.brand_id || brand?.id), location?.id, periodStart, periodEnd],
+        queryFn: () => api.reports.getPnlSummary(organization?.id, periodStart, periodEnd, (brand?.brand_id || brand?.id), location?.id),
         enabled: !!organization?.id && ['overview', 'pnl'].includes(activeTab),
       }
     ]
@@ -193,7 +193,7 @@ export default function Performance() {
       const existing = budgetByCategory[category];
       const payload = {
         organization_id: organization?.id,
-        brand_id: brand?.id || null,
+        brand_id: (brand?.brand_id || brand?.id) || null,
         location_id: location?.id || null,
         period_start: periodStart,
         period_end: periodEnd,
@@ -571,7 +571,7 @@ export default function Performance() {
                         <div key={idx} className="flex items-center justify-between bg-secondary/30 p-3 rounded-lg border border-border/40">
                           <div className="overflow-hidden">
                             <p className="font-medium text-sm truncate pr-2">{item.item}</p>
-                            <p className="text-xs text-muted-foreground">${item.previousPrice} → ${item.currentPrice}</p>
+                            <p className="text-xs text-muted-foreground">${item.previousPrice} â†’ ${item.currentPrice}</p>
                           </div>
                           <Badge variant="outline" className={item.change > 0 ? 'bg-resend-red/10 text-resend-red border-resend-red/20' : 'bg-resend-green/10 text-resend-green border-resend-green/20'}>
                             {item.change > 0 ? '+' : ''}{item.change}%

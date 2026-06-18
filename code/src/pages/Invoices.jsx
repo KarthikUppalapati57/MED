@@ -1142,7 +1142,7 @@ export default function Invoices() {
   useEffect(() => {
     setInvoiceTableScrollTop(0);
     if (invoiceTableRef.current) invoiceTableRef.current.scrollTop = 0;
-  }, [search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter, organization?.id, brand?.id, location?.id]);
+  }, [search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   const invoiceWindow = React.useMemo(() => {
     const total = filteredInvoices.length;

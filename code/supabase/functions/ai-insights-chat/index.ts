@@ -265,7 +265,7 @@ serve(async (req) => {
         .maybeSingle();
       if (error) throw error;
       if (!data) return jsonResponse({ error: 'Requested brand is outside your organization.' }, 403);
-      brand = { id: data.brand_id, name: data.name, organization_id: data.organization_id };
+      brand = { brand_id: data.brand_id, name: data.name, organization_id: data.organization_id };
     }
 
     let location = null;
@@ -298,17 +298,17 @@ serve(async (req) => {
     if (orgError) throw orgError;
 
     let locationIds = [];
-    if (brand?.id && !location?.id) {
+    if (brand?.brand_id && !location?.id) {
       const { data, error } = await admin
         .from('locations')
         .select('id')
         .eq('organization_id', orgId)
-        .eq('brand_id', brand.id);
+        .eq('brand_id', brand.brand_id);
       if (error) throw error;
       locationIds = (data || []).map((row) => row.id);
     }
 
-    const scope = { orgId, brandId: brand?.id || null, locationId: location?.id || null, locationIds };
+    const scope = { orgId, brandId: brand?.brand_id || null, locationId: location?.id || null, locationIds };
     const scopedContext = await getScopedContext(admin, scope);
     const scopeLabel = location
       ? `Location: ${location.name}`

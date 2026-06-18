@@ -505,7 +505,7 @@ export default function Recipes() {
     const data = {
       ...formData,
       organization_id: organization?.id,
-      brand_id: brand?.id || null,
+      brand_id: (brand?.brand_id || brand?.id) || null,
       location_id: location?.id || null,
       total_ingredient_cost: costs.ingredientCost,
       total_packaging_cost: costs.packagingCost,
@@ -844,7 +844,7 @@ export default function Recipes() {
                           <div key={cat}>
                             <div className="flex justify-between text-sm mb-1">
                               <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
-                              <span className="text-muted-foreground">{data.count} recipes · Avg ${data.avgPlateCost.toFixed(2)}/serving</span>
+                              <span className="text-muted-foreground">{data.count} recipes Â· Avg ${data.avgPlateCost.toFixed(2)}/serving</span>
                             </div>
                             <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
                               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(data.totalCost / maxCost) * 100}%` }} />
@@ -931,7 +931,7 @@ export default function Recipes() {
                       <TableBody>
                         {(viewingRecipe.ingredients || []).map((ing, idx) => (
                           <TableRow key={idx}>
-                            <TableCell className="font-medium">{ing.product_name || '—'}</TableCell>
+                            <TableCell className="font-medium">{ing.product_name || 'â€”'}</TableCell>
                             <TableCell>{ing.quantity}</TableCell>
                             <TableCell>{ing.unit}</TableCell>
                             <TableCell>${(ing.unit_cost || 0).toFixed(2)}</TableCell>

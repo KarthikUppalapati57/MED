@@ -149,7 +149,7 @@ export default function Payments() {
     hasNextPage: hasNextInvoicesPage,
     isFetchingNextPage: isFetchingNextInvoicesPage
   } = useAuthInfiniteQuery({
-    queryKey: ['invoices-payments', organization?.id, brand?.id, location?.id, activeTab, debouncedSearch, statusFilter, sortBy],
+    queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
       return await api.entities.Invoice.list(sortBy, {
         page: pageParam,
@@ -177,7 +177,7 @@ export default function Payments() {
     hasNextPage: hasNextPaymentsPage,
     isFetchingNextPage: isFetchingNextPaymentsPage
   } = useAuthInfiniteQuery({
-    queryKey: ['payments', organization?.id, brand?.id, location?.id, activeTab, debouncedSearch, sortBy],
+    queryKey: ['payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
       return await api.entities.Payment.list(sortBy, {
         page: pageParam,
@@ -218,7 +218,7 @@ export default function Payments() {
   });
 
   const { data: settingsRows = [] } = useAuthQuery({
-    queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'payments'],
+    queryKey: ['operational_settings', organization?.id, (brand?.brand_id || brand?.id), location?.id, 'payments'],
     queryFn: () => api.entities.OperationalSetting.filter({ organization_id: organization?.id }),
     enabled: !!organization?.id && activeTab === 'setup',
   });
@@ -279,9 +279,9 @@ export default function Payments() {
     mutationFn: async () => {
       const payload = {
         organization_id: organization?.id,
-        brand_id: brand?.id || null,
+        brand_id: (brand?.brand_id || brand?.id) || null,
         location_id: location?.id || null,
-        scope: location?.id ? 'location' : brand?.id ? 'brand' : 'organization',
+        scope: location?.id ? 'location' : (brand?.brand_id || brand?.id) ? 'brand' : 'organization',
         category: 'payments',
         settings: paymentSettings,
         created_by: userProfile?.id || null,
@@ -291,7 +291,7 @@ export default function Payments() {
       return api.entities.OperationalSetting.create(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'payments'] });
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, (brand?.brand_id || brand?.id), location?.id, 'payments'] });
       toast.success('Payment settings saved');
     },
     onError: (error) => toast.error(error.message || 'Failed to save payment settings'),
@@ -502,12 +502,12 @@ export default function Payments() {
   useEffect(() => {
     setInvoiceTableScrollTop(0);
     if (invoiceTableRef.current) invoiceTableRef.current.scrollTop = 0;
-  }, [debouncedSearch, statusFilter, sortBy, organization?.id, brand?.id, location?.id]);
+  }, [debouncedSearch, statusFilter, sortBy, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   useEffect(() => {
     setPaymentHistoryTableScrollTop(0);
     if (paymentHistoryTableRef.current) paymentHistoryTableRef.current.scrollTop = 0;
-  }, [debouncedSearch, sortBy, organization?.id, brand?.id, location?.id]);
+  }, [debouncedSearch, sortBy, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   const invoiceWindow = React.useMemo(() => {
     const total = filteredInvoices.length;
@@ -750,7 +750,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Vendor
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'vendor_name' ? '↑' : sortBy === '-vendor_name' ? '↓' : '↕'}
+                            {sortBy === 'vendor_name' ? 'â†‘' : sortBy === '-vendor_name' ? 'â†“' : 'â†•'}
                           </span>
                         </div>
                       </TableHead>
@@ -761,7 +761,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Invoice #
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'invoice_number' ? '↑' : sortBy === '-invoice_number' ? '↓' : '↕'}
+                            {sortBy === 'invoice_number' ? 'â†‘' : sortBy === '-invoice_number' ? 'â†“' : 'â†•'}
                           </span>
                         </div>
                       </TableHead>
@@ -772,7 +772,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Due Date
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'due_date' ? '↑' : sortBy === '-due_date' ? '↓' : '↕'}
+                            {sortBy === 'due_date' ? 'â†‘' : sortBy === '-due_date' ? 'â†“' : 'â†•'}
                           </span>
                         </div>
                       </TableHead>
@@ -783,7 +783,7 @@ export default function Payments() {
                         <div className="flex items-center gap-1">
                           Amount
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'total_amount' ? '↑' : sortBy === '-total_amount' ? '↓' : '↕'}
+                            {sortBy === 'total_amount' ? 'â†‘' : sortBy === '-total_amount' ? 'â†“' : 'â†•'}
                           </span>
                         </div>
                       </TableHead>
@@ -843,7 +843,7 @@ export default function Payments() {
                                 isOverdue && 'text-resend-red font-medium',
                                 isDueSoon && 'text-resend-orange font-medium'
                               )}>
-                                {dueDate ? format(dueDate, 'MMM d, yyyy') : '—'}
+                                {dueDate ? format(dueDate, 'MMM d, yyyy') : 'â€”'}
                               </span>
                             </TableCell>
                             <TableCell className="font-semibold">
@@ -1182,7 +1182,7 @@ export default function Payments() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
-                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '—'}
+                              {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : 'â€”'}
                             </TableCell>
                             <TableCell>
                               <Badge className="bg-resend-green/10 text-resend-green">Paid</Badge>

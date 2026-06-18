@@ -16,9 +16,9 @@ export function filterByContext(data, { organization, brand, location }) {
     }
 
     // 2. If Brand is selected (but no location)
-    if (brand?.id) {
+    if ((brand?.brand_id || brand?.id)) {
       // Match anything under this brand (including all its locations)
-      if (item.brand_id === brand.id) return true;
+      if (item.brand_id === (brand.brand_id || brand.id)) return true;
       // Inherited from Organization
       if (!item.brand_id && item.organization_id === organization?.id) return true;
       // If table lacks brand column but has org

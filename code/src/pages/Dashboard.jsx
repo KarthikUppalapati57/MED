@@ -163,7 +163,7 @@ function getDataHealthScore(metrics, data, canAccessPage = () => true) {
 
 function getDashboardScopeContext(scope, { organization, brand, location }) {
   const orgId = organization?.id || null;
-  const brandId = scope === 'brand' ? brand?.id || null : scope === 'location' || scope === 'staff' ? brand?.id || location?.brand_id || null : null;
+  const brandId = scope === 'brand' ? (brand?.brand_id || brand?.id) || null : scope === 'location' || scope === 'staff' ? (brand?.brand_id || brand?.id) || location?.brand_id || null : null;
   const locationId = scope === 'location' || scope === 'staff' ? location?.id || null : null;
   return {
     brandId,
@@ -1079,7 +1079,7 @@ function useDashboardData(scope) {
   const periodEnd = endOfMonth(now).toISOString().split('T')[0];
   const dashboardSummaryEnabled = enabled && (
     scope === 'org'
-    || (scope === 'brand' && !!brand?.id)
+    || (scope === 'brand' && !!(brand?.brand_id || brand?.id))
     || ((scope === 'location' || scope === 'staff') && !!location?.id)
   );
   const summaryInvalidationKeys = React.useMemo(() => [['dashboard-summary']], []);
@@ -1093,20 +1093,20 @@ function useDashboardData(scope) {
   const selectByScope = React.useCallback((data) => {
     const scoped = filterByContext(data || [], context);
     if (scope === 'org') return scoped;
-    if (scope === 'brand') return brand?.id ? scoped.filter((item) => !item.brand_id || item.brand_id === brand.id) : scoped;
+    if (scope === 'brand') return (brand?.brand_id || brand?.id) ? scoped.filter((item) => !item.brand_id || item.brand_id === (brand.brand_id || brand.id)) : scoped;
     if (scope === 'location' || scope === 'staff') {
       return location?.id ? scoped.filter((item) => !item.location_id || item.location_id === location.id) : scoped;
     }
     return scoped;
-  }, [brand?.id, context, location?.id, scope]);
+  }, [(brand?.brand_id || brand?.id), context, location?.id, scope]);
 
   const { data: dashboardSummary = null, isError: dashboardSummaryFailed } = useAuthQuery({
-    queryKey: ['dashboard-summary', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
+    queryKey: ['dashboard-summary', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope, periodStart, periodEnd],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_role_dashboard_summary', {
         p_scope: scope,
         p_org_id: organization?.id,
-        p_brand_id: scope === 'brand' ? brand?.id || null : null,
+        p_brand_id: scope === 'brand' ? (brand?.brand_id || brand?.id) || null : null,
         p_location_id: scope === 'location' || scope === 'staff' ? location?.id || null : null,
         p_period_start: periodStart,
         p_period_end: periodEnd,
@@ -1122,7 +1122,7 @@ function useDashboardData(scope) {
   const rawFallbackEnabled = enabled && dashboardSummaryFailed;
 
   const { data: invoices = [] } = useAuthQuery({
-    queryKey: ['dashboard-invoices', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-invoices', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.Invoice.list('-created_at', {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, total_amount, status, payment_status, due_date, invoice_date, created_at',
@@ -1132,7 +1132,7 @@ function useDashboardData(scope) {
   });
 
   const { data: payments = [] } = useAuthQuery({
-    queryKey: ['dashboard-payments', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.Payment.list('-created_at', {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, amount, status, payment_date, created_at',
@@ -1142,7 +1142,7 @@ function useDashboardData(scope) {
   });
 
   const { data: inventory = [] } = useAuthQuery({
-    queryKey: ['dashboard-inventory', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-inventory', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.Inventory.list(null, {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, current_quantity, current_value, unit_cost, product_name',
@@ -1152,7 +1152,7 @@ function useDashboardData(scope) {
   });
 
   const { data: products = [] } = useAuthQuery({
-    queryKey: ['dashboard-products', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-products', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.Product.list(null, {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, is_inventoried',
@@ -1162,7 +1162,7 @@ function useDashboardData(scope) {
   });
 
   const { data: salesData = [] } = useAuthQuery({
-    queryKey: ['dashboard-sales', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-sales', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.PosSalesData.list('-date', {
       limit: 50,
       select: 'id, organization_id, location_id, date, revenue',
@@ -1172,7 +1172,7 @@ function useDashboardData(scope) {
   });
 
   const { data: shifts = [] } = useAuthQuery({
-    queryKey: ['dashboard-shifts', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-shifts', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
       limit: 50,
       select: 'id, organization_id, location_id, shift_start, status, labor_cost',
@@ -1182,7 +1182,7 @@ function useDashboardData(scope) {
   });
 
   const { data: orders = [] } = useAuthQuery({
-    queryKey: ['dashboard-orders', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-orders', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.AutoOrder.list('-created_at', {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, status, created_at',
@@ -1192,7 +1192,7 @@ function useDashboardData(scope) {
   });
 
   const { data: wastageLogs = [] } = useAuthQuery({
-    queryKey: ['dashboard-wastage', organization?.id, brand?.id, location?.id, scope],
+    queryKey: ['dashboard-wastage', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
     queryFn: () => api.entities.WastageLog.list('-created_at', {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, value, created_at',
@@ -1202,7 +1202,7 @@ function useDashboardData(scope) {
   });
 
   const { data: budgetTargets = [] } = useAuthQuery({
-    queryKey: ['dashboard-budget-targets', organization?.id, brand?.id, location?.id, scope, periodStart, periodEnd],
+    queryKey: ['dashboard-budget-targets', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope, periodStart, periodEnd],
     queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
     select: React.useCallback((data) => selectByScope(data).filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [periodEnd, periodStart, selectByScope]),
     enabled: rawFallbackEnabled,

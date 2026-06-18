@@ -47,7 +47,7 @@ function getCachedContextScope() {
     const parsed = JSON.parse(raw);
     return {
       organization_id: parsed.organization_id || parsed.organization?.id || null,
-      brand_id: parsed.brand_id || parsed.brand?.id || null,
+      brand_id: parsed.brand_id || (parsed.brand?.brand_id || parsed.brand?.id) || null,
       location_id: parsed.location_id || parsed.location?.id || null,
     };
   } catch {

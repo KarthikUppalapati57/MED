@@ -274,7 +274,7 @@ export const AuthProvider = ({ children }) => {
             brand: currentCache.brand,
             location: currentCache.location,
             organization_id: freshOrg?.id || null,
-            brand_id: currentCache.brand?.id || null,
+            brand_id: currentCache.brand?.brand_id || currentCache.brand?.id || null,
             location_id: currentCache.location?.id || null,
           });
         } else {
@@ -568,7 +568,7 @@ export const AuthProvider = ({ children }) => {
       if (isMounted) {
         setIsLoadingAuth((current) => {
           if (current) {
-            console.debug('[AuthContext] Safety timeout â€” completing auth init with cached profile');
+            console.debug('[AuthContext] Safety timeout ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â completing auth init with cached profile');
             setIsMfaReady(true); // Ensure MFA is also marked ready to prevent stuck screen
             return false;
           }
@@ -708,7 +708,7 @@ export const AuthProvider = ({ children }) => {
       if (updatedOrg) {
         const { data, error } = await supabase.rpc('switch_user_context', {
           p_organization_id: updatedOrg.id,
-          p_brand_id: updatedBrand?.id || null,
+          p_brand_id: updatedBrand?.brand_id || updatedBrand?.id || null,
           p_location_id: updatedLocation?.id || null
         });
         if (error) throw error;
@@ -737,7 +737,7 @@ export const AuthProvider = ({ children }) => {
         currentCache.brand = updatedBrand;
         currentCache.location = updatedLocation;
         currentCache.organization_id = updatedOrg?.id || null;
-        currentCache.brand_id = updatedBrand?.id || null;
+        currentCache.brand_id = updatedBrand?.brand_id || updatedBrand?.id || null;
         currentCache.location_id = updatedLocation?.id || null;
         setCachedProfile(currentCache);
       }
@@ -764,7 +764,7 @@ export const AuthProvider = ({ children }) => {
     const currentCache = getCachedProfile();
     if (currentCache) {
       currentCache.brand = brand;
-      currentCache.brand_id = brand?.id || null;
+      currentCache.brand_id = brand?.brand_id || brand?.id || null;
       setCachedProfile(currentCache);
     }
     removeOrgScopedQueries();
@@ -795,7 +795,7 @@ export const AuthProvider = ({ children }) => {
     location: activeLocation,
     contextScope: {
       organizationId: activeOrg?.id || null,
-      brandId: activeBrand?.id || null,
+      brandId: activeBrand?.brand_id || activeBrand?.id || null,
       locationId: activeLocation?.id || null,
     },
     role,

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, Loader2, Send, User } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -67,9 +67,9 @@ export default function AiInsightsCopilotChat({ className, compact = false, stor
 
   const scopedContext = useMemo(() => ({
     organizationId: organization?.id || null,
-    brandId: brand?.id || brand?.brand_id || null,
+    brandId: brand?.brand_id || brand?.id || null,
     locationId: location?.id || null,
-  }), [organization?.id, brand?.id, brand?.brand_id, location?.id]);
+  }), [organization?.id, brand?.brand_id, brand?.id, location?.id]);
 
   const handleSendChatMessage = async (event) => {
     event.preventDefault();

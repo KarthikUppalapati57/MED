@@ -63,8 +63,8 @@ export default function ContextSwitcher() {
     enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!activeOrgId,
   });
 
-  // Locations: fetch for the active brand (or all locations in org for org_owner)
-  const activeBrandId = brand?.id || userProfile?.brand_id;
+  // Locations: fetch only after a brand is selected.
+  const activeBrandId = brand?.brand_id || brand?.id || null;
   const { data: brandLocations = [] } = useAuthQuery({
     queryKey: ['ctx-locations', activeOrgId, activeBrandId],
     queryFn: async () => {
@@ -72,18 +72,13 @@ export default function ContextSwitcher() {
         .from('locations')
         .select('id, name, brand_id, organization_id, address')
         .order('name');
-
-      if (activeBrandId) {
-        query = query.eq('brand_id', activeBrandId);
-      } else if (activeOrgId) {
-        query = query.eq('organization_id', activeOrgId);
-      }
+      query = query.eq('brand_id', activeBrandId);
 
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!(activeOrgId || activeBrandId),
+    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!activeBrandId,
   });
 
   // Ground staff: no switcher, just show assigned location name
@@ -146,7 +141,7 @@ export default function ContextSwitcher() {
       {/* Brand Selector */}
       {(isPlatformAdmin ? !!organization : true) && orgBrands.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">›</span>
+          <span className="text-muted-foreground text-xs">â€º</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
@@ -162,7 +157,7 @@ export default function ContextSwitcher() {
                 <DropdownMenuItem
                   key={b.brand_id}
                   onClick={() => switchContext('brand', b)}
-                  className={cn("gap-2 text-sm", brand?.brand_id === b.brand_id && "bg-purple-500/5 text-purple-400")}
+                  className={cn("gap-2 text-sm", (brand?.brand_id || brand?.id) === b.brand_id && "bg-purple-500/5 text-purple-400")}
                 >
                   <Store className="h-3.5 w-3.5" />
                   {b.name}
@@ -176,7 +171,7 @@ export default function ContextSwitcher() {
       {/* Location Selector */}
       {(isPlatformAdmin ? !!organization : true) && brandLocations.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">›</span>
+          <span className="text-muted-foreground text-xs">â€º</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">

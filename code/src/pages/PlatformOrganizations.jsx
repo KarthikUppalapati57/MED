@@ -1036,7 +1036,7 @@ export default function PlatformOrganizations() {
                       </SelectTrigger>
                       <SelectContent>
                         {orgBrands.map(b => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                          <SelectItem key={b.brand_id} value={b.brand_id}>{b.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

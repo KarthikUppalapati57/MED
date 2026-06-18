@@ -245,7 +245,7 @@ export default function AutoOrdering() {
   }, [receivingsData, organization, brand, location]);
 
   const { data: settingsRows = [] } = useAuthQuery({
-    queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'],
+    queryKey: ['operational_settings', organization?.id, (brand?.brand_id || brand?.id), location?.id, 'ordering'],
     queryFn: () => api.entities.OperationalSetting.filter({ organization_id: organization?.id }),
     enabled: !!organization?.id && needsOrderingSettings,
   });
@@ -278,9 +278,9 @@ export default function AutoOrdering() {
     mutationFn: async () => {
       const payload = {
         organization_id: organization?.id,
-        brand_id: brand?.id || null,
+        brand_id: (brand?.brand_id || brand?.id) || null,
         location_id: location?.id || null,
-        scope: location?.id ? 'location' : brand?.id ? 'brand' : 'organization',
+        scope: location?.id ? 'location' : (brand?.brand_id || brand?.id) ? 'brand' : 'organization',
         category: 'ordering',
         settings: orderSettings,
         created_by: userProfile?.id || null,
@@ -290,7 +290,7 @@ export default function AutoOrdering() {
       return api.entities.OperationalSetting.create(payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, brand?.id, location?.id, 'ordering'] });
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, (brand?.brand_id || brand?.id), location?.id, 'ordering'] });
       toast.success('Ordering settings saved');
     },
     onError: (error) => toast.error(error.message || 'Failed to save ordering settings'),
@@ -437,7 +437,7 @@ export default function AutoOrdering() {
       const orderPromises = Object.entries(vendorOrdersMap).map(([vendorName, items]) => {
         const order = {
           organization_id: organization?.id,
-          brand_id: brand?.id || null,
+          brand_id: (brand?.brand_id || brand?.id) || null,
           location_id: location?.id || null,
           order_number: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           vendor_name: vendorName,
@@ -643,7 +643,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Order #
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'order_number' ? '↑' : sortOrders === '-order_number' ? '↓' : '↕'}
+                          {sortOrders === 'order_number' ? 'â†‘' : sortOrders === '-order_number' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -654,7 +654,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Vendor
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'vendor_name' ? '↑' : sortOrders === '-vendor_name' ? '↓' : '↕'}
+                          {sortOrders === 'vendor_name' ? 'â†‘' : sortOrders === '-vendor_name' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -666,7 +666,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Total
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'total_amount' ? '↑' : sortOrders === '-total_amount' ? '↓' : '↕'}
+                          {sortOrders === 'total_amount' ? 'â†‘' : sortOrders === '-total_amount' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -678,7 +678,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Created
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortOrders === 'created_at' ? '↑' : sortOrders === '-created_at' ? '↓' : '↕'}
+                          {sortOrders === 'created_at' ? 'â†‘' : sortOrders === '-created_at' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -712,7 +712,7 @@ export default function AutoOrdering() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'â€”'}
                           </TableCell>
                           <TableCell className="text-right">
                             {order.status === 'pending_approval' && (
@@ -1147,7 +1147,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         To Location
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortTransfers === 'destination_name' ? '↑' : sortTransfers === '-destination_name' ? '↓' : '↕'}
+                          {sortTransfers === 'destination_name' ? 'â†‘' : sortTransfers === '-destination_name' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1160,7 +1160,7 @@ export default function AutoOrdering() {
                       <div className="flex items-center gap-1">
                         Date
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortTransfers === 'created_at' ? '↑' : sortTransfers === '-created_at' ? '↓' : '↕'}
+                          {sortTransfers === 'created_at' ? 'â†‘' : sortTransfers === '-created_at' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1241,7 +1241,7 @@ export default function AutoOrdering() {
                         <TableCell>{order?.vendor_name || 'Vendor'}</TableCell>
                         <TableCell>{receiving.items?.length || 0}</TableCell>
                         <TableCell><Badge variant="secondary">{receiving.status}</Badge></TableCell>
-                        <TableCell>{receiving.received_date ? new Date(receiving.received_date).toLocaleDateString() : '—'}</TableCell>
+                        <TableCell>{receiving.received_date ? new Date(receiving.received_date).toLocaleDateString() : 'â€”'}</TableCell>
                       </TableRow>
                     );
                   })}

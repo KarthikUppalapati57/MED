@@ -49,7 +49,7 @@ export default function EmailIngestionDialog({ open, onClose }) {
         port: data.port,
         username: data.username,
         organization_id: orgId,
-        brand_id: brand?.id || null,
+        brand_id: (brand?.brand_id || brand?.id) || null,
         location_id: location?.id || userProfile?.location_id || null,
       };
       
@@ -144,7 +144,7 @@ export default function EmailIngestionDialog({ open, onClose }) {
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input 
                   type="password"
-                  placeholder="••••••••••••••••" 
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
                   className="pl-9 h-11 rounded-xl bg-secondary/50 border-border" 
                   value={form.password}
                   onChange={e => setForm({...form, password: e.target.value})}

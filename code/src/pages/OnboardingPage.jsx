@@ -280,7 +280,7 @@ export default function OnboardingPage() {
         if (!primaryOrgId) primaryOrgId = result.org.id;
 
         const orgId = result.org.id;
-        const firstBrandId = result.brand.id;
+        const firstBrandId = result.brand.brand_id || result.brand.id;
 
         if (firstBrand.locations.length > 1) {
           const extraLocations = firstBrand.locations.slice(1)

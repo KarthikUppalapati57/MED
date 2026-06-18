@@ -175,10 +175,10 @@ async function sendDashboardReportNotifications({ brand, location, organization,
   if (error) throw error;
 
   const targets = (data || []).filter((profile) => {
-    if (scope === 'brand') return !profile.brand_id || !brand?.id || profile.brand_id === brand.id || profile.role === 'org_owner';
+    if (scope === 'brand') return !profile.brand_id || !(brand?.brand_id || brand?.id) || profile.brand_id === (brand.brand_id || brand.id) || profile.role === 'org_owner';
     if (scope === 'location') {
       if (profile.role === 'org_owner') return true;
-      if (profile.role === 'brand_manager' || profile.role === 'branch_manager') return !profile.brand_id || !brand?.id || profile.brand_id === brand.id;
+      if (profile.role === 'brand_manager' || profile.role === 'branch_manager') return !profile.brand_id || !(brand?.brand_id || brand?.id) || profile.brand_id === (brand.brand_id || brand.id);
       if (profile.role === 'location_manager') return !profile.location_id || !location?.id || profile.location_id === location.id;
       return false;
     }

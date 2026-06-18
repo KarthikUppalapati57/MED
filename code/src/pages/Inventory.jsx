@@ -679,7 +679,7 @@ export default function Inventory() {
     }));
     const order = await api.entities.AutoOrder.create({
       organization_id: organization?.id,
-      brand_id: brand?.id || null,
+      brand_id: (brand?.brand_id || brand?.id) || null,
       location_id: location?.id || null,
       order_number: `ORD-${Date.now()}`,
       vendor_name: 'Multiple Vendors',
@@ -689,7 +689,7 @@ export default function Inventory() {
       chat_history: [],
       created_by: userProfile?.id || null,
     });
-    toast.success(`Order created for ${selectedIds.size} item(s) — check Auto Ordering`);
+    toast.success(`Order created for ${selectedIds.size} item(s) â€” check Auto Ordering`);
     setSelectedIds(new Set());
     navigate(`/AutoOrdering?tab=all-orders&order=${order.id}`);
   };
@@ -799,7 +799,7 @@ export default function Inventory() {
                 {pendingItems.slice(0, 5).map(item => (
                   <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-resend-yellow/10 text-resend-yellow border border-resend-yellow/20 font-medium">
                     {item.product_name} ({item.current_quantity} {item.current_unit || 'ea'})
-                    {item.pending_source_invoice ? ` • Inv: ${item.pending_source_invoice}` : ''}
+                    {item.pending_source_invoice ? ` â€¢ Inv: ${item.pending_source_invoice}` : ''}
                   </span>
                 ))}
                 {pendingItems.length > 5 && (
@@ -1048,7 +1048,7 @@ export default function Inventory() {
                              <TableCell>
                                <div className="flex flex-col gap-1">
                                  <span className="text-xs text-muted-foreground flex items-center justify-between">
-                                   <span>Par: <span className="font-medium text-foreground">{item.par_level ?? '—'}</span></span>
+                                   <span>Par: <span className="font-medium text-foreground">{item.par_level ?? 'â€”'}</span></span>
                                    {isLow && (
                                      <Badge variant="outline" className="text-[9px] h-4 bg-indigo-50 border-indigo-200 text-indigo-700 ml-2" title="AI Suggested Par based on forecasted volume">
                                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />
@@ -1056,7 +1056,7 @@ export default function Inventory() {
                                      </Badge>
                                    )}
                                  </span>
-                                 <span className="text-xs text-muted-foreground">Reorder: <span className={cn("font-medium", isLow ? "text-resend-red" : "text-foreground")}>{item.reorder_point ?? '—'}</span></span>
+                                 <span className="text-xs text-muted-foreground">Reorder: <span className={cn("font-medium", isLow ? "text-resend-red" : "text-foreground")}>{item.reorder_point ?? 'â€”'}</span></span>
                                </div>
                              </TableCell>
                               <TableCell>
@@ -1163,7 +1163,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         Date
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortWastage === 'created_at' ? '↑' : sortWastage === '-created_at' ? '↓' : '↕'}
+                          {sortWastage === 'created_at' ? 'â†‘' : sortWastage === '-created_at' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1174,7 +1174,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         Product
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortWastage === 'product_name' ? '↑' : sortWastage === '-product_name' ? '↓' : '↕'}
+                          {sortWastage === 'product_name' ? 'â†‘' : sortWastage === '-product_name' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1186,7 +1186,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         Value
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortWastage === 'value' ? '↑' : sortWastage === '-value' ? '↓' : '↕'}
+                          {sortWastage === 'value' ? 'â†‘' : sortWastage === '-value' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1308,7 +1308,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         Template Name
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortCountSheets === 'name' ? '↑' : sortCountSheets === '-name' ? '↓' : '↕'}
+                          {sortCountSheets === 'name' ? 'â†‘' : sortCountSheets === '-name' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1321,7 +1321,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-1">
                         Last Count
                         <span className="opacity-0 group-hover:opacity-100 text-xs">
-                          {sortCountSheets === 'last_count_date' ? '↑' : sortCountSheets === '-last_count_date' ? '↓' : '↕'}
+                          {sortCountSheets === 'last_count_date' ? 'â†‘' : sortCountSheets === '-last_count_date' ? 'â†“' : 'â†•'}
                         </span>
                       </div>
                     </TableHead>
@@ -1388,7 +1388,7 @@ export default function Inventory() {
                         <div key={reason}>
                           <div className="flex justify-between text-sm mb-1">
                             <span className="font-medium capitalize">{reason.replace(/_/g, ' ')}</span>
-                            <span className="text-muted-foreground">{data.count} entries · ${data.value.toFixed(2)}</span>
+                            <span className="text-muted-foreground">{data.count} entries Â· ${data.value.toFixed(2)}</span>
                           </div>
                           <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div
@@ -1540,7 +1540,7 @@ export default function Inventory() {
                       <TableHead>Prev Count</TableHead>
                       <TableHead>Prev Value</TableHead>
                       <TableHead>Current Count</TableHead>
-                      <TableHead>Î” Change</TableHead>
+                      <TableHead>ÃŽâ€ Change</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

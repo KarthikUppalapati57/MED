@@ -23,7 +23,7 @@ export default function RestaurantSetup() {
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
   const activeOrgId = organization?.id || userProfile?.organization_id;
-  const activeBrandId = brand?.id || null;
+  const activeBrandId = (brand?.brand_id || brand?.id) || null;
   const activeLocationId = location?.id || userProfile?.location_id || null;
 
   const [posProvider, setPosProvider] = React.useState('');
