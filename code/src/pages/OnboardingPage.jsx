@@ -9,8 +9,127 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2, Sparkles, Check } from 'lucide-react';
+import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2, Sparkles, Check, Search } from 'lucide-react';
 import Papa from 'papaparse';
+
+function AddressAutocompleteInput({ id, value, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState('');
+  const abortRef = useRef(null);
+  const trimmedValue = value.trim();
+
+  useEffect(() => {
+    if (trimmedValue.length < 3) {
+      setSuggestions([]);
+      setIsSearching(false);
+      setError('');
+      abortRef.current?.abort();
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setIsSearching(true);
+      setError('');
+
+      try {
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          q: trimmedValue,
+          addressdetails: '1',
+          limit: '5',
+        });
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error('Address lookup failed');
+        const results = await response.json();
+        setSuggestions(Array.isArray(results) ? results : []);
+        setOpen(true);
+      } catch (lookupError) {
+        if (lookupError.name !== 'AbortError') {
+          setSuggestions([]);
+          setError('Address suggestions unavailable. You can still type it manually.');
+          setOpen(true);
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      abortRef.current?.abort();
+    };
+  }, [trimmedValue]);
+
+  const selectAddress = (address) => {
+    onChange(address);
+    setOpen(false);
+    setSuggestions([]);
+    setError('');
+  };
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          id={id}
+          placeholder={placeholder}
+          value={value}
+          autoComplete="street-address"
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            if (suggestions.length > 0 || error || isSearching) setOpen(true);
+          }}
+          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+          className="h-9 bg-card pl-9 text-sm text-muted-foreground"
+        />
+      </div>
+
+      {open && (suggestions.length > 0 || isSearching || error) && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-card shadow-lg">
+          {isSearching && (
+            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Searching addresses...
+            </div>
+          )}
+
+          {!isSearching && error && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              {error}
+            </div>
+          )}
+
+          {!isSearching && !error && suggestions.map((item) => (
+            <button
+              key={`${item.place_id}-${item.osm_id}`}
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                selectAddress(item.display_name);
+              }}
+              className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-secondary focus:bg-secondary focus:outline-none"
+            >
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="line-clamp-2 text-foreground">{item.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
@@ -803,11 +922,11 @@ export default function OnboardingPage() {
                                       onChange={(e) => updateLocation(orgIdx, brandIdx, locIdx, 'name', e.target.value)}
                                       className="h-10 bg-card"
                                     />
-                                    <Input 
-                                      placeholder="123 Street, City, State, ZIP" 
-                                      value={loc.address} 
-                                      onChange={(e) => updateLocation(orgIdx, brandIdx, locIdx, 'address', e.target.value)}
-                                      className="h-9 bg-card text-sm text-muted-foreground"
+                                    <AddressAutocompleteInput
+                                      id={`location-address-${orgIdx}-${brandIdx}-${locIdx}`}
+                                      placeholder="123 Street, City, State, ZIP"
+                                      value={loc.address}
+                                      onChange={(address) => updateLocation(orgIdx, brandIdx, locIdx, 'address', address)}
                                     />
                                   </div>
                                   {brand.locations.length > 1 && (

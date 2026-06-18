@@ -141,7 +141,7 @@ export default function ContextSwitcher() {
       {/* Brand Selector */}
       {(isPlatformAdmin ? !!organization : true) && orgBrands.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">â€º</span>
+          <span className="text-muted-foreground text-xs">Ã¢â‚¬Âº</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
@@ -171,7 +171,7 @@ export default function ContextSwitcher() {
       {/* Location Selector */}
       {(isPlatformAdmin ? !!organization : true) && brandLocations.length > 0 && (
         <>
-          <span className="text-muted-foreground text-xs">â€º</span>
+          <span className="text-muted-foreground text-xs">Ã¢â‚¬Âº</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[180px]">
