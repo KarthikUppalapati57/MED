@@ -203,7 +203,11 @@ export default function Integrations() {
   }, [queryClient]);
 
   const getProviderKey = (id) => {
-    const valid = ['quickbooks', 'xero', 'netsuite', 'stripe'];
+    const valid = [
+      'quickbooks', 'xero', 'netsuite', 'stripe', 'email_imap',
+      'toast', 'square', 'clover', 'lightspeed', '7shifts',
+      'spoton', 'supabase', 'cloudrun', 'sage', 'other'
+    ];
     return valid.includes(id) ? id : 'other';
   };
 
@@ -285,13 +289,7 @@ export default function Integrations() {
         }
       };
 
-      const res = await supabase.functions.invoke('pos-webhook', {
-        body: payload,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      // Need to pass provider via query string natively
+      // Call the webhook manually to pass the provider query string natively
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pos-webhook?provider=${integration.id}`;
       const manualRes = await fetch(url, {
         method: 'POST',
@@ -470,7 +468,10 @@ export default function Integrations() {
                <p className="text-xs mt-1">When connecting a POS system, all inbound traffic is routed through our secure `pos-webhook` Edge Function to guarantee payload authenticity.</p>
                <div className="mt-3 flex items-center gap-2">
                  <Input readOnly value="https://api.restops.com/v1/webhooks/pos/{location_id}" className="bg-white text-xs font-mono h-8" />
-                 <Button size="sm" variant="outline" className="h-8 shrink-0 bg-white" onClick={() => toast.success("Webhook URL copied to clipboard")}>
+                 <Button size="sm" variant="outline" className="h-8 shrink-0 bg-white" onClick={() => {
+                   navigator.clipboard.writeText("https://api.restops.com/v1/webhooks/pos/{location_id}");
+                   toast.success("Webhook URL copied to clipboard");
+                 }}>
                    <Copy className="h-3 w-3 mr-1" /> Copy URL
                  </Button>
                </div>
