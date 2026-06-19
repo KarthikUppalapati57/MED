@@ -106,7 +106,7 @@ async function runAccount(account) {
 
   const profileRes = await client
     .from('profiles')
-    .select('id,email,full_name,role,organization_id,brand_id,location_id,access_level,permissions,status')
+    .select('id,email,full_name,role,organization_id,brand_id,location_id,access_level,status')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -127,14 +127,7 @@ async function runAccount(account) {
   }
   if (profile?.status !== 'active') warnings.push(`profile status is ${profile?.status}`);
 
-  if (account.role === 'ground_staff') {
-    const permissions = profile?.permissions || {};
-    for (const page of ['Inventory', 'AutoOrdering']) {
-      if (!['read', 'full'].includes(permissions[page])) {
-        failures.push(`ground staff missing explicit ${page} permission`);
-      }
-    }
-  }
+  // Ground staff legacy permissions check removed since permissions column was dropped
 
   const tableResults = [];
   for (const check of tableChecks) {

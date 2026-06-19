@@ -41,6 +41,13 @@ const MODULES = [
   'setup',
 ];
 
+const BASIC_MODULES = [
+  'dashboard',
+  'setup',
+  'admin',
+  'performance',
+];
+
 const tenants = [
   {
     name: 'QA Bistro Group',
@@ -56,6 +63,14 @@ const tenants = [
     brands: [
       { name: 'Harbor Table', locations: ['Harbor Table Pier', 'Harbor Table Market'] },
       { name: 'Sunset Tacos', locations: ['Sunset Tacos Beach', 'Sunset Tacos City'] },
+    ],
+  },
+  {
+    name: 'QA Basic Setup',
+    slug: 'qa-basic-setup',
+    modules: BASIC_MODULES,
+    brands: [
+      { name: 'Basic Burgers', locations: ['Basic Downtown'] },
     ],
   },
 ];
@@ -79,6 +94,10 @@ const accounts = [
   { email: 'qa.brand.harbor@restops.test', fullName: 'QA Harbor Brand Manager', role: 'branch_manager', tenant: 1, brand: 0, accessLevel: 'brand' },
   { email: 'qa.location.harbor@restops.test', fullName: 'QA Harbor Location Manager', role: 'location_manager', tenant: 1, brand: 0, location: 0, accessLevel: 'location' },
   { email: 'qa.staff.harbor@restops.test', fullName: 'QA Harbor Staff', role: 'ground_staff', tenant: 1, brand: 0, location: 0, accessLevel: 'location', permissions: staffModulePermissions },
+  { email: 'qa.owner.basic@restops.test', fullName: 'QA Basic Owner', role: 'org_owner', tenant: 2, accessLevel: 'organization' },
+  { email: 'qa.brand.basic@restops.test', fullName: 'QA Basic Brand Manager', role: 'branch_manager', tenant: 2, brand: 0, accessLevel: 'brand' },
+  { email: 'qa.location.basic@restops.test', fullName: 'QA Basic Location Manager', role: 'location_manager', tenant: 2, brand: 0, location: 0, accessLevel: 'location' },
+  { email: 'qa.staff.basic@restops.test', fullName: 'QA Basic Staff', role: 'ground_staff', tenant: 2, brand: 0, location: 0, accessLevel: 'location', permissions: staffModulePermissions },
 ];
 
 async function must(label, promise) {
@@ -144,7 +163,7 @@ async function seedOrganization(tenant) {
       slug: tenant.slug,
       subscription_plan: 'enterprise',
       subscription_status: 'active',
-      enabled_modules: MODULES,
+      enabled_modules: tenant.modules || MODULES,
     }, { onConflict: 'slug' })
     .select('id, name, slug')
     .single());
@@ -210,7 +229,6 @@ async function seedProfile(account, user, context = {}) {
       id: user.id,
       location_id: context.locationId || null,
       organization_id: context.organizationId || null,
-      permissions: account.permissions || {},
       role: account.role,
       status: 'active',
     }, { onConflict: 'id' })

@@ -45,7 +45,7 @@ INVOICE_SCHEMA_PROMPT = """You are an expert invoice data extractor. You will re
   "total_amount": number,
   "line_items": [
     {
-      "product_id": "string or null (Leave null if no explicit product ID/SKU is present. Do NOT use the description here)",
+      "vendor_item_code": "string or null (Leave null if no explicit item code/SKU is present. Do NOT use the description here)",
       "description": "string",
       "quantity": number,
       "unit": "string (ea, lb, cs, etc.)",

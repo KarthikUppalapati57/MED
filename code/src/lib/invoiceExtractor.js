@@ -177,7 +177,7 @@ export async function extractInvoiceData(file, onProgress) {
       other_charges: result.other_charges || 0,
       total_amount: result.total_amount || 0,
       line_items: (result.line_items || []).map(item => ({
-        product_id: item.product_id || '',
+        vendor_item_code: item.vendor_item_code || '',
         description: item.description || '',
         quantity: item.quantity || 0,
         unit: item.unit || 'ea',

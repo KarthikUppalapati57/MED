@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ItemMappingSelect from './ItemMappingSelect';
 import ReconciliationVarianceTable from './ReconciliationVarianceTable';
 import { CategorySummaryTable } from './CategorySummaryTable';
 import { ApprovalWorkflowEngine } from './ApprovalWorkflowEngine';
@@ -86,7 +85,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
 
   const addLineItem = () => {
     const newItems = [...(invoice.line_items || []), {
-      product_id: '',
+      vendor_item_code: '',
       description: '',
       quantity: 1,
       unit: 'ea',
@@ -310,7 +309,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[200px]">Product</TableHead>
+                  <TableHead className="w-[180px]">Vendor Item ID</TableHead>
                   <TableHead>Vendor Item Description</TableHead>
                   <TableHead className="w-[100px]">AI Match</TableHead>
                   <TableHead className="w-[80px]">Qty</TableHead>
@@ -326,11 +325,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 {(invoice.line_items || []).map((item, index) => (
                   <TableRow key={index}>
                     <TableCell>
-                      <ItemMappingSelect
-                        value={item.product_id}
-                        onChange={(val) => handleLineItemChange(index, 'product_id', val)}
-                        vendorItemName={item.description}
-                        vendorId={invoice.vendor_id}
+                      <Input
+                        value={item.vendor_item_code || ''}
+                        onChange={(e) => handleLineItemChange(index, 'vendor_item_code', e.target.value)}
+                        className="h-8"
+                        placeholder="Item #"
                       />
                     </TableCell>
                     <TableCell>
