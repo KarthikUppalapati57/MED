@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -40,19 +41,7 @@ export default function VendorStatementsTab({ vendors }) {
   // Fetch statements
   const { data: statements = [], isLoading } = useAuthQuery({
     queryKey: ['vendor-statements', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendor_statements')
-        .select(`
-          *,
-          vendor:vendors(name),
-          lines:vendor_statement_lines(*)
-        `)
-        .eq('organization_id', organization?.id)
-        .order('statement_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => api.tenant.listVendorStatements(organization?.id),
     enabled: !!organization?.id
   });
 
@@ -79,25 +68,23 @@ export default function VendorStatementsTab({ vendors }) {
       // Simulate OCR delay
       await new Promise(res => setTimeout(res, 2000));
       
-      const { data: st, error: stErr } = await supabase
-        .from('vendor_statements')
-        .insert({
-          organization_id: organization.id,
-          vendor_id: uploadVendorId,
-          statement_date: uploadDate,
-          total_amount: Number(uploadAmount)
-        })
-        .select()
-        .single();
-        
-      if (stErr) throw stErr;
+      const st = await api.entities.VendorStatement.create({
+        organization_id: organization.id,
+        vendor_id: uploadVendorId,
+        statement_date: uploadDate,
+        total_amount: Number(uploadAmount)
+      });
 
       // Mock creating 3 statement lines, one matched, one unmatched, one missing credit
-      await supabase.from('vendor_statement_lines').insert([
-        { statement_id: st.id, invoice_number: 'INV-101', amount: Number(uploadAmount) * 0.5, status: 'unmatched' },
-        { statement_id: st.id, invoice_number: 'INV-102', amount: Number(uploadAmount) * 0.6, status: 'unmatched' },
-        { statement_id: st.id, invoice_number: 'CR-99', amount: -Number(uploadAmount) * 0.1, status: 'unmatched' }
-      ]);
+      const { error: lineErr } = await supabase.rpc('tenant_insert_vendor_statement_lines', {
+        p_organization_id: organization.id,
+        p_lines: [
+          { statement_id: st.id, invoice_number: 'INV-101', amount: Number(uploadAmount) * 0.5, status: 'unmatched' },
+          { statement_id: st.id, invoice_number: 'INV-102', amount: Number(uploadAmount) * 0.6, status: 'unmatched' },
+          { statement_id: st.id, invoice_number: 'CR-99', amount: -Number(uploadAmount) * 0.1, status: 'unmatched' }
+        ]
+      });
+      if (lineErr) throw lineErr;
       
       return st;
     },
@@ -118,7 +105,10 @@ export default function VendorStatementsTab({ vendors }) {
 
   const handleDispute = async () => {
     try {
-      await supabase.from('vendor_statements').update({ status: 'disputed' }).eq('id', selectedStatement.id);
+      await api.entities.VendorStatement.update(selectedStatement.id, {
+        organization_id: organization.id,
+        status: 'disputed'
+      });
       // Ideally send email or log
       toast.success('Dispute sent to vendor');
       queryClient.invalidateQueries({ queryKey: ['vendor-statements'] });

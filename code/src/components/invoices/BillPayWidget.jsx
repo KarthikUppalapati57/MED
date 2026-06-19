@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,16 +38,10 @@ export function BillPayWidget({ invoice }) {
 
   const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
     queryKey: ['payment-accounts', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payment_accounts')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .eq('is_active', true)
-        .order('name');
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.PaymentAccount.filter(
+      { organization_id: organization.id, is_active: true },
+      { orderBy: 'name' }
+    ),
     enabled: !!organization?.id
   });
 

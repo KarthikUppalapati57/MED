@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Plus, Trash, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -23,16 +24,14 @@ export default function ApiKeysTab() {
 
   async function fetchKeys() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('api_keys')
-      .select('id, organization_id, name, prefix, last_used_at, created_at')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      toast.error("Failed to load API keys");
-    } else {
+    try {
+      const data = await api.entities.ApiKey.filter(
+        { organization_id: organizationId },
+        { orderBy: '-created_at' }
+      );
       setKeys(data || []);
+    } catch {
+      toast.error("Failed to load API keys");
     }
     setLoading(false);
   }
@@ -58,11 +57,12 @@ export default function ApiKeysTab() {
   }
 
   async function handleRevoke(id) {
-    const { error } = await supabase.from('api_keys').delete().eq('id', id).eq('organization_id', organizationId);
-    if (error) toast.error("Failed to revoke key");
-    else {
+    try {
+      await api.entities.ApiKey.delete(id);
       toast.success("API key revoked");
       fetchKeys();
+    } catch {
+      toast.error("Failed to revoke key");
     }
   }
 

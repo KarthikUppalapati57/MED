@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Store, ArrowRightLeft, Plus, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -57,29 +58,24 @@ export default function Commissary() {
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['intercompany_transfers', organization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('intercompany_transfers')
-        .select(`
-          *,
-          from_location:locations!intercompany_transfers_from_location_id_fkey(name),
-          to_location:locations!intercompany_transfers_to_location_id_fkey(name)
-        `)
-        .eq('organization_id', organization?.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
+      const rows = await api.entities.IntercompanyTransfer.filter(
+        { organization_id: organization?.id },
+        { orderBy: '-created_at' }
+      );
+      const locationById = new Map(locations.map((item) => [item.id, item]));
+      return rows.map((row) => ({
+        ...row,
+        from_location: locationById.get(row.from_location_id) || null,
+        to_location: locationById.get(row.to_location_id) || null,
+      }));
     },
-    enabled: !!organization?.id
+    enabled: !!organization?.id && locations.length > 0
   });
 
   // Fetch recipes/products available to order from commissary
   const { data: recipes = [] } = useQuery({
     queryKey: ['recipes', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('recipes').select('id, is_batch, name, yield_unit, cost_per_serving, total_cost, category, organization_id').eq('organization_id', organization?.id);
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.Recipe.filter({ organization_id: organization?.id }),
     enabled: !!organization?.id
   });
 
@@ -122,7 +118,7 @@ export default function Commissary() {
       
       const total = orderItems.reduce((sum, item) => sum + item.total_cost, 0);
       
-      const { error } = await supabase.from('intercompany_transfers').insert({
+      await api.entities.IntercompanyTransfer.create({
         organization_id: organization.id,
         from_location_id: commissaryLocation.id,
         to_location_id: location.id,
@@ -130,7 +126,6 @@ export default function Commissary() {
         total_amount: total,
         status: 'pending'
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['intercompany_transfers']);
@@ -143,12 +138,12 @@ export default function Commissary() {
 
   const fulfillOrderMutation = useMutation({
     mutationFn: async (transferId) => {
-      const { error } = await supabase.from('intercompany_transfers').update({
+      await api.entities.IntercompanyTransfer.update(transferId, {
+        organization_id: organization.id,
         status: 'fulfilled',
         fulfilled_at: new Date().toISOString(),
         fulfilled_by: userProfile?.id
-      }).eq('id', transferId);
-      if (error) throw error;
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['intercompany_transfers']);

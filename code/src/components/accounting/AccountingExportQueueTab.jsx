@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -31,16 +32,19 @@ export default function AccountingExportQueueTab() {
     enabled: !!organization?.id
   });
 
-  // Since we just have the entity_id, let's also fetch invoices to map invoice numbers.
+  // Since we just have the entity_id, fetch routed invoices and vendors to map invoice numbers.
   const { data: invoices = [] } = useAuthQuery({
     queryKey: ['export-queue-invoices', organization?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('id, invoice_number, vendor:vendors(name), total_amount')
-        .eq('organization_id', organization?.id);
-      if (error) throw error;
-      return data;
+      const [invoiceRows, vendorRows] = await Promise.all([
+        api.entities.Invoice.filter({ organization_id: organization?.id }),
+        api.entities.Vendor.filter({ organization_id: organization?.id }),
+      ]);
+      const vendorById = new Map(vendorRows.map((vendor) => [vendor.id, vendor]));
+      return invoiceRows.map((invoice) => ({
+        ...invoice,
+        vendor: vendorById.get(invoice.vendor_id) ? { name: vendorById.get(invoice.vendor_id).name } : null,
+      }));
     },
     enabled: !!organization?.id
   });

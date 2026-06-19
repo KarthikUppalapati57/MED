@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,29 +29,20 @@ export default function ApprovalPolicySettings() {
 
   const { data: policies = [], isLoading } = useQuery({
     queryKey: ['approval-policies', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('approval_policies')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('min_amount', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.ApprovalPolicy.filter(
+      { organization_id: organization.id },
+      { orderBy: 'min_amount' }
+    ),
     enabled: !!organization?.id
   });
 
   const createPolicyMutation = useMutation({
-    mutationFn: async (policy) => {
-      const { data, error } = await supabase.from('approval_policies').insert({
-        organization_id: organization.id,
-        min_amount: policy.min_amount ? parseFloat(policy.min_amount) : 0,
-        max_amount: policy.max_amount ? parseFloat(policy.max_amount) : null,
-        required_role: policy.required_role
-      });
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (policy) => api.entities.ApprovalPolicy.create({
+      organization_id: organization.id,
+      min_amount: policy.min_amount ? parseFloat(policy.min_amount) : 0,
+      max_amount: policy.max_amount ? parseFloat(policy.max_amount) : null,
+      required_role: policy.required_role
+    }),
     onSuccess: () => {
       toast.success("Approval policy created");
       queryClient.invalidateQueries({ queryKey: ['approval-policies'] });
@@ -62,10 +53,7 @@ export default function ApprovalPolicySettings() {
   });
 
   const deletePolicyMutation = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from('approval_policies').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id) => api.entities.ApprovalPolicy.delete(id),
     onSuccess: () => {
       toast.success("Policy removed");
       queryClient.invalidateQueries({ queryKey: ['approval-policies'] });

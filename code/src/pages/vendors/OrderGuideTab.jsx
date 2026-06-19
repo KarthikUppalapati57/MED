@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -16,30 +16,18 @@ export default function OrderGuideTab({ vendorId }) {
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['vendor_items_order_guide', vendorId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .select('*')
-        .eq('vendor_id', vendorId)
-        .eq('organization_id', organization?.id)
-        .order('vendor_item_name');
-        
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.VendorItem.filter(
+      { vendor_id: vendorId, organization_id: organization?.id },
+      { orderBy: 'vendor_item_name' }
+    ),
     enabled: !!vendorId && !!organization?.id
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, updates }) => {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .update(updates)
-        .eq('id', id)
-        .select();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }) => api.entities.VendorItem.update(id, {
+      ...updates,
+      organization_id: organization?.id
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_items_order_guide', vendorId]);
     },
@@ -79,8 +67,7 @@ export default function OrderGuideTab({ vendorId }) {
         total_amount: orderItems.reduce((acc, i) => acc + ((i.last_price || i.default_price || 0) * (i.preferred_quantity || 1)), 0)
       };
 
-      const { error } = await supabase.from('auto_orders').insert([payload]);
-      if (error) throw error;
+      await api.entities.AutoOrder.create(payload);
 
       toast.success("Draft order generated successfully!");
       // Optionally navigate to orders tab or auto orders page

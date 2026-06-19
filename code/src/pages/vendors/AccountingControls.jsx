@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,24 +15,13 @@ export default function AccountingControls({ vendorId }) {
 
   const { data: vendor, isLoading } = useQuery({
     queryKey: ['vendor_accounting', vendorId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('default_expense_category, default_payment_account_id, file_routing_preference')
-        .eq('id', vendorId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => api.entities.Vendor.get(vendorId),
     enabled: !!vendorId
   });
 
   const { data: paymentAccounts = [] } = useQuery({
     queryKey: ['payment_accounts'],
-    queryFn: async () => {
-      const { data } = await supabase.from('payment_accounts').select('*').eq('organization_id', organization?.id);
-      return data || [];
-    },
+    queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id }),
     enabled: !!organization?.id
   });
 
@@ -49,13 +38,7 @@ export default function AccountingControls({ vendorId }) {
   }, [vendor, formData]);
 
   const updateMutation = useMutation({
-    mutationFn: async (updates) => {
-      const { error } = await supabase
-        .from('vendors')
-        .update(updates)
-        .eq('id', vendorId);
-      if (error) throw error;
-    },
+    mutationFn: (updates) => api.entities.Vendor.update(vendorId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_accounting', vendorId]);
       queryClient.invalidateQueries(['vendor', vendorId]);

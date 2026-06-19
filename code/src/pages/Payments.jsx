@@ -463,7 +463,7 @@ export default function Payments() {
 
   const handleConfirmBankTransfer = async (payment) => {
     try {
-      const confirmedPayment = await confirmBankTransfer(payment.id);
+      const confirmedPayment = await confirmBankTransfer(payment.id, payment.organization_id || organization?.id);
       // Also update invoice to paid
       if (payment.invoice_id) {
         const fileDestination = await getVendorFileDestination(payment.vendor_id);

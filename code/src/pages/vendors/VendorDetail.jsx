@@ -82,12 +82,12 @@ export default function VendorDetail() {
 
 
   const { data: vendorItems = [] } = useAuthQuery({
-    queryKey: ['vendor_items_insights', id],
-    queryFn: async () => {
-      const { data } = await api.client.from('vendor_items').select('price_variance_flag, on_order_guide').eq('vendor_id', id);
-      return data || [];
-    },
-    enabled: !!id,
+    queryKey: ['vendor_items_insights', id, vendor?.organization_id],
+    queryFn: () => api.entities.VendorItem.filter({
+      vendor_id: id,
+      organization_id: vendor?.organization_id,
+    }),
+    enabled: !!id && !!vendor?.organization_id,
   });
 
   // Data-Driven Insights

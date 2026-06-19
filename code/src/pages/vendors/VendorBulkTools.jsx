@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { UploadCloud, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 import Papa from 'papaparse';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 
 export default function VendorBulkTools({ vendorId }) {
   const { organization } = useAuth();
@@ -17,13 +17,10 @@ export default function VendorBulkTools({ vendorId }) {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .select('vendor_item_code, vendor_item_name, vendor_unit, pack_size, default_price, on_order_guide, preferred_quantity')
-        .eq('vendor_id', vendorId)
-        .eq('organization_id', organization?.id);
-        
-      if (error) throw error;
+      const data = await api.entities.VendorItem.filter(
+        { vendor_id: vendorId, organization_id: organization?.id },
+        { orderBy: 'vendor_item_name' }
+      );
       
       if (!data || data.length === 0) {
         toast.info("No items to export for this vendor.");
@@ -78,11 +75,20 @@ export default function VendorBulkTools({ vendorId }) {
             preferred_quantity: row.preferred_quantity ? parseFloat(row.preferred_quantity) : 1
           }));
 
-          const { error } = await supabase
-            .from('vendor_items')
-            .upsert(itemsToInsert, { onConflict: 'organization_id,vendor_id,vendor_item_code,vendor_item_name' });
-            
-          if (error) throw error;
+          for (const item of itemsToInsert) {
+            const matches = await api.entities.VendorItem.filter({
+              organization_id: item.organization_id,
+              vendor_id: item.vendor_id,
+              vendor_item_code: item.vendor_item_code,
+              vendor_item_name: item.vendor_item_name,
+            }, { limit: 1 });
+
+            if (matches[0]) {
+              await api.entities.VendorItem.update(matches[0].id, item);
+            } else {
+              await api.entities.VendorItem.create(item);
+            }
+          }
           
           toast.success(`Successfully imported ${itemsToInsert.length} items`);
           // Note: The VendorItemsTab will need to be re-focused or query invalidated.

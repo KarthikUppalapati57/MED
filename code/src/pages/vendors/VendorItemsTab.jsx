@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,48 +31,44 @@ export default function VendorItemsTab({ vendorId }) {
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['vendor_items', vendorId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .select(`
-          *,
-          vendor_item_mappings (
-            internal_product_id,
-            products ( name )
-          )
-        `)
-        .eq('vendor_id', vendorId)
-        .eq('organization_id', organization?.id);
-        
-      if (error) throw error;
-      return data || [];
+      const [vendorItems, mappings, mappedProducts] = await Promise.all([
+        api.entities.VendorItem.filter({ vendor_id: vendorId, organization_id: organization?.id }),
+        api.entities.VendorItemMapping.filter({ organization_id: organization?.id }),
+        api.entities.Product.filter({ organization_id: organization?.id }),
+      ]);
+      const productById = new Map(mappedProducts.map((product) => [product.id, product]));
+      const mappingsByVendorItem = mappings.reduce((acc, mapping) => {
+        if (!acc[mapping.vendor_item_id]) acc[mapping.vendor_item_id] = [];
+        acc[mapping.vendor_item_id].push({
+          ...mapping,
+          products: productById.get(mapping.internal_product_id) || null,
+        });
+        return acc;
+      }, {});
+
+      return vendorItems.map((item) => ({
+        ...item,
+        vendor_item_mappings: mappingsByVendorItem[item.id] || [],
+      }));
     },
     enabled: !!vendorId && !!organization?.id
   });
 
   const { data: products = [] } = useQuery({
     queryKey: ['products-for-vendor-item-mapping', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, product_id, latest_price')
-        .eq('organization_id', organization?.id)
-        .is('deleted_at', null)
-        .order('name');
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.Product.filter(
+      { organization_id: organization?.id },
+      { orderBy: 'name' }
+    ),
     enabled: !!organization?.id
   });
 
   const createMutation = useMutation({
-    mutationFn: async (newItem) => {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .insert([{ ...newItem, vendor_id: vendorId, organization_id: organization?.id }])
-        .select();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (newItem) => api.entities.VendorItem.create({
+      ...newItem,
+      vendor_id: vendorId,
+      organization_id: organization?.id
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_items', vendorId]);
       toast.success('Vendor item added');
@@ -82,15 +79,7 @@ export default function VendorItemsTab({ vendorId }) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, updates }) => {
-      const { data, error } = await supabase
-        .from('vendor_items')
-        .update(updates)
-        .eq('id', id)
-        .select();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, updates }) => api.entities.VendorItem.update(id, { ...updates, organization_id: organization?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_items', vendorId]);
       toast.success('Vendor item updated');
@@ -101,10 +90,7 @@ export default function VendorItemsTab({ vendorId }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from('vendor_items').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id) => api.entities.VendorItem.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_items', vendorId]);
       toast.success('Vendor item deleted');
@@ -142,8 +128,8 @@ export default function VendorItemsTab({ vendorId }) {
     };
 
     const saveItem = editingItem
-      ? updateMutation.mutateAsync({ id: editingItem.id, updates: payload }).then((rows) => rows?.[0] || editingItem)
-      : createMutation.mutateAsync(payload).then((rows) => rows?.[0]);
+      ? updateMutation.mutateAsync({ id: editingItem.id, updates: payload }).then((row) => row || editingItem)
+      : createMutation.mutateAsync(payload);
 
     saveItem.then(async (savedItem) => {
       if (!savedItem?.id || !formData.internal_product_id) return;
@@ -152,14 +138,13 @@ export default function VendorItemsTab({ vendorId }) {
       );
       if (existing) return;
 
-      const { error } = await supabase.from('vendor_item_mappings').insert({
+      await api.entities.VendorItemMapping.create({
         organization_id: organization?.id,
         vendor_item_id: savedItem.id,
         internal_product_id: formData.internal_product_id,
         conversion_multiplier: 1,
         is_verified: true
       });
-      if (error) throw error;
       toast.success('Product mapping saved');
       queryClient.invalidateQueries(['vendor_items', vendorId]);
     }).catch((err) => toast.error(`Failed to save mapping: ${err.message}`));

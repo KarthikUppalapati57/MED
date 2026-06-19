@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import {
   Table,
   TableBody,
@@ -24,12 +25,10 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
     queryKey: ['invoice-allocations', invoiceId],
     queryFn: async () => {
       if (!invoiceId) return [];
-      const res = await supabase.from('invoice_allocations')
-        .select('*')
-        .eq('invoice_id', invoiceId)
-        .order('allocation_type', { ascending: true });
-      if (res.error) throw res.error;
-      return res.data;
+      return api.entities.InvoiceAllocation.filter(
+        { invoice_id: invoiceId },
+        { orderBy: 'allocation_type' }
+      );
     },
     enabled: !!invoiceId
   });
@@ -38,9 +37,7 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
   const { data: glMappings = [] } = useQuery({
     queryKey: ['gl-mappings'],
     queryFn: async () => {
-      const res = await supabase.from('gl_mappings').select('*');
-      if (res.error) throw res.error;
-      return res.data;
+      return api.entities.GlMapping.list();
     }
   });
 
@@ -62,8 +59,7 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
   const saveSplitsMutation = useMutation({
     mutationFn: async ({ originalAllocation, newSplits }) => {
       // Delete original
-      const delRes = await supabase.from('invoice_allocations').delete().eq('id', originalAllocation.id);
-      if (delRes.error) throw delRes.error;
+      await api.entities.InvoiceAllocation.delete(originalAllocation.id);
 
       // Insert new ones
       const toInsert = newSplits.map(s => ({
@@ -75,8 +71,7 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
         amount: s.amount,
         percentage: s.percentage
       }));
-      const insRes = await supabase.from('invoice_allocations').insert(toInsert);
-      if (insRes.error) throw insRes.error;
+      await Promise.all(toInsert.map((row) => api.entities.InvoiceAllocation.create(row)));
     },
     onSuccess: () => {
       toast.success("Split coding saved.");

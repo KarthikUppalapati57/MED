@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,15 +32,10 @@ export default function PaymentAccountsSettings() {
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['payment-accounts', organization?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payment_accounts')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
+    queryFn: () => api.entities.PaymentAccount.filter(
+      { organization_id: organization.id },
+      { orderBy: 'created_at' }
+    ),
     enabled: !!organization?.id
   });
 
@@ -63,17 +57,13 @@ export default function PaymentAccountsSettings() {
   });
 
   const createAccountMutation = useMutation({
-    mutationFn: async (account) => {
-      const { data, error } = await supabase.from('payment_accounts').insert({
-        organization_id: organization.id,
-        name: account.name,
-        account_type: account.account_type,
-        routing_number_last4: account.routing_number_last4 || null,
-        account_number_last4: account.account_number_last4 || null
-      });
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (account) => api.entities.PaymentAccount.create({
+      organization_id: organization.id,
+      name: account.name,
+      account_type: account.account_type,
+      routing_number_last4: account.routing_number_last4 || null,
+      account_number_last4: account.account_number_last4 || null
+    }),
     onSuccess: () => {
       toast.success("Payment account created");
       queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });
@@ -84,10 +74,7 @@ export default function PaymentAccountsSettings() {
   });
 
   const deleteAccountMutation = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from('payment_accounts').update({ is_active: false }).eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: (id) => api.entities.PaymentAccount.update(id, { is_active: false }),
     onSuccess: () => {
       toast.success("Account deactivated");
       queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });

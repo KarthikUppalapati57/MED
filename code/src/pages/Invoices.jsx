@@ -350,23 +350,15 @@ export default function Invoices() {
 
   const findExistingVendorItem = async ({ organizationId, vendorId, name, code }) => {
     if (!organizationId || !name) return null;
-    let query = api.client
-      .from('vendor_items')
-      .select('id, last_price, default_price, price_variance_threshold_percent, mapping_status, match_confidence')
-      .eq('organization_id', organizationId)
-      .eq('vendor_item_name', name);
+    const conditions = {
+      organization_id: organizationId,
+      vendor_item_name: name,
+      vendor_id: vendorId || null,
+    };
+    if (code) conditions.vendor_item_code = code;
 
-    if (vendorId) {
-      query = query.eq('vendor_id', vendorId);
-    } else {
-      query = query.is('vendor_id', null);
-    }
-
-    if (code) query = query.eq('vendor_item_code', code);
-
-    const { data, error } = await query.maybeSingle();
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    const rows = await api.entities.VendorItem.filter(conditions, { limit: 1 });
+    return rows[0] || null;
   };
 
   const syncInvoiceVendorCatalog = async (invoice, lineItems = [], lineRecords = []) => {
@@ -701,7 +693,7 @@ export default function Invoices() {
           
           if (finalStatus === 'approved') {
             // Update the record with approved_date
-            await api.client.from('invoices').update({ approved_date: new Date().toISOString() }).eq('id', savedInvoice.id);
+            await api.entities.Invoice.update(savedInvoice.id, { organization_id: savedInvoice.organization_id, approved_date: new Date().toISOString() });
             savedInvoice.approved_date = new Date().toISOString();
           }
         }

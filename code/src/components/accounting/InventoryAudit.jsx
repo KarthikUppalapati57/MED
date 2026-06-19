@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { getCOALabel } from '@/lib/accountingConfig';
 import { TrendingUp, AlertCircle, ArrowUpRight } from 'lucide-react';
 
@@ -11,11 +11,7 @@ export default function InventoryAudit() {
   const { data: auditData = [], isLoading } = useAuthQuery({
     queryKey: ['inventory-audit-summary'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('accounting_category, current_quantity, unit_cost');
-      
-      if (error) throw error;
+      const data = await api.entities.Inventory.list(null, { limit: 1000 });
       
       // Aggregate by category
       const summary = {};

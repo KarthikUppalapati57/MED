@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2, Send, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Send, Plus, Mail } from 'lucide-react';
 
 export default function CommunicationHub({ vendorId }) {
   const { organization, user } = useAuth();
@@ -19,25 +19,17 @@ export default function CommunicationHub({ vendorId }) {
 
   const { data: issues = [], isLoading: loadingIssues } = useQuery({
     queryKey: ['vendor_issues', vendorId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vendor_issues')
-        .select('*, reported_by (email), resolved_by (email)')
-        .eq('vendor_id', vendorId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!vendorId
+    queryFn: () => api.entities.VendorIssue.filter(
+      { vendor_id: vendorId, organization_id: organization?.id },
+      { orderBy: '-created_at' }
+    ),
+    enabled: !!vendorId && !!organization?.id
   });
 
   const { data: vendor } = useQuery({
     queryKey: ['vendor', vendorId],
-    queryFn: async () => {
-      const { data } = await supabase.from('vendors').select('id').eq('id', vendorId).single();
-      return data;
-    },
-    enabled: !!vendorId
+    queryFn: () => api.entities.Vendor.get(vendorId),
+    enabled: !!vendorId && !!organization?.id
   });
 
   const [notes, setNotes] = useState('');
@@ -54,15 +46,12 @@ export default function CommunicationHub({ vendorId }) {
   });
 
   const createIssueMutation = useMutation({
-    mutationFn: async (issueData) => {
-      const { error } = await supabase.from('vendor_issues').insert([{
-        ...issueData,
-        vendor_id: vendorId,
-        organization_id: organization?.id,
-        reported_by: user?.id
-      }]);
-      if (error) throw error;
-    },
+    mutationFn: (issueData) => api.entities.VendorIssue.create({
+      ...issueData,
+      vendor_id: vendorId,
+      organization_id: organization?.id,
+      reported_by: user?.id
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_issues', vendorId]);
       toast.success('Issue logged successfully');
@@ -71,14 +60,11 @@ export default function CommunicationHub({ vendorId }) {
   });
 
   const resolveIssueMutation = useMutation({
-    mutationFn: async (issueId) => {
-      const { error } = await supabase.from('vendor_issues').update({
-        status: 'resolved',
-        resolved_by: user?.id,
-        updated_at: new Date().toISOString()
-      }).eq('id', issueId);
-      if (error) throw error;
-    },
+    mutationFn: (issueId) => api.entities.VendorIssue.update(issueId, {
+      status: 'resolved',
+      resolved_by: user?.id,
+      updated_at: new Date().toISOString()
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor_issues', vendorId]);
       toast.success('Issue marked as resolved');

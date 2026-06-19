@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import {
   Table,
@@ -23,27 +22,24 @@ export default function ReconciliationVarianceTable({ invoiceId, isEditable = fa
 
   const { data: variances = [], isLoading } = useQuery({
     queryKey: ['invoice-variances', invoiceId],
-    queryFn: async () => {
-      if (!invoiceId) return [];
-      const res = await supabase.from('reconciliation_variances')
-        .select('*')
-        .eq('invoice_id', invoiceId);
-      if (res.error) throw res.error;
-      return res.data;
+    queryFn: () => {
+      if (!invoiceId || !organization?.id) return [];
+      return api.entities.ReconciliationVariance.filter({
+        invoice_id: invoiceId,
+        organization_id: organization.id
+      });
     },
-    enabled: !!invoiceId
+    enabled: !!invoiceId && !!organization?.id
   });
 
   const resolveMutation = useMutation({
     mutationFn: async ({ id, resolution_notes }) => {
-      // Stub for updating the variance resolution in DB
-      const result = await supabase.from('reconciliation_variances')
-        .update({ is_resolved: true, resolution_notes, resolved_by: (await api.auth.getUser()).data.user?.id })
-        .eq('id', id)
-        .select()
-        .single();
-      if (result.error) throw result.error;
-      return result.data;
+      const currentUser = await api.auth.me();
+      return api.entities.ReconciliationVariance.update(id, {
+        is_resolved: true,
+        resolution_notes,
+        resolved_by: currentUser?.id
+      });
     },
     onSuccess: () => {
       toast.success('Variance resolved.');

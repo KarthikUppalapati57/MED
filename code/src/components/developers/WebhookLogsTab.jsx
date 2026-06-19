@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/lib/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,33 +23,27 @@ export default function WebhookLogsTab() {
 
   async function fetchLogs() {
     setLoading(true);
-    // Join with queue to get payload and event_type
-    const { data, error } = await supabase
-      .from('webhook_delivery_logs')
-      .select(`
-        *,
-        webhook_events_queue(event_type, payload),
-        webhook_endpoints(url)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    
-    if (error) toast.error("Failed to load logs");
-    else setLogs(data || []);
+    try {
+      const data = await api.tenant.listWebhookDeliveryLogs(organizationId, 100);
+      setLogs(data || []);
+    } catch {
+      toast.error("Failed to load logs");
+    }
     setLoading(false);
   }
 
   async function handleRetry(eventId) {
     if (!eventId) return;
-    const { error } = await supabase.from('webhook_events_queue').update({
-      status: 'pending',
-      next_retry_at: new Date().toISOString()
-    }).eq('id', eventId);
-
-    if (error) toast.error("Failed to retry event");
-    else {
+    try {
+      await api.entities.WebhookEventQueue.update(eventId, {
+        organization_id: organizationId,
+        status: 'pending',
+        next_retry_at: new Date().toISOString()
+      });
       toast.success("Event queued for retry");
       fetchLogs();
+    } catch {
+      toast.error("Failed to retry event");
     }
   }
 

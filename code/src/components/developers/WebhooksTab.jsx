@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/lib/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Plus, Trash, Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -31,13 +31,15 @@ export default function WebhooksTab() {
 
   async function fetchEndpoints() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('webhook_endpoints')
-      .select(`id, organization_id, url, status, secret_prefix, created_at, webhook_subscriptions(event_type)`)
-      .eq('organization_id', organizationId);
-    
-    if (error) toast.error("Failed to load webhooks");
-    else setEndpoints(data || []);
+    try {
+      const data = await api.entities.WebhookEndpoint.filter(
+        { organization_id: organizationId },
+        { orderBy: '-created_at' }
+      );
+      setEndpoints(data || []);
+    } catch {
+      toast.error("Failed to load webhooks");
+    }
     setLoading(false);
   }
 
@@ -65,32 +67,38 @@ export default function WebhooksTab() {
 
   async function handleToggleStatus(id, currentStatus) {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    const { error } = await supabase.from('webhook_endpoints').update({ status: newStatus }).eq('id', id);
-    if (error) toast.error("Failed to update status");
-    else fetchEndpoints();
+    try {
+      await api.entities.WebhookEndpoint.update(id, { organization_id: organizationId, status: newStatus });
+      fetchEndpoints();
+    } catch {
+      toast.error("Failed to update status");
+    }
   }
 
   async function handleDelete(id) {
-    const { error } = await supabase.from('webhook_endpoints').delete().eq('id', id).eq('organization_id', organizationId);
-    if (error) toast.error("Failed to delete webhook");
-    else {
+    try {
+      await api.entities.WebhookEndpoint.delete(id);
       toast.success("Webhook deleted");
       fetchEndpoints();
+    } catch {
+      toast.error("Failed to delete webhook");
     }
   }
 
   async function handleTestEvent(endpointId) {
     // Insert a dummy event into the queue to test dispatch
-    const { error } = await supabase.from('webhook_events_queue').insert({
-      organization_id: organizationId,
-      endpoint_id: endpointId,
-      event_type: 'test.event',
-      payload: { event: "test.event", timestamp: new Date().toISOString() },
-      status: 'pending'
-    });
-
-    if (error) toast.error("Failed to trigger test event");
-    else toast.success("Test event queued for delivery!");
+    try {
+      await api.entities.WebhookEventQueue.create({
+        organization_id: organizationId,
+        endpoint_id: endpointId,
+        event_type: 'test.event',
+        payload: { event: "test.event", timestamp: new Date().toISOString() },
+        status: 'pending'
+      });
+      toast.success("Test event queued for delivery!");
+    } catch {
+      toast.error("Failed to trigger test event");
+    }
   }
 
   function copySecretToClipboard() {

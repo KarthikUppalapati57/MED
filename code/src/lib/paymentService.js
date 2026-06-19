@@ -1,5 +1,6 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 
 /**
  * Payment Service unified abstraction for Stripe, PayPal, bank transfer.
@@ -75,44 +76,31 @@ export const BANK_DETAILS = {
 
 // Payment Records 
 export async function createPaymentRecord(paymentData) {
-  const { data, error } = await supabase
-    .from('payments')
-    .insert([{
-      ...paymentData,
-      payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
-      created_at: new Date().toISOString(),
-    }])
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  return api.entities.Payment.create({
+    ...paymentData,
+    payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+    created_at: new Date().toISOString(),
+  });
 }
 
-export async function updateInvoicePaymentStatus(invoiceId, status = 'paid') {
-  const { error } = await supabase
-    .from('invoices')
-    .update({ payment_status: status, status: status === 'paid' ? 'paid' : undefined })
-    .eq('id', invoiceId);
-  if (error) throw error;
+export async function updateInvoicePaymentStatus(invoiceId, status = 'paid', organizationId = null) {
+  const updates = { payment_status: status };
+  if (status === 'paid') updates.status = 'paid';
+  if (organizationId) updates.organization_id = organizationId;
+  await api.entities.Invoice.update(invoiceId, updates);
 }
 
-export async function getPaymentsByInvoice(invoiceId) {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('invoice_id', invoiceId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+export async function getPaymentsByInvoice(invoiceId, organizationId = null) {
+  return api.entities.Payment.filter(
+    { invoice_id: invoiceId, ...(organizationId ? { organization_id: organizationId } : {}) },
+    { orderBy: '-created_at' }
+  );
 }
 
-export async function confirmBankTransfer(paymentId) {
-  const { data, error } = await supabase
-    .from('payments')
-    .update({ status: 'completed', confirmed_at: new Date().toISOString() })
-    .eq('id', paymentId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+export async function confirmBankTransfer(paymentId, organizationId = null) {
+  return api.entities.Payment.update(paymentId, {
+    ...(organizationId ? { organization_id: organizationId } : {}),
+    status: 'completed',
+    confirmed_at: new Date().toISOString(),
+  });
 }

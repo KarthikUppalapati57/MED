@@ -22,13 +22,14 @@ import {
 } from "@/components/ui/dialog";
 import { 
   Shield, Search, Download, CheckCircle2, X, Loader2, Trash2, Mail, Building2, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, 
-  Receipt, History, Fingerprint, Send, FileText
+  Receipt, History, Fingerprint, Send, FileText, Database
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import InventoryAudit from '@/components/accounting/InventoryAudit';
+import TenantMigrationPanel from '@/components/platform/TenantMigrationPanel';
 import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
 import posthog from '@/lib/posthog';
 
@@ -1183,6 +1184,14 @@ The Restops Platform Team
           </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="rounded-xl border-border h-10 px-6"
+            onClick={() => setActiveTab('tenant-migration')}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Tenant Migration
+          </Button>
           <Button 
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-10 px-6 shadow-sm"
             onClick={() => setActiveTab('invite')}
@@ -1408,6 +1417,10 @@ The Restops Platform Team
                  </div>
                )}
              </div>
+          </TabsContent>
+
+          <TabsContent value="tenant-migration" className="mt-0 outline-none">
+            <TenantMigrationPanel />
           </TabsContent>
 
           <TabsContent value="ocr">

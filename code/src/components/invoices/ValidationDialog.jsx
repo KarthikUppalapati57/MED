@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
 import { CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,12 +123,11 @@ export default function ValidationDialog({
           let deliveryStatus = 'checking';
 
           try {
-            const { data: variances, error } = await supabase.from('reconciliation_variances')
-              .select('*')
-              .eq('invoice_id', invoice.id)
-              .eq('is_resolved', false);
-            
-            if (error) throw error;
+            const variances = await api.entities.ReconciliationVariance.filter({
+              invoice_id: invoice.id,
+              organization_id: invoice.organization_id,
+              is_resolved: false
+            });
             
             if (variances && variances.length > 0) {
                deliveryStatus = 'fail';
