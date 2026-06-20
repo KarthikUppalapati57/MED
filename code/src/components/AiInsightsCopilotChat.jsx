@@ -47,14 +47,14 @@ function readStoredHistory(storageKey) {
   }
 }
 
-export default function AiInsightsCopilotChat({ className, compact = false, storageKey }) {
+export default function AiInsightsCopilotChat({ className, compact = false, showHeader = true, storageKey }) {
   const { organization, brand, location } = useAuth();
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState(() => readStoredHistory(storageKey));
   const [isChatLoading, setIsChatLoading] = useState(false);
 
   const scopeLabel = location?.name || brand?.name || organization?.name || 'Current context';
-  const scrollHeight = compact ? 'h-[330px]' : 'h-[520px]';
+  const scrollHeight = compact ? 'h-[292px] sm:h-[312px]' : 'h-[520px]';
 
   useEffect(() => {
     if (!storageKey || typeof sessionStorage === 'undefined') return;
@@ -119,30 +119,33 @@ export default function AiInsightsCopilotChat({ className, compact = false, stor
   return (
     <Card className={cn('glass-card border border-border/50 shadow-sm overflow-hidden', className)}>
       <CardContent className="p-0">
-        <div className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-9 w-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-              <Bot className="h-5 w-5 text-brand" />
+        {showHeader && (
+          <div className="flex items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-9 w-9 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+                <Bot className="h-5 w-5 text-brand" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground leading-tight">AI Insights Copilot</p>
+                <p className="text-xs text-muted-foreground truncate">Scope: {scopeLabel}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground leading-tight">AI Insights Copilot</p>
-              <p className="text-xs text-muted-foreground truncate">Scope: {scopeLabel}</p>
-            </div>
+            <Badge variant="secondary" className="bg-brand/10 text-brand border-0">Scoped</Badge>
           </div>
-          <Badge variant="secondary" className="bg-brand/10 text-brand border-0">Scoped</Badge>
-        </div>
+        )}
 
-        <ScrollArea className={cn(scrollHeight, 'p-4')}>
-          <div className="space-y-4 pb-4">
+        <ScrollArea className={cn(scrollHeight, compact ? 'px-3 py-3' : 'p-4')}>
+          <div className={cn(compact ? 'space-y-3 pb-3' : 'space-y-4 pb-4')}>
             {chatHistory.map((msg, index) => (
               <div key={`${msg.role}-${index}`} className={cn('flex gap-2', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                 {msg.role === 'assistant' && (
-                  <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                    <Bot className="h-4 w-4 text-brand" />
+                  <div className={cn('rounded-full bg-brand/10 flex items-center justify-center shrink-0', compact ? 'h-7 w-7' : 'h-8 w-8')}>
+                    <Bot className={cn('text-brand', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
                   </div>
                 )}
                 <div className={cn(
-                  'max-w-[82%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm leading-relaxed',
+                  'max-w-[82%] whitespace-pre-wrap rounded-xl px-3 py-2 leading-relaxed',
+                  compact ? 'text-[13px]' : 'text-sm',
                   msg.role === 'user'
                     ? 'bg-primary text-primary-foreground rounded-tr-sm'
                     : 'bg-secondary text-secondary-foreground rounded-tl-sm'
@@ -150,18 +153,18 @@ export default function AiInsightsCopilotChat({ className, compact = false, stor
                   {msg.content}
                 </div>
                 {msg.role === 'user' && (
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-primary" />
+                  <div className={cn('rounded-full bg-primary/10 flex items-center justify-center shrink-0', compact ? 'h-7 w-7' : 'h-8 w-8')}>
+                    <User className={cn('text-primary', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
                   </div>
                 )}
               </div>
             ))}
             {isChatLoading && (
               <div className="flex gap-2 justify-start">
-                <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
-                  <Bot className="h-4 w-4 text-brand" />
+                <div className={cn('rounded-full bg-brand/10 flex items-center justify-center shrink-0', compact ? 'h-7 w-7' : 'h-8 w-8')}>
+                  <Bot className={cn('text-brand', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
                 </div>
-                <div className="bg-secondary text-secondary-foreground rounded-xl rounded-tl-sm px-3 py-2 text-sm flex items-center gap-2">
+                <div className={cn('bg-secondary text-secondary-foreground rounded-xl rounded-tl-sm px-3 py-2 flex items-center gap-2', compact ? 'text-[13px]' : 'text-sm')}>
                   <Loader2 className="h-4 w-4 animate-spin text-brand" />
                   Reviewing scoped data
                 </div>
@@ -170,14 +173,14 @@ export default function AiInsightsCopilotChat({ className, compact = false, stor
           </div>
         </ScrollArea>
 
-        <form onSubmit={handleSendChatMessage} className="flex gap-2 border-t border-border/50 p-3">
+        <form onSubmit={handleSendChatMessage} className={cn('flex gap-2 border-t border-border/50', compact ? 'p-2.5' : 'p-3')}>
           <Input
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder={compact ? 'Ask about this location...' : 'Ask about invoices, sales, prep, inventory, vendors, or labor...'}
-            className="flex-1 bg-background/60"
+            className={cn('flex-1 bg-background/60', compact && 'h-9 text-sm')}
           />
-          <Button type="submit" size="icon" disabled={!chatInput.trim() || isChatLoading}>
+          <Button type="submit" size="icon" className={compact ? 'h-9 w-9' : undefined} disabled={!chatInput.trim() || isChatLoading}>
             {isChatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
