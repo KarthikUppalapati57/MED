@@ -594,7 +594,28 @@ export const AuthProvider = ({ children }) => {
         setAuthError(error);
         return { data: null, error };
       }
-      posthog.capture('user_logged_in');
+      posthog.capture('user_logged_in', { method: 'email' });
+      return { data, error: null };
+    } catch (err) {
+      setAuthError(err);
+      return { data: null, error: err };
+    }
+  }, []);
+
+  const loginWithSSO = useCallback(async (provider) => {
+    setAuthError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${APP_URL}/`,
+        },
+      });
+      if (error) {
+        setAuthError(error);
+        return { data: null, error };
+      }
+      posthog.capture('user_logged_in', { method: `sso_${provider}` });
       return { data, error: null };
     } catch (err) {
       setAuthError(err);
@@ -804,6 +825,7 @@ export const AuthProvider = ({ children }) => {
     isMfaReady,
     authError,
     loginWithEmail,
+    loginWithSSO,
     signUp,
     resetPassword,
     logout,

@@ -275,7 +275,7 @@ function SignupPage() {
 
 // Login Page 
 function LoginPage() {
-  const { loginWithEmail, resetPassword, authError } = useAuth();
+  const { loginWithEmail, loginWithSSO, resetPassword, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -460,6 +460,34 @@ function LoginPage() {
           >
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border/40" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground font-semibold">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => loginWithSSO('google')}
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
+            >
+              Google
+            </button>
+            <button
+              type="button"
+              onClick={() => loginWithSSO('azure')}
+              disabled={isSubmitting}
+              className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
+            >
+              Microsoft
+            </button>
+          </div>
         </form>
       </Card>
     </div>
