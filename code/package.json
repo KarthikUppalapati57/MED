@@ -23,7 +23,10 @@
     "smoke:core": "node scripts/core-workflow-smoke-test.mjs",
     "smoke:ui": "node scripts/ui-smoke-test-role-qa-platform.mjs",
     "typecheck": "tsc -p ./jsconfig.json || true",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:backend": "vitest run tests/backend",
+    "test:frontend": "vitest run tests/frontend",
+    "test:e2e": "playwright test tests/e2e"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
