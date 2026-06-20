@@ -75,6 +75,26 @@ export async function applyTenantPilotWriteCutover(organizationId, confirmation)
   return data;
 }
 
+export async function completeTenantPilotCutover({ organizationId, notes = null }) {
+  const { data, error } = await supabase.rpc('complete_tenant_pilot_cutover', {
+    p_organization_id: organizationId,
+    p_notes: notes,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function abortTenantPilotCutover({ organizationId, notes = null }) {
+  const { data, error } = await supabase.rpc('abort_tenant_pilot_cutover', {
+    p_organization_id: organizationId,
+    p_notes: notes,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export function hasTenantMigrationBlockers(snapshot) {
   return Number(snapshot?.blocker_count ?? 0) > 0;
 }

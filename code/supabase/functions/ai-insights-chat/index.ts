@@ -92,15 +92,15 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
     applyScope(
       supabase
         .from('vendors')
-        .select('id, name, status, total_spent, unpaid_ap, default_expense_category, updated_at')
-        .order('updated_at', { ascending: false })
+        .select('id, name, status, total_spent, unpaid_ap, default_expense_category')
+        .order('name', { ascending: true })
         .limit(25),
       scope,
     ),
     applyLocationScope(
       supabase
         .from('pos_sales_data')
-        .select('id, organization_id, location_id, date, total_sales, transaction_count, created_at')
+        .select('id, organization_id, location_id, date, revenue, quantity_sold, created_at')
         .order('date', { ascending: false })
         .limit(30),
       scope,
@@ -108,8 +108,8 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
     applyLocationScope(
       supabase
         .from('employee_shifts')
-        .select('id, organization_id, location_id, employee_id, start_time, end_time, role, status')
-        .order('start_time', { ascending: false })
+        .select('id, organization_id, location_id, employee_id, shift_start, shift_end, labor_cost, status')
+        .order('shift_start', { ascending: false })
         .limit(30),
       scope,
     ),
@@ -132,7 +132,7 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
     applyScope(
       supabase
         .from('auto_orders')
-        .select('id, order_number, vendor_name, status, total_amount, order_date, expected_delivery_date')
+        .select('id, order_number, vendor_name, status, total_amount, created_at, delivery_date')
         .order('created_at', { ascending: false })
         .limit(20),
       scope,

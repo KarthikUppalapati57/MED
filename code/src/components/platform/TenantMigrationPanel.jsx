@@ -1,14 +1,29 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, ShieldCheck, PlayCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, ShieldCheck, PlayCircle, ArrowRight, Check, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import {
+  abortTenantPilotCutover,
+  applyTenantPilotReadCutover,
+  applyTenantPilotWriteCutover,
+  completeTenantPilotCutover,
   getTenantMigrationModeLabel,
   getTenantPilotCutovers,
   getTenantReportingSnapshots,
@@ -46,11 +61,44 @@ function isPilotActive(pilot) {
   return pilot && !['completed', 'aborted'].includes(pilot.status);
 }
 
+function ConfirmedPilotAction({
+  children,
+  title,
+  description,
+  confirmLabel,
+  onConfirm,
+  disabled,
+  destructive = false,
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={disabled}
+            onClick={onConfirm}
+            className={destructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : undefined}
+          >
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function TenantMigrationPanel() {
   const queryClient = useQueryClient();
   const [refreshingAll, setRefreshingAll] = React.useState(false);
   const [refreshingOrgId, setRefreshingOrgId] = React.useState(null);
   const [preparingOrgId, setPreparingOrgId] = React.useState(null);
+  const [pilotActionKey, setPilotActionKey] = React.useState(null);
 
   const { data: snapshots = [], isLoading, error } = useAuthQuery({
     queryKey: ['tenant-reporting-snapshots'],
@@ -127,6 +175,37 @@ export default function TenantMigrationPanel() {
       toast.error(err.message || 'Could not prepare tenant pilot');
     } finally {
       setPreparingOrgId(null);
+    }
+  };
+
+  const handlePilotAction = async (snapshot, action) => {
+    const organizationId = snapshot.organization_id;
+    setPilotActionKey(`${organizationId}:${action}`);
+    try {
+      if (action === 'read') {
+        await applyTenantPilotReadCutover(organizationId, 'CUTOVER_READ');
+        toast.success(`${snapshot.organization_name || 'Tenant'} is now on tenant-schema reads`);
+      } else if (action === 'write') {
+        await applyTenantPilotWriteCutover(organizationId, 'CUTOVER_WRITE');
+        toast.success(`${snapshot.organization_name || 'Tenant'} is now on tenant-schema writes`);
+      } else if (action === 'complete') {
+        await completeTenantPilotCutover({
+          organizationId,
+          notes: 'Pilot verified from Platform Console after read/write cutover',
+        });
+        toast.success(`${snapshot.organization_name || 'Tenant'} pilot marked complete`);
+      } else if (action === 'abort') {
+        await abortTenantPilotCutover({
+          organizationId,
+          notes: 'Pilot aborted from Platform Console',
+        });
+        toast.success(`${snapshot.organization_name || 'Tenant'} pilot aborted`);
+      }
+      invalidateAll();
+    } catch (err) {
+      toast.error(err.message || 'Pilot action failed');
+    } finally {
+      setPilotActionKey(null);
     }
   };
 
@@ -241,7 +320,7 @@ export default function TenantMigrationPanel() {
                     <TableHead className="text-[11px] font-bold">ROWS</TableHead>
                     <TableHead className="text-[11px] font-bold">READINESS</TableHead>
                     <TableHead className="text-[11px] font-bold">BLOCKERS</TableHead>
-                    <TableHead className="min-w-[210px] text-right text-[11px] font-bold">ACTIONS</TableHead>
+                    <TableHead className="min-w-[360px] text-right text-[11px] font-bold">ACTIONS</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -250,6 +329,16 @@ export default function TenantMigrationPanel() {
                     const refreshing = refreshingOrgId === snapshot.organization_id;
                     const preparing = preparingOrgId === snapshot.organization_id;
                     const pilot = pilotByOrg[snapshot.organization_id];
+                    const activePilot = isPilotActive(pilot);
+                    const baseDisabled = refreshing || preparing || Boolean(pilotActionKey);
+                    const readActionKey = `${snapshot.organization_id}:read`;
+                    const writeActionKey = `${snapshot.organization_id}:write`;
+                    const completeActionKey = `${snapshot.organization_id}:complete`;
+                    const abortActionKey = `${snapshot.organization_id}:abort`;
+                    const canPrepare = !activePilot && snapshot.read_mode !== 'tenant_schema';
+                    const canReadCutover = pilot?.status === 'prepared' && snapshot.ready_for_tenant_schema_reads && !hasBlockers;
+                    const canWriteCutover = pilot?.status === 'read_cutover' && snapshot.ready_for_tenant_schema_writes && !hasBlockers;
+                    const canComplete = pilot?.status === 'write_cutover';
                     return (
                       <TableRow key={snapshot.organization_id}>
                         <TableCell>
@@ -305,15 +394,74 @@ export default function TenantMigrationPanel() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={refreshing || preparing} onClick={() => handleRefreshOne(snapshot.organization_id)}>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={baseDisabled} onClick={() => handleRefreshOne(snapshot.organization_id)}>
                               {refreshing ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1.5 h-3 w-3" />}
                               Refresh
                             </Button>
-                            <Button size="sm" className="h-8 rounded-lg bg-slate-900 text-xs text-white hover:bg-slate-800" disabled={refreshing || preparing} onClick={() => handlePreparePilot(snapshot)}>
-                              {preparing ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <PlayCircle className="mr-1.5 h-3 w-3" />}
-                              Prepare Pilot
-                            </Button>
+                            {canPrepare && (
+                              <Button size="sm" className="h-8 rounded-lg bg-slate-900 text-xs text-white hover:bg-slate-800" disabled={baseDisabled} onClick={() => handlePreparePilot(snapshot)}>
+                                {preparing ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <PlayCircle className="mr-1.5 h-3 w-3" />}
+                                Prepare Pilot
+                              </Button>
+                            )}
+                            {canReadCutover && (
+                              <ConfirmedPilotAction
+                                title="Cut over tenant reads?"
+                                description={`This moves ${snapshot.organization_name || 'this tenant'} from public-table reads to tenant-schema reads. Continue only after validation is clear.`}
+                                confirmLabel="Cut Over Reads"
+                                disabled={baseDisabled}
+                                onConfirm={() => handlePilotAction(snapshot, 'read')}
+                              >
+                                <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={baseDisabled}>
+                                  {pilotActionKey === readActionKey ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <ArrowRight className="mr-1.5 h-3 w-3" />}
+                                  Read Cutover
+                                </Button>
+                              </ConfirmedPilotAction>
+                            )}
+                            {canWriteCutover && (
+                              <ConfirmedPilotAction
+                                title="Cut over tenant writes?"
+                                description={`This moves ${snapshot.organization_name || 'this tenant'} from public-table writes to tenant-schema writes. Continue only after app workflows were verified on tenant-schema reads.`}
+                                confirmLabel="Cut Over Writes"
+                                disabled={baseDisabled}
+                                onConfirm={() => handlePilotAction(snapshot, 'write')}
+                              >
+                                <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={baseDisabled}>
+                                  {pilotActionKey === writeActionKey ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <ArrowRight className="mr-1.5 h-3 w-3" />}
+                                  Write Cutover
+                                </Button>
+                              </ConfirmedPilotAction>
+                            )}
+                            {canComplete && (
+                              <ConfirmedPilotAction
+                                title="Mark pilot complete?"
+                                description={`This closes the active pilot for ${snapshot.organization_name || 'this tenant'} after read and write cutover have been verified.`}
+                                confirmLabel="Complete Pilot"
+                                disabled={baseDisabled}
+                                onConfirm={() => handlePilotAction(snapshot, 'complete')}
+                              >
+                                <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs" disabled={baseDisabled}>
+                                  {pilotActionKey === completeActionKey ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Check className="mr-1.5 h-3 w-3" />}
+                                  Complete
+                                </Button>
+                              </ConfirmedPilotAction>
+                            )}
+                            {activePilot && (
+                              <ConfirmedPilotAction
+                                title="Abort pilot?"
+                                description={`This marks the active pilot for ${snapshot.organization_name || 'this tenant'} as aborted. It does not delete data or change tenant schemas.`}
+                                confirmLabel="Abort Pilot"
+                                destructive
+                                disabled={baseDisabled}
+                                onConfirm={() => handlePilotAction(snapshot, 'abort')}
+                              >
+                                <Button size="sm" variant="outline" className="h-8 rounded-lg border-rose-200 text-xs text-rose-700 hover:bg-rose-50" disabled={baseDisabled}>
+                                  {pilotActionKey === abortActionKey ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <XCircle className="mr-1.5 h-3 w-3" />}
+                                  Abort
+                                </Button>
+                              </ConfirmedPilotAction>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
