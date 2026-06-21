@@ -20,8 +20,14 @@ import { useInView } from '@/hooks/useInView';
 export default function MenuEngineering() {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('matrix');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
+
+  const filterCb = React.useCallback(
+    (data) => filterByContext(data, { organization, brand, location }),
+    [organization, brand, location]
+  );
 
   const {
     data: posItemsData,
