@@ -8,9 +8,13 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+  throw new Error('Missing VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, or SUPABASE_SERVICE_ROLE_KEY in .env');
+}
+
 // Create clients
-const anonClient = createClient(supabaseUrl, supabaseAnonKey);
-const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+const anonClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+const serviceClient = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
 describe('Schema-per-Tenant RPC Validation', () => {
   beforeAll(() => {

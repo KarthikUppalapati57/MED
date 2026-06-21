@@ -7,8 +7,11 @@ dotenv.config({ path: '.env' });
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-// Create an unauthenticated client
-const anonClient = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
+}
+
+const anonClient = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
 describe('Database Triggers & Webhooks Validation', () => {
   beforeAll(() => {
