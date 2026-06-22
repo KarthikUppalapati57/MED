@@ -61,6 +61,8 @@ const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
   { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
+  { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
+  { name: 'Food Safety (HACCP)', href: 'FoodSafety', icon: ShieldCheck, minRole: 'manager' },
   { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { 
     name: 'Platform Console', 
@@ -138,6 +140,7 @@ const navigation = [
       { name: 'Recipes List', href: 'Recipes?tab=recipes', icon: ChefHat },
       { name: 'Prepared Items', href: 'Recipes?tab=prepared-items', icon: Plus },
       { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
+      { name: 'Delivery Menus', href: 'DeliveryAggregator', icon: Package },
       { name: 'Setup', href: 'Recipes?tab=setup', icon: Settings }
     ]
   },
@@ -182,10 +185,12 @@ const navigation = [
     minRole: 'org_owner',
     subItems: [
       { name: 'Hierarchy', href: 'OrgManagement?tab=hierarchy', icon: Building2 },
+      { name: 'Franchisor Console', href: 'FranchisorConsole', icon: Building2 },
       { name: 'Security & MFA', href: 'OrgManagement?tab=security', icon: ShieldCheck }
     ]
   },
   { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
+  { name: 'Billing & Plans', href: 'Billing', icon: CreditCard, minRole: 'org_owner' },
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
   { name: 'Organization Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },

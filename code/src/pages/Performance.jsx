@@ -88,97 +88,28 @@ export default function Performance() {
   const results = useAuthQueries({
     queries: [
       {
-        queryKey: ['mv_daily_sales_summary', organization?.id],
-        queryFn: () => api.entities.MvDailySalesSummary.list('-date', {
-          limit: 500,
-          select: 'organization_id, brand_id, location_id, date, total_revenue',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id && needsSalesData,
+        queryKey: ['performance_metrics', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
+        queryFn: () => api.reports.getPerformanceMetrics(organization?.id, periodStart, periodEnd, brand?.brand_id || brand?.id, location?.id),
+        enabled: !!organization?.id,
       },
       {
-        queryKey: ['invoices', organization?.id],
-        queryFn: () => api.entities.Invoice.list('-invoice_date', {
-          limit: 500,
-          gte: { invoice_date: periodStart },
-          lte: { invoice_date: periodEnd },
-          select: 'id, organization_id, brand_id, location_id, invoice_date, created_at, total_amount, status',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id && needsInvoices,
-      },
-      {
-        queryKey: ['employee_shifts', organization?.id],
-        queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
-          limit: 500,
-          gte: { shift_start: periodStart },
-          lte: { shift_start: periodEnd },
-          select: 'id, organization_id, location_id, shift_start, start_time, created_at, labor_cost',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id && needsShifts,
-      },
-      {
-        queryKey: ['invoice_allocations', organization?.id],
-        queryFn: () => api.entities.InvoiceAllocation.list(null, {
-          limit: 500,
-          select: 'id, organization_id, location_id, allocation_type, category_name, amount',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id && needsAllocations,
-      },
-      {
-        queryKey: ['invoice_line_items', organization?.id],
-        queryFn: () => api.entities.InvoiceLineItem.list('-created_at', {
-          limit: 500,
-          gte: { created_at: `${periodStart}T00:00:00.000Z` },
-          lte: { created_at: `${periodEnd}T23:59:59.999Z` },
-          select: 'id, organization_id, item_name, unit_price, created_at',
-        }),
-        select: filterCb,
-        enabled: !!organization?.id && needsLineItems,
-      },
-      {
-        queryKey: ['budget_targets', organization?.id, (brand?.brand_id || brand?.id), location?.id, periodStart, periodEnd],
+        queryKey: ['budget_targets', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
         queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
         select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
           .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
         enabled: !!organization?.id && needsBudgetTargets,
-      },
-      {
-        queryKey: ['pnl_summary', organization?.id, (brand?.brand_id || brand?.id), location?.id, periodStart, periodEnd],
-        queryFn: () => api.reports.getPnlSummary(organization?.id, periodStart, periodEnd, (brand?.brand_id || brand?.id), location?.id),
-        enabled: !!organization?.id && ['overview', 'pnl'].includes(activeTab),
       }
     ]
   });
 
-  const loadingSales = results[0].isLoading;
-  const rawSalesData = results[0].data;
-  const salesData = rawSalesData || [];
+  const loadingMetrics = results[0].isLoading;
+  const metricsData = results[0].data || {
+    total_sales: 0, today_sales: 0, total_cogs: 0, today_cogs: 0,
+    total_labor: 0, today_labor: 0, prime_cost: 0, pending_invoices_count: 0,
+    trend_data: [], category_data: [], movers_data: []
+  };
 
-  const loadingInvoices = results[1].isLoading;
-  const rawInvoices = results[1].data;
-  const invoices = rawInvoices || [];
-
-  const rawShifts = results[2].data;
-  const shifts = rawShifts || [];
-
-  const rawAllocations = results[3].data;
-  const allocations = rawAllocations || [];
-  const lineItemAllocations = useMemo(
-    () => allocations.filter((allocation) => allocation.allocation_type === 'line_items'),
-    [allocations]
-  );
-
-  const rawLineItems = results[4].data;
-  const lineItems = rawLineItems || [];
-
-  const rawBudgetTargets = results[5].data;
-  const budgetTargets = rawBudgetTargets || [];
-
-  const rawPnlSummary = results[6].data;
-  const pnlSummary = rawPnlSummary || { total_revenue: 0, total_labor_cost: 0, total_cogs: 0, prime_cost: 0 };
+  const budgetTargets = results[1].data || [];
 
   const budgetByCategory = useMemo(() => {
     const map = {};
@@ -214,85 +145,27 @@ export default function Performance() {
   });
 
   // --- CORE CALCULATIONS ---
-  const totalSales = Number(pnlSummary.total_revenue || 0);
-  const totalLaborCost = Number(pnlSummary.total_labor_cost || 0);
-  const totalCogs = Number(pnlSummary.total_cogs || 0);
-  const primeCost = Number(pnlSummary.prime_cost || 0);
+  const totalSales = Number(metricsData.total_sales || 0);
+  const totalLaborCost = Number(metricsData.total_labor || 0);
+  const totalCogs = Number(metricsData.total_cogs || 0);
+  const primeCost = Number(metricsData.prime_cost || 0);
 
   const salesBudgetTarget = Number(budgetByCategory.Sales?.target_amount || 0);
   const budget = salesBudgetTarget > 0 ? salesBudgetTarget : (totalSales > 0 ? totalSales * 0.95 : 0);
   const variance = budget > 0 ? ((totalSales - budget) / budget) * 100 : 0;
 
   // --- TREND DATA ---
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const trendMap = Object.fromEntries(days.map(d => [d, { name: d, actual: 0, budget: 0, forecast: 0 }]));
-  salesData.forEach(sale => {
-    const d = new Date(sale.date);
-    if (!isNaN(d)) {
-      const dayName = days[d.getDay()];
-      const rev = Number(sale.total_revenue || 0);
-      trendMap[dayName].actual += rev;
-      trendMap[dayName].budget += budget > 0 ? budget / 7 : rev * 0.95;
-      trendMap[dayName].forecast += rev * 1.05;
-    }
-  });
-  const trendData = days.map(d => trendMap[d]);
+  const trendData = metricsData.trend_data || [];
 
   // --- PRICE MOVERS ---
-  const moversData = useMemo(() => {
-    const map = {};
-    lineItems.forEach(item => {
-      const name = item.item_name || 'Unknown';
-      if (!map[name]) map[name] = [];
-      map[name].push({ price: Number(item.unit_price), date: new Date(item.created_at || new Date()).getTime() });
-    });
-
-    const result = [];
-    Object.entries(map).forEach(([name, prices]) => {
-      if (prices.length > 1) {
-        prices.sort((a, b) => b.date - a.date);
-        const currentPrice = prices[0].price;
-        let previousPrice = prices[1].price;
-        for (let i=1; i<prices.length; i++) {
-          if (prices[i].price !== currentPrice) {
-            previousPrice = prices[i].price;
-            break;
-          }
-        }
-
-        if (previousPrice > 0 && currentPrice !== previousPrice) {
-          const change = ((currentPrice - previousPrice) / previousPrice) * 100;
-          let status = 'neutral';
-          if (change > 5) status = 'critical';
-          else if (change > 0) status = 'warning';
-          else if (change < 0) status = 'positive';
-
-          result.push({ item: name, currentPrice, previousPrice, change: Number(change.toFixed(1)), status });
-        }
-      }
-    });
-    return result.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-  }, [lineItems]);
+  const moversData = metricsData.movers_data || [];
 
   // --- CATEGORY REPORT ---
-  const categoryReportData = useMemo(() => {
-    const map = {};
-    if (lineItemAllocations.length > 0) {
-      lineItemAllocations.forEach(a => {
-        const cat = a.category_name || 'Uncategorized';
-        map[cat] = (map[cat] || 0) + Number(a.amount || 0);
-      });
-    } else {
-      invoices.forEach(inv => {
-        const cat = 'General';
-        map[cat] = (map[cat] || 0) + Number(inv.total_amount || 0);
-      });
-    }
-
-    return Object.entries(map)
-      .map(([name, spend]) => ({ name, spend, pct: totalCogs > 0 ? (spend / totalCogs) * 100 : 0 }))
-      .sort((a, b) => b.spend - a.spend);
-  }, [lineItemAllocations, invoices, totalCogs]);
+  const categoryReportData = (metricsData.category_data || []).map(item => ({
+    name: item.name,
+    spend: item.spend,
+    pct: totalCogs > 0 ? (item.spend / totalCogs) * 100 : 0
+  }));
 
   const categoryPieData = categoryReportData.map((d, i) => ({
     name: d.name,
@@ -347,18 +220,9 @@ export default function Performance() {
   };
 
   const dailyPnl = useMemo(() => {
-    const todaysSales = salesData.reduce((sum, record) => {
-      const dateValue = record.date;
-      return sameDate(dateValue, todayKey) ? sum + Number(record.total_revenue || 0) : sum;
-    }, 0);
-
-    const todaysInvoices = invoices.filter((invoice) => sameDate(invoice.invoice_date || invoice.created_at, todayKey));
-    const todaysInvoiceSpend = todaysInvoices.reduce((sum, invoice) => sum + Number(invoice.total_amount || 0), 0);
-
-    const todaysLabor = shifts.reduce((sum, shift) => {
-      const dateValue = shift.shift_start || shift.start_time || shift.created_at;
-      return sameDate(dateValue, todayKey) ? sum + Number(shift.labor_cost || 0) : sum;
-    }, 0);
+    const todaysSales = Number(metricsData.today_sales || 0);
+    const todaysInvoiceSpend = Number(metricsData.today_cogs || 0);
+    const todaysLabor = Number(metricsData.today_labor || 0);
 
     const periodDaysElapsed = Math.max(1, Math.min(now.getDate(), new Date(periodEnd).getDate()));
     const dailySalesTarget = Number(budgetByCategory.Sales?.target_amount || 0) / periodDaysElapsed || (totalSales ? totalSales / periodDaysElapsed : 0);
@@ -367,7 +231,7 @@ export default function Performance() {
     const dailyPrimeTarget = Number(budgetByCategory['Prime Cost']?.target_amount || 0) / periodDaysElapsed || (todaysSales * 0.6);
     const prime = todaysInvoiceSpend + todaysLabor;
 
-    const pendingInvoicesCount = invoices.filter((invoice) => ['pending_review', 'validated', 'flagged'].includes(invoice.status)).length;
+    const pendingInvoicesCount = Number(metricsData.pending_invoices_count || 0);
     const missingInvoiceRisk = todaysSales > 0 && todaysInvoiceSpend === 0;
     const highPriceMovers = moversData.filter((item) => item.status === 'critical' || item.status === 'warning').slice(0, 5);
 
@@ -396,24 +260,24 @@ export default function Performance() {
       primePercent: todaysSales > 0 ? (prime / todaysSales) * 100 : 0,
       grossProfit: todaysSales - todaysInvoiceSpend,
       estimatedControllableProfit: todaysSales - prime,
-      invoicesCaptured: todaysInvoices.length,
+      invoicesCaptured: 0,
       pendingInvoices: pendingInvoicesCount,
       highPriceMovers,
       alerts,
       coverage: [
-        { label: 'POS Sales', ready: salesData.length > 0, count: salesData.length },
-        { label: 'Invoices', ready: invoices.length > 0, count: invoices.length },
-        { label: 'Labor', ready: shifts.length > 0, count: shifts.length },
+        { label: 'POS Sales', ready: totalSales > 0, count: totalSales > 0 ? 1 : 0 },
+        { label: 'Invoices', ready: totalCogs > 0, count: totalCogs > 0 ? 1 : 0 },
+        { label: 'Labor', ready: totalLaborCost > 0, count: totalLaborCost > 0 ? 1 : 0 },
         { label: 'Budgets', ready: budgetTargets.length > 0, count: budgetTargets.length },
       ],
     };
-  }, [salesData, invoices, shifts, todayKey, budgetByCategory, periodEnd, totalSales, moversData, budgetTargets.length]);
+  }, [metricsData, todayKey, budgetByCategory, periodEnd, totalSales, moversData, budgetTargets.length]);
 
   // --- HEALTH SCORE COMPUTATION ---
   const readySources = dailyPnl.coverage.filter(c => c.ready).length;
   const totalSources = dailyPnl.coverage.length;
   const healthScore = Math.round((readySources / totalSources) * 100);
-  const showHealthBanner = readySources < totalSources && !loadingSales && !loadingInvoices;
+  const showHealthBanner = readySources < totalSources && !loadingMetrics;
 
   return (
     <div className="space-y-6 animate-fade-in-scale flex flex-col h-full w-full">

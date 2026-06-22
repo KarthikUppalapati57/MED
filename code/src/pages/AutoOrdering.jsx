@@ -434,8 +434,8 @@ export default function AutoOrdering() {
       setSuggestions(generatedSuggestions);
 
       // Create an order for each vendor
-      const orderPromises = Object.entries(vendorOrdersMap).map(([vendorName, items]) => {
-        const order = {
+      const ordersToCreate = Object.entries(vendorOrdersMap).map(([vendorName, items]) => {
+        return {
           organization_id: organization?.id,
           brand_id: (brand?.brand_id || brand?.id) || null,
           location_id: location?.id || null,
@@ -448,10 +448,10 @@ export default function AutoOrdering() {
           chat_history: [],
           created_by: userProfile?.id || null,
         };
-        return createMutation.mutateAsync(order);
       });
 
-      await Promise.all(orderPromises);
+      await api.entities.AutoOrder.createMany(ordersToCreate);
+      queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       toast.success('Smart Orders generated and routed to cheapest vendors');
     } catch (error) {
       toast.error('Failed to generate orders');

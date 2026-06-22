@@ -61,7 +61,7 @@ serve(async (req) => {
         const session = event.data.object;
         const orgId = session.client_reference_id; // Passed when creating the session
         if (orgId && session.customer && session.subscription) {
-          // Link customer and subscription to the org
+          // Update organizations
           await supabase
             .from('organizations')
             .update({
@@ -70,6 +70,17 @@ serve(async (req) => {
               subscription_status: 'active'
             })
             .eq('id', orgId);
+
+          // Update subscriptions table
+          await supabase
+            .from('subscriptions')
+            .upsert({
+              organization_id: orgId,
+              stripe_customer_id: session.customer as string,
+              stripe_subscription_id: session.subscription as string,
+              status: 'active',
+              plan_tier: 'pro' // Default to pro upon checkout, would parse line items in real life
+            }, { onConflict: 'organization_id' });
 
           await capturePostHogEvent('billing_subscription_created', {
             org_id: orgId,
@@ -95,6 +106,17 @@ serve(async (req) => {
           })
           .eq('stripe_customer_id', customerId);
 
+        // Update subscriptions table
+        await supabase
+          .from('subscriptions')
+          .update({
+            stripe_subscription_id: subscription.id,
+            status: subscription.status,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            cancel_at_period_end: subscription.cancel_at_period_end
+          })
+          .eq('stripe_customer_id', customerId);
+
         await capturePostHogEvent('billing_subscription_updated', {
           customer_id: customerId,
           subscription_id: subscription.id,
@@ -114,6 +136,11 @@ serve(async (req) => {
             subscription_status: 'canceled',
             plan_id: null
           })
+          .eq('stripe_customer_id', customerId);
+
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'canceled' })
           .eq('stripe_customer_id', customerId);
 
         await capturePostHogEvent('billing_subscription_canceled', {

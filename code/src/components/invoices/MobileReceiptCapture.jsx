@@ -3,7 +3,7 @@ import { Camera, X, UploadCloud, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { extractInvoiceData } from '@/lib/invoiceExtractor';
+// extractInvoiceData import removed
 
 export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtracted }) {
   const videoRef = useRef(null);
@@ -73,50 +73,41 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
   const handleUpload = async () => {
     if (!capturedImage) return;
     setIsUploading(true);
-    setProgressMsg('Extracting data...');
+    setProgressMsg('Uploading image...');
     try {
       const res = await fetch(capturedImage);
       const blob = await res.blob();
       const file = new File([blob], `receipt_${Date.now()}.jpg`, { type: 'image/jpeg' });
       
-      const newFileUrl = URL.createObjectURL(file);
-      const extractedData = await extractInvoiceData(file, (msg) => {
-        setProgressMsg(msg);
-      });
+      const fileExt = file.name?.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `mobile_uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(filePath);
 
       const invoiceData = {
-        vendor_name: extractedData.vendor_name || '',
-        vendor_address: extractedData.vendor_address || '',
-        invoice_number: extractedData.invoice_number || '',
-        invoice_date: extractedData.invoice_date || '',
-        due_date: extractedData.due_date || '',
-        payment_terms: extractedData.payment_terms || '',
-        purchase_order: extractedData.purchase_order || '',
-        subtotal: extractedData.subtotal || 0,
-        tax_amount: extractedData.tax_amount || 0,
-        fuel_surcharge: extractedData.fuel_surcharge || 0,
-        delivery_fee: extractedData.delivery_fee || 0,
-        other_charges: extractedData.other_charges || 0,
-        total_amount: extractedData.total_amount || 0,
-        line_items: extractedData.line_items || [],
-        file_url: newFileUrl,
+        vendor_name: 'Extracting...',
+        total_amount: 0,
+        file_url: publicUrlData.publicUrl,
         file_type: file.type,
         source: 'mobile_camera',
-        status: 'pending_review',
-        payment_status: extractedData.payment_status || 'unpaid',
-        extraction_method: extractedData.extraction_method || 'manual',
-        validation_results: {
-          paid_status_detection: extractedData.paid_status_detection || null,
-        },
-        raw_text: extractedData.raw_text || '',
+        status: 'extracting',
       };
       
-      toast.success('Receipt captured & extracted successfully!');
+      toast.success('Receipt captured! Extraction is running in the background.');
       onInvoiceExtracted(invoiceData);
       onOpenChange(false);
     } catch (err) {
       console.error('Upload failed:', err);
-      toast.error('Failed to process the receipt.');
+      toast.error('Failed to process the receipt: ' + err.message);
     } finally {
       setIsUploading(false);
       setProgressMsg('');

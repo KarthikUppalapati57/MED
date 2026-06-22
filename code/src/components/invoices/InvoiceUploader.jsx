@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { extractInvoiceData } from '@/lib/invoiceExtractor';
+import { supabase } from '@/lib/supabaseClient';
 
-export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted }) {
+export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted, organizationId }) {
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState('');
@@ -100,68 +101,50 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
   const processFile = async (fileToProcess, source) => {
     setUploading(true);
-    setProgress('Preparing file...');
+    setProgress('Uploading file...');
     setExtractionDone(false);
 
     try {
-      // Upload file to Supabase Storage (or use blob for now)
-      // Revoke any previous URL before creating a new one
       if (fileUrl) {
         URL.revokeObjectURL(fileUrl);
       }
       const newFileUrl = URL.createObjectURL(fileToProcess);
       setFileUrl(newFileUrl);
 
-      // Run AI/OCR extraction
-      const extractedData = await extractInvoiceData(fileToProcess, (msg) => {
-        setProgress(msg);
-      });
+      const fileExt = fileToProcess.name?.split('.').pop() || 'pdf';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${organizationId || 'unassigned'}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(filePath, fileToProcess);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(filePath);
 
       setExtractionDone(true);
-      setProgress('Extraction complete!');
+      setProgress('Upload complete! Extraction started...');
 
-      // Wait a moment to show success state
       await new Promise(r => setTimeout(r, 800));
 
       const invoiceData = {
-        vendor_name: extractedData.vendor_name || '',
-        vendor_address: extractedData.vendor_address || '',
-        invoice_number: extractedData.invoice_number || '',
-        invoice_date: extractedData.invoice_date || '',
-        due_date: extractedData.due_date || '',
-        payment_terms: extractedData.payment_terms || '',
-        purchase_order: extractedData.purchase_order || '',
-        subtotal: extractedData.subtotal || 0,
-        tax_amount: extractedData.tax_amount || 0,
-        fuel_surcharge: extractedData.fuel_surcharge || 0,
-        delivery_fee: extractedData.delivery_fee || 0,
-        other_charges: extractedData.other_charges || 0,
-        total_amount: extractedData.total_amount || 0,
-        line_items: extractedData.line_items || [],
-        file_url: newFileUrl,
+        status: 'extracting',
+        file_url: publicUrlData.publicUrl,
         file_type: fileToProcess.type,
         source,
-        status: 'pending_review',
-        payment_status: extractedData.payment_status || 'unpaid',
-        extraction_method: extractedData.extraction_method || 'manual',
-        validation_results: {
-          paid_status_detection: extractedData.paid_status_detection || null,
-        },
-        raw_text: extractedData.raw_text || '',
+        vendor_name: 'Extracting...', // Temporary placeholder
+        total_amount: 0,
       };
 
       onInvoiceExtracted(invoiceData);
       onOpenChange(false);
-
-      const method = extractedData.extraction_method;
-      if (method === 'gemini') {
-        toast.success('Invoice extracted with Gemini AI! Please review the details.');
-      } else {
-        toast.success('Invoice uploaded. Please fill in the details manually.');
-      }
+      toast.success('Invoice uploaded. Extraction is running in the background.');
     } catch (error) {
-      toast.error('Error processing invoice: ' + (error.message || 'Unknown error'));
-      console.error('Invoice extraction error:', error);
+      toast.error('Error uploading invoice: ' + (error.message || 'Unknown error'));
+      console.error('Invoice upload error:', error);
     } finally {
       setUploading(false);
       setFile(null);

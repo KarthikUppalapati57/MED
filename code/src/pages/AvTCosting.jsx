@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { format, subDays } from 'date-fns';
 import { Download } from 'lucide-react';
+import { DailyPOSSyncReview } from '@/components/DailyPOSSyncReview';
 
 const trendData = [
   { day: 'Mon', theoretical: 850, actual: 920 },
@@ -149,6 +150,7 @@ export default function AvTCosting() {
           </div>
         </div>
         <div className="flex gap-2">
+          <DailyPOSSyncReview />
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="w-4 h-4 mr-2" /> CSV
           </Button>

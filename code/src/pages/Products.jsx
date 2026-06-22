@@ -17,7 +17,12 @@ import {
   MoreVertical,
   X,
   Settings,
-  Wand2
+  Wand2,
+  AlertTriangle,
+  TrendingUp,
+  ArrowUpRight,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,12 +100,16 @@ export default function Products() {
     setSelectedIds(checked ? new Set(filteredProducts.map(p => p.id)) : new Set());
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
-    Promise.all([...selectedIds].map(id => deleteMutation.mutateAsync(id))).then(() => {
+    try {
+      await api.entities.Product.deleteMany([...selectedIds]);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       setSelectedIds(new Set());
       toast.success(`${selectedIds.size} product(s) deleted`);
-    });
+    } catch (error) {
+      toast.error('Failed to delete products');
+    }
   };
 
   const handleBulkExport = () => {
@@ -174,6 +183,22 @@ export default function Products() {
       return data || [];
     },
     enabled: !!organization?.id && needsGlobalItems,
+  });
+
+  const { data: priceVariances = [], isLoading: loadingVariances } = useAuthQuery({
+    queryKey: ['price_variances', organization?.id],
+    queryFn: () => api.vendors.getFlaggedVendorItems(organization?.id),
+    enabled: !!organization?.id && (activeTab === 'price-variances' || activeTab === 'all-products'), // load if in either tab so we can show badge count
+  });
+
+  const resolveVarianceMutation = useMutation({
+    mutationFn: ({ vendorItemId, updateProduct }) => api.vendors.resolvePriceVariance(vendorItemId, updateProduct),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['price_variances'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Price variance resolved');
+    },
+    onError: () => toast.error('Failed to resolve price variance'),
   });
 
   useEffect(() => {
@@ -390,6 +415,12 @@ export default function Products() {
           <TabsTrigger value="ai-verification" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5 relative">
             AI Verification Queue
             <Badge className="ml-2 bg-primary/20 text-primary hover:bg-primary/30">New</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="price-variances" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5 relative">
+            Price Action Center
+            {priceVariances.length > 0 && (
+              <Badge className="ml-2 bg-resend-red text-white hover:bg-resend-red/90">{priceVariances.length}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="purchase-report" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
             Purchase Report
@@ -704,7 +735,111 @@ export default function Products() {
           </Card>
         </TabsContent>
 
- {/* Purchase Report Tab */}
+        {/* Price Action Center Tab */}
+        <TabsContent value="price-variances">
+          <Card className="border-0 shadow-sm border-t-4 border-t-resend-red">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-resend-red" />
+                  Price Action Center
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Vendor items with recent price spikes over 10%. Acknowledge the change to update your master product costs.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>Vendor Item</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>Linked Product</TableHead>
+                    <TableHead>Old Price</TableHead>
+                    <TableHead>New Price</TableHead>
+                    <TableHead>Variance</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingVariances ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                        Loading flagged items...
+                      </TableCell>
+                    </TableRow>
+                  ) : priceVariances.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                        <CheckCircle2 className="h-8 w-8 mx-auto mb-3 text-resend-green opacity-50" />
+                        All caught up! No recent price spikes detected.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    priceVariances.map((item) => (
+                      <TableRow key={item.id} className="bg-resend-red/5">
+                        <TableCell className="text-sm text-muted-foreground">
+                          {item.invoice_date ? new Date(item.invoice_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">{item.vendor_item_name}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.vendor_name}</TableCell>
+                        <TableCell>
+                          {item.internal_product_id ? (
+                            <Badge variant="outline" className="font-medium">
+                              {item.internal_product_name}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs italic">Unmapped</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground line-through decoration-resend-red/50">
+                          ${(item.previous_price || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="font-semibold text-foreground">
+                          ${(item.latest_price || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className="bg-resend-red/10 text-resend-red border-resend-red/20 font-mono">
+                            <ArrowUpRight className="h-3 w-3 mr-1" />
+                            {item.variance_percent ? item.variance_percent.toFixed(1) : '0'}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => resolveVarianceMutation.mutate({ vendorItemId: item.id, updateProduct: false })}
+                              disabled={resolveVarianceMutation.isPending}
+                            >
+                              <XCircle className="h-4 w-4 mr-2 text-muted-foreground" />
+                              Dismiss
+                            </Button>
+                            {item.internal_product_id && (
+                              <Button
+                                size="sm"
+                                className="bg-resend-red hover:bg-resend-red/90 text-white"
+                                onClick={() => resolveVarianceMutation.mutate({ vendorItemId: item.id, updateProduct: true })}
+                                disabled={resolveVarianceMutation.isPending}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                Accept & Update Cost
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Purchase Report Tab */}
         <TabsContent value="purchase-report">
           <Card className="border-0 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between">

@@ -101,6 +101,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
     department: member.department || '',
     location: member.location || '',
     status: member.status || 'active',
+    invoice_approval_limit: member.profiles?.invoice_approval_limit || 0,
   });
   const [saving, setSaving] = useState(false);
 
@@ -126,6 +127,13 @@ function UserDetailDrawer({ member, orgId, onClose }) {
         new_location: form.location
       });
       if (error) throw error;
+
+      // Update invoice approval limit
+      const { error: limitError } = await supabase.rpc('update_user_approval_limit', {
+        target_user_id: userId,
+        new_limit: Number(form.invoice_approval_limit) || 0
+      });
+      if (limitError) throw limitError;
 
       // Update user_roles mapping if we selected a role
       const selectedDbRole = dbRoles?.find(r => r.name === form.role);
@@ -282,6 +290,18 @@ function UserDetailDrawer({ member, orgId, onClose }) {
                     className="rounded-xl border-border focus:ring-ring/10 focus:border-primary"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-muted-foreground uppercase">Invoice Approval Limit ($)</Label>
+                <Input 
+                  type="number"
+                  placeholder="e.g. 500" 
+                  value={form.invoice_approval_limit}
+                  onChange={e => setForm({...form, invoice_approval_limit: e.target.value})}
+                  className="rounded-xl border-border focus:ring-ring/10 focus:border-primary"
+                />
+                <p className="text-[10px] text-muted-foreground">Invoices exceeding this amount will require higher-level approval.</p>
               </div>
 
               <div className="space-y-3">

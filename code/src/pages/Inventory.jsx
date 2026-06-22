@@ -408,106 +408,22 @@ export default function Inventory() {
       const sheet = countSheets.find((item) => item.id === selectedCountSheetId) || countSheets[0];
       if (!sheet) throw new Error('Create a count template first');
 
-      let totalVarianceValue = 0;
-      const varianceData = {};
+      // The new Postgres RPC handles the variance math, GL entry generation,
+      // count session creation, inventory updates, and inventory movements atomically.
+      const result = await api.metrics.completeCountSession(
+        organization?.id,
+        location?.id || userProfile?.location_id,
+        sheet.id,
+        counts,
+        userProfile?.id
+      );
 
-      const countedData = Object.fromEntries((sheet.items || []).map((item) => {
-        const countedQty = counts[item.inventory_id] !== undefined && counts[item.inventory_id] !== '' ? parseFloat(counts[item.inventory_id]) : item.expected_quantity || 0;
-
-        // Match with full inventory record to calculate dollar variance
-        const invItem = inventory.find(i => i.id === item.inventory_id);
-        const unitCost = invItem?.unit_cost || 0;
-        const varianceQty = countedQty - (item.expected_quantity || 0);
-        const varianceDollar = varianceQty * unitCost;
-
-        if (varianceDollar !== 0) {
-          totalVarianceValue += varianceDollar;
-          varianceData[item.inventory_id] = { qty: varianceQty, value: varianceDollar };
-        }
-
-        return [
-          item.inventory_id || item.product_name,
-          {
-            product_name: item.product_name,
-            expected_quantity: item.expected_quantity || 0,
-            counted_quantity: countedQty,
-            unit: item.unit || 'ea',
-            unit_cost: unitCost,
-            variance: varianceDollar
-          },
-        ];
-      }));
-
-      // Generate the Automated GL Journal Entry for the Variance
-      if (Math.abs(totalVarianceValue) > 0.01) {
-        try {
-          const isFavorable = totalVarianceValue > 0; // We have MORE stock than theoretical
-
-          // Real API call to insert into General Ledger
-          await api.entities.GeneralLedgerEntry.create({
-            organization_id: organization?.id,
-            date: new Date().toISOString(),
-            reference: `INV-VAR-${Date.now()}`,
-            description: `Inventory Count Variance Adjustment`,
-            debit_account: isFavorable ? 'Inventory Asset (1210)' : 'COGS - Variance (5100)',
-            credit_account: isFavorable ? 'COGS - Variance (5100)' : 'Inventory Asset (1210)',
-            amount: Math.abs(totalVarianceValue),
-            created_by: userProfile?.id || null
-          });
-
-          toast.success(`Automated GL Entry Generated: ${isFavorable ? 'Credited' : 'Debited'} COGS for $${Math.abs(totalVarianceValue).toFixed(2)}`);
-        } catch (e) {
-          console.error("Failed to generate GL entry", e);
-          toast.error("Failed to generate automated GL entry");
-        }
+      if (result && Math.abs(result.total_variance || 0) > 0.01) {
+        const isFavorable = result.total_variance > 0;
+        toast.success(`Automated GL Entry Generated: ${isFavorable ? 'Credited' : 'Debited'} COGS for $${Math.abs(result.total_variance).toFixed(2)}`);
       }
 
-      const countSession = await api.entities.CountSession.create({
-        organization_id: organization?.id,
-        count_sheet_id: sheet.id,
-        status: 'completed',
-        counted_data: countedData,
-        variance_data: varianceData,
-        completed_at: new Date().toISOString(),
-        counted_by: userProfile?.id || null,
-      });
-
-      // Update Inventory Quantities and generate Movements
-      const promises = [];
-      for (const invId in countedData) {
-        const itemData = countedData[invId];
-        const varianceVal = itemData.variance || 0;
-        const countedQty = itemData.counted_quantity;
-        const expectedQty = itemData.expected_quantity;
-
-        if (countedQty !== expectedQty) {
-          const invItem = inventory.find(i => i.id === invId);
-          if (invItem) {
-            promises.push(api.entities.Inventory.update(invId, {
-              current_quantity: countedQty,
-              current_value: countedQty * (invItem.unit_cost || 0),
-              previous_quantity: expectedQty,
-              previous_value: invItem.current_value || 0,
-              last_counted_date: new Date().toISOString().split('T')[0]
-            }));
-            promises.push(api.entities.InventoryMovement.create({
-              organization_id: organization?.id,
-              location_id: invItem.location_id || location?.id || null,
-              inventory_id: invId,
-              movement_type: 'count_variance',
-              quantity: countedQty - expectedQty,
-              source_type: 'count_session',
-              source_id: countSession.id,
-              previous_quantity: expectedQty,
-              new_quantity: countedQty,
-              created_by: userProfile?.id || null,
-            }));
-          }
-        }
-      }
-      await Promise.allSettled(promises);
-
-      return countSession;
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
@@ -653,13 +569,17 @@ export default function Inventory() {
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (confirm(`Delete ${selectedIds.size} selected item(s)? This cannot be undone.`)) {
-      Promise.all([...selectedIds].map(id => deleteMutation.mutateAsync(id))).then(() => {
+      try {
+        await api.entities.Inventory.deleteMany([...selectedIds]);
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
         setSelectedIds(new Set());
         toast.success(`${selectedIds.size} item(s) deleted`);
-      });
+      } catch (error) {
+        toast.error('Failed to delete items');
+      }
     }
   };
 

@@ -367,6 +367,29 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     if (error) throw error;
     return true;
   },
+  createMany: async (payloads) => {
+    if (!payloads || payloads.length === 0) return [];
+    const scopedPayloads = payloads.map(p => withActiveScope(table, p));
+    const { data, error } = await supabase.from(table).insert(scopedPayloads).select();
+    if (error) throw error;
+    return data;
+  },
+  deleteMany: async (ids) => {
+    if (!ids || ids.length === 0) return true;
+    let query = supabase.from(table);
+    if (useSoftDelete) {
+      query = query.update({ deleted_at: new Date().toISOString() });
+    } else {
+      query = query.delete();
+    }
+    query = query.in('id', ids);
+    Object.entries(withActiveScope(table, {})).forEach(([key, value]) => {
+      if (value) query = query.eq(key, value);
+    });
+    const { error } = await query;
+    if (error) throw error;
+    return true;
+  },
 });
 
 export const api = {
@@ -510,6 +533,37 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    completeCountSession: async (orgId, locationId, countSheetId, counts, userId) => {
+      const { data, error } = await supabase.rpc('complete_count_session', {
+        p_organization_id: orgId,
+        p_location_id: locationId,
+        p_count_sheet_id: countSheetId,
+        p_counts: counts,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    receivePurchaseOrder: async (orgId, locationId, orderId, receivedQuantities, userId) => {
+      const { data, error } = await supabase.rpc('receive_purchase_order', {
+        p_organization_id: orgId,
+        p_location_id: locationId,
+        p_order_id: orderId,
+        p_received_quantities: receivedQuantities,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    completeInventoryTransfer: async (orgId, transferId, userId) => {
+      const { data, error } = await supabase.rpc('complete_inventory_transfer', {
+        p_organization_id: orgId,
+        p_transfer_id: transferId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
   },
   admin: {
     /** Securely update a user's role via server-side RPC (prevents privilege escalation) */
@@ -538,6 +592,17 @@ export const api = {
     },
   },
   reports: {
+    getPerformanceMetrics: async (orgId, startDate, endDate, brandId = null, locationId = null) => {
+      const { data, error } = await supabase.rpc('get_performance_dashboard_metrics', {
+        p_organization_id: orgId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_brand_id: brandId,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data;
+    },
     getPnlSummary: async (orgId, startDate, endDate, brandId = null, locationId = null) => {
       const { data, error } = await supabase.rpc('get_pnl_summary', {
         p_org_id: orgId,
@@ -570,6 +635,36 @@ export const api = {
     getThreeWayMatchStatus: async (poId) => {
       const { data, error } = await supabase.rpc('get_three_way_match_status', {
         p_purchase_order_id: poId
+      });
+      if (error) throw error;
+      return data;
+    },
+    recordPaymentLedger: async (orgId, billId, sourcePaymentId, paymentMethod, amount, paymentDate, userId) => {
+      const { data, error } = await supabase.rpc('record_payment_ledger', {
+        p_organization_id: orgId,
+        p_bill_id: billId,
+        p_source_payment_id: sourcePaymentId,
+        p_payment_method: paymentMethod,
+        p_amount: amount,
+        p_payment_date: paymentDate,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    }
+  },
+  vendors: {
+    getFlaggedVendorItems: async (orgId) => {
+      const { data, error } = await supabase.rpc('get_flagged_vendor_items', {
+        p_organization_id: orgId
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    resolvePriceVariance: async (vendorItemId, updateProduct) => {
+      const { data, error } = await supabase.rpc('resolve_price_variance', {
+        p_vendor_item_id: vendorItemId,
+        p_update_product: updateProduct
       });
       if (error) throw error;
       return data;

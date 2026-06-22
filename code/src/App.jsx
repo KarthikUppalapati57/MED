@@ -881,6 +881,8 @@ const AuthenticatedApp = () => {
 };
 
 
+import { OfflineBanner } from '@/components/OfflineBanner';
+
 function App() {
   return (
     <ErrorBoundary>
@@ -890,6 +892,7 @@ function App() {
             <AuthenticatedApp />
           </Router>
           <DeferredAppSonnerToaster />
+          <OfflineBanner />
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>

@@ -122,41 +122,22 @@ export async function recordPaymentLedger({ invoice, paymentRecord, userId }) {
   if (!invoice || !paymentRecord || paymentRecord.status !== 'completed') return null;
 
   const bill = await ensureLedgerBill(invoice, { status: 'paid' });
-  const existing = await api.entities.LedgerPayment.filter({ source_payment_id: paymentRecord.id });
-  if (existing?.length) return existing[0];
-
+  
+  const orgId = invoice.organization_id || paymentRecord.organization_id;
   const amount = Number(paymentRecord.amount || invoice.total_amount || 0);
-  const ledgerPayment = await api.entities.LedgerPayment.create({
-    organization_id: invoice.organization_id || paymentRecord.organization_id,
-    bill_id: bill.id,
-    source_payment_id: paymentRecord.id,
-    payment_method: paymentRecord.payment_method,
+  const paymentDate = paymentRecord.payment_date || new Date().toISOString();
+
+  const result = await api.metrics.recordPaymentLedger(
+    orgId,
+    bill.id,
+    paymentRecord.id,
+    paymentRecord.payment_method,
     amount,
-    payment_date: paymentRecord.payment_date || new Date().toISOString(),
-    status: 'completed',
-    created_by: userId || null,
-  });
+    paymentDate,
+    userId || null
+  );
 
-  await Promise.allSettled([
-    api.entities.LedgerEntry.create({
-      organization_id: invoice.organization_id || paymentRecord.organization_id,
-      account_code: '2000',
-      debit: amount,
-      credit: 0,
-      reference_type: 'payment',
-      reference_id: paymentRecord.id,
-    }),
-    api.entities.LedgerEntry.create({
-      organization_id: invoice.organization_id || paymentRecord.organization_id,
-      account_code: '1000',
-      debit: 0,
-      credit: amount,
-      reference_type: 'payment',
-      reference_id: paymentRecord.id,
-    }),
-  ]);
-
-  return ledgerPayment;
+  return result;
 }
 
 export async function receiveOrderWorkflow({
@@ -168,134 +149,39 @@ export async function receiveOrderWorkflow({
 }) {
   if (!order?.id) throw new Error('Select an order to receive.');
 
-  const expectedItems = order.items || [];
-  const receivingItems = expectedItems.map((item) => {
-    const key = itemKey(item);
-    const expected = Number(item.approved_quantity ?? item.suggested_quantity ?? item.quantity ?? 0);
-    const received = Number(receivedQuantities[key] ?? expected);
-    return {
-      ...item,
-      received_quantity: received,
-      discrepancy: expected - received,
-      receiving_status: received === expected ? 'matched' : received > expected ? 'over' : 'short',
-    };
-  });
-
-  const hasDiscrepancy = receivingItems.some((item) => Number(item.discrepancy || 0) !== 0);
-  const hasShort = receivingItems.some((item) => Number(item.discrepancy || 0) > 0);
-  const orderStatus = hasShort ? 'partially_received' : 'received';
-  const receivingStatus = hasDiscrepancy ? 'discrepancy' : 'received';
   const orgId = organizationId || order.organization_id;
 
-  const receiving = await api.entities.Receiving.create({
-    organization_id: orgId,
-    order_id: order.id,
-    vendor_id: order.vendor_id || null,
-    status: receivingStatus,
-    items: receivingItems,
-    received_by: userId || null,
-  });
-
-  await api.entities.AutoOrder.update(order.id, {
-    status: orderStatus,
-    received_at: new Date().toISOString(),
-    last_workflow_step: hasDiscrepancy ? 'receiving_discrepancy' : 'received',
-  });
-
-  const inventory = await api.entities.Inventory.list();
-  const inventoryByProduct = new Map();
-  const inventoryByName = new Map();
-  inventory.forEach((record) => {
-    if (record.product_id) inventoryByProduct.set(record.product_id, record);
-    if (record.product_name) inventoryByName.set(record.product_name.toLowerCase(), record);
-  });
-
-  await Promise.allSettled(receivingItems.map(async (item) => {
-    const received = Number(item.received_quantity || 0);
-    if (received <= 0) return;
-
-    const name = itemName(item);
-    const productId = item.product_id || null;
-    const unit = item.unit || item.current_unit || 'ea';
-    const unitCost = itemUnitPrice(item);
-    const existing = (productId && inventoryByProduct.get(productId)) || inventoryByName.get(name.toLowerCase());
-
-    if (existing) {
-      const previousQuantity = Number(existing.current_quantity || 0);
-      const newQuantity = previousQuantity + received;
-      await api.entities.Inventory.update(existing.id, {
-        current_quantity: newQuantity,
-        current_unit: existing.current_unit || unit,
-        unit_cost: unitCost || existing.unit_cost || 0,
-        current_value: newQuantity * (unitCost || existing.unit_cost || 0),
-        previous_quantity: previousQuantity,
-        previous_value: existing.current_value || 0,
-        last_counted_date: new Date().toISOString().split('T')[0],
-      });
-      await api.entities.InventoryMovement.create({
-        organization_id: orgId,
-        location_id: locationId || order.location_id || existing.location_id || null,
-        inventory_id: existing.id,
-        movement_type: 'purchase_order',
-        quantity: received,
-        source_type: 'receiving',
-        source_id: receiving.id,
-        previous_quantity: previousQuantity,
-        new_quantity: newQuantity,
-        created_by: userId || null,
-      });
-      return;
-    }
-
-    const created = await api.entities.Inventory.create({
-      organization_id: orgId,
-      location_id: locationId || order.location_id || null,
-      product_id: productId || `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      product_name: name,
-      current_quantity: received,
-      current_unit: unit,
-      unit_cost: unitCost,
-      current_value: received * unitCost,
-      accounting_category: 'food',
-      par_level: 0,
-      reorder_point: 0,
-      previous_quantity: 0,
-      previous_value: 0,
-      location: order.location || '',
-    });
-
-    await api.entities.InventoryMovement.create({
-      organization_id: orgId,
-      location_id: locationId || order.location_id || null,
-      inventory_id: created.id,
-      movement_type: 'purchase_order',
-      quantity: received,
-      source_type: 'receiving',
-      source_id: receiving.id,
-      previous_quantity: 0,
-      new_quantity: received,
-      created_by: userId || null,
-    });
-  }));
+  const result = await api.metrics.receivePurchaseOrder(
+    orgId,
+    locationId || order.location_id || null,
+    order.id,
+    receivedQuantities,
+    userId || null
+  );
 
   await Promise.allSettled([
     api.entities.Notification.create({
       organization_id: orgId,
       user_id: userId || null,
-      title: hasDiscrepancy ? 'Receiving discrepancy' : 'Order received',
-      message: `${order.order_number || 'Order'} was ${hasDiscrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
+      title: result.has_discrepancy ? 'Receiving discrepancy' : 'Order received',
+      message: `${order.order_number || 'Order'} was ${result.has_discrepancy ? 'received with discrepancies' : 'received and inventory was updated'}.`,
       type: 'inventory',
-      metadata: { order_id: order.id, receiving_id: receiving.id, has_discrepancy: hasDiscrepancy },
+      metadata: { order_id: order.id, receiving_id: result.receiving_id, has_discrepancy: result.has_discrepancy },
       is_read: false,
     }),
-    emitWorkflowEvent(hasDiscrepancy ? 'order.receiving_discrepancy' : 'order.received', 'receiving', receiving.id, {
+    emitWorkflowEvent(result.has_discrepancy ? 'order.receiving_discrepancy' : 'order.received', 'receiving', result.receiving_id, {
       order_id: order.id,
       order_number: order.order_number,
-      has_discrepancy: hasDiscrepancy,
+      has_discrepancy: result.has_discrepancy,
     }),
   ]);
 
-  return { receiving, orderStatus, receivingStatus, hasDiscrepancy };
+  return { 
+    receiving: { id: result.receiving_id }, 
+    orderStatus: result.order_status, 
+    receivingStatus: result.receiving_status, 
+    hasDiscrepancy: result.has_discrepancy 
+  };
 }
 
 export async function createTransferWorkflow({
@@ -349,108 +235,23 @@ export async function completeTransferWorkflow({ transfer, inventoryRecords = []
   if (!transfer?.id) throw new Error('Select a transfer to complete.');
   if (!['pending', 'in_transit'].includes(transfer.status)) return transfer;
 
-  const items = transfer.items || [];
-  await Promise.all(items.map(async (item) => {
-    const source = inventoryRecords.find((record) => record.id === item.inventory_id);
-    if (!source) return;
+  await api.metrics.completeInventoryTransfer(
+    transfer.organization_id,
+    transfer.id,
+    userId || null
+  );
 
-    const quantity = Number(item.quantity || 0);
-    const previousSourceQty = Number(source.current_quantity || 0);
-    const newSourceQty = Math.max(0, previousSourceQty - quantity);
-
-    await api.entities.Inventory.update(source.id, {
-      current_quantity: newSourceQty,
-      current_value: newSourceQty * Number(source.unit_cost || item.unit_cost || 0),
-      previous_quantity: previousSourceQty,
-      previous_value: source.current_value || 0,
-    });
-
-    await api.entities.InventoryMovement.create({
-      organization_id: transfer.organization_id,
-      location_id: transfer.from_location_id || source.location_id || null,
-      inventory_id: source.id,
-      movement_type: 'transfer_out',
-      quantity: -quantity,
-      source_type: 'transfer',
-      source_id: transfer.id,
-      previous_quantity: previousSourceQty,
-      new_quantity: newSourceQty,
-      created_by: userId || null,
-    });
-
-    const destination = inventoryRecords.find((record) =>
-      record.location_id === transfer.to_location_id &&
-      ((record.product_id && record.product_id === source.product_id) ||
-       record.product_name?.toLowerCase() === source.product_name?.toLowerCase())
-    );
-
-    if (destination) {
-      const previousDestinationQty = Number(destination.current_quantity || 0);
-      const newDestinationQty = previousDestinationQty + quantity;
-      await api.entities.Inventory.update(destination.id, {
-        current_quantity: newDestinationQty,
-        current_unit: destination.current_unit || source.current_unit || item.unit || 'ea',
-        unit_cost: Number(source.unit_cost || item.unit_cost || destination.unit_cost || 0),
-        current_value: newDestinationQty * Number(source.unit_cost || item.unit_cost || destination.unit_cost || 0),
-        previous_quantity: previousDestinationQty,
-        previous_value: destination.current_value || 0,
-      });
-      await api.entities.InventoryMovement.create({
-        organization_id: transfer.organization_id,
-        location_id: transfer.to_location_id,
-        inventory_id: destination.id,
-        movement_type: 'transfer_in',
-        quantity,
-        source_type: 'transfer',
-        source_id: transfer.id,
-        previous_quantity: previousDestinationQty,
-        new_quantity: newDestinationQty,
-        created_by: userId || null,
-      });
-      return;
-    }
-
-    const created = await api.entities.Inventory.create({
-      organization_id: transfer.organization_id,
-      location_id: transfer.to_location_id,
-      product_id: source.product_id || item.product_id || `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      product_name: source.product_name || item.product_name,
-      current_quantity: quantity,
-      current_unit: source.current_unit || item.unit || 'ea',
-      unit_cost: Number(source.unit_cost || item.unit_cost || 0),
-      current_value: quantity * Number(source.unit_cost || item.unit_cost || 0),
-      accounting_category: source.accounting_category || 'food',
-      par_level: source.par_level || 0,
-      reorder_point: source.reorder_point || 0,
-      previous_quantity: 0,
-      previous_value: 0,
-      location: '',
-    });
-
-    await api.entities.InventoryMovement.create({
-      organization_id: transfer.organization_id,
-      location_id: transfer.to_location_id,
-      inventory_id: created.id,
-      movement_type: 'transfer_in',
-      quantity,
-      source_type: 'transfer',
-      source_id: transfer.id,
-      previous_quantity: 0,
-      new_quantity: quantity,
-      created_by: userId || null,
-    });
-  }));
-
-  const updatedTransfer = await api.entities.Transfer.update(transfer.id, {
+  const updatedTransfer = {
+    ...transfer,
     status: 'completed',
     completed_at: new Date().toISOString(),
     completed_by: userId || null,
-  });
+  };
 
   await emitWorkflowEvent('transfer.completed', 'transfer', transfer.id, {
     from_location_id: transfer.from_location_id,
     to_location_id: transfer.to_location_id,
-    items,
+    items: transfer.items,
   });
 
   return updatedTransfer;

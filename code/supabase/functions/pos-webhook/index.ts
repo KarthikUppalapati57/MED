@@ -83,48 +83,44 @@ serve(async (req) => {
 
     // Process line items
     if (lineItems.length > 0) {
-      const today = new Date().toISOString().split('T')[0];
+      // 1. Insert the pos_order header
+      const { data: posOrder, error: orderError } = await supabaseClient
+        .from('pos_orders')
+        .upsert(
+          {
+            organization_id: orgId,
+            location_id: locationId || null,
+            pos_provider: provider,
+            pos_order_id: payload.id || `mock_${Date.now()}`,
+            total_amount: lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+            order_date: payload.created_at || new Date().toISOString(),
+            status: 'logged'
+          },
+          { onConflict: 'organization_id, pos_provider, pos_order_id' }
+        )
+        .select()
+        .single();
 
-      for (const item of lineItems) {
-        // 1. Upsert into pos_items
-        const { data: posItem, error: itemError } = await supabaseClient
-          .from('pos_items')
-          .upsert(
-            {
-              organization_id: orgId,
-              location_id: locationId || null,
-              pos_provider: provider,
-              pos_item_id: item.pos_item_id,
-              item_name: item.item_name,
-              price: item.price
-            },
-            { onConflict: 'organization_id, pos_provider, pos_item_id' }
-          )
-          .select()
-          .single();
+      if (orderError) {
+        console.error('Failed to insert pos_order:', orderError);
+        throw orderError;
+      }
 
-        if (itemError) {
-          console.error('Failed to upsert pos_item:', itemError);
-          continue;
-        }
+      // 2. Insert line items
+      const orderItemsToInsert = lineItems.map(item => ({
+        order_id: posOrder.id,
+        pos_item_id: item.pos_item_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        price: item.price
+      }));
 
-        // 2. Insert into pos_sales_data
-        if (posItem) {
-          const { error: saleError } = await supabaseClient
-            .from('pos_sales_data')
-            .insert({
-              organization_id: orgId,
-              location_id: locationId || null,
-              date: today,
-              pos_item_id: posItem.id,
-              quantity_sold: item.quantity,
-              revenue: item.quantity * item.price
-            });
+      const { error: itemsError } = await supabaseClient
+        .from('pos_order_items')
+        .insert(orderItemsToInsert);
 
-          if (saleError) {
-            console.error('Failed to insert pos_sales_data:', saleError);
-          }
-        }
+      if (itemsError) {
+        console.error('Failed to insert pos_order_items:', itemsError);
       }
     }
 

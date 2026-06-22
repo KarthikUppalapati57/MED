@@ -11,3 +11,69 @@ verify_jwt = false
 
 [functions.pos-webhook]
 verify_jwt = false
+
+[functions.sync-accounting]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-accounting/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/sync-accounting/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/sync-accounting/*.html" ]
+
+[functions.schedule-reports]
+enabled = true
+verify_jwt = false
+import_map = "./functions/schedule-reports/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/schedule-reports/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/schedule-reports/*.html" ]
+
+[functions.iot-ingest]
+enabled = true
+verify_jwt = false
+import_map = "./functions/iot-ingest/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/iot-ingest/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/iot-ingest/*.html" ]
+
+[functions.voice-copilot-parser]
+enabled = true
+verify_jwt = false
+import_map = "./functions/voice-copilot-parser/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/voice-copilot-parser/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/voice-copilot-parser/*.html" ]
+
+[functions.calculate-royalties]
+enabled = true
+verify_jwt = false
+import_map = "./functions/calculate-royalties/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/calculate-royalties/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/calculate-royalties/*.html" ]
+
+[functions.sync-delivery-menus]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-delivery-menus/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/sync-delivery-menus/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/sync-delivery-menus/*.html" ]

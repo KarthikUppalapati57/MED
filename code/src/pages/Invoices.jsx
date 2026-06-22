@@ -92,6 +92,9 @@ function InlineLoader({ label = 'Loading...' }) {
 }
 
 const statusColors = {
+  extracting: 'bg-resend-purple/10 text-resend-purple',
+  extract_failed: 'bg-resend-red/10 text-resend-red',
+  manual_review_required: 'bg-resend-orange/10 text-resend-orange',
   pending_review: 'bg-resend-yellow/10 text-resend-yellow',
   pending_match_approval: 'bg-amber-500/10 text-amber-500',
   validated: 'bg-resend-blue/10 text-resend-blue',
@@ -256,15 +259,26 @@ export default function Invoices() {
 
   useEffect(() => {
     const channel = supabase.channel('invoices-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, (payload) => {
+        queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
+          if (!oldData) return [];
+          const invoice = payload.new;
+          if (payload.eventType === 'INSERT') {
+            return [invoice, ...oldData];
+          } else if (payload.eventType === 'UPDATE') {
+            return oldData.map(i => i.id === invoice.id ? { ...i, ...invoice } : i);
+          } else if (payload.eventType === 'DELETE') {
+            return oldData.filter(i => i.id !== payload.old.id);
+          }
+          return oldData;
+        });
       })
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, organization?.id]);
 
   const handleExportCsv = () => {
     if (!filteredInvoices || filteredInvoices.length === 0) {
@@ -318,8 +332,8 @@ export default function Invoices() {
       delete cleaned.file_url;
     }
     
-    // Remove extremely large texts that cause Supabase timeout errors
-    delete cleaned.raw_text;
+    // Keep raw_text for auditing purposes (since we now do background extraction, payload timeouts aren't an issue)
+    // delete cleaned.raw_text;
     
     // Remove document-specific fields that do not belong in the invoices table
     delete cleaned.file_type;
@@ -351,130 +365,7 @@ export default function Invoices() {
     return cleaned;
   };
 
-  const normalizeLineItemForVendorCatalog = (item = {}) => {
-    const name = (item.description || item.item_name || item.product_name || '').trim();
-    const code = (item.vendor_item_code || item.item_code || item.sku || item.product_code || '').trim();
-    const unit = (item.vendor_unit || item.unit || item.pack_size || '').trim();
-    const unitPrice = Number(item.unit_price ?? item.price ?? 0) || 0;
-    return { name, code, unit, unitPrice };
-  };
 
-  const findExistingVendorItem = async ({ organizationId, vendorId, name, code }) => {
-    if (!organizationId || !name) return null;
-    const conditions = {
-      organization_id: organizationId,
-      vendor_item_name: name,
-      vendor_id: vendorId || null,
-    };
-    if (code) conditions.vendor_item_code = code;
-
-    const rows = await api.entities.VendorItem.filter(conditions, { limit: 1 });
-    return rows[0] || null;
-  };
-
-  const syncInvoiceVendorCatalog = async (invoice, lineItems = [], lineRecords = []) => {
-    if (!invoice?.organization_id || !lineItems.length) return;
-
-    const existingProducts = await api.entities.Product.list('name', {
-      limit: 1000,
-      select: 'id, product_id, name, latest_price, organization_id, brand_id, location_id',
-    });
-    const productByName = new Map();
-    const productByProductId = new Map();
-    existingProducts.forEach((product) => {
-      if (product.name) productByName.set(product.name.toLowerCase(), product);
-      if (product.product_id) productByProductId.set(product.product_id, product);
-      if (product.id) productByProductId.set(product.id, product);
-    });
-
-    const operations = lineItems.map(async (item, index) => {
-      const { name, code, unit, unitPrice } = normalizeLineItemForVendorCatalog(item);
-      if (!name) return null;
-
-      const existingItem = await findExistingVendorItem({
-        organizationId: invoice.organization_id,
-        vendorId: invoice.vendor_id || null,
-        name,
-        code,
-      });
-
-      const previousPrice = Number(existingItem?.last_price ?? existingItem?.default_price ?? 0) || null;
-      const threshold = Number(existingItem?.price_variance_threshold_percent ?? 10) || 10;
-      const priceChangePercent = previousPrice && unitPrice
-        ? ((unitPrice - previousPrice) / previousPrice) * 100
-        : 0;
-      const priceVarianceFlag = previousPrice
-        ? Math.abs(priceChangePercent) >= threshold
-        : false;
-
-      const vendorPayload = {
-        organization_id: invoice.organization_id,
-        vendor_id: invoice.vendor_id || null,
-        vendor_item_code: code || null,
-        vendor_item_name: name,
-        vendor_unit: unit || item.unit || null,
-        default_price: existingItem?.default_price ?? unitPrice,
-        previous_price: previousPrice,
-        last_price: unitPrice,
-        last_invoice_id: invoice.id,
-        last_purchased_at: invoice.invoice_date || new Date().toISOString().slice(0, 10),
-        last_price_change_percent: Number(priceChangePercent.toFixed(2)),
-        price_variance_flag: priceVarianceFlag,
-        mapping_status: existingItem?.mapping_status || 'unmapped',
-        match_confidence: existingItem?.match_confidence || 0,
-        updated_at: new Date().toISOString(),
-      };
-
-      let vendorItem = existingItem;
-      if (vendorItem) {
-        vendorItem = await api.entities.VendorItem.update(vendorItem.id, vendorPayload);
-      } else {
-        vendorItem = await api.entities.VendorItem.create(vendorPayload);
-      }
-
-      const product = (item.product_id && productByProductId.get(item.product_id))
-        || productByName.get(name.toLowerCase());
-
-      if (product?.id) {
-        const existingMappings = await api.entities.VendorItemMapping.filter({
-          vendor_item_id: vendorItem.id,
-          internal_product_id: product.id,
-        });
-        if (!existingMappings.length) {
-          await api.entities.VendorItemMapping.create({
-            organization_id: invoice.organization_id,
-            vendor_item_id: vendorItem.id,
-            internal_product_id: product.id,
-            conversion_multiplier: 1,
-            is_verified: false,
-          });
-        }
-      }
-
-      const lineRecord = lineRecords[index];
-      if (lineRecord?.id) {
-        await api.entities.InvoiceLineItem.update(lineRecord.id, {
-          vendor_id: invoice.vendor_id || null,
-          vendor_item_id: vendorItem.id,
-          vendor_item_code: code || null,
-          vendor_unit: unit || item.unit || null,
-          price_variance_percent: Number(priceChangePercent.toFixed(2)),
-          price_variance_flag: priceVarianceFlag,
-        });
-      }
-
-      return vendorItem;
-    });
-
-    const results = await Promise.allSettled(operations);
-    const flaggedCount = results.filter((result) => result.status === 'fulfilled' && result.value?.price_variance_flag).length;
-    queryClient.invalidateQueries({ queryKey: ['vendor_items'] });
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-
-    if (flaggedCount > 0) {
-      toast.warning(`${flaggedCount} vendor item price change${flaggedCount === 1 ? '' : 's'} need review.`);
-    }
-  };
 
   const createMutation = useMutation({
     mutationFn: async (data) => {
@@ -484,21 +375,21 @@ export default function Invoices() {
       
       const invoice = await api.entities.Invoice.create(cleaned);
       
-      let lineRecords = [];
       if (lineItems.length > 0) {
-        lineRecords = await Promise.all(lineItems.map(item => 
-          api.entities.InvoiceLineItem.create({
-            invoice_id: invoice.id,
-            organization_id: invoice.organization_id,
+        await api.client.rpc('upsert_invoice_line_items', {
+          p_invoice_id: invoice.id,
+          p_items: lineItems.map(item => ({
+            id: item.id || null,
             inventory_item_id: item.product_id || null,
             internal_product_id: item.product_id || null,
             item_name: item.description || 'Unknown Item',
             quantity: item.quantity || 1,
             unit_price: item.unit_price || 0,
-            total_price: item.extended_price || 0
-          })
-        ));
-        await syncInvoiceVendorCatalog(invoice, lineItems, lineRecords);
+            total_price: item.extended_price || 0,
+            vendor_item_code: item.vendor_item_code || null,
+            vendor_unit: item.vendor_unit || null
+          }))
+        });
       }
       return { ...invoice, line_items: lineItems };
     },
@@ -516,27 +407,21 @@ export default function Invoices() {
       
       const invoice = await api.entities.Invoice.update(id, cleaned);
       
-      // Delete old line items and insert new ones to keep them synced
-      const oldItems = await api.entities.InvoiceLineItem.filter({ invoice_id: id });
-      if (oldItems && oldItems.length > 0) {
-        await Promise.all(oldItems.map(item => api.entities.InvoiceLineItem.delete(item.id)));
-      }
-      
-      let lineRecords = [];
       if (lineItems.length > 0) {
-        lineRecords = await Promise.all(lineItems.map(item => 
-          api.entities.InvoiceLineItem.create({
-            invoice_id: invoice.id,
-            organization_id: invoice.organization_id,
+        await api.client.rpc('upsert_invoice_line_items', {
+          p_invoice_id: invoice.id,
+          p_items: lineItems.map(item => ({
+            id: item.id || null,
             inventory_item_id: item.product_id || null,
             internal_product_id: item.product_id || null,
             item_name: item.description || 'Unknown Item',
             quantity: item.quantity || 1,
             unit_price: item.unit_price || 0,
-            total_price: item.extended_price || 0
-          })
-        ));
-        await syncInvoiceVendorCatalog(invoice, lineItems, lineRecords);
+            total_price: item.extended_price || 0,
+            vendor_item_code: item.vendor_item_code || null,
+            vendor_unit: item.vendor_unit || null
+          }))
+        });
       }
       return { ...invoice, line_items: lineItems };
     },
@@ -548,14 +433,12 @@ export default function Invoices() {
 
   const batchUpdateMutation = useMutation({
     mutationFn: async ({ ids, data }) => {
-      const targets = invoices.filter((invoice) => ids.includes(invoice.id));
-      return Promise.all(targets.map(async (invoice) => {
-        const updated = await api.entities.Invoice.update(invoice.id, data);
-        if (data.status === 'approved') {
-          await finalizeApprovedInvoiceWorkflow({ ...invoice, ...updated });
-        }
-        return updated;
-      }));
+      const { error } = await api.client.rpc('bulk_process_invoices', {
+        p_invoice_ids: ids,
+        p_status: data.status
+      });
+      if (error) throw error;
+      return true;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
@@ -622,7 +505,7 @@ export default function Invoices() {
   const isPaidInvoice = (invoice) => ['paid', 'auto_pay'].includes(invoice?.payment_status) || invoice?.status === 'paid';
 
   const finalizeApprovedInvoiceWorkflow = async (invoice) => {
-    await syncInvoiceToProductsAndInventory(invoice);
+    await api.client.rpc('sync_invoice_products', { p_invoice_id: invoice.id });
     const { ensureLedgerBill, recordPaymentLedger } = await import('@/lib/workflowService');
 
     if (!isPaidInvoice(invoice)) {
@@ -671,10 +554,18 @@ export default function Invoices() {
     return { redirectedToPayments: true };
   };
 
-  const handleInvoiceExtracted = (data) => {
+  const handleInvoiceExtracted = async (data) => {
     console.log('Invoices Page received extraction data:', data);
-    setEditingInvoice(data);
-    setEditorOpen(true);
+    if (data.status === 'extracting') {
+      try {
+        await createMutation.mutateAsync(data);
+      } catch (err) {
+        console.error('Failed to create extracting invoice', err);
+      }
+    } else {
+      setEditingInvoice(data);
+      setEditorOpen(true);
+    }
   };
 
   const handleAcceptInvoice = () => {
@@ -746,203 +637,7 @@ export default function Invoices() {
     }
   };
 
-  const syncInvoiceToProductsAndInventory = async (invoice) => {
-    const items = invoice.line_items;
-    if (!items || items.length === 0) {
-      toast.warning('Invoice has no line items to sync');
-      return;
-    }
 
-    const [existingProducts, existingInventory] = await Promise.all([
-      api.entities.Product.list('name', {
-        limit: 1000,
-        select: 'id, product_id, name, latest_price, organization_id, brand_id, location_id',
-      }),
-      api.entities.Inventory.list('product_name', {
-        limit: 1000,
-        select: 'id, product_id, product_name, current_quantity, current_value, unit_cost, organization_id, brand_id, location_id',
-      }),
-    ]);
-
-    // O(1) Precomputed Lookups
-    const productByProductIdMap = new Map();
-    const productByNameMap = new Map();
-    existingProducts.forEach(p => {
-      if (p.product_id) {
-        productByProductIdMap.set(p.product_id, p);
-      }
-      if (p.id) {
-        productByProductIdMap.set(p.id, p);
-      }
-      if (p.name) {
-        productByNameMap.set(p.name.toLowerCase(), p);
-      }
-    });
-
-    const inventoryByNameMap = new Map();
-    existingInventory.forEach(i => {
-      if (i.product_name) {
-        inventoryByNameMap.set(i.product_name.toLowerCase(), i);
-      }
-    });
-
-    // Aggregate line items by product name to sum quantities and prevent race conditions/duplicate creations
-    const aggregatedItems = [];
-    const aggregatedByName = new Map();
-    for (const item of items) {
-      const name = (item.description || item.product_name || '').trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (aggregatedByName.has(key)) {
-        const existing = aggregatedByName.get(key);
-        existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
-        existing.unit_price = item.unit_price || existing.unit_price || 0;
-      } else {
-        const itemCopy = { ...item, description: name };
-        aggregatedByName.set(key, itemCopy);
-        aggregatedItems.push(itemCopy);
-      }
-    }
-
-    const pendingUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    const vendorName = invoice.vendor_name || '';
-
-    // Parallelize operations safely using Promise.allSettled
-    const syncOperations = aggregatedItems.map(async (item) => {
-      const name = item.description;
-      const unitPrice = item.unit_price || 0;
-      const unit = item.unit || 'ea';
-      const qty = item.quantity || 0;
-      const itemProductId = item.product_id || '';
-
-      // O(1) Product Lookup
-      let existingProduct = itemProductId ? (productByProductIdMap.get(itemProductId) || productByProductIdMap.get(`PRD-${itemProductId}`)) : null;
-      if (!existingProduct) {
-        existingProduct = productByNameMap.get(name.toLowerCase());
-      }
-
-      // Zero-Touch AI Auto-Mapping Bypass Logic
-      const aiConfidence = item.ai_confidence || Math.floor(Math.random() * 20) + 80;
-      const isHighConfidence = aiConfidence >= 90;
-
-      if (!isHighConfidence) {
-        console.log(`[AI Queue] Routing ${name} to AI Verification Queue (Confidence: ${aiConfidence}%)`);
-        // The Products.jsx UI will pick this up automatically as a new item needing review
-      } else {
-        console.log(`[AI Auto-Map] Zero-Touch Auto-Mapping successful for ${name} (Confidence: ${aiConfidence}%)`);
-      }
-
-      let productId;
-      if (existingProduct) {
-        productId = existingProduct.product_id;
-        try {
-          await api.entities.Product.update(existingProduct.id, {
-            latest_price: unitPrice,
-            vendor_name: vendorName,
-            description: name,
-            price_history: [
-              ...(existingProduct.price_history || []),
-              { price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }
-            ]
-          });
-        } catch (e) {
-          console.warn('Could not update product (likely ground_staff RLS):', e);
-        }
-      } else {
-        productId = itemProductId ? `PRD-${itemProductId}` : `PRD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        try {
-          const newProd = await api.entities.Product.create({
-            name,
-            description: name,
-            product_id: productId,
-            latest_price: unitPrice,
-            report_by_unit: unit,
-            base_unit: unit,
-            is_inventoried: true,
-            accounting_category: 'food',
-            vendor_name: vendorName,
-            organization_id: invoice.organization_id,
-            location_id: invoice.location_id,
-            price_history: [{ price: unitPrice, date: new Date().toISOString(), vendor_id: invoice.vendor_id }]
-          });
-          productByNameMap.set(name.toLowerCase(), newProd);
-          productByProductIdMap.set(productId, newProd);
-        } catch (e) {
-          console.warn('Could not create product:', e);
-        }
-      }
-
-      // O(1) Inventory Lookup
-      const existingInv = inventoryByNameMap.get(name.toLowerCase());
-      if (existingInv) {
-        const previousQuantity = Number(existingInv.current_quantity || 0);
-        const newQty = (existingInv.current_quantity || 0) + qty;
-        try {
-          await api.entities.Inventory.update(existingInv.id, {
-            current_quantity: newQty,
-            unit_cost: unitPrice,
-            current_value: newQty * unitPrice,
-            pending_until: pendingUntil,
-            pending_source_invoice: invoice.invoice_number || invoice.id,
-          });
-          await api.entities.InventoryMovement.create({
-            organization_id: invoice.organization_id,
-            location_id: invoice.location_id || existingInv.location_id || null,
-            inventory_id: existingInv.id,
-            movement_type: 'invoice_received',
-            quantity: qty,
-            source_type: 'invoice',
-            source_id: invoice.id,
-            previous_quantity: previousQuantity,
-            new_quantity: newQty,
-            created_by: userProfile?.id || null,
-          });
-        } catch (e) {
-          console.warn('Could not update inventory (likely ground_staff RLS):', e);
-        }
-      } else {
-        try {
-          const createdInventory = await api.entities.Inventory.create({
-            product_id: productId,
-            product_name: name,
-            current_quantity: qty,
-            current_unit: unit,
-            unit_cost: unitPrice,
-            current_value: qty * unitPrice,
-            accounting_category: 'food',
-            par_level: 0,
-            reorder_point: 0,
-            previous_quantity: 0,
-            previous_value: 0,
-            location: invoice.location || '',
-            organization_id: invoice.organization_id,
-            location_id: invoice.location_id,
-            pending_until: pendingUntil,
-            pending_source_invoice: invoice.invoice_number || invoice.id,
-          });
-          await api.entities.InventoryMovement.create({
-            organization_id: invoice.organization_id,
-            location_id: invoice.location_id || null,
-            inventory_id: createdInventory.id,
-            movement_type: 'invoice_received',
-            quantity: qty,
-            source_type: 'invoice',
-            source_id: invoice.id,
-            previous_quantity: 0,
-            new_quantity: qty,
-            created_by: userProfile?.id || null,
-          });
-        } catch (e) {
-          console.warn('Could not create inventory:', e);
-        }
-      }
-    });
-
-    await Promise.allSettled(syncOperations);
-
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    queryClient.invalidateQueries({ queryKey: ['inventory'] });
-  };
 
   const handleApprove = async (invoice) => {
     try {
@@ -1674,6 +1369,7 @@ export default function Invoices() {
             open={uploadOpen}
             onOpenChange={setUploadOpen}
             onInvoiceExtracted={handleInvoiceExtracted}
+            organizationId={organization?.id}
           />
         </React.Suspense>
       )}

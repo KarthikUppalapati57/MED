@@ -45,6 +45,11 @@ const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
 const SmartPrep = React.lazy(() => import('./pages/SmartPrep'));
 const Commissary = React.lazy(() => import('./pages/Commissary'));
 const MobileApp = React.lazy(() => import('./pages/MobileApp'));
+const Billing = React.lazy(() => import('./pages/Billing'));
+const CustomReports = React.lazy(() => import('./pages/CustomReports'));
+const FoodSafety = React.lazy(() => import('./pages/FoodSafety'));
+const FranchisorConsole = React.lazy(() => import('./pages/FranchisorConsole'));
+const DeliveryAggregator = React.lazy(() => import('./pages/DeliveryAggregator'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -80,7 +85,12 @@ export const PAGES = {
     "DeveloperPortal": DeveloperPortal,
     "SmartPrep": SmartPrep,
     "Commissary": Commissary,
-    "MobileApp": MobileApp
+    "MobileApp": MobileApp,
+    "Billing": Billing,
+    "CustomReports": CustomReports,
+    "FoodSafety": FoodSafety,
+    "FranchisorConsole": FranchisorConsole,
+    "DeliveryAggregator": DeliveryAggregator
 }
 
 export const pagesConfig = {

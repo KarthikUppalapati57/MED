@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Bot, Loader2 } from 'lucide-react';
 import { generateLaborSchedule } from '@/lib/geminiService';
+import { api } from '@/lib/apiClient';
 import { toast } from 'sonner';
 export default function LaborScheduler({ employees, shifts, forecastData, onCreateShift, onEditShift }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -38,7 +39,7 @@ export default function LaborScheduler({ employees, shifts, forecastData, onCrea
       if (schedule && schedule.shifts && schedule.shifts.length > 0) {
         // Since we don't have a bulk API currently, we Promise.all the creations
         // In a real prod scenario, we would add a bulk endpoint
-        await Promise.all(schedule.shifts.map(shift => onCreateShift(shift)));
+        await api.entities.EmployeeShift.createMany(schedule.shifts);
         toast.success(`Generated ${schedule.shifts.length} shifts successfully!`);
       } else {
         toast.error('AI failed to generate any shifts.');

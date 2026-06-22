@@ -92,6 +92,32 @@ export default defineConfig({
                 statuses: [0, 200]
               }
             }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkOnly',
+            method: 'POST',
+            options: {
+              backgroundSync: {
+                name: 'supabase-post-queue',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 hours
+                }
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkOnly',
+            method: 'PATCH',
+            options: {
+              backgroundSync: {
+                name: 'supabase-patch-queue',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 hours
+                }
+              }
+            }
           }
         ]
       }
