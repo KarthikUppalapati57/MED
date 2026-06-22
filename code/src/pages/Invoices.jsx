@@ -296,6 +296,13 @@ export default function Invoices() {
       organization_id: organization?.id || userProfile?.organization_id,
     };
 
+    // Assign to active Brand context if available, fallback to userProfile brand
+    if (!cleaned.brand_id && (brand?.id || brand?.brand_id)) {
+      cleaned.brand_id = brand.id || brand.brand_id;
+    } else if (!cleaned.brand_id && userProfile?.brand_id) {
+      cleaned.brand_id = userProfile.brand_id;
+    }
+
     // Assign to active Location context if available, fallback to userProfile location
     if (!cleaned.location_id && location?.id) {
       cleaned.location_id = location.id;
@@ -338,6 +345,7 @@ export default function Invoices() {
     if (!cleaned.approved_by) delete cleaned.approved_by;
     // Remove null/undefined organization_id and location_id (if still missing)
     if (!cleaned.organization_id) delete cleaned.organization_id;
+    if (!cleaned.brand_id) delete cleaned.brand_id;
     if (!cleaned.location_id) delete cleaned.location_id;
     if (!cleaned.created_by) delete cleaned.created_by;
     return cleaned;
