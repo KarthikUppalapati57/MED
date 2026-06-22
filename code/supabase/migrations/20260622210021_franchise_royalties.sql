@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS public.franchise_agreements (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Add organization_id if it doesn't exist (table may have been created in an earlier migration without it)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'franchise_agreements' AND column_name = 'organization_id') THEN
+        ALTER TABLE public.franchise_agreements ADD COLUMN organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE;
+    END IF;
+END $$;
+
 -- Franchise Invoices (Royalties billed to the franchisee)
 CREATE TABLE IF NOT EXISTS public.franchise_invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,8 +41,10 @@ CREATE TABLE IF NOT EXISTS public.franchise_invoices (
 ALTER TABLE public.franchise_agreements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.franchise_invoices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Org admins can manage franchise agreements" ON public.franchise_agreements;
 CREATE POLICY "Org admins can manage franchise agreements" ON public.franchise_agreements FOR ALL USING (organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid()) AND (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('org_owner'));
 
+DROP POLICY IF EXISTS "Org admins can view franchise invoices" ON public.franchise_invoices;
 CREATE POLICY "Org admins can view franchise invoices" ON public.franchise_invoices FOR SELECT USING (agreement_id IN (SELECT id FROM public.franchise_agreements WHERE organization_id = (SELECT organization_id FROM public.profiles WHERE id = auth.uid())));
 
 COMMIT;
