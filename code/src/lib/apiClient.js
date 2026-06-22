@@ -370,6 +370,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
 });
 
 export const api = {
+  client: supabase,
   entities: {
     AutoOrder: createEntityClient('auto_orders'),
     Inventory: createEntityClient('inventory', true),
