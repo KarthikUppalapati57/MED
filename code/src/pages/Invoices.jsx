@@ -314,6 +314,9 @@ export default function Invoices() {
     // Remove extremely large texts that cause Supabase timeout errors
     delete cleaned.raw_text;
     
+    // Remove document-specific fields that do not belong in the invoices table
+    delete cleaned.file_type;
+    
     // Convert empty date strings to null (PostgreSQL rejects "" for date columns)
     ['invoice_date', 'due_date', 'approved_date'].forEach(field => {
       if (cleaned[field] === '' || cleaned[field] === undefined) {
