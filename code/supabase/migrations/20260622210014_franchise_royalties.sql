@@ -31,16 +31,16 @@ ALTER TABLE public.franchise_agreements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.royalty_invoices ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage franchise agreements" ON public.franchise_agreements
-    FOR ALL USING (parent_org_id IN (SELECT auth.get_user_orgs()) OR child_org_id IN (SELECT auth.get_user_orgs()));
+    FOR ALL USING (parent_org_id = public.get_auth_org() OR child_org_id = public.get_auth_org());
 
 CREATE POLICY "Users can view royalty invoices" ON public.royalty_invoices
-    FOR ALL USING (agreement_id IN (SELECT id FROM public.franchise_agreements WHERE parent_org_id IN (SELECT auth.get_user_orgs()) OR child_org_id IN (SELECT auth.get_user_orgs())));
+    FOR ALL USING (agreement_id IN (SELECT id FROM public.franchise_agreements WHERE parent_org_id = public.get_auth_org() OR child_org_id = public.get_auth_org()));
 
 -- Triggers for updated_at
 CREATE TRIGGER on_franchise_agreements_updated
     BEFORE UPDATE ON public.franchise_agreements
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();
     
 CREATE TRIGGER on_royalty_invoices_updated
     BEFORE UPDATE ON public.royalty_invoices
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();

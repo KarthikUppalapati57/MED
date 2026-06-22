@@ -20,7 +20,7 @@ CREATE POLICY "Platform admins can manage all subscriptions" ON public.subscript
     FOR ALL USING (public.is_platform_admin());
 
 CREATE POLICY "Users can view their organization's subscription" ON public.subscriptions
-    FOR SELECT USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR SELECT USING (organization_id = public.get_auth_org());
 
 -- Automatically create a starter subscription when an organization is created
 CREATE OR REPLACE FUNCTION handle_new_organization_subscription()

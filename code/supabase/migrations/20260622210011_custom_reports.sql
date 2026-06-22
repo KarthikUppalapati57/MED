@@ -15,9 +15,9 @@ CREATE TABLE IF NOT EXISTS public.custom_reports (
 ALTER TABLE public.custom_reports ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage custom reports for their org" ON public.custom_reports
-    FOR ALL USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR ALL USING (organization_id = public.get_auth_org());
 
 -- Trigger for updated_at
 CREATE TRIGGER on_custom_reports_updated
     BEFORE UPDATE ON public.custom_reports
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();

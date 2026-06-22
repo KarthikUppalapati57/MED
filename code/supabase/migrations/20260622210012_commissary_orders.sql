@@ -17,9 +17,9 @@ CREATE TABLE IF NOT EXISTS public.intercompany_transfers (
 ALTER TABLE public.intercompany_transfers ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage intercompany transfers" ON public.intercompany_transfers
-    FOR ALL USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR ALL USING (organization_id = public.get_auth_org());
 
 -- Trigger for updated_at
 CREATE TRIGGER on_intercompany_transfers_updated
     BEFORE UPDATE ON public.intercompany_transfers
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();

@@ -57,7 +57,6 @@ CREATE INDEX IF NOT EXISTS idx_invoice_event_log_invoice_id ON public.invoice_ev
 CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON public.invoice_line_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_products_organization_id ON public.products(organization_id);
 CREATE INDEX IF NOT EXISTS idx_products_name ON public.products(name);
-CREATE INDEX IF NOT EXISTS idx_products_sku ON public.products(sku);
 CREATE INDEX IF NOT EXISTS idx_vendor_items_vendor_id ON public.vendor_items(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_product_id ON public.inventory(product_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);

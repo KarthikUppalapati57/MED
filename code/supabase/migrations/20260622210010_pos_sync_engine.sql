@@ -29,10 +29,10 @@ ALTER TABLE public.pos_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pos_order_items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view pos_orders in their org" ON public.pos_orders
-    FOR SELECT USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR SELECT USING (organization_id = public.get_auth_org());
 
 CREATE POLICY "Users can view pos_order_items in their org" ON public.pos_order_items
-    FOR SELECT USING (order_id IN (SELECT id FROM public.pos_orders WHERE organization_id IN (SELECT auth.get_user_orgs())));
+    FOR SELECT USING (order_id IN (SELECT id FROM public.pos_orders WHERE organization_id = public.get_auth_org()));
 
 -- 2. Generate Daily Theoretical Usage RPC
 CREATE OR REPLACE FUNCTION generate_daily_theoretical_usage(

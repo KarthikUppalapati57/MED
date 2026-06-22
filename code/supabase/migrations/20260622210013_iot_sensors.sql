@@ -26,12 +26,12 @@ ALTER TABLE public.iot_sensors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.temperature_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage IoT sensors" ON public.iot_sensors
-    FOR ALL USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR ALL USING (organization_id = public.get_auth_org());
 
 CREATE POLICY "Users can view temperature logs" ON public.temperature_logs
-    FOR ALL USING (sensor_id IN (SELECT id FROM public.iot_sensors WHERE organization_id IN (SELECT auth.get_user_orgs())));
+    FOR ALL USING (sensor_id IN (SELECT id FROM public.iot_sensors WHERE organization_id = public.get_auth_org()));
 
 -- Trigger for updated_at
 CREATE TRIGGER on_iot_sensors_updated
     BEFORE UPDATE ON public.iot_sensors
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();

@@ -12,11 +12,13 @@ BEGIN;
 DROP POLICY IF EXISTS "Tenant_Isolation_locations" ON public.locations;
 
 -- Read Access: All members of the organization can read locations
+DROP POLICY IF EXISTS "Tenant_Isolation_locations_SELECT" ON public.locations;
 CREATE POLICY "Tenant_Isolation_locations_SELECT"
   ON public.locations FOR SELECT
   USING (organization_id = public.get_auth_org());
 
 -- Write Access: Only org_owner or platform_admin can insert
+DROP POLICY IF EXISTS "Tenant_Isolation_locations_INSERT" ON public.locations;
 CREATE POLICY "Tenant_Isolation_locations_INSERT"
   ON public.locations FOR INSERT
   WITH CHECK (
@@ -24,19 +26,17 @@ CREATE POLICY "Tenant_Isolation_locations_INSERT"
     AND public.get_auth_role() IN ('org_owner', 'platform_admin')
   );
 
--- Write Access: Only org_owner or platform_admin can update
+-- Update Access: Org owners or specific location managers
+DROP POLICY IF EXISTS "Tenant_Isolation_locations_UPDATE" ON public.locations;
 CREATE POLICY "Tenant_Isolation_locations_UPDATE"
   ON public.locations FOR UPDATE
   USING (
-    organization_id = public.get_auth_org() 
-    AND public.get_auth_role() IN ('org_owner', 'platform_admin')
-  )
-  WITH CHECK (
-    organization_id = public.get_auth_org() 
+    organization_id = public.get_auth_org()
     AND public.get_auth_role() IN ('org_owner', 'platform_admin')
   );
 
--- Write Access: Only org_owner or platform_admin can delete
+-- Delete Access: Only org_owner or platform_admin
+DROP POLICY IF EXISTS "Tenant_Isolation_locations_DELETE" ON public.locations;
 CREATE POLICY "Tenant_Isolation_locations_DELETE"
   ON public.locations FOR DELETE
   USING (

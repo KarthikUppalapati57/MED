@@ -28,12 +28,12 @@ ALTER TABLE public.delivery_channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_sync_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can manage delivery channels" ON public.delivery_channels
-    FOR ALL USING (organization_id IN (SELECT auth.get_user_orgs()));
+    FOR ALL USING (organization_id = public.get_auth_org());
 
 CREATE POLICY "Users can view menu sync logs" ON public.menu_sync_logs
-    FOR ALL USING (channel_id IN (SELECT id FROM public.delivery_channels WHERE organization_id IN (SELECT auth.get_user_orgs())));
+    FOR ALL USING (channel_id IN (SELECT id FROM public.delivery_channels WHERE organization_id = public.get_auth_org()));
 
 -- Trigger for updated_at
 CREATE TRIGGER on_delivery_channels_updated
     BEFORE UPDATE ON public.delivery_channels
-    FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION update_modified_column();

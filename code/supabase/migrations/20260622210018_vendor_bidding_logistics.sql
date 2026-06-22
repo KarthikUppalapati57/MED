@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.procurement_bids (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     vendor_id UUID NOT NULL REFERENCES public.vendors(id) ON DELETE CASCADE,
-    global_item_id UUID REFERENCES public.global_items(id) ON DELETE SET NULL,
+    global_item_id UUID,
     requested_quantity NUMERIC(10, 2) NOT NULL,
     bid_price NUMERIC(10, 2) NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired')),
