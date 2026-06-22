@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, ChefHat, Clock, Flame, Plus, Search, Loader2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
+import VoiceAssistant from '@/components/kitchen/VoiceAssistant';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { filterByContext } from '@/lib/contextUtils';
@@ -211,10 +212,16 @@ export default function SmartPrep() {
           </h1>
           <p className="text-muted-foreground mt-1">Plan prep from pars, on-hand counts, and forecast demand.</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Prep Plan
-        </Button>
+        <div className="flex items-center gap-2">
+          <VoiceAssistant onTranscript={(text) => {
+            setForm(f => ({ ...f, name: text, prep_quantity: 10, unit: 'lbs', priority: 'high' }));
+            setDialogOpen(true);
+          }} />
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Prep Plan
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

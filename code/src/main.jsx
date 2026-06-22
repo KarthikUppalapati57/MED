@@ -5,10 +5,13 @@ import App from '@/App.jsx'
 import '@/index.css'
 import { initSentry } from '@/lib/sentry'
 import { initPostHog } from '@/lib/posthog'
+import '@/i18n.js'
 
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { reportWebVitals } from '@/lib/vitals'
 
 initSentry();
+reportWebVitals();
 
 const schedulePostHogInit = () => {
   if ('requestIdleCallback' in window) {

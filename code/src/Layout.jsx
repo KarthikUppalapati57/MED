@@ -34,7 +34,8 @@ import {
   Plus,
   Receipt,
   ArrowLeft,
-  Smartphone
+  Smartphone,
+  Code
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,9 +57,12 @@ import RestopsLogo from '@/components/RestopsLogo';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 import AiInsightsAssistant from '@/components/AiInsightsAssistant';
+import i18n from '@/i18n';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Executive BI', href: 'ExecutiveBI', icon: Activity, minRole: 'org_owner' },
   { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
@@ -132,6 +136,15 @@ const navigation = [
   { name: 'SmartPrep', href: 'SmartPrep', icon: ChefHat, minRole: 'location_manager' },
   { name: 'Commissary', href: 'Commissary', icon: Building2, minRole: 'location_manager' },
   { 
+    name: 'Storefront', 
+    icon: Store, 
+    minRole: 'location_manager',
+    subItems: [
+      { name: 'Menu Engineering', href: 'Recipes', icon: BookOpen },
+      { name: 'Consumer Online Ordering', href: 'OrderOnline', icon: Store }
+    ]
+  },
+  { 
     name: 'Recipes', 
     pageKey: 'Recipes',
     icon: ChefHat, 
@@ -151,7 +164,8 @@ const navigation = [
     minRole: 'location_manager',
     subItems: [
       { name: 'Vendors List', href: 'Vendors?tab=vendors', icon: Store },
-      { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package }
+      { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package },
+      { name: 'Bidding & Logistics', href: 'VendorBidding', icon: Store }
     ]
   },
   { 
@@ -163,9 +177,15 @@ const navigation = [
       { name: 'Labor Summary', href: 'Labor?tab=summary', icon: FileText },
       { name: 'Shifts & Scheduling', href: 'Labor?tab=shifts', icon: Check },
       { name: 'Employees', href: 'Labor?tab=employees', icon: Users },
+      { name: 'Shift Trade Board', href: 'ShiftBoard', icon: RefreshCcw },
+      { name: 'AI Forecasts', href: 'LaborSchedules', icon: Activity },
+      { name: 'Time Clock', href: 'TimeClock', icon: Users },
+      { name: 'Tip Pooling', href: 'TipPooling', icon: Calculator },
+      { name: 'Payroll Export', href: 'PayrollExport', icon: FileText },
       { name: 'Setup', href: 'Labor?tab=setup', icon: Settings }
     ]
   },
+  { name: 'CRM & Marketing', href: 'CRM', icon: Users, minRole: 'location_manager' },
   { 
     name: 'Accounting', 
     pageKey: 'Accounting',
@@ -194,6 +214,17 @@ const navigation = [
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
   { name: 'Organization Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
+  { name: 'Developer Portal', href: 'DeveloperPortal', icon: Code, minRole: 'org_owner' },
+  { 
+    name: 'Hardware & Displays', 
+    icon: Smartphone, 
+    minRole: 'ground_staff',
+    subItems: [
+      { name: 'Kitchen Display (KDS)', href: 'KDS', icon: ChefHat },
+      { name: 'Digital Menu TV', href: 'DigitalMenu', icon: Sparkles }
+    ]
+  },
+  { name: 'Audit Vault (SOC2)', href: 'AuditVault', icon: ShieldCheck, minRole: 'platform_admin' }
 ];
 
 const roleBadgeColors = {
@@ -209,9 +240,9 @@ const roleBadgeColors = {
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Accordion: only one menu can be expanded at a time (null = none)
   const [expandedMenu, setExpandedMenu] = useState(null);
   const { user, userProfile, logout, role, organization } = useAuth();
+  const { isOnline } = useOfflineSync();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -516,10 +547,21 @@ export default function Layout({ children, currentPageName }) {
 
           <div className="flex-1 flex items-center px-4 gap-4">
             {!isPlatformAdmin && <ContextSwitcher />}
+            {!isOnline && (
+              <Badge variant="destructive" className="animate-pulse">
+                Offline Mode
+              </Badge>
+            )}
             <PwaInstallPrompt variant="outline" size="sm" className="hidden md:flex h-8 ml-auto" />
           </div>
 
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => {
+              const newLang = i18n.language === 'en' ? 'es' : 'en';
+              i18n.changeLanguage(newLang);
+            }}>
+              {i18n.language.toUpperCase()}
+            </Button>
             <ThemeToggle />
             {/* Notifications */}
             <DropdownMenu>

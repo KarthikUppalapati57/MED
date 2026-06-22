@@ -42,6 +42,7 @@ const Performance = React.lazy(() => import('./pages/Performance'));
 const MenuEngineering = React.lazy(() => import('./pages/MenuEngineering'));
 const RestaurantSetup = React.lazy(() => import('./pages/RestaurantSetup'));
 const DeveloperPortal = React.lazy(() => import('./pages/DeveloperPortal'));
+const AuditVault = React.lazy(() => import('./pages/AuditVault'));
 const SmartPrep = React.lazy(() => import('./pages/SmartPrep'));
 const Commissary = React.lazy(() => import('./pages/Commissary'));
 const MobileApp = React.lazy(() => import('./pages/MobileApp'));
@@ -50,6 +51,17 @@ const CustomReports = React.lazy(() => import('./pages/CustomReports'));
 const FoodSafety = React.lazy(() => import('./pages/FoodSafety'));
 const FranchisorConsole = React.lazy(() => import('./pages/FranchisorConsole'));
 const DeliveryAggregator = React.lazy(() => import('./pages/DeliveryAggregator'));
+const LaborSchedules = React.lazy(() => import('./pages/LaborSchedules'));
+const TimeClock = React.lazy(() => import('./pages/TimeClock'));
+const CRM = React.lazy(() => import('./pages/CRM'));
+const VendorBidding = React.lazy(() => import('./pages/VendorBidding'));
+const ExecutiveBI = React.lazy(() => import('./pages/ExecutiveBI'));
+const KDS = React.lazy(() => import('./pages/KDS'));
+const DigitalMenu = React.lazy(() => import('./pages/DigitalMenu'));
+const PayrollExport = React.lazy(() => import('./pages/PayrollExport'));
+const TipPooling = React.lazy(() => import('./pages/TipPooling'));
+const ShiftBoard = React.lazy(() => import('./pages/ShiftBoard'));
+const OrderOnline = React.lazy(() => import('./pages/OrderOnline'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -83,6 +95,10 @@ export const PAGES = {
     "MenuEngineering": MenuEngineering,
     "RestaurantSetup": RestaurantSetup,
     "DeveloperPortal": DeveloperPortal,
+    "AuditVault": AuditVault,
+    "KDS": KDS,
+    "DigitalMenu": DigitalMenu,
+    "PayrollExport": PayrollExport,
     "SmartPrep": SmartPrep,
     "Commissary": Commissary,
     "MobileApp": MobileApp,
@@ -90,7 +106,18 @@ export const PAGES = {
     "CustomReports": CustomReports,
     "FoodSafety": FoodSafety,
     "FranchisorConsole": FranchisorConsole,
-    "DeliveryAggregator": DeliveryAggregator
+    "DeliveryAggregator": DeliveryAggregator,
+    "LaborSchedules": LaborSchedules,
+    "TimeClock": TimeClock,
+    "CRM": CRM,
+    "VendorBidding": VendorBidding,
+    "ExecutiveBI": ExecutiveBI,
+    "KDS": KDS,
+    "DigitalMenu": DigitalMenu,
+    "PayrollExport": PayrollExport,
+    "TipPooling": TipPooling,
+    "ShiftBoard": ShiftBoard,
+    "OrderOnline": OrderOnline
 }
 
 export const pagesConfig = {

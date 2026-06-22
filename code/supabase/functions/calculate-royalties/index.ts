@@ -1,69 +1,79 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno'
+import { corsHeaders } from '../_shared/cors.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    )
 
-    // This cron job fetches all franchise agreements, aggregates sales for the week, and creates invoices
-    console.log("Starting weekly franchise royalty calculation job...");
+    // This function is meant to be triggered by a pg_cron job or manual webhook
+    const { period_start, period_end } = await req.json()
 
-    const { data: agreements, error } = await supabaseClient
-      .from('franchise_agreements')
-      .select('id, parent_org_id, child_org_id, royalty_percentage, marketing_fee_percentage')
-      .eq('status', 'active');
-      
-    if (error) throw error;
-
-    let invoicesCreated = 0;
-
-    for (const agreement of agreements || []) {
-      // MOCK: In production, we'd query the `sales_data` table for the child_org_id
-      const mockWeeklySales = Math.random() * 50000 + 10000; 
-      
-      const royaltyFee = mockWeeklySales * (agreement.royalty_percentage / 100);
-      const marketingFee = mockWeeklySales * (agreement.marketing_fee_percentage / 100);
-      
-      const { error: invoiceError } = await supabaseClient
-        .from('royalty_invoices')
-        .insert({
-          agreement_id: agreement.id,
-          period_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          period_end: new Date().toISOString().split('T')[0],
-          gross_sales: Number(mockWeeklySales.toFixed(2)),
-          royalty_fee: Number(royaltyFee.toFixed(2)),
-          marketing_fee: Number(marketingFee.toFixed(2)),
-          total_due: Number((royaltyFee + marketingFee).toFixed(2)),
-          status: 'pending_payment'
-        });
-        
-      if (!invoiceError) invoicesCreated++;
+    if (!period_start || !period_end) {
+      throw new Error("Missing billing period dates");
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Royalty calculation completed',
-      invoices_created: invoicesCreated
-    }), {
+    console.log(`Calculating royalties for period: ${period_start} to ${period_end}`);
+
+    // 1. Fetch all active franchise agreements
+    const { data: agreements, error: agError } = await supabaseClient
+      .from('franchise_agreements')
+      .select('*')
+      .eq('status', 'active');
+
+    if (agError) throw agError;
+
+    const results = [];
+
+    // 2. Loop through agreements and calculate fees
+    for (const agreement of agreements || []) {
+      // Mocking the gross sales aggregate from accounting/ledger tables
+      const mockGrossSales = Math.floor(Math.random() * 50000) + 10000; // Between $10k and $60k
+      
+      const royaltyFee = (mockGrossSales * (agreement.royalty_percentage / 100));
+      const marketingFee = (mockGrossSales * (agreement.marketing_fee_percentage / 100));
+      const totalDue = royaltyFee + marketingFee;
+
+      // 3. Insert Invoice Record
+      const { data: invoice, error: invError } = await supabaseClient
+        .from('franchise_invoices')
+        .insert({
+          agreement_id: agreement.id,
+          billing_period_start: period_start,
+          billing_period_end: period_end,
+          gross_sales: mockGrossSales,
+          royalty_fee_amount: royaltyFee,
+          marketing_fee_amount: marketingFee,
+          total_amount_due: totalDue,
+          due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Net 15
+          status: 'issued'
+        })
+        .select()
+        .single();
+
+      if (invError) throw invError;
+      results.push(invoice);
+      
+      // Note: In production, we would use the Stripe SDK here to issue a real invoice to the franchisee's connected account.
+    }
+
+    return new Response(JSON.stringify({ success: true, processed: results.length, invoices: results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    });
+    })
   } catch (error) {
+    console.error("Calculate royalties error:", error)
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
-    });
+    })
   }
-});
+})

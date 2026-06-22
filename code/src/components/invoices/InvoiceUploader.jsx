@@ -16,7 +16,6 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { extractInvoiceData } from '@/lib/invoiceExtractor';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted, organizationId }) {

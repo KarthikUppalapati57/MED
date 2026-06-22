@@ -40,18 +40,19 @@ export default function Billing() {
     setSelectedPlan(plan.id);
 
     try {
-      // In production, this would call a Supabase Edge Function to create a Stripe Checkout session
-      // const response = await supabase.functions.invoke('create-checkout-session', { body: { plan_id: plan.id, org_id: organization.id } });
-      // const { url } = response.data;
-      // window.location.href = url;
+      const response = await supabase.functions.invoke('create-checkout-session', { 
+        body: { plan_id: plan.id, org_id: organization.id } 
+      });
       
-      const res = await mockStripeCheckout(plan.id, organization.id);
-      if (res.success) {
-        toast.success(`Successfully upgraded to ${plan.name} plan!`);
-        // Force reload or query invalidation here
+      if (response.error) throw response.error;
+      
+      const { url } = response.data;
+      if (url) {
+        // Redirect to Stripe checkout (or simulated success URL)
+        window.location.href = url;
       }
     } catch (err) {
-      toast.error("Checkout failed. Please try again.");
+      toast.error("Checkout failed: " + err.message);
     } finally {
       setIsProcessing(false);
       setSelectedPlan(null);
