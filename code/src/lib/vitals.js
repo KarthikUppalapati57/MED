@@ -1,4 +1,4 @@
-import { onCLS, onFID, onLCP } from 'web-vitals';
+import { onCLS, onINP, onLCP } from 'web-vitals';
 import { supabase } from './supabaseClient';
 
 function sendToSupabase(metric) {
@@ -20,7 +20,7 @@ function sendToSupabase(metric) {
 export function reportWebVitals() {
   if (typeof window !== 'undefined') {
     onCLS(sendToSupabase);
-    onFID(sendToSupabase);
+    onINP(sendToSupabase);
     onLCP(sendToSupabase);
   }
 }
