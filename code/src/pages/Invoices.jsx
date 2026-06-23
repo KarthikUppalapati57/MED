@@ -298,14 +298,12 @@ export default function Invoices() {
         if (current && current.status !== 'extracting') {
           if (['pending_approval', 'pending_review', 'validated', 'processed'].includes(current.status)) {
             toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
-            setEditingInvoice(current);
             setIsMinimized(false);
-            setEditorOpen(true);
+            openEditorWithFullData(current);
           } else if (['failed', 'extract_failed', 'rejected'].includes(current.status)) {
             toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
-            setEditingInvoice(current);
             setIsMinimized(false);
-            setEditorOpen(true);
+            openEditorWithFullData(current);
           }
         }
       }
@@ -427,14 +425,11 @@ export default function Invoices() {
       return { ...invoice, line_items: lineItems };
     },
     onSuccess: (updatedInvoice) => {
-      queryClient.setQueriesData({ queryKey: ['invoices-dashboard'] }, (oldData) => {
-        if (!oldData?.pages) return oldData;
-        return {
-          ...oldData,
-          pages: oldData.pages.map(page => 
-            page.map(inv => inv.id === updatedInvoice.id ? { ...inv, ...updatedInvoice } : inv)
-          )
-        };
+      queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
+        if (!oldData) return [updatedInvoice];
+        const exists = oldData.some(inv => inv.id === updatedInvoice.id);
+        if (exists) return oldData.map(inv => inv.id === updatedInvoice.id ? { ...inv, ...updatedInvoice } : inv);
+        return [updatedInvoice, ...oldData];
       });
       toast.success('Invoice saved successfully');
     },
@@ -611,6 +606,18 @@ export default function Invoices() {
 
   const handleAcceptInvoice = () => {
     setValidationOpen(true);
+  };
+
+  const openEditorWithFullData = async (invoice) => {
+    try {
+      const fullInvoice = await api.entities.Invoice.get(invoice.id);
+      setEditingInvoice(fullInvoice);
+      setEditorOpen(true);
+    } catch (err) {
+      console.error('Failed to fetch full invoice:', err);
+      setEditingInvoice(invoice);
+      setEditorOpen(true);
+    }
   };
 
   const handleSaveValidated = async (validatedInvoice) => {
@@ -1295,7 +1302,7 @@ export default function Invoices() {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="font-medium" onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                        <TableCell className="font-medium" onClick={() => openEditorWithFullData(invoice)}>
                           <div>{invoice.vendor_name || 'Unassigned vendor'}</div>
                           {actionReason && (
                             <div className="text-xs text-resend-orange mt-1">
@@ -1303,7 +1310,7 @@ export default function Invoices() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell onClick={() => { setEditingInvoice(invoice); setEditorOpen(true); }}>
+                        <TableCell onClick={() => openEditorWithFullData(invoice)}>
                           {invoice.invoice_number || '-'}
                         </TableCell>
                         <TableCell>
@@ -1348,8 +1355,7 @@ export default function Invoices() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onSelect={(e) => {
                                 e.preventDefault();
-                                setEditingInvoice(invoice);
-                                setEditorOpen(true);
+                                openEditorWithFullData(invoice);
                               }}>
                                 <Eye className="h-4 w-4 mr-2" /> View/Edit
                               </DropdownMenuItem>

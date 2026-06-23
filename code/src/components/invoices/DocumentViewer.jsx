@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Image as ImageIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/lib/supabaseClient';

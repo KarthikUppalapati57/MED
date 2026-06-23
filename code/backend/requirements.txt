@@ -2,6 +2,6 @@ docling
 fastapi
 uvicorn[standard]
 python-multipart
-openai
+google-genai
 python-dotenv
 posthog

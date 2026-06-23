@@ -1,5 +1,5 @@
 """
-FastAPI backend for Docling-based invoice extraction.
+FastAPI backend for Docling + Vertex AI Gemini invoice extraction.
 
 Run with:
     uvicorn main:app --reload --port 8000
@@ -23,8 +23,8 @@ posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
 
 app = FastAPI(
     title="MEVS Invoice Extraction API",
-    description="Docling-powered invoice document extraction",
-    version="1.0.0",
+    description="Docling + Vertex AI Gemini invoice document extraction",
+    version="1.1.0",
 )
 
 # CORS — allow the Vite dev server and common deployment origins
@@ -91,7 +91,7 @@ async def extract_invoice(file: UploadFile = File(...)):
         invoice_data = extract_invoice_fields(markdown_text)
 
         # Add metadata
-        invoice_data["extraction_method"] = "docling"
+        invoice_data["extraction_method"] = "docling+gemini"
         invoice_data["raw_text"] = markdown_text
 
         posthog.capture(
@@ -100,7 +100,7 @@ async def extract_invoice(file: UploadFile = File(...)):
             {
                 "file_type": file.content_type,
                 "filename": file.filename,
-                "extraction_method": "docling",
+                "extraction_method": "docling+gemini",
             },
         )
 

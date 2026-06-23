@@ -1,9 +1,9 @@
 """
-Invoice Parser — Docling + OpenAI structured extraction.
+Invoice Parser — Docling + Vertex AI Gemini structured extraction.
 
 1. Docling converts the document (PDF/image) → Markdown with table support
-2. OpenAI GPT-4o reads the Markdown and returns structured invoice JSON
-3. Fallback regex parser if OpenAI is unavailable
+2. Vertex AI Gemini 2.5 Flash reads the Markdown and returns structured invoice JSON
+3. Fallback regex parser if Vertex AI key is unavailable
 """
 
 import json
@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 from docling.document_converter import DocumentConverter
-from openai import OpenAI
+from google import genai
 
 
 # ── Docling Conversion ───────────────────────────────────────
@@ -25,7 +25,7 @@ def parse_with_docling(file_path: str) -> str:
     return markdown
 
 
-# ── OpenAI Structured Extraction ─────────────────────────────
+# ── Vertex AI Gemini Structured Extraction ───────────────────
 
 INVOICE_SCHEMA_PROMPT = """You are an expert invoice data extractor. You will receive the text content of an invoice document (in Markdown format, possibly with tables). Extract all invoice information and return ONLY valid JSON with this exact structure:
 {
@@ -58,28 +58,20 @@ Return ONLY the JSON object, no markdown, no explanation. Be precise with number
 
 
 def extract_invoice_fields(markdown_text: str) -> dict:
-    """Send Docling's Markdown output to OpenAI for structured extraction."""
-    api_key = os.getenv("OPENAI_API_KEY")
+    """Send Docling's Markdown output to Vertex AI Gemini for structured extraction."""
+    api_key = os.getenv("VERTEX_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        print("[invoice_parser] No OPENAI_API_KEY found, falling back to regex parser")
+        print("[invoice_parser] No VERTEX_API_KEY found, falling back to regex parser")
         return extract_with_regex(markdown_text)
 
-    client = OpenAI(api_key=api_key)
+    client = genai.Client(api_key=api_key)
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": INVOICE_SCHEMA_PROMPT},
-            {
-                "role": "user",
-                "content": f"Extract all invoice data from this document:\n\n{markdown_text}",
-            },
-        ],
-        max_tokens=4096,
-        temperature=0,
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=f"{INVOICE_SCHEMA_PROMPT}\n\nExtract all invoice data from this document:\n\n{markdown_text}",
     )
 
-    content = response.choices[0].message.content or ""
+    content = response.text or ""
 
     # Strip markdown code fences if present
     json_str = re.sub(r"```json\n?", "", content)
