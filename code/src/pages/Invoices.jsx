@@ -206,6 +206,28 @@ export default function Invoices() {
     }
   }, [isResizing]);
 
+
+  useEffect(() => {
+    if (!editorOpen || !editingInvoice?.id || editingInvoice.status !== 'extracting') return undefined;
+
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const fullInvoice = await api.entities.Invoice.get(editingInvoice.id);
+        if (!cancelled && fullInvoice?.status && fullInvoice.status !== 'extracting') {
+          setEditingInvoice(fullInvoice);
+          queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+        }
+      } catch (err) {
+        console.error('Failed to refresh extracting invoice:', err);
+      }
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [editorOpen, editingInvoice?.id, editingInvoice?.status, queryClient, organization?.id]);
   useEffect(() => {
     if (isResizing) {
       window.addEventListener('mousemove', resize);
@@ -236,7 +258,7 @@ export default function Invoices() {
       const data = query?.state?.data;
       if (!data) return false;
       const isExtracting = Array.isArray(data) ? data.some(i => i.status === 'extracting') : false;
-      return isExtracting ? 3000 : false;
+      return isExtracting ? 1000 : false;
     }
   });
 

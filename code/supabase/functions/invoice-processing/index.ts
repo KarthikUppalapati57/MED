@@ -35,6 +35,118 @@ function assertSafeSchemaName(schemaName) {
   throw new Error(`Unsafe tenant schema name: ${schemaName}`);
 }
 
+function parseMoney(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const cleaned = String(value).replace(/[^0-9.-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseQuantity(value) {
+  const parsed = parseMoney(value);
+  return parsed === null ? null : parsed;
+}
+
+function cleanString(value) {
+  if (value === null || value === undefined) return null;
+  const cleaned = String(value).trim();
+  return cleaned.length ? cleaned : null;
+}
+
+function normalizeDate(value) {
+  const raw = cleanString(value);
+  if (!raw) return null;
+
+  const iso = raw.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (iso) {
+    const [, y, m, d] = iso;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  const us = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (us) {
+    let [, m, d, y] = us;
+    if (y.length === 2) y = Number(y) > 70 ? `19${y}` : `20${y}`;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return null;
+}
+
+function firstValue(...values) {
+  for (const value of values) {
+    const cleaned = cleanString(value);
+    if (cleaned !== null) return cleaned;
+  }
+  return null;
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const parsed = parseMoney(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function normalizeLineItem(item = {}) {
+  const quantity = firstNumber(
+    item.quantity,
+    item.qty,
+    item.shipped_quantity,
+    item.shipped_qty,
+    item.invoice_quantity,
+    item.invoice_qty,
+    item.order_quantity,
+    item.order_qty
+  );
+  const unitPrice = firstNumber(item.unit_price, item.price, item.pricing_unit_price, item.invoice_unit_price);
+  const extendedPrice = firstNumber(item.extended_price, item.extended, item.total_price, item.line_total, item.amount);
+
+  return {
+    vendor_item_code: firstValue(item.vendor_item_code, item.product_number, item.item_number, item.item_code, item.product_id) || '',
+    description: firstValue(item.description, item.item_description, item.vendor_item_description, item.product_description, item.name) || '',
+    quantity: quantity ?? '',
+    unit: firstValue(item.unit, item.pricing_unit, item.uom, item.unit_of_measure) || '',
+    unit_price: unitPrice ?? '',
+    discount: firstNumber(item.discount) ?? 0,
+    adjustment: firstNumber(item.adjustment) ?? 0,
+    extended_price: extendedPrice ?? (quantity !== null && unitPrice !== null ? quantity * unitPrice : 0),
+    pack_size: firstValue(item.pack_size, item.pack, item.size) || '',
+    label: firstValue(item.label, item.brand) || '',
+    ai_confidence: firstNumber(item.ai_confidence, item.confidence) ?? null,
+  };
+}
+
+function normalizeExtraction(data = {}) {
+  const lineItems = Array.isArray(data.line_items) ? data.line_items.map(normalizeLineItem) : [];
+  const subtotal = firstNumber(data.subtotal, data.invoice_subtotal, data.merchandise_total);
+  const taxAmount = firstNumber(data.tax_amount, data.tax, data.sales_tax);
+  const fuelSurcharge = firstNumber(data.fuel_surcharge, data.fuel_charge);
+  const deliveryFee = firstNumber(data.delivery_fee, data.freight, data.freight_amount, data.delivery_charge);
+  const otherCharges = firstNumber(data.other_charges, data.misc_charges, data.other_amount);
+  const totalAmount = firstNumber(data.total_amount, data.invoice_total, data.grand_total, data.amount_due);
+
+  return {
+    vendor_name: firstValue(data.vendor_name, data.supplier_name, data.remit_to_name),
+    invoice_number: firstValue(data.invoice_number, data.invoice_no, data.invoice_id),
+    account_number: firstValue(data.account_number, data.customer_number, data.customer_id, data.customer_account_number),
+    invoice_date: normalizeDate(data.invoice_date),
+    due_date: normalizeDate(data.due_date),
+    payment_terms: firstValue(data.payment_terms, data.terms),
+    subtotal,
+    tax_amount: taxAmount,
+    fuel_surcharge: fuelSurcharge,
+    delivery_fee: deliveryFee,
+    other_charges: otherCharges,
+    total_amount: totalAmount,
+    line_items: lineItems,
+  };
+}
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
@@ -82,32 +194,45 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
-      You are an expert invoice parser. Extract the following information from the provided invoice image:
-      1. Vendor Name
-      2. Invoice Number
-      3. Subtotal
-      4. Tax Amount
-      5. Total Amount
-      6. A list of all line items, where each line item has: description, quantity, unit_price, extended_price.
-      
-      Respond STRICTLY with a valid JSON object matching this schema:
+      You are an expert AP invoice data extractor for restaurant supplier invoices.
+      Extract every visible header field and every invoice line from the PDF. Preserve the values exactly as printed when possible.
+
+      Return STRICT JSON only. No markdown fences. Use this exact shape:
       {
-        "vendor_name": "string",
-        "invoice_number": "string",
+        "vendor_name": "string or null",
+        "invoice_number": "string or null",
+        "account_number": "string or null",
+        "customer_number": "string or null",
+        "invoice_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+        "due_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+        "payment_terms": "string or null",
         "subtotal": 0.0,
         "tax_amount": 0.0,
+        "fuel_surcharge": 0.0,
+        "delivery_fee": 0.0,
+        "other_charges": 0.0,
         "total_amount": 0.0,
         "line_items": [
           {
-            "description": "string",
+            "vendor_item_code": "product/item number as printed",
+            "description": "full item description",
             "quantity": 0,
+            "unit": "CS/EA/LB/etc from pricing unit or UOM",
             "unit_price": 0.0,
             "extended_price": 0.0,
-            "unit": "cs"
+            "pack_size": "pack size if visible",
+            "label": "brand/label if visible",
+            "ai_confidence": 0.0
           }
         ]
       }
-      Do not include markdown tags like \`\`\`json. Just output the raw JSON object.
+
+      For US Foods invoices, line item columns often include ORDER, SHP, ADJ, SALES UNIT, PRODUCT NUMBER,
+      DESCRIPTION, LABEL, PACK SIZE, CODE, WEIGHT, PRICING UNIT, UNIT PRICE, and EXTENDED PRICE.
+      Use the shipped quantity (SHP) for quantity when present. Use PRODUCT NUMBER for vendor_item_code.
+      Use PRICING UNIT or SALES UNIT for unit. Use UNIT PRICE for unit_price and EXTENDED PRICE for extended_price.
+      Do not leave quantity/unit/unit_price blank if those columns are visible. If a value is unreadable, use null.
+      Include all line rows across all pages, excluding subtotal/summary/footer rows.
     `;
 
     await supabaseClient.from('debug_logs').insert({
@@ -144,13 +269,21 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     // 3. Update invoice with extracted data securely inside the tenant schema
     console.log(`Updating invoice ${record.id} to pending_review in schema ${schemaName}...`);
     
+    const normalized = normalizeExtraction(extractedData);
     const updatePayload = {
-      vendor_name: extractedData.vendor_name,
-      invoice_number: extractedData.invoice_number,
-      subtotal: extractedData.subtotal,
-      total_amount: extractedData.total_amount,
-      tax_amount: extractedData.tax_amount,
-      line_items: extractedData.line_items || [],
+      vendor_name: normalized.vendor_name || record.vendor_name,
+      invoice_number: normalized.invoice_number || record.invoice_number,
+      account_number: normalized.account_number,
+      invoice_date: normalized.invoice_date,
+      due_date: normalized.due_date,
+      payment_terms: normalized.payment_terms,
+      subtotal: normalized.subtotal,
+      total_amount: normalized.total_amount,
+      tax_amount: normalized.tax_amount,
+      fuel_surcharge: normalized.fuel_surcharge,
+      delivery_fee: normalized.delivery_fee,
+      other_charges: normalized.other_charges,
+      line_items: normalized.line_items,
       status: 'pending_review',
       raw_text: responseText,
       extraction_method: 'gemini_vision_api',

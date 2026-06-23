@@ -32,6 +32,9 @@ export default function InvoiceEditor({ invoice, onChange }) {
   const hasPaidDetection = paidDetection?.detected;
   const isHighConfidencePaid = paidDetection?.should_mark_paid;
 
+  const displayValue = (value) => (value === 0 || value ? value : '');
+  const displayMoney = (value) => (value === 0 || value ? Number(value).toFixed(2) : '');
+
   const recalculateTotals = (items, currentInvoice) => {
     const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.extended_price) || 0), 0);
     const totalAmount = subtotal +
@@ -87,6 +90,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
     const newItems = [...(invoice.line_items || []), {
       vendor_item_code: '',
       description: '',
+      pack_size: '',
+      label: '',
       quantity: 1,
       unit: 'ea',
       unit_price: 0,
@@ -254,7 +259,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.subtotal || ''}
+                value={displayMoney(invoice.subtotal)}
                 onChange={(e) => handleFieldChange('subtotal', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -263,7 +268,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.tax_amount || ''}
+                value={displayMoney(invoice.tax_amount)}
                 onChange={(e) => handleFieldChange('tax_amount', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -272,7 +277,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.fuel_surcharge || ''}
+                value={displayMoney(invoice.fuel_surcharge)}
                 onChange={(e) => handleFieldChange('fuel_surcharge', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -281,7 +286,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.delivery_fee || ''}
+                value={displayMoney(invoice.delivery_fee)}
                 onChange={(e) => handleFieldChange('delivery_fee', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -290,7 +295,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.other_charges || ''}
+                value={displayMoney(invoice.other_charges)}
                 onChange={(e) => handleFieldChange('other_charges', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -299,7 +304,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={invoice.total_amount || ''}
+                value={displayMoney(invoice.total_amount)}
                 onChange={(e) => handleFieldChange('total_amount', parseFloat(e.target.value) || 0)}
               />
             </div>
@@ -320,12 +325,14 @@ export default function InvoiceEditor({ invoice, onChange }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[180px]">Vendor Item ID</TableHead>
-                  <TableHead>Vendor Item Description</TableHead>
+                  <TableHead className="w-[120px] min-w-[120px]">Vendor Item ID</TableHead>
+                  <TableHead className="min-w-[320px]">Vendor Item Description</TableHead>
+                  <TableHead className="w-[120px] min-w-[120px]">Pack</TableHead>
+                  <TableHead className="w-[140px] min-w-[140px]">Label</TableHead>
                   <TableHead className="w-[100px]">AI Match</TableHead>
-                  <TableHead className="w-[80px]">Qty</TableHead>
-                  <TableHead className="w-[80px]">Unit</TableHead>
-                  <TableHead className="w-[100px]">Unit Price</TableHead>
+                  <TableHead className="w-[90px] min-w-[90px]">Qty</TableHead>
+                  <TableHead className="w-[90px] min-w-[90px]">Unit</TableHead>
+                  <TableHead className="w-[110px] min-w-[110px]">Unit Price</TableHead>
                   <TableHead className="w-[80px]">Discount</TableHead>
                   <TableHead className="w-[80px]">Adjustment</TableHead>
                   <TableHead className="w-[100px]">Extended</TableHead>
@@ -337,7 +344,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                   <TableRow key={index}>
                     <TableCell>
                       <Input
-                        value={item.vendor_item_code || ''}
+                        value={displayValue(item.vendor_item_code)}
                         onChange={(e) => handleLineItemChange(index, 'vendor_item_code', e.target.value)}
                         className="h-8"
                         placeholder="Item #"
@@ -345,9 +352,25 @@ export default function InvoiceEditor({ invoice, onChange }) {
                     </TableCell>
                     <TableCell>
                       <Input
-                        value={item.description || ''}
+                        value={displayValue(item.description)}
                         onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
                         className="h-8"
+                        title={displayValue(item.description)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={displayValue(item.pack_size)}
+                        onChange={(e) => handleLineItemChange(index, 'pack_size', e.target.value)}
+                        className="h-8"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={displayValue(item.label)}
+                        onChange={(e) => handleLineItemChange(index, 'label', e.target.value)}
+                        className="h-8"
+                        title={displayValue(item.label)}
                       />
                     </TableCell>
                     <TableCell>
@@ -365,14 +388,14 @@ export default function InvoiceEditor({ invoice, onChange }) {
                     <TableCell>
                       <Input
                         type="number"
-                        value={item.quantity || ''}
+                        value={displayValue(item.quantity)}
                         onChange={(e) => handleLineItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
                         className="h-8"
                       />
                     </TableCell>
                     <TableCell>
                       <Input
-                        value={item.unit || ''}
+                        value={displayValue(item.unit)}
                         onChange={(e) => handleLineItemChange(index, 'unit', e.target.value)}
                         className="h-8"
                       />
@@ -381,7 +404,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={item.unit_price || ''}
+                        value={displayMoney(item.unit_price)}
                         onChange={(e) => handleLineItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
                         className="h-8"
                       />
@@ -390,7 +413,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={item.discount || ''}
+                        value={displayMoney(item.discount)}
                         onChange={(e) => handleLineItemChange(index, 'discount', parseFloat(e.target.value) || 0)}
                         className="h-8 text-red-500"
                       />
@@ -399,7 +422,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={item.adjustment || ''}
+                        value={displayMoney(item.adjustment)}
                         onChange={(e) => handleLineItemChange(index, 'adjustment', parseFloat(e.target.value) || 0)}
                         className="h-8"
                       />
@@ -421,7 +444,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 ))}
                 {(!invoice.line_items || invoice.line_items.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={12} className="text-center text-slate-500 py-8">
                       No line items. Click "Add Item" to add products.
                     </TableCell>
                   </TableRow>
@@ -518,3 +541,5 @@ export default function InvoiceEditor({ invoice, onChange }) {
     </div>
   );
 }
+
+
