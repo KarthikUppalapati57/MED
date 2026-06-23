@@ -122,7 +122,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdf8f1] dark:bg-background text-black dark:text-foreground selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
+    <div className="min-h-screen bg-[#FAF8F4] dark:bg-background text-black dark:text-foreground selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
       
       {/* 3D BACKBONE (Sticky Backdrop) */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -137,7 +137,7 @@ export default function LandingPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/5 bg-[#fdf8f1]/80 dark:bg-background/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/5 bg-[#FAF8F4]/80 dark:bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export default function LandingPage() {
               Intelligence Orchestration
             </div>
             
-            <h1 className="text-fluid-h1 font-bold technical-tracking text-black dark:text-white mb-12">
+            <h1 className="text-fluid-h1 text-[clamp(3.35rem,8.8vw,7rem)] md:text-[clamp(4.5rem,9.5vw,8.25rem)] font-bold technical-tracking text-black dark:text-white mb-12 leading-[0.92]">
               Building <br /> technical <br /> kitchens.
             </h1>
             
@@ -194,7 +194,12 @@ export default function LandingPage() {
               <Button size="lg" className="h-14 px-12 bg-[#ff5c35] text-white hover:bg-black font-bold text-xs tracking-[4px] rounded-sm transition-all shadow-xl shadow-[#ff5c35]/20 uppercase" onClick={() => setIsDemoModalOpen(true)}>
                 REQUEST ACCESS <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="link" className="text-black font-bold text-xs tracking-[3px] uppercase hover:text-[#ff5c35]">
+              <Button
+                size="lg"
+                variant="link"
+                className="text-black dark:text-white font-bold text-xs tracking-[3px] uppercase hover:text-[#ff5c35]"
+                onClick={() => navigate('/docs')}
+              >
                 VIEW DOCUMENTATION
               </Button>
             </div>
@@ -203,7 +208,7 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Bar (Minimal technical style) */}
-      <section className="relative py-12 border-y border-black/5 z-10 bg-[#fdf8f1]/50 backdrop-blur-sm">
+      <section className="relative py-12 border-y border-black/5 dark:border-white/10 z-10 bg-[#F2EEE8]/80 dark:bg-background/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-16">
             <StatItem value="99.9%" label="Sync Fidelity" />
@@ -231,10 +236,10 @@ export default function LandingPage() {
                 <div className="text-[11px] text-[#ff5c35] font-bold tracking-[4px] uppercase">
                   Edge Logics
                 </div>
-                <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-black">
+                <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-black dark:text-white">
                   Decentralized <br /> Kitchen Ops.
                 </h2>
-                <p className="text-black/50 text-xl leading-relaxed max-w-lg font-medium technical-tracking">
+                <p className="text-black/50 dark:text-white/70 text-xl leading-relaxed max-w-lg font-medium technical-tracking">
                   Our vision-driven interface allows your frontline staff to synchronize physical logistics with high-fidelity digital audits instantly.
                 </p>
                 
@@ -253,7 +258,7 @@ export default function LandingPage() {
               >
                   <div className="relative p-1 bg-gradient-to-br from-black/10 to-transparent rounded-sm overflow-hidden">
                     <img src={scannerImg} alt="Interface" className="w-full max-w-sm mx-auto filter grayscale opacity-90 transition-all duration-1000 hover:grayscale-0 hover:opacity-100" />
-                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#fdf8f1] to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#FAF8F4] to-transparent" />
                   </div>
               </motion.div>
             </div>
@@ -269,7 +274,7 @@ export default function LandingPage() {
               viewport={{ once: true }}
               className="mb-32"
             >
-              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-black">Infrastructure Modules</h2>
+              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-black dark:text-white">Infrastructure Modules</h2>
               <div className="h-0.5 w-16 bg-[#ff5c35]" />
             </motion.div>
 
@@ -288,8 +293,8 @@ export default function LandingPage() {
         <section id="pricing">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-32">
-              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black">Licensing</h2>
-              <p className="text-black/40 text-lg font-bold tracking-widest uppercase">Select your tier</p>
+              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black dark:text-white">Licensing</h2>
+              <p className="text-black/40 dark:text-white/60 text-lg font-bold tracking-widest uppercase">Select your tier</p>
             </div>
 
             <motion.div 
@@ -298,20 +303,20 @@ export default function LandingPage() {
               viewport={{ once: true }}
               className="max-w-md mx-auto"
             >
-              <div className="p-12 bg-white mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
+              <div className="p-12 bg-[#F2EEE8] dark:bg-white/5 dark:border dark:border-white/10 mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
                 <div className="absolute top-0 right-0 p-8">
                   <span className="text-[10px] font-bold px-3 py-1 bg-black text-white uppercase tracking-[4px]">Private Beta</span>
                 </div>
                 <div className="mb-16">
-                  <h3 className="text-2xl font-bold tracking-tight mb-8 text-black">Platform Complete</h3>
+                  <h3 className="text-2xl font-bold tracking-tight mb-8 text-black dark:text-white">Platform Complete</h3>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-8xl font-bold tracking-tighter text-black">$149</span>
-                    <span className="text-black/30 font-bold text-sm uppercase tracking-[4px]">USD / Mo</span>
+                    <span className="text-8xl font-bold tracking-tighter text-black dark:text-white">$149</span>
+                    <span className="text-black/30 dark:text-white/50 font-bold text-sm uppercase tracking-[4px]">USD / Mo</span>
                   </div>
                 </div>
                 <ul className="space-y-6 mb-16">
                   {["Unlimited visual extractions", "Universal user access", "Full-stack telemetry", "Dedicated API instance", "24/7 technical escort"].map((item, i) => (
-                    <li key={i} className="flex items-center gap-4 text-black/60 text-xs font-bold uppercase tracking-widest">
+                    <li key={i} className="flex items-center gap-4 text-black/60 dark:text-white/70 text-xs font-bold uppercase tracking-widest">
                       <div className="h-1 w-1 bg-[#ff5c35]" />
                       {item}
                     </li>
@@ -327,37 +332,37 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="relative py-40 border-t border-black/5 bg-[#fdf8f1] z-10">
+      <footer className="relative py-40 border-t border-black/5 dark:border-white/10 bg-[#FAF8F4] dark:bg-background z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-24 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
                 <RestopsLogo className="h-24" origin="origin-left" />
               </div>
-              <p className="text-black/40 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
+              <p className="text-black/40 dark:text-white/60 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Sovereign infrastructure for high-performance hospitality logistics and telemetry.
               </p>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/20 mb-10">Systems</h5>
-              <ul className="space-y-6 text-[11px] font-bold text-black/60 uppercase tracking-widest">
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/20 dark:text-white/40 mb-10">Systems</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/70 uppercase tracking-widest">
                 <li><a href="#features" className="hover:text-[#ff5c35] transition-colors">Core Nodes</a></li>
                 <li><a href="#" className="hover:text-[#ff5c35] transition-colors">Security</a></li>
               </ul>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/20 mb-10">Resources</h5>
-              <ul className="space-y-6 text-[11px] font-bold text-black/60 uppercase tracking-widest">
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/20 dark:text-white/40 mb-10">Resources</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/70 uppercase tracking-widest">
                 <li><a href="#" className="hover:text-[#ff5c35] transition-colors">API Docs</a></li>
                 <li><a href="#" className="hover:text-[#ff5c35] transition-colors">Support</a></li>
               </ul>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 gap-8">
+          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
             <p className="text-[9px] text-black/30 font-bold tracking-[5px] uppercase">© 2026 EDGEOPS INC. BUILT FOR SCALE.</p>
-            <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/30">
-                <a href="#" className="hover:text-black transition-colors">Privacy</a>
-                <a href="#" className="hover:text-black transition-colors">Terms</a>
+            <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/30 dark:text-white/40">
+                <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Privacy</a>
+                <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Terms</a>
             </div>
           </div>
         </div>
@@ -365,7 +370,7 @@ export default function LandingPage() {
 
       {/* Demo Request Modal */}
       <Dialog open={isDemoModalOpen} onOpenChange={setIsDemoModalOpen}>
-        <DialogContent className="sm:max-w-[450px] bg-white border-black/10 text-black p-0 overflow-hidden rounded-sm">
+        <DialogContent className="sm:max-w-[450px] bg-[#FAF8F4] border-black/10 text-black p-0 overflow-hidden rounded-sm">
           <div className="h-1 bg-[#ff5c35] w-full" />
           <div className="p-12">
             <DialogHeader className="mb-10">
@@ -379,15 +384,15 @@ export default function LandingPage() {
             <form onSubmit={handleDemoSubmit} className="space-y-8">
               <div className="space-y-3">
                 <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Full Identity</Label>
-                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="JOHN DOE" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="JOHN DOE" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <div className="space-y-3">
                 <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Technical Email</Label>
-                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="JOHN@OPS.COM" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="JOHN@OPS.COM" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <div className="space-y-3">
                 <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Enterprise Name</Label>
-                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="ACME LOGISTICS" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="ACME LOGISTICS" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <DialogFooter className="pt-8">
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-[#ff5c35] text-white hover:bg-black font-bold py-8 text-xs tracking-[5px] rounded-none uppercase shadow-2xl">
@@ -409,8 +414,8 @@ const StatItem = ({ value, label }) => (
     viewport={{ once: true }}
     className="flex flex-col items-center md:items-start"
   >
-    <div className="text-5xl font-bold tracking-tighter mb-4 text-black">{value}</div>
-    <div className="text-[10px] text-black/30 font-bold uppercase tracking-[4px]">{label}</div>
+    <div className="text-5xl font-bold tracking-tighter mb-4 text-black dark:text-white">{value}</div>
+    <div className="text-[10px] text-black/30 dark:text-white/50 font-bold uppercase tracking-[4px]">{label}</div>
   </motion.div>
 );
 
@@ -418,9 +423,9 @@ const CheckItem = ({ title, desc }) => (
   <div className="space-y-2 group">
     <div className="flex items-center gap-3">
       <CheckCircle2 className="h-4 w-4 text-[#ff5c35]" />
-      <h4 className="font-bold text-sm tracking-[2px] uppercase mb-0">{title}</h4>
+      <h4 className="font-bold text-sm tracking-[2px] uppercase mb-0 text-black dark:text-white">{title}</h4>
     </div>
-    <p className="text-xs text-black/40 font-bold uppercase tracking-widest pl-7">{desc}</p>
+    <p className="text-xs text-black/40 dark:text-white/60 font-bold uppercase tracking-widest pl-7">{desc}</p>
   </div>
 );
 
@@ -435,12 +440,12 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     <div className="mb-10 text-[#ff5c35]">
       {React.cloneElement(icon, { size: 32, strokeWidth: 1 })}
     </div>
-    <h3 className="text-xl font-bold tracking-tighter mb-4 uppercase text-black">{title}</h3>
-    <p className="text-black/50 text-sm leading-relaxed pr-10 font-medium technical-tracking">
+    <h3 className="text-xl font-bold tracking-tighter mb-4 uppercase text-black dark:text-white">{title}</h3>
+    <p className="text-black/50 dark:text-white/70 text-sm leading-relaxed pr-10 font-medium technical-tracking">
       {description}
     </p>
     <div className="mt-8 opacity-0 group-hover:opacity-100 transition-all duration-700">
-      <div className="h-[2px] w-12 bg-black" />
+      <div className="h-[2px] w-12 bg-black dark:bg-white" />
     </div>
   </motion.div>
 );

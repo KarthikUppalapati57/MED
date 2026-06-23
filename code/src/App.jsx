@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigat
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { supabase } from '@/lib/supabaseClient';
+import { hasSupabaseEnv, supabase } from '@/lib/supabaseClient';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
 import { MFAChallenge } from '@/components/auth/MFAChallenge';
 import ProtectedModule from '@/components/ProtectedModule';
@@ -890,6 +890,28 @@ const AuthenticatedApp = () => {
 import { OfflineBanner } from '@/components/OfflineBanner';
 
 function App() {
+  if (!hasSupabaseEnv) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="w-full max-w-2xl rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold">Missing local environment setup</h1>
+            <p className="text-sm text-muted-foreground">
+              Restops needs Supabase environment variables before it can render locally.
+            </p>
+          </div>
+          <div className="rounded-xl bg-muted p-4 text-sm font-mono overflow-x-auto">
+            <div>VITE_SUPABASE_URL=your_supabase_url</div>
+            <div>VITE_SUPABASE_ANON_KEY=your_supabase_anon_key</div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Create a <code>.env</code> file in the <code>code</code> folder, add those values, then restart <code>npm run dev</code>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <AuthProvider>
