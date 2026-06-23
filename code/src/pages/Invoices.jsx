@@ -592,15 +592,19 @@ export default function Invoices() {
 
   const handleInvoiceExtracted = async (data) => {
     console.log('Invoices Page received extraction data:', data);
-    if (data.status === 'extracting') {
-      try {
-        await createMutation.mutateAsync(data);
-      } catch (err) {
-        console.error('Failed to create extracting invoice', err);
+    try {
+      const savedInvoice = await createMutation.mutateAsync(data);
+      // Refresh the invoice list
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
+      
+      if (data.status !== 'extracting' && savedInvoice) {
+        // Extraction succeeded — open the editor with saved data
+        setEditingInvoice(savedInvoice);
+        setEditorOpen(true);
       }
-    } else {
-      setEditingInvoice(data);
-      setEditorOpen(true);
+    } catch (err) {
+      console.error('Failed to create invoice:', err);
+      toast.error('Failed to save invoice: ' + (err.message || 'Unknown error'));
     }
   };
 
