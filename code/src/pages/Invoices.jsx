@@ -229,7 +229,6 @@ export default function Invoices() {
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
     refetchInterval: (query) => {
-      // Poll every 3 seconds if there are invoices actively being extracted
       const data = query?.state?.data;
       if (!data) return false;
       const isExtracting = Array.isArray(data) ? data.some(i => i.status === 'extracting') : false;
