@@ -594,6 +594,18 @@ export default function Invoices() {
     console.log('Invoices Page received extraction data:', data);
     try {
       const savedInvoice = await createMutation.mutateAsync(data);
+      
+      // Fire the edge function directly from the client if it's pending extraction
+      if (data.status === 'extracting') {
+        supabase.functions.invoke('invoice-processing', {
+          body: {
+            type: 'INSERT',
+            table: 'invoices',
+            record: savedInvoice
+          }
+        }).catch(err => console.error('Edge function invocation failed:', err));
+      }
+
       // Refresh the invoice list
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       
