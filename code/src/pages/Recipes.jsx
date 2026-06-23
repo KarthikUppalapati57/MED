@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -77,9 +77,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 export default function Recipes() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'recipes';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const subPathToTab = {
+    'recipes-list': 'recipes',
+  };
+  const tabToSubPath = {
+    'recipes': 'recipes-list',
+  };
+
+  const activeTab = subPathToTab[currentSubPath] || currentSubPath || 'recipes';
+
+  const setActiveTab = (tab) => {
+    const subPath = tabToSubPath[tab] || tab;
+    navigate(`/Recipes/${subPath}${routerLocation.search}`);
+  };
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);

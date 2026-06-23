@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
@@ -80,9 +80,16 @@ const categoryColors = {
 };
 
 export default function Products() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'all-products';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'all-products';
+
+  const setActiveTab = (tab) => {
+    navigate(`/Products/${tab}${routerLocation.search}`);
+  };
   const { isGroundStaff } = usePermissions();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);

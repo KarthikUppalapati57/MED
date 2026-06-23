@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
@@ -135,9 +135,15 @@ export default function Payments() {
     overdueAlerts: true,
     weeklySummary: false,
   });
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'invoices';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'invoices';
+
+  const setActiveTab = (tab) => {
+    navigate(`/Payments/${tab}${routerLocation.search}`);
+  };
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();

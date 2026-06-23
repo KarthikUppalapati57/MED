@@ -1,6 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -13,14 +12,16 @@ import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import RestopsLogo from '@/components/RestopsLogo';
-// Initialize global error monitoring
+import { legacyRoutes as Pages, Layout, mainPage } from './router';
+import LegacyRedirectHandler from '@/lib/LegacyRedirectHandler';
+import { useUrlHierarchy } from '@/hooks/useUrlHierarchy';
+
 initGlobalErrorHandlers();
 
-const { Pages, Layout, mainPage } = pagesConfig;
-const { OnboardingPage, PaymentVerification } = Pages;
+const OnboardingPage = Pages.OnboardingPage;
+const PaymentVerification = Pages.PaymentVerification;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
-
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const MFASetupPage = React.lazy(() => import('./pages/MFASetupPage'));
 const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
@@ -696,6 +697,9 @@ function UpdatePasswordPage() {
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   const location = useLocation();
+
+  // Sync URL hierarchy params (?company= / ?store=) with AuthContext
+  useUrlHierarchy();
   
   // MFA Interceptor
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
@@ -792,6 +796,8 @@ const AuthenticatedApp = () => {
 
   return (
     <>
+      {/* Redirect legacy ?tab= URLs to canonical nested paths */}
+      <LegacyRedirectHandler />
       <Routes>
         {/* Public routes */}
         <Route path="/terms" element={lazyElement(<TermsOfService />, 'Loading terms...')} />
@@ -853,7 +859,7 @@ const AuthenticatedApp = () => {
           {Object.entries(Pages).map(([path, Page]) => (
             <Route
               key={path}
-              path={path === 'Vendors' ? `/${path}/*` : `/${path}`}
+              path={`/${path}/*`}
               element={
                 <LayoutWrapper currentPageName={path}>
                   <ProtectedModule pageName={path}>

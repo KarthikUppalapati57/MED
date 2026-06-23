@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -86,9 +86,15 @@ function VendorTabFallback() {
 
 export default function VendorList() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'vendors';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'vendors';
+
+  const setActiveTab = (tab) => {
+    navigate(`/Vendors/${tab}${routerLocation.search}`);
+  };
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('all');

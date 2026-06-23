@@ -2,87 +2,109 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 
 // Background processing function
-async function processInvoiceBackground(record, supabaseClient) {
+async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
-    console.log(`Starting background extraction for ${record.id}...`);
+    console.log(`Starting background extraction for ${record.id} in schema ${schemaName}...`);
     
-    // 1. Fetch file using the public URL
-    const fileRes = await fetch(record.file_url);
-    if (!fileRes.ok) throw new Error(`Failed to fetch file from URL: ${fileRes.statusText}`);
-    const fileData = await fileRes.blob();
-
-    // 2. Dynamic Mock Extraction Logic
-    // In production, this would be a call to Gemini Pro Vision or AWS Textract
-    console.log("Using dynamic OCR extraction logic...");
+    // 1. Securely fetch file from private bucket using service role client
+    // We assume record.file_url now stores the exact filePath (e.g. 'auto-ingested/uuid.pdf') 
+    // or a full url. We will extract the path if it's a URL.
+    let filePath = record.file_url;
+    if (filePath.includes('invoices/')) {
+        filePath = filePath.split('invoices/')[1];
+    }
     
-    // Simulate API delay
-    await new Promise(r => setTimeout(r, 2500));
-
-    const vendors = [
-      'Sysco Food Services', 'US Foods', 'Gordon Food Service', 'Performance Food Group', 
-      'Cheney Brothers', 'Ben E. Keith', 'Shamrock Foods'
-    ];
-    const items = [
-      { desc: 'Chicken Breast 40lb', price: 85.50 },
-      { desc: 'Ground Beef 80/20 10lb', price: 45.20 },
-      { desc: 'Romaine Hearts 48ct', price: 32.00 },
-      { desc: 'Frying Oil Clear Liquid 35lb', price: 42.10 },
-      { desc: 'French Fries 3/8" 30lb', price: 28.50 },
-      { desc: 'Bleach 1 Gal', price: 6.50 },
-      { desc: 'Napkins Dispenser 6000ct', price: 54.00 }
-    ];
-
-    // Generate random realistic data
-    const randomVendor = vendors[Math.floor(Math.random() * vendors.length)];
-    const invoiceNum = `INV-${Math.floor(Math.random() * 90000) + 10000}`;
+    // Create service role DB client for storage
+    const storageDb = supabaseClient; 
     
-    // Pick 2 to 4 random items
-    const numItems = Math.floor(Math.random() * 3) + 2;
-    const line_items = [];
-    let subtotal = 0;
+    const { data: fileBlob, error: downloadError } = await storageDb.storage.from('invoices').download(filePath);
+    if (downloadError) throw new Error(`Failed to download file from private bucket: ${downloadError.message}`);
+    
+    const fileBuffer = await fileBlob.arrayBuffer();
+    const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
 
-    for (let i = 0; i < numItems; i++) {
-      const item = items[Math.floor(Math.random() * items.length)];
-      const qty = Math.floor(Math.random() * 5) + 1;
-      const extPrice = item.price * qty;
-      subtotal += extPrice;
+    // 2. Vertex / Gemini Extraction Logic
+    console.log("Invoking Gemini Vision API...");
+    
+    // Get the API key from environment variables
+    const apiKey = Deno.env.get('VITE_GEMINI_API_KEY') || Deno.env.get('vertex_api_key');
+    if (!apiKey) throw new Error("Gemini API key is not configured in Edge Function environment.");
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+    const prompt = `
+      You are an expert invoice parser. Extract the following information from the provided invoice image:
+      1. Vendor Name
+      2. Invoice Number
+      3. Subtotal
+      4. Tax Amount
+      5. Total Amount
+      6. A list of all line items, where each line item has: description, quantity, unit_price, extended_price.
       
-      line_items.push({
-        description: item.desc,
-        quantity: qty,
-        unit_price: item.price,
-        extended_price: parseFloat(extPrice.toFixed(2)),
-        unit: 'cs'
-      });
+      Respond STRICTLY with a valid JSON object matching this schema:
+      {
+        "vendor_name": "string",
+        "invoice_number": "string",
+        "subtotal": 0.0,
+        "tax_amount": 0.0,
+        "total_amount": 0.0,
+        "line_items": [
+          {
+            "description": "string",
+            "quantity": 0,
+            "unit_price": 0.0,
+            "extended_price": 0.0,
+            "unit": "cs"
+          }
+        ]
+      }
+      Do not include markdown tags like \`\`\`json. Just output the raw JSON object.
+    `;
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: "application/pdf"
+        }
+      },
+      prompt
+    ]);
+
+    const responseText = result.response.text();
+    console.log("Raw Gemini Response:", responseText);
+
+    let extractedData;
+    try {
+      // Clean potential markdown from response
+      const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      extractedData = JSON.parse(cleanJsonStr);
+    } catch (parseError) {
+      console.error("Failed to parse Gemini JSON output:", parseError);
+      throw new Error("AI returned invalid JSON format.");
     }
 
-    const tax_amount = parseFloat((subtotal * 0.07).toFixed(2));
-    const total_amount = parseFloat((subtotal + tax_amount).toFixed(2));
+    // 3. Update invoice with extracted data securely inside the tenant schema
+    console.log(`Updating invoice ${record.id} to pending_review in schema ${schemaName}...`);
+    
+    const db = schemaName && schemaName !== 'public' 
+      ? supabaseClient.schema(schemaName) 
+      : supabaseClient;
 
-    const extractedData = {
-      vendor_name: randomVendor,
-      invoice_number: invoiceNum,
-      subtotal: subtotal,
-      tax_amount: tax_amount,
-      total_amount: total_amount,
-      line_items: line_items,
-      raw_text: `Extracted ${numItems} items from ${randomVendor} invoice ${invoiceNum}.`
-    };
-
-    // 3. Update invoice with extracted data
-    console.log(`Updating invoice ${record.id} to pending_review...`);
-    const { error: updateError } = await supabaseClient.from('invoices').update({
+    const { error: updateError } = await db.from('invoices').update({
       vendor_name: extractedData.vendor_name,
       invoice_number: extractedData.invoice_number,
       subtotal: extractedData.subtotal,
       total_amount: extractedData.total_amount,
       tax_amount: extractedData.tax_amount,
-      line_items: extractedData.line_items,
+      line_items: extractedData.line_items || [],
       status: 'pending_review',
-      raw_text: extractedData.raw_text,
-      extraction_method: 'background_job',
+      raw_text: responseText,
+      extraction_method: 'gemini_vision_api',
     }).eq('id', record.id);
 
     if (updateError) {
@@ -94,8 +116,13 @@ async function processInvoiceBackground(record, supabaseClient) {
 
   } catch (err) {
     console.error(`Error in background extraction for invoice ${record.id}:`, err);
+    
+    const db = schemaName && schemaName !== 'public' 
+      ? supabaseClient.schema(schemaName) 
+      : supabaseClient;
+
     // Correctly update invoice status to 'extract_failed' instead of 'rejected'
-    await supabaseClient.from('invoices')
+    await db.from('invoices')
       .update({ status: 'extract_failed', validation_results: { error: err.message } })
       .eq('id', record.id);
   }
@@ -113,7 +140,9 @@ serve(async (req) => {
     )
 
     const payload = await req.json()
-    const { invoice_id, action, type, table, record, old_record } = payload
+    const { invoice_id, action, type, table, record, old_record, schema } = payload
+
+    const targetSchema = schema || 'public';
 
     // 1. Direct Call logic
     if (action && invoice_id) {
@@ -131,17 +160,17 @@ serve(async (req) => {
     // 2. pg_net webhook logic
     if (table === 'invoices') {
       if (type === 'INSERT' && record.status === 'extracting') {
-        console.log(`Triggering OCR extraction for Invoice ${record.id}`);
+        console.log(`Triggering OCR extraction for Invoice ${record.id} in schema ${targetSchema}`);
         
         // Use EdgeRuntime.waitUntil to safely execute background tasks in serverless environments
         if (typeof EdgeRuntime !== 'undefined' && typeof EdgeRuntime.waitUntil === 'function') {
-           EdgeRuntime.waitUntil(processInvoiceBackground(record, supabaseClient));
+           EdgeRuntime.waitUntil(processInvoiceBackground(record, targetSchema, supabaseClient));
         } else if (typeof globalThis !== 'undefined' && typeof globalThis.EdgeRuntime !== 'undefined' && typeof globalThis.EdgeRuntime.waitUntil === 'function') {
-           globalThis.EdgeRuntime.waitUntil(processInvoiceBackground(record, supabaseClient));
+           globalThis.EdgeRuntime.waitUntil(processInvoiceBackground(record, targetSchema, supabaseClient));
         } else {
            // Fallback to synchronous execution if EdgeRuntime is unavailable
            console.log("EdgeRuntime.waitUntil unavailable, falling back to synchronous execution");
-           await processInvoiceBackground(record, supabaseClient);
+           await processInvoiceBackground(record, targetSchema, supabaseClient);
         }
       } 
       else if (type === 'UPDATE' && record.status !== old_record?.status) {

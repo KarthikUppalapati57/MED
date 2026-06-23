@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
@@ -30,9 +30,16 @@ import LaborScheduler from '@/components/LaborScheduler';
 import ShiftDialog from '@/components/ShiftDialog';
 
 export default function Labor() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'summary';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'summary';
+
+  const setActiveTab = (tab) => {
+    navigate(`/Labor/${tab}${routerLocation.search}`);
+  };
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const needsEmployees = ['summary', 'shifts', 'employees'].includes(activeTab);

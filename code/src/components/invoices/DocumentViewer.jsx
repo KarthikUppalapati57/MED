@@ -1,25 +1,51 @@
 import React, { useState } from 'react';
 import { ZoomIn, ZoomOut, RotateCw, Image as ImageIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { supabase } from '@/lib/supabaseClient';
 
 export default function DocumentViewer({ fileUrl, fileType }) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [signedUrl, setSignedUrl] = useState(null);
+
+  useEffect(() => {
+    async function fetchSignedUrl() {
+      if (!fileUrl) {
+        setSignedUrl(null);
+        return;
+      }
+      if (fileUrl.startsWith('http') || fileUrl.startsWith('blob:')) {
+        setSignedUrl(fileUrl);
+        return;
+      }
+      
+      const { data, error } = await supabase.storage
+        .from('invoices')
+        .createSignedUrl(fileUrl, 3600);
+        
+      if (data && !error) {
+        setSignedUrl(data.signedUrl);
+      } else {
+        console.error("Failed to generate signed URL:", error);
+      }
+    }
+    fetchSignedUrl();
+  }, [fileUrl]);
 
   const handleZoomIn = () => setZoom(z => Math.min(z + 0.25, 3));
   const handleZoomOut = () => setZoom(z => Math.max(z - 0.25, 0.5));
   const handleRotate = () => setRotation(r => (r + 90) % 360);
 
-  if (!fileUrl) {
+  if (!signedUrl) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-slate-50 text-slate-400 rounded-lg border border-dashed">
         <ImageIcon className="h-12 w-12 mb-2" />
-        <p>No document attached</p>
+        <p>{fileUrl ? "Loading document..." : "No document attached"}</p>
       </div>
     );
   }
 
-  const isPdf = fileType === 'application/pdf' || (fileUrl && fileUrl.toLowerCase().includes('.pdf'));
+  const isPdf = fileType === 'application/pdf' || (fileUrl && fileUrl.toLowerCase().includes('.pdf')) || (signedUrl && signedUrl.toLowerCase().includes('.pdf'));
 
   return (
     <div className="flex flex-col h-full bg-slate-100/50 rounded-xl overflow-hidden border">
@@ -42,13 +68,13 @@ export default function DocumentViewer({ fileUrl, fileType }) {
         >
           {isPdf ? (
             <iframe 
-              src={`${fileUrl}#toolbar=0`} 
+              src={`${signedUrl}#toolbar=0`} 
               className="w-full h-[800px] border-0 bg-white" 
               title="Document Viewer"
             />
           ) : (
             <img 
-              src={fileUrl} 
+              src={signedUrl} 
               alt="Invoice Document" 
               className="max-w-full h-auto object-contain"
               draggable="false"

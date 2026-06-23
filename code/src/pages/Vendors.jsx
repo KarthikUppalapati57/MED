@@ -17,6 +17,9 @@ export default function VendorsRouter() {
     <React.Suspense fallback={<VendorsRouteFallback />}>
       <Routes>
         <Route path="/" element={<VendorList />} />
+        <Route path="vendors" element={<VendorList />} />
+        <Route path="vendor-items" element={<VendorList />} />
+        <Route path="statements" element={<VendorList />} />
         <Route path=":id" element={<VendorDetail />} />
       </Routes>
     </React.Suspense>

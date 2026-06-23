@@ -120,9 +120,8 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(filePath);
+      // Removed getPublicUrl because the bucket is now private.
+      // We store the raw filePath directly in the database.
 
       setExtractionDone(true);
       setProgress('Upload complete! Extraction started...');
@@ -131,7 +130,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       const invoiceData = {
         status: 'extracting',
-        file_url: publicUrlData.publicUrl,
+        file_url: filePath,
         file_type: fileToProcess.type,
         source,
         vendor_name: 'Extracting...', // Temporary placeholder

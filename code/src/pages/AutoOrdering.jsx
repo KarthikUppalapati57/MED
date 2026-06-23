@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
@@ -74,9 +74,16 @@ const STATUS_COLORS = {
 };
 
 export default function AutoOrdering() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'all-orders';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'all-orders';
+
+  const setActiveTab = (tab) => {
+    navigate(`/AutoOrdering/${tab}${routerLocation.search}`);
+  };
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
   const [generating, setGenerating] = useState(false);

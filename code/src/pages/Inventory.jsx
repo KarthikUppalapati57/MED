@@ -126,9 +126,26 @@ function useDebouncedQueryInvalidation(queryClient, queryKeys, delay = 1000) {
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'inventory';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const routerLocation = useLocation();
+  const pathParts = routerLocation.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const subPathToTab = {
+    'inventory-list': 'inventory',
+    'wastage-log': 'wastage',
+  };
+  const tabToSubPath = {
+    'inventory': 'inventory-list',
+    'wastage': 'wastage-log',
+  };
+
+  const activeTab = subPathToTab[currentSubPath] || currentSubPath || 'inventory';
+
+  const setActiveTab = (tab) => {
+    const subPath = tabToSubPath[tab] || tab;
+    navigate(`/Inventory/${subPath}${routerLocation.search}`);
+  };
+
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
 

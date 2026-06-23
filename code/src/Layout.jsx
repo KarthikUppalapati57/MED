@@ -76,9 +76,9 @@ const navigation = [
     icon: Shield, 
     minRole: 'platform_admin',
     subItems: [
-      { name: 'Requests', href: 'PlatformAdmin?tab=requests', icon: ShieldAlert },
-      { name: 'Invite Clients', href: 'PlatformAdmin?tab=invite', icon: UserPlus },
-      { name: 'Accounting', href: 'PlatformAdmin?tab=accounting', icon: DollarSign }
+      { name: 'Requests', href: 'PlatformAdmin/requests', icon: ShieldAlert },
+      { name: 'Invite Clients', href: 'PlatformAdmin/invite', icon: UserPlus },
+      { name: 'Accounting', href: 'PlatformAdmin/accounting', icon: DollarSign }
     ]
   },
   { name: 'All Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
@@ -93,10 +93,10 @@ const navigation = [
     icon: CreditCard, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Invoices', href: 'Payments?tab=invoices', icon: FileText },
-      { name: 'Payment History', href: 'Payments?tab=history', icon: History },
-      { name: 'Reconciliation', href: 'Payments?tab=reconciliation', icon: ArrowRightLeft },
-      { name: 'Gateway Setup', href: 'Payments?tab=setup', icon: Settings }
+      { name: 'Invoices', href: 'Payments/invoices', icon: FileText },
+      { name: 'Payment History', href: 'Payments/history', icon: History },
+      { name: 'Reconciliation', href: 'Payments/reconciliation', icon: ArrowRightLeft },
+      { name: 'Gateway Setup', href: 'Payments/setup', icon: Settings }
     ]
   },
   { 
@@ -104,9 +104,9 @@ const navigation = [
     icon: Package, 
     minRole: 'ground_staff',
     subItems: [
-      { name: 'All Products', href: 'Products?tab=all-products', icon: Package },
-      { name: 'Product Review', href: 'Products?tab=new-review', icon: Check },
-      { name: 'Purchase Report', href: 'Products?tab=purchase-report', icon: FileText }
+      { name: 'All Products', href: 'Products/all-products', icon: Package },
+      { name: 'Product Review', href: 'Products/new-review', icon: Check },
+      { name: 'Purchase Report', href: 'Products/purchase-report', icon: FileText }
     ]
   },
   { 
@@ -114,11 +114,11 @@ const navigation = [
     icon: Warehouse, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Inventory List', href: 'Inventory?tab=inventory', icon: Warehouse },
-      { name: 'Summary', href: 'Inventory?tab=summary', icon: FileText },
-      { name: 'Wastage Log', href: 'Inventory?tab=wastage', icon: Trash2 },
-      { name: 'Stock Counts', href: 'Inventory?tab=counts', icon: Check },
-      { name: 'Count Sheets', href: 'Inventory?tab=count-sheets', icon: FileText },
+      { name: 'Inventory List', href: 'Inventory/inventory-list', icon: Warehouse },
+      { name: 'Summary', href: 'Inventory/summary', icon: FileText },
+      { name: 'Wastage Log', href: 'Inventory/wastage-log', icon: Trash2 },
+      { name: 'Stock Counts', href: 'Inventory/counts', icon: Check },
+      { name: 'Count Sheets', href: 'Inventory/count-sheets', icon: FileText },
       { name: 'AvT Costing', href: 'AvTCosting', icon: Activity }
     ]
   },
@@ -128,12 +128,12 @@ const navigation = [
     icon: ShoppingCart, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'All Orders', href: 'AutoOrdering?tab=all-orders', icon: ShoppingCart },
-      { name: 'Place Order', href: 'AutoOrdering?tab=place-order', icon: Plus },
-      { name: 'Invoice Approval', href: 'AutoOrdering?tab=invoice-approval', icon: FileText },
-      { name: 'Transfers', href: 'AutoOrdering?tab=transfers', icon: ArrowRightLeft },
-      { name: 'Receiving', href: 'AutoOrdering?tab=receiving', icon: Package },
-      { name: 'Order Setup', href: 'AutoOrdering?tab=order-setup', icon: Settings }
+      { name: 'All Orders', href: 'AutoOrdering/all-orders', icon: ShoppingCart },
+      { name: 'Place Order', href: 'AutoOrdering/place-order', icon: Plus },
+      { name: 'Invoice Approval', href: 'AutoOrdering/invoice-approval', icon: FileText },
+      { name: 'Transfers', href: 'AutoOrdering/transfers', icon: ArrowRightLeft },
+      { name: 'Receiving', href: 'AutoOrdering/receiving', icon: Package },
+      { name: 'Order Setup', href: 'AutoOrdering/order-setup', icon: Settings }
     ]
   },
   { name: 'SmartPrep', href: 'SmartPrep', icon: ChefHat, minRole: 'location_manager' },
@@ -153,11 +153,11 @@ const navigation = [
     icon: ChefHat, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Recipes List', href: 'Recipes?tab=recipes', icon: ChefHat },
-      { name: 'Prepared Items', href: 'Recipes?tab=prepared-items', icon: Plus },
+      { name: 'Recipes List', href: 'Recipes/recipes-list', icon: ChefHat },
+      { name: 'Prepared Items', href: 'Recipes/prepared-items', icon: Plus },
       { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
       { name: 'Delivery Menus', href: 'DeliveryAggregator', icon: Package },
-      { name: 'Setup', href: 'Recipes?tab=setup', icon: Settings }
+      { name: 'Setup', href: 'Recipes/setup', icon: Settings }
     ]
   },
   { 
@@ -166,8 +166,8 @@ const navigation = [
     icon: Store, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Vendors List', href: 'Vendors?tab=vendors', icon: Store },
-      { name: 'Vendor Items', href: 'Vendors?tab=vendor-items', icon: Package },
+      { name: 'Vendors List', href: 'Vendors/vendors', icon: Store },
+      { name: 'Vendor Items', href: 'Vendors/vendor-items', icon: Package },
       { name: 'Bidding & Logistics', href: 'VendorBidding', icon: Store }
     ]
   },
@@ -177,15 +177,15 @@ const navigation = [
     icon: Users, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Labor Summary', href: 'Labor?tab=summary', icon: FileText },
-      { name: 'Shifts & Scheduling', href: 'Labor?tab=shifts', icon: Check },
-      { name: 'Employees', href: 'Labor?tab=employees', icon: Users },
+      { name: 'Labor Summary', href: 'Labor/summary', icon: FileText },
+      { name: 'Shifts & Scheduling', href: 'Labor/shifts', icon: Check },
+      { name: 'Employees', href: 'Labor/employees', icon: Users },
       { name: 'Shift Trade Board', href: 'ShiftBoard', icon: RefreshCcw },
       { name: 'AI Forecasts', href: 'LaborSchedules', icon: Activity },
       { name: 'Time Clock', href: 'TimeClock', icon: Users },
       { name: 'Tip Pooling', href: 'TipPooling', icon: Calculator },
       { name: 'Payroll Export', href: 'PayrollExport', icon: FileText },
-      { name: 'Setup', href: 'Labor?tab=setup', icon: Settings }
+      { name: 'Setup', href: 'Labor/setup', icon: Settings }
     ]
   },
   { name: 'CRM & Marketing', href: 'CRM', icon: Users, minRole: 'location_manager' },
@@ -195,11 +195,11 @@ const navigation = [
     icon: DollarSign, 
     minRole: 'manager',
     subItems: [
-      { name: 'Dashboard', href: 'Accounting?tab=dashboard', icon: LayoutDashboard },
-      { name: 'Export & Sync', href: 'Accounting?tab=export', icon: ArrowRightLeft },
-      { name: 'Reconciliation', href: 'Accounting?tab=reconciliation', icon: FileText },
-      { name: 'GL Mapping', href: 'Accounting?tab=gl-mapping', icon: Settings },
-      { name: 'Close Books', href: 'Accounting?tab=close-books', icon: Check }
+      { name: 'Dashboard', href: 'Accounting/dashboard', icon: LayoutDashboard },
+      { name: 'Export & Sync', href: 'Accounting/export', icon: ArrowRightLeft },
+      { name: 'Reconciliation', href: 'Accounting/reconciliation', icon: FileText },
+      { name: 'GL Mapping', href: 'Accounting/gl-mapping', icon: Settings },
+      { name: 'Close Books', href: 'Accounting/close-books', icon: Check }
     ]
   },
   { 
@@ -207,9 +207,9 @@ const navigation = [
     icon: Building2, 
     minRole: 'org_owner',
     subItems: [
-      { name: 'Hierarchy', href: 'OrgManagement?tab=hierarchy', icon: Building2 },
+      { name: 'Hierarchy', href: 'OrgManagement/hierarchy', icon: Building2 },
       { name: 'Franchisor Console', href: 'FranchisorConsole', icon: Building2 },
-      { name: 'Security & MFA', href: 'OrgManagement?tab=security', icon: ShieldCheck }
+      { name: 'Security & MFA', href: 'OrgManagement/security', icon: ShieldCheck }
     ]
   },
   { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
@@ -392,16 +392,19 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const activeParent = filteredNavigation.find(item =>
       item.subItems?.some(sub => {
-        const [base, query] = sub.href.split('?');
-        if (currentPageName !== base) return false;
-        if (query) return location.search.includes(query.split('=')[1] || query);
-        return true;
+        const basePath = sub.href.split('?')[0].split('/')[0];
+        if (currentPageName !== basePath) return false;
+        
+        if (sub.href.includes('?')) {
+            const query = sub.href.split('?')[1];
+            return location.search.includes(query.split('=')[1] || query);
+        } else {
+            return location.pathname.toLowerCase().includes(sub.href.toLowerCase());
+        }
       })
     );
     if (activeParent) setExpandedMenu(activeParent.name);
-  // Only run on page/path changes
-   
-  }, [currentPageName, location.search]);
+  }, [currentPageName, location.search, location.pathname]);
 
   const displayName = userProfile?.full_name || user?.email?.split('@')[0] || 'User';
   const displayRole = role || 'loading';
@@ -441,10 +444,14 @@ export default function Layout({ children, currentPageName }) {
           {filteredNavigation.map((item) => {
             if (item.subItems) {
               const isActive = item.subItems.some(sub => {
-                const [base, query] = sub.href.split('?');
-                if (currentPageName !== base) return false;
-                if (query) return location.search.includes(query.split('=')[1] || query);
-                return true;
+                const basePath = sub.href.split('?')[0].split('/')[0];
+                if (currentPageName !== basePath) return false;
+                if (sub.href.includes('?')) {
+                    const query = sub.href.split('?')[1];
+                    return location.search.includes(query.split('=')[1] || query);
+                } else {
+                    return location.pathname.toLowerCase().includes(sub.href.toLowerCase());
+                }
               });
               const isExpanded = expandedMenu === item.name || isActive;
               return (
@@ -471,10 +478,14 @@ export default function Layout({ children, currentPageName }) {
                     <div className="pl-6 pr-2 space-y-0.5 mt-0.5 border-l border-border/40 ml-5 animate-fade-in-up">
                       {item.subItems.map(sub => {
                         const isSubActive = (() => {
-                          const [base, query] = sub.href.split('?');
-                          if (currentPageName !== base) return false;
-                          if (query) return location.search.includes(query.split('=')[1] || query);
-                          return true;
+                          const basePath = sub.href.split('?')[0].split('/')[0];
+                          if (currentPageName !== basePath) return false;
+                          if (sub.href.includes('?')) {
+                              const query = sub.href.split('?')[1];
+                              return location.search.includes(query.split('=')[1] || query);
+                          } else {
+                              return location.pathname.toLowerCase().includes(sub.href.toLowerCase());
+                          }
                         })();
                         return (
                           <Link

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -26,9 +26,15 @@ export default function Accounting() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { organization, userProfile } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'dashboard';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const location = useLocation();
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'dashboard';
+
+  const setActiveTab = (tab) => {
+    navigate(`/Accounting/${tab}${location.search}`);
+  };
   const needsInvoices = ['export', 'reconciliation'].includes(activeTab);
   const needsPayments = activeTab === 'reconciliation';
   const needsVendors = activeTab === 'vendor-mapping';

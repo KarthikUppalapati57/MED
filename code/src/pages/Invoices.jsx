@@ -1326,10 +1326,20 @@ export default function Invoices() {
                                 <AlertTriangle className="h-4 w-4 mr-2" /> Request Credit
                               </DropdownMenuItem>
                               {invoice.file_url && (
-                                <DropdownMenuItem asChild>
-                                  <a href={invoice.file_url} target="_blank" rel="noopener noreferrer">
-                                    <Download className="h-4 w-4 mr-2" /> Download
-                                  </a>
+                                <DropdownMenuItem onSelect={async (e) => { 
+                                  e.preventDefault(); 
+                                  if (invoice.file_url.startsWith('http')) {
+                                    window.open(invoice.file_url, '_blank');
+                                  } else {
+                                    const { data, error } = await supabase.storage.from('invoices').createSignedUrl(invoice.file_url, 3600);
+                                    if (!error && data) {
+                                      window.open(data.signedUrl, '_blank');
+                                    } else {
+                                      toast.error('Could not fetch secure document link');
+                                    }
+                                  }
+                                }}>
+                                  <Download className="h-4 w-4 mr-2" /> Download
                                 </DropdownMenuItem>
                               )}
                               {isHigherRole && (

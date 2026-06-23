@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
@@ -24,9 +24,16 @@ import CustomRolesTab from '@/components/org/CustomRolesTab';
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'hierarchy';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'hierarchy';
+
+  const setActiveTab = (tab) => {
+    navigate(`/OrgManagement/${tab}${location.search}`);
+  };
   const [showEnrolling, setShowEnrolling] = useState(false);
   const [expandedOrgs, setExpandedOrgs] = useState(new Set());
   const [expandedBrands, setExpandedBrands] = useState(new Set());

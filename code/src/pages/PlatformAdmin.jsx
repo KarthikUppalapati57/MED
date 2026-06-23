@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
@@ -50,10 +50,16 @@ export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
 
- // Tab State persisted in URL search params so it survives navigation
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'requests';
-  const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+
+  const activeTab = currentSubPath || 'requests';
+
+  const setActiveTab = (tab) => {
+    navigate(`/PlatformAdmin/${tab}${location.search}`);
+  };
 
   // Selection/Processing State
   const [processingRequests, setProcessingRequests] = useState(new Set());

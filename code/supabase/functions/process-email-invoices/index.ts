@@ -80,21 +80,19 @@ serve(async (req) => {
                 // and parse the text to extract invoice details.
                 
                 // For this implementation, we upload it to storage and create a pending review invoice.
-                const filename = `${Date.now()}_${att.filename}`;
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                  .from('invoices')
-                  .upload(`auto-ingested/${filename}`, att.content, { contentType: 'application/pdf' });
+                const filename = `${crypto.randomUUID()}_${att.filename.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+                const filePath = `auto-ingested/${filename}`;
                 
-                let fileUrl = '';
-                if (!uploadError && uploadData) {
-                  fileUrl = supabase.storage.from('invoices').getPublicUrl(`auto-ingested/${filename}`).data.publicUrl;
-                }
-
+                const { error: uploadError } = await supabase.storage
+                  .from('invoices')
+                  .upload(filePath, att.content, { contentType: 'application/pdf' });
+                
                 // 4. Inject into the approval workflow
+                // We set status to 'extracting' so that the pg_net webhook picks it up for Gemini Processing
                 const { error: insertError } = await supabase.from('invoices').insert({
                    organization_id: orgId || null,
-                   status: 'pending_review',
-                   file_url: fileUrl,
+                   status: 'extracting', 
+                   file_url: filePath,
                    vendor_name: parsed.from?.text || 'Unknown Vendor (Auto-Ingested)',
                    raw_text: parsed.text, // Store email body as context
                    invoice_number: `EMAIL-${id}-${Date.now()}`,

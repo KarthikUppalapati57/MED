@@ -89,14 +89,11 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(filePath);
-
+      // Bucket is private, store raw filePath
       const invoiceData = {
         vendor_name: 'Extracting...',
         total_amount: 0,
-        file_url: publicUrlData.publicUrl,
+        file_url: filePath,
         file_type: file.type,
         source: 'mobile_camera',
         status: 'extracting',
