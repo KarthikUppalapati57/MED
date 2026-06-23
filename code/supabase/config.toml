@@ -1,5 +1,8 @@
 project_id = "gsupqfmwlsmwoybphimx"
 
+[functions.invoice-processing]
+verify_jwt = false
+
 [functions.dashboard-report-scheduler]
 verify_jwt = false
 

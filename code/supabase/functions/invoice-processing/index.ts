@@ -144,11 +144,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     // 3. Update invoice with extracted data securely inside the tenant schema
     console.log(`Updating invoice ${record.id} to pending_review in schema ${schemaName}...`);
     
-    const db = schemaName && schemaName !== 'public' 
-      ? supabaseClient.schema(schemaName) 
-      : supabaseClient;
-
-    const { error: updateError } = await db.from('invoices').update({
+    const updatePayload = {
       vendor_name: extractedData.vendor_name,
       invoice_number: extractedData.invoice_number,
       subtotal: extractedData.subtotal,
@@ -158,7 +154,20 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       status: 'pending_review',
       raw_text: responseText,
       extraction_method: 'gemini_vision_api',
-    }).eq('id', record.id);
+    };
+
+    let updateError = null;
+    if (schemaName && schemaName !== 'public') {
+      const { error } = await supabaseClient.rpc('tenant_update_row', {
+        p_table_name: 'invoices',
+        p_id: record.id,
+        p_payload: { organization_id: record.organization_id, ...updatePayload }
+      });
+      updateError = error;
+    } else {
+      const { error } = await supabaseClient.from('invoices').update(updatePayload).eq('id', record.id);
+      updateError = error;
+    }
 
     if (updateError) {
       await supabaseClient.from('debug_logs').insert({
@@ -180,14 +189,22 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       log_data: { point: 'catch_block', error_message: err.message, error_stack: err.stack }
     });
 
-    const db = schemaName && schemaName !== 'public' 
-      ? supabaseClient.schema(schemaName) 
-      : supabaseClient;
+    const failPayload = { status: 'extract_failed', validation_results: { error: err.message } };
+    let failUpdateError = null;
 
-    // Correctly update invoice status to 'extract_failed' instead of 'rejected'
-    const { error: failUpdateError } = await db.from('invoices')
-      .update({ status: 'extract_failed', validation_results: { error: err.message } })
-      .eq('id', record.id);
+    if (schemaName && schemaName !== 'public') {
+      const { error } = await supabaseClient.rpc('tenant_update_row', {
+        p_table_name: 'invoices',
+        p_id: record.id,
+        p_payload: { organization_id: record.organization_id, ...failPayload }
+      });
+      failUpdateError = error;
+    } else {
+      const { error } = await supabaseClient.from('invoices')
+        .update(failPayload)
+        .eq('id', record.id);
+      failUpdateError = error;
+    }
       
     // Log the failure to event log
     await supabaseClient.from('debug_logs').insert({
