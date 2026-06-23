@@ -224,6 +224,12 @@ export default function Invoices() {
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
+    refetchInterval: (data) => {
+      // Poll every 3 seconds if there are invoices actively being extracted
+      if (!data) return false;
+      const isExtracting = Array.isArray(data) ? data.some(i => i.status === 'extracting') : false;
+      return isExtracting ? 3000 : false;
+    }
   });
 
   const { data: paymentAccounts = [] } = useAuthQuery({
