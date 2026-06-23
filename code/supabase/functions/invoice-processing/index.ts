@@ -9,6 +9,12 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
     console.log(`Starting background extraction for ${record.id} in schema ${schemaName}...`);
     
+    await supabaseClient.from('invoice_event_log').insert({
+      invoice_id: record.id,
+      event_type: 'extraction_started',
+      event_data: { schemaName, filePath: record.file_url }
+    });
+
     // 1. Securely fetch file from private bucket using service role client
     // We assume record.file_url now stores the exact filePath (e.g. 'auto-ingested/uuid.pdf') 
     // or a full url. We will extract the path if it's a URL.
@@ -112,6 +118,11 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       throw updateError;
     } else {
       console.log(`Successfully processed invoice ${record.id}`);
+      await supabaseClient.from('invoice_event_log').insert({
+        invoice_id: record.id,
+        event_type: 'extraction_success',
+        event_data: { schemaName }
+      });
     }
 
   } catch (err) {
@@ -122,9 +133,16 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       : supabaseClient;
 
     // Correctly update invoice status to 'extract_failed' instead of 'rejected'
-    await db.from('invoices')
+    const { error: failUpdateError } = await db.from('invoices')
       .update({ status: 'extract_failed', validation_results: { error: err.message } })
       .eq('id', record.id);
+      
+    // Log the failure to event log
+    await supabaseClient.from('invoice_event_log').insert({
+      invoice_id: record.id,
+      event_type: 'extraction_failed',
+      event_data: { error: err.message, stack: err.stack, failUpdateError }
+    });
   }
 }
 

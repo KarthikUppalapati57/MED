@@ -291,7 +291,17 @@ export default function Payments() {
 
   const updateInvoice = useMutation({
     mutationFn: (params) => api.entities.Invoice.update(params.id, params.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices-payments'] }),
+    onSuccess: (updatedInvoice) => {
+      queryClient.setQueriesData({ queryKey: ['invoices-payments'] }, (oldData) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map(page => 
+            page.map(inv => inv.id === updatedInvoice.id ? { ...inv, ...updatedInvoice } : inv)
+          )
+        };
+      });
+    },
   });
 
   const savePaymentSettings = useMutation({

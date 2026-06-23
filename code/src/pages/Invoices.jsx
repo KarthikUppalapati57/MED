@@ -426,8 +426,16 @@ export default function Invoices() {
       }
       return { ...invoice, line_items: lineItems };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
+    onSuccess: (updatedInvoice) => {
+      queryClient.setQueriesData({ queryKey: ['invoices-dashboard'] }, (oldData) => {
+        if (!oldData?.pages) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map(page => 
+            page.map(inv => inv.id === updatedInvoice.id ? { ...inv, ...updatedInvoice } : inv)
+          )
+        };
+      });
       toast.success('Invoice saved successfully');
     },
   });

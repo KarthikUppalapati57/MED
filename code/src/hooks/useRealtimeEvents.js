@@ -29,25 +29,31 @@ export function useRealtimeEvents() {
 
           const eventName = newEvent.event_name;
           
-          // Pattern matching for event types to selectively invalidate queries
+          const keysToInvalidate = [];
           if (eventName.startsWith('user.') || eventName.startsWith('invitation.') || eventName.startsWith('employee.')) {
-            queryClient.invalidateQueries({ queryKey: ['client-invites'] });
-            queryClient.invalidateQueries({ queryKey: ['all-profiles'] });
-            queryClient.invalidateQueries({ queryKey: ['dash-profiles'] });
-            queryClient.invalidateQueries({ queryKey: ['labor'] });
+            keysToInvalidate.push(['client-invites'], ['all-profiles'], ['dash-profiles'], ['labor']);
           } else if (eventName.startsWith('organization.')) {
-            queryClient.invalidateQueries({ queryKey: ['organizations'] });
-            queryClient.invalidateQueries({ queryKey: ['dash-orgs'] });
+            keysToInvalidate.push(['organizations'], ['dash-orgs']);
           } else if (eventName.startsWith('inventory.')) {
-            queryClient.invalidateQueries({ queryKey: ['inventory'] });
-            queryClient.invalidateQueries({ queryKey: ['products'] });
+            keysToInvalidate.push(['inventory'], ['products']);
           } else if (eventName.startsWith('order.') || eventName.startsWith('payment.') || eventName.startsWith('invoice.')) {
-            queryClient.invalidateQueries({ queryKey: ['invoices'] });
-            queryClient.invalidateQueries({ queryKey: ['payments'] });
+            keysToInvalidate.push(['invoices'], ['payments']);
           } else if (eventName.startsWith('subscription.')) {
-            queryClient.invalidateQueries({ queryKey: ['dash-plans'] });
-            queryClient.invalidateQueries({ queryKey: ['dash-orgs'] });
+            keysToInvalidate.push(['dash-plans'], ['dash-orgs']);
           }
+
+          // Debounce invalidations to prevent network spam and UI lag
+          keysToInvalidate.forEach(key => {
+            const keyStr = JSON.stringify(key);
+            if (window.__realtimeTimeouts?.[keyStr]) {
+              clearTimeout(window.__realtimeTimeouts[keyStr]);
+            }
+            window.__realtimeTimeouts = window.__realtimeTimeouts || {};
+            window.__realtimeTimeouts[keyStr] = setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: key });
+              delete window.__realtimeTimeouts[keyStr];
+            }, 800);
+          });
 
           // Dispatch a custom window event so specific components can listen if needed
           window.dispatchEvent(new CustomEvent('domain-event', { detail: newEvent }));
