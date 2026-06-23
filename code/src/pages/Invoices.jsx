@@ -296,12 +296,12 @@ export default function Invoices() {
       for (const prev of previouslyExtracting) {
         const current = invoices.find(i => i.id === prev.id);
         if (current && current.status !== 'extracting') {
-          if (current.status === 'pending_approval' || current.status === 'pending_review') {
+          if (['pending_approval', 'pending_review', 'validated', 'processed'].includes(current.status)) {
             toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
             setEditingInvoice(current);
             setIsMinimized(false);
             setEditorOpen(true);
-          } else if (current.status === 'failed' || current.status === 'extract_failed') {
+          } else if (['failed', 'extract_failed', 'rejected'].includes(current.status)) {
             toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
             setEditingInvoice(current);
             setIsMinimized(false);
