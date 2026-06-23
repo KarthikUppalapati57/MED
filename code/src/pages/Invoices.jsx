@@ -31,7 +31,10 @@ import {
   Link2,
   RefreshCcw,
   Minimize2,
-  Maximize2
+  Maximize2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -153,6 +156,7 @@ export default function Invoices() {
   const [agingFilter, setAgingFilter] = useState('all');
   const [paymentAccountFilter, setPaymentAccountFilter] = useState('all');
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
   const [batchPaymentAccountId, setBatchPaymentAccountId] = useState('');
   const [batchScheduleDate, setBatchScheduleDate] = useState(
     new Date(Date.now() + 86400000).toISOString().split('T')[0]
@@ -887,7 +891,7 @@ export default function Invoices() {
   };
 
   const filteredInvoices = React.useMemo(() => {
-    return invoices.filter(inv => {
+    let result = invoices.filter(inv => {
       const matchesSearch = !search || 
         inv.vendor_name?.toLowerCase().includes(search.toLowerCase()) ||
         inv.invoice_number?.toLowerCase().includes(search.toLowerCase());
@@ -899,7 +903,40 @@ export default function Invoices() {
       const matchesPaymentAccount = paymentAccountFilter === 'all' || inv.payment_account_id === paymentAccountFilter;
       return matchesSearch && matchesStatus && matchesApStatus && matchesAging && matchesPaymentAccount;
     });
-  }, [invoices, search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter]);
+
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+        
+        if (sortConfig.key === 'vendor_name') {
+          aValue = (aValue || '').toLowerCase();
+          bValue = (bValue || '').toLowerCase();
+        } else if (sortConfig.key === 'total_amount') {
+          aValue = Number(aValue || 0);
+          bValue = Number(bValue || 0);
+        } else if (sortConfig.key === 'invoice_date' || sortConfig.key === 'due_date' || sortConfig.key === 'created_at') {
+          aValue = new Date(aValue || 0).getTime();
+          bValue = new Date(bValue || 0).getTime();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [invoices, search, statusFilter, apStatusFilter, agingFilter, paymentAccountFilter, sortConfig]);
+
+  const handleSort = (key) => {
+    setSortConfig(current => {
+      if (current?.key === key) {
+        return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
   useEffect(() => {
     setInvoiceTableScrollTop(0);
@@ -1269,12 +1306,24 @@ export default function Invoices() {
                       }}
                     />
                   </TableHead>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>AP Status</TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('vendor_name')}>
+                    <div className="flex items-center">Vendor {sortConfig.key === 'vendor_name' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('invoice_number')}>
+                    <div className="flex items-center">Invoice # {sortConfig.key === 'invoice_number' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('invoice_date')}>
+                    <div className="flex items-center">Date {sortConfig.key === 'invoice_date' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('due_date')}>
+                    <div className="flex items-center">Due Date {sortConfig.key === 'due_date' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('total_amount')}>
+                    <div className="flex items-center">Amount {sortConfig.key === 'total_amount' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}>
+                    <div className="flex items-center">AP Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
+                  </TableHead>
                   <TableHead>Aging</TableHead>
                   <TableHead>Destination</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
