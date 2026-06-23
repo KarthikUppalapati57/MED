@@ -134,6 +134,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
         file_type: fileToProcess.type,
         source,
         vendor_name: 'Extracting...', // Temporary placeholder
+        invoice_number: 'PENDING_EXTRACTION', // Temporary placeholder to satisfy DB constraints
         total_amount: 0,
       };
 
