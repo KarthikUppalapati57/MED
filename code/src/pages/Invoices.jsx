@@ -301,7 +301,7 @@ export default function Invoices() {
             setEditingInvoice(current);
             setIsMinimized(false);
             setEditorOpen(true);
-          } else if (current.status === 'failed') {
+          } else if (current.status === 'failed' || current.status === 'extract_failed') {
             toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
             setEditingInvoice(current);
             setIsMinimized(false);
