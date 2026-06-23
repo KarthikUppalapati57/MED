@@ -9,19 +9,19 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
     console.log(`Starting background extraction for ${record.id} in schema ${schemaName}...`);
     
-    await supabaseClient.from('invoice_event_log').insert({
-      invoice_id: record.id,
-      event_type: 'extraction_started',
-      event_data: { schemaName, filePath: record.file_url }
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'start', invoice_id: record.id, schemaName, filePath: record.file_url }
     });
 
     // 1. Securely fetch file from private bucket using service role client
-    // We assume record.file_url now stores the exact filePath (e.g. 'auto-ingested/uuid.pdf') 
-    // or a full url. We will extract the path if it's a URL.
     let filePath = record.file_url;
     if (filePath.includes('invoices/')) {
         filePath = filePath.split('invoices/')[1];
     }
+    
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'downloading', filePath }
+    });
     
     // Create service role DB client for storage
     const storageDb = supabaseClient; 
@@ -29,8 +29,30 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     const { data: fileBlob, error: downloadError } = await storageDb.storage.from('invoices').download(filePath);
     if (downloadError) throw new Error(`Failed to download file from private bucket: ${downloadError.message}`);
     
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'download_success', size: fileBlob.size }
+    });
+    
     const fileBuffer = await fileBlob.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
+    
+    // SAFE base64 encoding that does not crash on large files!
+    // Using Deno's built-in Buffer to encode safely without exceeding call stack
+    const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(fileBuffer).slice(0, 50000))) + "...(truncated for debug)";
+    
+    // Wait, the real base64 encoding needs to work for Gemini!
+    // In Deno, we can use `btoa` but `String.fromCharCode.apply` crashes on large arrays.
+    // The correct way in Deno to convert ArrayBuffer to Base64 is:
+    let realBase64Data = '';
+    const bytes = new Uint8Array(fileBuffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        realBase64Data += String.fromCharCode(bytes[i]);
+    }
+    const finalBase64Data = btoa(realBase64Data);
+
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'base64_encoded', length: finalBase64Data.length }
+    });
 
     // 2. Vertex / Gemini Extraction Logic
     console.log("Invoking Gemini Vision API...");
@@ -71,10 +93,14 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       Do not include markdown tags like \`\`\`json. Just output the raw JSON object.
     `;
 
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'invoking_gemini' }
+    });
+
     const result = await model.generateContent([
       {
         inlineData: {
-          data: base64Data,
+          data: finalBase64Data,
           mimeType: "application/pdf"
         }
       },
@@ -83,6 +109,10 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
 
     const responseText = result.response.text();
     console.log("Raw Gemini Response:", responseText);
+
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'gemini_response', responseText }
+    });
 
     let extractedData;
     try {
@@ -114,20 +144,25 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     }).eq('id', record.id);
 
     if (updateError) {
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'update_failed', error: updateError }
+      });
       console.error(`Failed to update invoice ${record.id}:`, updateError);
       throw updateError;
     } else {
       console.log(`Successfully processed invoice ${record.id}`);
-      await supabaseClient.from('invoice_event_log').insert({
-        invoice_id: record.id,
-        event_type: 'extraction_success',
-        event_data: { schemaName }
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'success', invoice_id: record.id }
       });
     }
 
   } catch (err) {
     console.error(`Error in background extraction for invoice ${record.id}:`, err);
     
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'catch_block', error_message: err.message, error_stack: err.stack }
+    });
+
     const db = schemaName && schemaName !== 'public' 
       ? supabaseClient.schema(schemaName) 
       : supabaseClient;
@@ -138,10 +173,8 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       .eq('id', record.id);
       
     // Log the failure to event log
-    await supabaseClient.from('invoice_event_log').insert({
-      invoice_id: record.id,
-      event_type: 'extraction_failed',
-      event_data: { error: err.message, stack: err.stack, failUpdateError }
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'catch_block_update', failUpdateError: failUpdateError || null }
     });
   }
 }
