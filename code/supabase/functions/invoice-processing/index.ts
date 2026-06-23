@@ -1,7 +1,10 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 
 // Background processing function
@@ -62,7 +65,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     if (!apiKey) throw new Error("Gemini API key is not configured in Edge Function environment.");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       You are an expert invoice parser. Extract the following information from the provided invoice image:

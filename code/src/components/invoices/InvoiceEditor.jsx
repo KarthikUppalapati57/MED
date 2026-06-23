@@ -147,6 +147,17 @@ export default function InvoiceEditor({ invoice, onChange }) {
               </div>
             </div>
           )}
+          {invoice.status === 'extract_failed' && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-red-600" />
+                <div>
+                  <p className="font-semibold">AI Extraction Failed</p>
+                  <p className="mt-1">{invoice.validation_results?.error || 'Unknown error occurred during AI processing. Please enter details manually.'}</p>
+                </div>
+              </div>
+            </div>
+          )}
           {hasPaidDetection && (
             <div className={`mb-4 rounded-lg border p-3 text-sm ${
               isHighConfidencePaid
