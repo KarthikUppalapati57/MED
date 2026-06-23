@@ -272,8 +272,9 @@ export default function Invoices() {
   }, [searchParams]);
 
   useEffect(() => {
-    const channel = supabase.channel('invoices-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, (payload) => {
+    const targetSchema = organization?.schema_name || 'public';
+    const channel = supabase.channel(`invoices-realtime-${targetSchema}`)
+      .on('postgres_changes', { event: '*', schema: targetSchema, table: 'invoices' }, (payload) => {
         queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
           if (!oldData) return [];
           const invoice = payload.new;
@@ -599,12 +600,12 @@ export default function Invoices() {
     try {
       const savedInvoice = await createMutation.mutateAsync(data);
       
-      // Fire the edge function directly from the client if it's pending extraction
       if (data.status === 'extracting') {
         supabase.functions.invoke('invoice-processing', {
           body: {
             type: 'INSERT',
             table: 'invoices',
+            schema: organization?.schema_name || 'public',
             record: savedInvoice
           }
         }).catch(err => console.error('Edge function invocation failed:', err));
