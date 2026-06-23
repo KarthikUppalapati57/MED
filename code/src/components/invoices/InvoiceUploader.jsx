@@ -120,65 +120,28 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       if (uploadError) throw uploadError;
 
-      // Call Dockling + Vertex AI backend for extraction
-      setProgress('Extracting invoice with AI...');
+      // Removed getPublicUrl because the bucket is now private.
+      // We store the raw filePath directly in the database.
 
-      let invoiceData;
-      try {
-        const formData = new FormData();
-        formData.append('file', fileToProcess);
+      setExtractionDone(true);
+      setProgress('Upload complete! Extraction started...');
 
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-        const extractionRes = await fetch(`${backendUrl}/extract-invoice`, {
-          method: 'POST',
-          body: formData,
-        });
+      await new Promise(r => setTimeout(r, 800));
 
-        if (!extractionRes.ok) {
-          const errBody = await extractionRes.text().catch(() => 'Unknown error');
-          throw new Error(`Extraction API error ${extractionRes.status}: ${errBody}`);
-        }
-
-        const extractedData = await extractionRes.json();
-
-        setExtractionDone(true);
-        setProgress('Extraction complete!');
-
-        invoiceData = {
-          ...extractedData,
-          status: 'pending_review',
-          ap_status: 'processing',
-          file_url: filePath,
-          source,
-        };
-      } catch (extractionError) {
-        console.warn('Backend extraction failed, saving for background retry:', extractionError);
-        toast.warning('AI extraction unavailable — invoice saved for manual review.');
-
-        setExtractionDone(true);
-        setProgress('Upload complete! Saved for review.');
-
-        invoiceData = {
-          status: 'extracting',
-          ap_status: 'processing',
-          file_url: filePath,
-          file_type: fileToProcess.type,
-          source,
-          vendor_name: 'Extracting...',
-          invoice_number: 'PENDING_EXTRACTION',
-          total_amount: 0,
-        };
-      }
-
-      await new Promise(r => setTimeout(r, 600));
+      const invoiceData = {
+        status: 'extracting',
+        ap_status: 'processing', // DB Constraint requires ap_status
+        file_url: filePath,
+        file_type: fileToProcess.type,
+        source,
+        vendor_name: 'Extracting...', // Temporary placeholder
+        invoice_number: 'PENDING_EXTRACTION', // Temporary placeholder to satisfy DB constraints
+        total_amount: 0,
+      };
 
       onInvoiceExtracted(invoiceData);
       onOpenChange(false);
-      toast.success(
-        invoiceData.status === 'pending_review'
-          ? `Invoice extracted — ${invoiceData.vendor_name || 'vendor'} · $${Number(invoiceData.total_amount || 0).toLocaleString()}`
-          : 'Invoice uploaded. Extraction is running in the background.'
-      );
+      toast.success('Invoice uploaded. Extraction is running in the background.');
     } catch (error) {
       toast.error('Error uploading invoice: ' + (error.message || 'Unknown error'));
       console.error('Invoice upload error:', error);
