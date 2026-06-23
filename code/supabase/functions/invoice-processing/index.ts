@@ -285,6 +285,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       other_charges: normalized.other_charges,
       line_items: normalized.line_items,
       status: 'pending_review',
+      ap_status: 'action_required',
       raw_text: responseText,
       extraction_method: 'gemini_vision_api',
     };
@@ -322,7 +323,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       log_data: { point: 'catch_block', error_message: err.message, error_stack: err.stack }
     });
 
-    const failPayload = { status: 'extract_failed', validation_results: { error: err.message } };
+    const failPayload = { status: 'extract_failed', ap_status: 'action_required', validation_results: { error: err.message } };
     let failUpdateError = null;
 
     if (schemaName && schemaName !== 'public') {
@@ -417,3 +418,5 @@ serve(async (req) => {
     })
   }
 })
+
+
