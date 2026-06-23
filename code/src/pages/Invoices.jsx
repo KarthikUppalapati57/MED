@@ -1445,7 +1445,7 @@ export default function Invoices() {
           overlay={!isMinimized}
           className={
             isMinimized 
-              ? "!h-auto !w-[350px] !top-auto !bottom-6 !right-6 border border-slate-200 shadow-2xl rounded-2xl p-0 flex flex-col transition-all duration-300 z-50 bg-white"
+              ? "!w-[400px] border-l border-slate-200 shadow-2xl p-0 flex flex-col transition-all duration-300 z-50 bg-white"
               : "p-0 sm:max-w-none overflow-hidden flex flex-col transition-all duration-300"
           }
           style={isMinimized ? {} : { width: `${sheetWidth}px`, maxWidth: '100vw' }}

@@ -130,6 +130,7 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       const invoiceData = {
         status: 'extracting',
+        ap_status: 'processing', // DB Constraint requires ap_status
         file_url: filePath,
         file_type: fileToProcess.type,
         source,

@@ -34,16 +34,37 @@ serve(async (req) => {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, name')
       .eq('id', profile.organization_id)
       .single();
 
-    if (!org?.stripe_customer_id) {
-      throw new Error('Organization does not have a Stripe customer ID');
+    let customerId = org?.stripe_customer_id;
+
+    if (!customerId) {
+      // Lazy creation of Stripe customer for legacy organizations
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: org?.name || 'Organization Customer',
+        metadata: {
+          organization_id: profile.organization_id,
+        }
+      });
+      customerId = customer.id;
+
+      // Update the organization with the new Stripe customer ID
+      const { error: updateError } = await supabase
+        .from('organizations')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', profile.organization_id);
+
+      if (updateError) {
+        console.error('Failed to update organization with new Stripe customer ID:', updateError);
+        // Continue anyway so the user isn't blocked, but log the error
+      }
     }
 
     const session = await stripe.billingPortal.sessions.create({
-      customer: org.stripe_customer_id,
+      customer: customerId,
       return_url: returnUrl || req.headers.get('origin'),
     });
 

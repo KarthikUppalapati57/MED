@@ -157,12 +157,25 @@ export default function Payments() {
   } = useAuthInfiniteQuery({
     queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
-      return await api.entities.Invoice.list(sortBy, {
+      const filters = {};
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'partial') {
+           filters.payment_status = 'partial';
+        } else if (statusFilter === 'paid') {
+           filters.payment_status = 'paid';
+        } else if (statusFilter === 'auto_pay') {
+           filters.payment_status = 'auto_pay';
+        } else {
+           filters.status = statusFilter;
+        }
+      }
+      return await api.entities.Invoice.filter(filters, {
         page: pageParam,
         pageSize: 50,
-        select: 'id, invoice_number, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
+        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
         search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
-        searchColumn: 'invoice_number'
+        searchColumn: 'invoice_number',
+        orderBy: sortBy
       });
     },
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
@@ -188,7 +201,7 @@ export default function Payments() {
       return await api.entities.Payment.list(sortBy, {
         page: pageParam,
         pageSize: 50,
-        select: 'id, invoice_id, invoice_number, vendor_name, amount, status, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
+        select: 'id, invoice_id, invoice_number, vendor_id, vendor_name, amount, status, payment_method, payment_date, created_at, organization_id, brand_id, location_id',
         search: activeTab === 'history' ? debouncedSearch || undefined : undefined,
         searchColumn: 'invoice_number'
       });
@@ -478,7 +491,14 @@ export default function Payments() {
           id: payment.invoice_id,
           data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
         });
-        const invoice = invoices.find(i => i.id === payment.invoice_id);
+        let invoice = invoices.find(i => i.id === payment.invoice_id);
+        if (!invoice) {
+          try {
+            invoice = await api.entities.Invoice.get(payment.invoice_id);
+          } catch (e) {
+            console.error('Failed to fetch invoice for ledger:', e);
+          }
+        }
         if (invoice) {
           await recordPaymentLedger({
             invoice: { ...invoice, organization_id: invoice.organization_id || organization?.id },
@@ -739,7 +759,10 @@ export default function Payments() {
                     <TableRow>
                       <TableHead className="w-12">
                         <Checkbox
-                          checked={filteredInvoices.length > 0 && selectedInvoiceIds.length === filteredInvoices.length}
+                          checked={
+                            filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).length > 0 &&
+                            selectedInvoiceIds.length === filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).length
+                          }
                           onCheckedChange={(checked) => {
                             if (checked) {
                               setSelectedInvoiceIds(filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).map(i => i.id));
