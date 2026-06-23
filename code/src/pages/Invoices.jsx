@@ -613,8 +613,8 @@ export default function Invoices() {
       // Refresh the invoice list
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       
-      if (data.status !== 'extracting' && savedInvoice) {
-        // Extraction succeeded — open the editor with saved data
+      if (savedInvoice) {
+        // Open the editor immediately with saved data
         setEditingInvoice(savedInvoice);
         setEditorOpen(true);
       }
