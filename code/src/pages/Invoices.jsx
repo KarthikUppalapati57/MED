@@ -29,7 +29,9 @@ import {
   Inbox,
   ClipboardCheck,
   Link2,
-  RefreshCcw
+  RefreshCcw,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,6 +166,8 @@ export default function Invoices() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const previousInvoicesRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { userProfile, role, organization, brand, location } = useAuth();
@@ -285,6 +289,29 @@ export default function Invoices() {
       supabase.removeChannel(channel);
     };
   }, [queryClient, organization?.id]);
+
+  useEffect(() => {
+    if (previousInvoicesRef.current.length > 0 && invoices.length > 0) {
+      const previouslyExtracting = previousInvoicesRef.current.filter(i => i.status === 'extracting');
+      for (const prev of previouslyExtracting) {
+        const current = invoices.find(i => i.id === prev.id);
+        if (current && current.status !== 'extracting') {
+          if (current.status === 'pending_approval' || current.status === 'pending_review') {
+            toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
+            setEditingInvoice(current);
+            setIsMinimized(false);
+            setEditorOpen(true);
+          } else if (current.status === 'failed') {
+            toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
+            setEditingInvoice(current);
+            setIsMinimized(false);
+            setEditorOpen(true);
+          }
+        }
+      }
+    }
+    previousInvoicesRef.current = invoices;
+  }, [invoices]);
 
   const handleExportCsv = () => {
     if (!filteredInvoices || filteredInvoices.length === 0) {
@@ -1413,56 +1440,77 @@ export default function Invoices() {
       )}
 
       {/* Editor Sheet */}
-      <Sheet open={editorOpen} onOpenChange={setEditorOpen}>
+      <Sheet open={editorOpen} onOpenChange={setEditorOpen} modal={!isMinimized}>
         <SheetContent 
-          className="p-0 sm:max-w-none overflow-hidden flex flex-col"
-          style={{ width: `${sheetWidth}px`, maxWidth: '100vw' }}
+          overlay={!isMinimized}
+          className={
+            isMinimized 
+              ? "!h-auto !w-[350px] !top-auto !bottom-6 !right-6 border border-slate-200 shadow-2xl rounded-2xl p-0 flex flex-col transition-all duration-300 z-50 bg-white"
+              : "p-0 sm:max-w-none overflow-hidden flex flex-col transition-all duration-300"
+          }
+          style={isMinimized ? {} : { width: `${sheetWidth}px`, maxWidth: '100vw' }}
         >
           {/* Resize Handle */}
-          <div
-            onMouseDown={startResizing}
-            className={cn(
-              "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
-              isResizing && "bg-primary/40"
+          {!isMinimized && (
+            <div
+              onMouseDown={startResizing}
+              className={cn(
+                "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
+                isResizing && "bg-primary/40"
+              )}
+            >
+               <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
+            </div>
+          )}
 
-            )}
-          >
-             <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
-          </div>
-
-          <div className="p-6 overflow-y-auto flex-1 h-full">
-            <SheetHeader>
-              <SheetTitle>
+          <div className={cn("flex-1 h-full", isMinimized ? "p-4" : "p-6 overflow-y-auto")}>
+            <SheetHeader className={isMinimized ? "flex flex-row items-center justify-between pb-2" : ""}>
+              <SheetTitle className={isMinimized ? "text-left mt-0 text-base" : ""}>
                 {editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
               </SheetTitle>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={() => setIsMinimized(!isMinimized)} className="h-8 w-8 text-slate-500 hover:text-slate-800">
+                  {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                </Button>
+              </div>
             </SheetHeader>
             {editingInvoice && (
-              <div className="mt-6 flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden gap-6 h-[calc(100vh-140px)]">
-                {/* Left Pane: Document Viewer */}
-                {editingInvoice.file_url && (
-                  <div className="w-full lg:w-1/2 h-[400px] lg:h-full rounded-xl overflow-hidden border bg-slate-50 shrink-0">
-                    <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
-                      <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
-                    </React.Suspense>
+              <>
+                {isMinimized ? (
+                  <div className="mt-3 flex flex-col gap-2">
+                     <p className="text-sm text-slate-600 truncate font-medium">{editingInvoice.vendor_name || 'Processing vendor...'}</p>
+                     <p className="text-sm font-semibold text-teal-700">${parseFloat(editingInvoice.total_amount || 0).toFixed(2)}</p>
+                     <Button size="sm" onClick={() => setIsMinimized(false)} className="w-full mt-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-sm h-9">
+                       Open Review
+                     </Button>
                   </div>
-                )}
-                
-                {/* Right Pane: Editor */}
-                <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'w-full lg:w-1/2' : 'w-full'}`}>
-                  <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
-                    <InvoiceEditor
-                      invoice={editingInvoice}
-                      onChange={setEditingInvoice}
-                    />
-                  </React.Suspense>
-                  <div className="flex flex-wrap gap-3 mt-6 pb-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => setEditorOpen(false)}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
+                ) : (
+                  <div className="mt-6 flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden gap-6 h-[calc(100vh-140px)]">
+                    {/* Left Pane: Document Viewer */}
+                    {editingInvoice.file_url && (
+                      <div className="w-full lg:w-1/2 h-[400px] lg:h-full rounded-xl overflow-hidden border bg-slate-50 shrink-0">
+                        <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
+                          <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                        </React.Suspense>
+                      </div>
+                    )}
+                    
+                    {/* Right Pane: Editor */}
+                    <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'w-full lg:w-1/2' : 'w-full'}`}>
+                      <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
+                        <InvoiceEditor
+                          invoice={editingInvoice}
+                          onChange={setEditingInvoice}
+                        />
+                      </React.Suspense>
+                      <div className="flex flex-wrap gap-3 mt-6 pb-6">
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditorOpen(false)}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
                     <Button
                       variant="outline"
                       onClick={handleEditorSave}
@@ -1496,7 +1544,9 @@ export default function Invoices() {
                     )}
                   </div>
                 </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </SheetContent>
