@@ -158,22 +158,16 @@ serve(async (req) => {
     }
 
     // 2. pg_net webhook logic
+    if (type === 'INSERT' && table === 'invoices' && record.status === 'extracting') {
+      // We must AWAIT this! Deno Edge Functions terminate when the response is sent.
+      // pg_net handles the timeout asynchronously from the database side.
+      await processInvoiceBackground(record, targetSchema, supabaseClient);
+      
+      return new Response(JSON.stringify({ success: true, message: 'Processing complete' }), { headers: corsHeaders, status: 200 })
+    } 
+
     if (table === 'invoices') {
-      if (type === 'INSERT' && record.status === 'extracting') {
-        console.log(`Triggering OCR extraction for Invoice ${record.id} in schema ${targetSchema}`);
-        
-        // Use EdgeRuntime.waitUntil to safely execute background tasks in serverless environments
-        if (typeof EdgeRuntime !== 'undefined' && typeof EdgeRuntime.waitUntil === 'function') {
-           EdgeRuntime.waitUntil(processInvoiceBackground(record, targetSchema, supabaseClient));
-        } else if (typeof globalThis !== 'undefined' && typeof globalThis.EdgeRuntime !== 'undefined' && typeof globalThis.EdgeRuntime.waitUntil === 'function') {
-           globalThis.EdgeRuntime.waitUntil(processInvoiceBackground(record, targetSchema, supabaseClient));
-        } else {
-           // Fallback to synchronous execution if EdgeRuntime is unavailable
-           console.log("EdgeRuntime.waitUntil unavailable, falling back to synchronous execution");
-           await processInvoiceBackground(record, targetSchema, supabaseClient);
-        }
-      } 
-      else if (type === 'UPDATE' && record.status !== old_record?.status) {
+      if (type === 'UPDATE' && record.status !== old_record?.status) {
         if (record.status === 'processed' || record.status === 'approved') {
           console.log(`Starting post-processing for Invoice ${record.id}`);
           if (record.total_amount > 1000) {
