@@ -92,9 +92,32 @@ function withActiveScope(table, conditions = {}) {
   return scoped;
 }
 
-function canUseTenantRead(table, options = {}) {
-  const select = options.select || '*';
-  return TENANT_SCHEMA_READS_ENABLED && TENANT_ROUTED_TABLES.has(table) && select === '*';
+function canUseTenantRead(table) {
+  return TENANT_SCHEMA_READS_ENABLED && TENANT_ROUTED_TABLES.has(table);
+}
+
+function projectSelectedColumns(rows, select = '*') {
+  if (!rows || select === '*') return rows;
+  if (typeof select !== 'string' || select.includes('(')) return rows;
+
+  const columns = select
+    .split(',')
+    .map((column) => column.trim())
+    .filter(Boolean);
+
+  if (columns.length === 0) return rows;
+
+  const projectRow = (row) => {
+    if (!row || typeof row !== 'object') return row;
+    return columns.reduce((projected, column) => {
+      if (Object.prototype.hasOwnProperty.call(row, column)) {
+        projected[column] = row[column];
+      }
+      return projected;
+    }, {});
+  };
+
+  return Array.isArray(rows) ? rows.map(projectRow) : projectRow(rows);
 }
 
 async function tenantSelectRows(table, {
@@ -218,7 +241,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   list: async (orderBy, options = {}) => {
-    if (canUseTenantRead(table, options)) {
+    if (canUseTenantRead(table)) {
       const routed = await tenantSelectRows(table, {
         conditions: {},
         gte: options.gte,
@@ -231,7 +254,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
         limit: options.limit,
         includeDeleted: !useSoftDelete,
       });
-      if (routed !== null) return routed ?? [];
+      if (routed !== null) return projectSelectedColumns(routed ?? [], options.select);
     }
     let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
@@ -273,7 +296,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data ?? [];
   },
   filter: async (conditions, options = {}) => {
-    if (canUseTenantRead(table, options)) {
+    if (canUseTenantRead(table)) {
       const routed = await tenantSelectRows(table, {
         conditions,
         gte: options.gte,
@@ -286,7 +309,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
         limit: options.limit,
         includeDeleted: !useSoftDelete,
       });
-      if (routed !== null) return routed ?? [];
+      if (routed !== null) return projectSelectedColumns(routed ?? [], options.select);
     }
     let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {

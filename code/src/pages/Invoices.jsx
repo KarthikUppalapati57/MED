@@ -599,19 +599,6 @@ export default function Invoices() {
     console.log('Invoices Page received extraction data:', data);
     try {
       const savedInvoice = await createMutation.mutateAsync(data);
-      
-      if (data.status === 'extracting') {
-        const targetSchema = organization ? `tenant_${organization.slug.replace(/[^a-z0-9_]/gi, '_')}_${organization.id.substring(0, 8)}` : 'public';
-        supabase.functions.invoke('invoice-processing', {
-          body: {
-            type: 'INSERT',
-            table: 'invoices',
-            schema: targetSchema,
-            record: savedInvoice
-          }
-        }).catch(err => console.error('Edge function invocation failed:', err));
-      }
-
       // Refresh the invoice list
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       

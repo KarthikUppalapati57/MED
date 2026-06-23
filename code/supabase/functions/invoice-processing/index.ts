@@ -1,11 +1,39 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Buffer } from 'node:buffer'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
+
+async function resolveInvoiceWriteSchema(record, requestedSchema, supabaseClient) {
+  const fallbackSchema = requestedSchema || 'public';
+  const organizationId = record?.organization_id;
+
+  if (!organizationId) return fallbackSchema;
+
+  try {
+    const { data, error } = await supabaseClient.rpc('get_tenant_data_route', {
+      p_organization_id: organizationId,
+      p_brand_id: record?.brand_id || null,
+      p_location_id: record?.location_id || null,
+    });
+
+    if (error) throw error;
+
+    return data?.write_target || fallbackSchema;
+  } catch (error) {
+    console.error('Failed to resolve tenant write schema, using payload schema fallback:', error);
+    return fallbackSchema;
+  }
+}
+
+function assertSafeSchemaName(schemaName) {
+  if (schemaName === 'public' || /^tenant_[a-z0-9_]+$/.test(schemaName)) return;
+  throw new Error(`Unsafe tenant schema name: ${schemaName}`);
+}
 
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
@@ -37,21 +65,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     });
     
     const fileBuffer = await fileBlob.arrayBuffer();
-    
-    // SAFE base64 encoding that does not crash on large files!
-    // Using Deno's built-in Buffer to encode safely without exceeding call stack
-    const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(fileBuffer).slice(0, 50000))) + "...(truncated for debug)";
-    
-    // Wait, the real base64 encoding needs to work for Gemini!
-    // In Deno, we can use `btoa` but `String.fromCharCode.apply` crashes on large arrays.
-    // The correct way in Deno to convert ArrayBuffer to Base64 is:
-    let realBase64Data = '';
-    const bytes = new Uint8Array(fileBuffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        realBase64Data += String.fromCharCode(bytes[i]);
-    }
-    const finalBase64Data = btoa(realBase64Data);
+    const finalBase64Data = Buffer.from(fileBuffer).toString('base64');
 
     await supabaseClient.from('debug_logs').insert({
       log_data: { point: 'base64_encoded', length: finalBase64Data.length }
@@ -196,7 +210,8 @@ serve(async (req) => {
     const payload = await req.json()
     const { invoice_id, action, type, table, record, old_record, schema } = payload
 
-    const targetSchema = schema || 'public';
+    const targetSchema = await resolveInvoiceWriteSchema(record, schema || 'public', supabaseClient);
+    assertSafeSchemaName(targetSchema);
 
     // 1. Direct Call logic
     if (action && invoice_id) {
@@ -212,14 +227,21 @@ serve(async (req) => {
     }
 
     // 2. pg_net webhook logic
-    if (type === 'INSERT' && table === 'invoices' && record.status === 'extracting') {
+    const shouldProcessExtraction = table === 'invoices'
+      && record?.status === 'extracting'
+      && (
+        type === 'INSERT'
+        || old_record?.status !== 'extracting'
+        || old_record?.extraction_started_at !== record?.extraction_started_at
+      );
+
+    if (shouldProcessExtraction) {
       // We must AWAIT this! Deno Edge Functions terminate when the response is sent.
       // pg_net handles the timeout asynchronously from the database side.
       await processInvoiceBackground(record, targetSchema, supabaseClient);
       
       return new Response(JSON.stringify({ success: true, message: 'Processing complete' }), { headers: corsHeaders, status: 200 })
     } 
-
     if (table === 'invoices') {
       if (type === 'UPDATE' && record.status !== old_record?.status) {
         if (record.status === 'processed' || record.status === 'approved') {
