@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Gavel, Truck, TrendingDown, CheckCircle2 } from 'lucide-react';
@@ -10,6 +10,42 @@ export default function VendorBidding() {
   const { currentOrganization } = useAuth();
   const [loading, setLoading] = useState(false);
   const [bidsResolved, setBidsResolved] = useState(false);
+
+  useEffect(() => {
+    if (!currentOrganization) return;
+    
+    // Subscribe to realtime updates for vendor bids
+    const channel = supabase.channel('vendor-bids-sync')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'vendor_bids' 
+      }, (payload) => {
+        // If a bid is updated or inserted, handle the status
+        console.log('Real-time bid update:', payload);
+        toast.info('Vendor bid statuses updated via real-time sync.');
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Connected to vendor bids real-time channel');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.warn('Real-time channel disconnected. Attempting to reconnect...');
+          // Implement simple polling fallback on disconnect
+          setTimeout(() => channel.subscribe(), 5000);
+        }
+      });
+
+    const handleOnline = () => {
+      toast.success('Connection restored. Syncing latest bids...');
+      // Trigger a re-fetch of bids here if we had a data-fetching function
+    };
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [currentOrganization]);
 
   const handleEvaluateBids = async () => {
     if (!currentOrganization) return;

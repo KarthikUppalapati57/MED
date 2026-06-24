@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Save } from 'lucide-react';
+import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
 
 export default function AccountingControls({ vendorId }) {
   const { organization } = useAuth();
@@ -32,7 +33,8 @@ export default function AccountingControls({ vendorId }) {
       setFormData({
         default_expense_category: vendor.default_expense_category || 'food',
         default_payment_account_id: vendor.default_payment_account_id || 'none',
-        file_routing_preference: vendor.file_routing_preference || 'storage'
+        file_routing_preference: vendor.file_routing_preference || 'storage',
+        ap_routing_preference: normalizeApRouting(vendor.ap_routing_preference)
       });
     }
   }, [vendor, formData]);
@@ -52,7 +54,8 @@ export default function AccountingControls({ vendorId }) {
     updateMutation.mutate({
       default_expense_category: formData.default_expense_category,
       default_payment_account_id: formData.default_payment_account_id === 'none' ? null : formData.default_payment_account_id,
-      file_routing_preference: formData.file_routing_preference
+      file_routing_preference: formData.file_routing_preference,
+      ap_routing_preference: normalizeApRouting(formData.ap_routing_preference)
     });
   };
 
@@ -128,21 +131,25 @@ export default function AccountingControls({ vendorId }) {
           </div>
 
           <div className="space-y-2">
-            <Label>File Routing Preference</Label>
+            <Label>AP Invoice Routing</Label>
             <Select 
-              value={formData.file_routing_preference} 
-              onValueChange={v => setFormData({...formData, file_routing_preference: v})}
+              value={formData.ap_routing_preference} 
+              onValueChange={v => setFormData({
+                ...formData,
+                ap_routing_preference: v,
+                file_routing_preference: ['payments', 'storage', 'accounting'].includes(v) ? v : formData.file_routing_preference,
+              })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select routing" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="storage">File Storage Only</SelectItem>
-                <SelectItem value="accounting">Accounting (Auto-process)</SelectItem>
-                <SelectItem value="payments">Payments (Process & Pay)</SelectItem>
+                {AP_ROUTING_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">What happens when documents are uploaded for this vendor.</p>
+            <p className="text-xs text-muted-foreground">Controls whether approved invoices enter Bill Pay, accounting export, storage, or paid-history only.</p>
           </div>
         </div>
 
@@ -156,3 +163,4 @@ export default function AccountingControls({ vendorId }) {
     </Card>
   );
 }
+

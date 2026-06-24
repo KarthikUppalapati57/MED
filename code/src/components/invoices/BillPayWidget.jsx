@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -17,6 +17,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
 import { Calendar as CalendarIcon, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export function BillPayWidget({ invoice }) {
@@ -101,6 +102,22 @@ export function BillPayWidget({ invoice }) {
   // Only show this widget if the invoice is approved, scheduled, partially paid, or paid
   if (!['approved', 'scheduled', 'partially_paid', 'paid'].includes(invoice.status)) {
     return null;
+  }
+
+  const isPaid = ['paid', 'auto_pay'].includes(invoice.payment_status) || invoice.status === 'paid';
+  if (!isPaid && !isPaymentQueueRouted(invoice)) {
+    return (
+      <Card className="border-border shadow-sm bg-muted/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">Bill Pay & Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            This vendor is routed to {getApRoutingLabel(invoice.ap_routing_destination)}, so this invoice is excluded from Bill Pay.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   const remainingBalance = invoice.total_amount - (invoice.paid_amount || 0);
@@ -281,3 +298,4 @@ export function BillPayWidget({ invoice }) {
     </Card>
   );
 }
+

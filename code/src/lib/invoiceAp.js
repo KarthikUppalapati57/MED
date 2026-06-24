@@ -1,6 +1,7 @@
 const CLOSED_AP_STATUSES = new Set(['paid', 'closed', 'rejected']);
 
 export const AP_STATUS_LABELS = {
+  pending_review: 'Review',
   processing: 'Processing',
   action_required: 'Action Required',
   pending_approval: 'Pending Approval',
@@ -23,19 +24,22 @@ export const ACTION_REASON_LABELS = {
 };
 
 export function deriveApStatus(invoice) {
-  if (invoice?.ap_status) return invoice.ap_status;
-  if (invoice?.status === 'rejected') return 'rejected';
+  if (invoice?.status === 'extracting') return 'processing';
+  if (invoice?.status === 'pending_review') return 'pending_review';
+  if (invoice?.status === 'validated') return 'pending_approval';
+  if (invoice?.status === 'rejected' || invoice?.status === 'extract_failed') return 'rejected';
   if (invoice?.status === 'paid' || invoice?.payment_status === 'paid') return 'paid';
   if (invoice?.status === 'approved') return 'approved';
+  if (invoice?.ap_status && invoice.ap_status !== 'processing') return invoice.ap_status;
   if (
     ['flagged', 'duplicate', 'pending_match_approval'].includes(invoice?.status) ||
     ['needs_review', 'variance', 'missing_receipt', 'unmatched'].includes(invoice?.match_status)
   ) return 'action_required';
-  if (invoice?.status === 'validated') return 'pending_approval';
-  return 'processing';
+  return invoice?.ap_status || 'processing';
 }
 
 export function deriveActionReason(invoice) {
+  if (deriveApStatus(invoice) !== 'action_required') return null;
   if (invoice?.action_required_reason) return invoice.action_required_reason;
   if (invoice?.status === 'duplicate') return 'possible_duplicate';
   if (invoice?.status === 'flagged') return 'validation_flag';
@@ -89,3 +93,5 @@ export function invoicesToCsv(invoices, paymentAccounts = []) {
   ]);
   return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 }
+
+

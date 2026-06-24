@@ -58,6 +58,7 @@ export function useAuthQuery(options) {
     // Keep unused data in cache for 10 minutes so navigating back is instant
     gcTime: options.gcTime ?? 10 * 60 * 1000, // 10 minutes
     placeholderData: options.placeholderData,
+    throwOnError: options.throwOnError ?? true,
   });
 }
 
@@ -93,6 +94,7 @@ export function useAuthQueries({ queries }) {
       enabled: authReady && (query.enabled !== undefined ? query.enabled : true),
       staleTime: query.staleTime ?? 5 * 60 * 1000,
       gcTime: query.gcTime ?? 10 * 60 * 1000,
+      throwOnError: query.throwOnError ?? true,
     };
   });
 
@@ -130,5 +132,6 @@ export function useAuthInfiniteQuery(options) {
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.gcTime ?? 10 * 60 * 1000,
+    throwOnError: options.throwOnError ?? true,
   });
 }

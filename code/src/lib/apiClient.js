@@ -587,6 +587,17 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    executeInternalTransfer: async (orgId, fromLocationId, toLocationId, items, userId) => {
+      const { data, error } = await supabase.rpc('execute_internal_transfer', {
+        p_organization_id: orgId,
+        p_from_location_id: fromLocationId,
+        p_to_location_id: toLocationId,
+        p_items: items,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
   },
   admin: {
     /** Securely update a user's role via server-side RPC (prevents privilege escalation) */

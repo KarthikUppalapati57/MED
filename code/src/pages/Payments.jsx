@@ -64,6 +64,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
 import { confirmBankTransfer } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
+import { isPaymentQueueRouted } from '@/lib/apRouting';
 
 const paymentMethodIcons = {
   stripe: CreditCard,
@@ -138,11 +139,16 @@ export default function Payments() {
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
+  const queryParams = new URLSearchParams(routerLocation.search);
+  const queryTab = queryParams.get('tab');
 
-  const activeTab = currentSubPath || 'invoices';
+  const activeTab = currentSubPath || queryTab || 'invoices';
 
   const setActiveTab = (tab) => {
-    navigate(`/Payments/${tab}${routerLocation.search}`);
+    const nextParams = new URLSearchParams(routerLocation.search);
+    nextParams.delete('tab');
+    const search = nextParams.toString();
+    navigate(`/Payments/${tab}${search ? `?${search}` : ''}`);
   };
 
   const queryClient = useQueryClient();
@@ -172,7 +178,7 @@ export default function Payments() {
       return await api.entities.Invoice.filter(filters, {
         page: pageParam,
         pageSize: 50,
-        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id',
+        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination',
         search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
         searchColumn: 'invoice_number',
         orderBy: sortBy
@@ -391,7 +397,7 @@ export default function Payments() {
 
   // Stats
   const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue, overdueAmount, scheduledInvoices, scheduledAmount, partialInvoices, dueNextSevenAmount } = React.useMemo(() => {
-    const openInvoices = invoices.filter(i => !['paid', 'auto_pay'].includes(i.payment_status) && i.status !== 'rejected');
+    const openInvoices = invoices.filter(i => isPaymentQueueRouted(i) && !['paid', 'auto_pay'].includes(i.payment_status) && i.status !== 'rejected');
     const appUnpaid = openInvoices.filter(i => ['approved', 'scheduled', 'partially_paid'].includes(i.status));
     const dueSum = appUnpaid.reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0);
     const paidSum = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -526,8 +532,10 @@ export default function Payments() {
 
   const filteredInvoices = React.useMemo(() => {
     return invoices.filter(inv => {
-      const matchesStatus = statusFilter === 'all' || inv.payment_status === statusFilter || inv.status === statusFilter;
-      return matchesStatus;
+      if (statusFilter === 'all') {
+        return isPaymentQueueRouted(inv) && inv.payment_status !== 'paid' && inv.status !== 'paid';
+      }
+      return isPaymentQueueRouted(inv) && (inv.payment_status === statusFilter || inv.status === statusFilter);
     });
   }, [invoices, statusFilter]);
 
@@ -720,7 +728,7 @@ export default function Payments() {
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Invoices</SelectItem>
+                  <SelectItem value="all">All Unpaid Invoices</SelectItem>
                   <SelectItem value="approved">Approved (Unpaid)</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
                   <SelectItem value="auto_pay">Auto-Pay</SelectItem>
@@ -855,9 +863,10 @@ export default function Payments() {
                         const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
                         const isOverdue = dueDate && dueDate < new Date() && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && !['paid', 'auto_pay'].includes(invoice.payment_status);
-                        const canPay = invoice.status === 'approved' && !['paid', 'auto_pay'].includes(invoice.payment_status);
-                        const canSchedule = ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
-                        const canRecord = ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const isPayableRoute = isPaymentQueueRouted(invoice);
+                        const canPay = isPayableRoute && invoice.status === 'approved' && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canSchedule = isPayableRoute && ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canRecord = isPayableRoute && ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
 
                         return (
                           <TableRow key={invoice.id}>

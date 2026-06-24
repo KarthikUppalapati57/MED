@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -61,6 +61,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
 
 const VendorStatementsTab = React.lazy(() => import('./VendorStatementsTab'));
 
@@ -119,7 +120,8 @@ export default function VendorList() {
     status: 'active',
     notes: '',
     whatsapp_number: '',
-    file_routing_preference: 'storage'
+    file_routing_preference: 'storage',
+    ap_routing_preference: 'payments'
   });
 
   const queryClient = useQueryClient();
@@ -129,7 +131,7 @@ export default function VendorList() {
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, default_expense_category, default_payment_method, default_payment_account_id',
+      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
@@ -207,7 +209,8 @@ export default function VendorList() {
       status: 'active',
       notes: '',
       whatsapp_number: '',
-      file_routing_preference: 'storage'
+      file_routing_preference: 'storage',
+      ap_routing_preference: 'payments'
     });
     setEditingVendor(null);
   };
@@ -228,7 +231,8 @@ export default function VendorList() {
       status: vendor.status || 'active',
       notes: vendor.notes || '',
       whatsapp_number: vendor.whatsapp_number || '',
-      file_routing_preference: vendor.file_routing_preference || 'storage'
+      file_routing_preference: vendor.file_routing_preference || 'storage',
+      ap_routing_preference: normalizeApRouting(vendor.ap_routing_preference)
     });
     setDialogOpen(true);
   };
@@ -244,6 +248,7 @@ export default function VendorList() {
       email: formData.email || null,
       status: formData.status || 'active',
       file_routing_preference: formData.file_routing_preference || 'storage',
+      ap_routing_preference: normalizeApRouting(formData.ap_routing_preference),
     };
 
     if (editingVendor) {
@@ -746,17 +751,22 @@ export default function VendorList() {
                 </Select>
               </div>
               <div className="col-span-2 space-y-2">
-                <Label>File Routing Preference</Label>
+                <Label>AP Invoice Routing</Label>
                 <Select
-                  value={formData.file_routing_preference}
-                  onValueChange={(v) => setFormData({ ...formData, file_routing_preference: v })}
+                  value={formData.ap_routing_preference}
+                  onValueChange={(v) => setFormData({
+                    ...formData,
+                    ap_routing_preference: v,
+                    file_routing_preference: ['payments', 'storage', 'accounting'].includes(v) ? v : formData.file_routing_preference,
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="storage">Storage</SelectItem>
-                    <SelectItem value="payments">Payments</SelectItem>
+                    {AP_ROUTING_OPTIONS.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -840,3 +850,6 @@ export default function VendorList() {
     </div>
   );
 }
+
+
+

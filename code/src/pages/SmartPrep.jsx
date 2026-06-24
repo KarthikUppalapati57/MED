@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Check, ChefHat, Clock, Flame, Plus, Search, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import VoiceAssistant from '@/components/kitchen/VoiceAssistant';
 import { useAuth } from '@/lib/AuthContext';
@@ -202,6 +203,25 @@ export default function SmartPrep() {
 
   const startPlan = (plan) => updateMutation.mutate({ id: plan.id, data: { status: 'in_progress' } });
 
+  const generateMasterPrepMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('generate-prep-sheet', {
+        body: {
+          organization_id: organization?.id,
+          date: today,
+          created_by: user?.id
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['smart-prep-plans'] });
+      toast.success('Master Prep Sheet generated via Edge Function!');
+    },
+    onError: (error) => toast.error('Failed to generate master prep: ' + error.message),
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -217,6 +237,14 @@ export default function SmartPrep() {
             setForm(f => ({ ...f, name: text, prep_quantity: 10, unit: 'lbs', priority: 'high' }));
             setDialogOpen(true);
           }} />
+          <Button 
+            variant="outline" 
+            onClick={() => generateMasterPrepMutation.mutate()} 
+            disabled={generateMasterPrepMutation.isPending}
+          >
+            {generateMasterPrepMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ChefHat className="h-4 w-4 mr-2" />}
+            Generate Master Sheet
+          </Button>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Prep Plan
