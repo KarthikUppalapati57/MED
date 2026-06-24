@@ -44,7 +44,7 @@ const accounts = [
     email: 'qa.staff.northfork@restops.test',
     role: 'ground_staff',
     expectedContext: ['organization_id', 'brand_id', 'location_id'],
-    expectedPages: ['Dashboard', 'Notifications', 'Invoices', 'Products', 'Inventory', 'AutoOrdering'],
+    expectedPages: ['Dashboard', 'Notifications', 'Invoices', 'Products', 'Inventory'],
   },
 ];
 

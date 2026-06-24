@@ -39,7 +39,7 @@ const accounts = [
   {
     email: 'qa.brand.northfork@restops.test',
     role: 'branch_manager',
-    dashboardText: 'North Fork Grill Dashboard',
+    dashboardText: 'Brand Dashboard',
     routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'RestaurantSetup'],
     forbiddenRoutes: ['Accounting', 'OrgManagement', 'UserManagement', 'Integrations', 'AuditLogs', 'PlatformAdmin'],
   },
@@ -54,8 +54,8 @@ const accounts = [
     email: 'qa.staff.northfork@restops.test',
     role: 'ground_staff',
     dashboardText: 'My Dashboard',
-    routes: ['Dashboard', 'Notifications', 'Invoices', 'Products', 'Inventory', 'AutoOrdering'],
-    forbiddenRoutes: ['Performance', 'Payments', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup', 'UserManagement', 'PlatformAdmin'],
+    routes: ['Dashboard', 'Notifications', 'Invoices', 'Products', 'Inventory'],
+    forbiddenRoutes: ['Performance', 'Payments', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'RestaurantSetup', 'UserManagement', 'PlatformAdmin'],
   },
 ];
 
