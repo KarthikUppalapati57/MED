@@ -9,9 +9,9 @@ Invoice Parser — Docling + Vertex AI Gemini structured extraction.
 import json
 import os
 import re
-from pathlib import Path
-
-from docling.document_converter import DocumentConverter
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.document_converter import DocumentConverter, PdfFormatOption
 from google import genai
 
 
@@ -19,10 +19,26 @@ from google import genai
 
 def parse_with_docling(file_path: str) -> str:
     """Convert a document to Markdown using Docling's DocumentConverter."""
-    converter = DocumentConverter()
+    converter = _build_converter(file_path)
     result = converter.convert(file_path)
     markdown = result.document.export_to_markdown()
     return markdown
+
+
+def _build_converter(file_path: str) -> DocumentConverter:
+    """Build a fast converter for digital PDFs and keep defaults for image OCR inputs."""
+    if file_path.lower().endswith(".pdf"):
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.do_ocr = False
+        pipeline_options.force_backend_text = True
+
+        return DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+            }
+        )
+
+    return DocumentConverter()
 
 
 # ── Vertex AI Gemini Structured Extraction ───────────────────
@@ -64,27 +80,31 @@ def extract_invoice_fields(markdown_text: str) -> dict:
         print("[invoice_parser] No VERTEX_API_KEY found, falling back to regex parser")
         return extract_with_regex(markdown_text)
 
-    client = genai.Client(api_key=api_key)
+    try:
+        client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=f"{INVOICE_SCHEMA_PROMPT}\n\nExtract all invoice data from this document:\n\n{markdown_text}",
-    )
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"{INVOICE_SCHEMA_PROMPT}\n\nExtract all invoice data from this document:\n\n{markdown_text}",
+        )
 
-    content = response.text or ""
+        content = response.text or ""
 
-    # Strip markdown code fences if present
-    json_str = re.sub(r"```json\n?", "", content)
-    json_str = re.sub(r"```\n?", "", json_str).strip()
+        # Strip markdown code fences if present
+        json_str = re.sub(r"```json\n?", "", content)
+        json_str = re.sub(r"```\n?", "", json_str).strip()
 
-    return json.loads(json_str)
+        return json.loads(json_str)
+    except Exception as exc:
+        print(f"[invoice_parser] Gemini extraction failed, falling back to regex parser: {exc}")
+        return extract_with_regex(markdown_text)
 
 
 # ── Fallback Regex Parser ────────────────────────────────────
 
 def extract_with_regex(text: str) -> dict:
     """Basic regex-based extraction as fallback when OpenAI is unavailable."""
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    lines = [re.sub(r"^#+\s*", "", l).strip() for l in text.split("\n") if l.strip()]
 
     result = {
         "vendor_name": "",
@@ -102,10 +122,11 @@ def extract_with_regex(text: str) -> dict:
         "other_charges": 0,
         "total_amount": 0,
         "line_items": [],
+        "normalization_method": "regex_fallback",
     }
 
     label_keywords = re.compile(
-        r"^(invoice|bill|receipt|statement|account|date|page|no\b|number|#|\|)",
+        r"^(invoice|bill|receipt|statement|account|date|page|no\b|number|item\b|#|\|)",
         re.IGNORECASE,
     )
 
@@ -130,12 +151,21 @@ def extract_with_regex(text: str) -> dict:
         # Invoice date
         if not result["invoice_date"]:
             m = re.search(
-                r"(?:invoice\s*)?date\s*[:\-]?\s*(\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})",
+                r"(?:invoice\s*)?date\s*[:\-]?\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})",
                 line,
                 re.IGNORECASE,
             )
             if m:
                 result["invoice_date"] = _normalize_date(m.group(1))
+
+        if not result["due_date"]:
+            m = re.search(
+                r"due\s*date\s*[:\-]?\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{2,4})",
+                line,
+                re.IGNORECASE,
+            )
+            if m:
+                result["due_date"] = _normalize_date(m.group(1))
 
         # Total amount
         m = re.search(
@@ -165,12 +195,31 @@ def extract_with_regex(text: str) -> dict:
         if m and not result["tax_amount"]:
             result["tax_amount"] = float(m.group(1).replace(",", ""))
 
+
+    for match in re.finditer(
+        r"Item:\s*(?P<description>.*?)\s+Qty\s+(?P<quantity>\d+(?:\.\d+)?)\s+Unit\s+Price\s+(?P<unit_price>\d+(?:\.\d+)?)\s+Total\s+(?P<extended_price>\d+(?:\.\d+)?)",
+        text,
+        re.IGNORECASE,
+    ):
+        item = match.groupdict()
+        result["line_items"].append({
+            "vendor_item_code": None,
+            "description": item["description"].strip(),
+            "quantity": float(item["quantity"]),
+            "unit": "",
+            "unit_price": float(item["unit_price"]),
+            "extended_price": float(item["extended_price"]),
+        })
     return result
 
 
 def _normalize_date(date_str: str) -> str:
     """Normalize dates to YYYY-MM-DD format."""
     try:
+        if re.match(r"^\d{4}-\d{1,2}-\d{1,2}$", date_str):
+            y, m, d = [int(p) for p in date_str.split("-")]
+            return f"{y}-{m:02d}-{d:02d}"
+
         clean = re.sub(r"\s+", "/", date_str)
         clean = re.sub(r"[\/\-\.]", "/", clean)
         parts = clean.split("/")

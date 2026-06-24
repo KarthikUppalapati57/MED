@@ -161,6 +161,16 @@ function normalizeExtraction(data = {}) {
     paid_status_detection: paidDetection.detected ? paidDetection : null,
   };
 }
+function getDoclingBackendUrl() {
+  const configuredUrl = Deno.env.get('PYTHON_BACKEND_URL')?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  const isLocalSupabase = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost');
+  if (isLocalSupabase) return 'http://127.0.0.1:8000';
+
+  throw new Error('PYTHON_BACKEND_URL is required for deployed invoice extraction.');
+}
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
@@ -190,15 +200,15 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       log_data: { point: 'download_success', size: fileBlob.size }
     });
 
-    // 2. Route Extraction to Python Dockling Backend
-    console.log("Routing file to Python Dockling Backend for extraction...");
+    // 2. Route extraction to Python Docling backend
+    console.log("Routing file to Python Docling backend for extraction...");
     
-    const backendUrl = Deno.env.get('PYTHON_BACKEND_URL') || 'http://127.0.0.1:8000';
+    const backendUrl = getDoclingBackendUrl();
     const formData = new FormData();
     formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
 
     await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'invoking_dockling_backend', url: `${backendUrl}/extract-invoice` }
+      log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
     });
 
     const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
@@ -214,7 +224,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     const extractedData = await extractionResponse.json();
 
     await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'dockling_response_success' }
+      log_data: { point: 'docling_response_success' }
     });
 
     // 3. Update invoice with extracted data securely inside the tenant schema

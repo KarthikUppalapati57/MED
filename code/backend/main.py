@@ -21,6 +21,16 @@ load_dotenv()
 posthog.project_api_key = os.environ.get("POSTHOG_API_KEY", "")
 posthog.host = os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
 
+def capture_event(event: str, properties: dict):
+    """Send best-effort telemetry without breaking invoice extraction."""
+    if not posthog.project_api_key:
+        return
+
+    try:
+        posthog.capture(event, distinct_id="backend", properties=properties)
+    except Exception:
+        traceback.print_exc()
+
 app = FastAPI(
     title="MEVS Invoice Extraction API",
     description="Docling + Vertex AI Gemini invoice document extraction",
@@ -91,16 +101,16 @@ async def extract_invoice(file: UploadFile = File(...)):
         invoice_data = extract_invoice_fields(markdown_text)
 
         # Add metadata
-        invoice_data["extraction_method"] = "docling+gemini"
+        normalization_method = invoice_data.pop("normalization_method", "gemini")
+        invoice_data["extraction_method"] = "docling+regex" if normalization_method == "regex_fallback" else "docling+gemini"
         invoice_data["raw_text"] = markdown_text
 
-        posthog.capture(
-            "backend",
+        capture_event(
             "invoice_extracted",
             {
                 "file_type": file.content_type,
                 "filename": file.filename,
-                "extraction_method": "docling+gemini",
+                "extraction_method": invoice_data["extraction_method"],
             },
         )
 
@@ -110,8 +120,7 @@ async def extract_invoice(file: UploadFile = File(...)):
         raise
     except Exception as e:
         traceback.print_exc()
-        posthog.capture(
-            "backend",
+        capture_event(
             "invoice_extraction_failed",
             {
                 "file_type": file.content_type,
