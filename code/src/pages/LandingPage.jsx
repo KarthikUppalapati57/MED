@@ -187,7 +187,7 @@ export default function LandingPage() {
             </h1>
             
             <p className="max-w-xl text-xl text-black/60 dark:text-white/60 mb-16 leading-relaxed font-medium technical-tracking">
-              EdgeOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
+              RestOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -234,7 +234,7 @@ export default function LandingPage() {
                 className="flex-1 space-y-12"
               >
                 <div className="text-[11px] text-[#ff5c35] font-bold tracking-[4px] uppercase">
-                  Edge Logics
+                  RestOps Logics
                 </div>
                 <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-black dark:text-white">
                   Decentralized <br /> Kitchen Ops.
@@ -323,7 +323,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Button className="w-full h-16 bg-black text-white hover:bg-[#ff5c35] font-bold text-[10px] tracking-[5px] rounded-sm uppercase transition-all shadow-2xl" onClick={() => setIsDemoModalOpen(true)}>
-                  JOIN WAITLIST
+                  JOIN NOW
                 </Button>
               </div>
             </motion.div>
@@ -359,7 +359,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
-            <p className="text-[9px] text-black/30 font-bold tracking-[5px] uppercase">© 2026 EDGEOPS INC. BUILT FOR SCALE.</p>
+            <p className="text-[9px] text-black/30 font-bold tracking-[5px] uppercase">© 2026 RestOps INC. BUILT FOR SCALE.</p>
             <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/30 dark:text-white/40">
                 <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Privacy</a>
                 <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Terms</a>
