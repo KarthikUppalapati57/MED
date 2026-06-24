@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { useTheme } from '@/components/ThemeProvider';
 
 // Highly interactive particle wave terrain
-function ParticleWave() {
+function ParticleWave({ isDark }) {
   const count = 2500; // 50x50 grid
   const mesh = useRef();
   
@@ -91,14 +91,19 @@ function ParticleWave() {
     <instancedMesh ref={mesh} args={[null, null, count]}>
       {/* Octahedrons look incredible when wireframed */}
       <octahedronGeometry args={[0.3, 0]} />
+      {(() => {
+        const accentColor = isDark ? '#14c6cb' : '#22c55e';
+        return (
       <meshStandardMaterial 
-        color="#14c6cb" 
-        emissive="#14c6cb"
+        color={accentColor}
+        emissive={accentColor}
         emissiveIntensity={0.8}
         wireframe={true}
         transparent 
         opacity={0.6} 
       />
+        );
+      })()}
     </instancedMesh>
   );
 }
@@ -190,12 +195,12 @@ const InteractiveScene = () => {
 
         {/* The massive interactive terrain */}
         <Float speed={1.5} floatIntensity={0.5} rotationIntensity={0.1}>
-          <ParticleWave />
+          <ParticleWave isDark={isDark} />
         </Float>
         
         {/* Background elements (Orange & Teal sparkles) - Use wrapper to fix blending */}
         <ThemedSparkles isDark={isDark} count={400} scale={30} size={isDark ? 3 : 4} speed={0.8} color="#ff5c35" opacity={isDark ? 0.6 : 0.8} />
-        <ThemedSparkles isDark={isDark} count={200} scale={30} size={isDark ? 2 : 3} speed={0.5} color="#14c6cb" opacity={isDark ? 0.4 : 0.6} />
+        <ThemedSparkles isDark={isDark} count={200} scale={30} size={isDark ? 2 : 3} speed={0.5} color={isDark ? '#14c6cb' : '#22c55e'} opacity={isDark ? 0.4 : 0.6} />
         
         {/* Deep starfield (Restored professional version with forced colors) */}
         <ThemedStars isDark={isDark} />
