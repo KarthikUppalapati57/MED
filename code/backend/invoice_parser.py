@@ -9,6 +9,7 @@ Invoice Parser — Docling + Vertex AI Gemini structured extraction.
 import json
 import os
 import re
+import pypdfium2 as pdfium
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -18,11 +19,32 @@ from google import genai
 # ── Docling Conversion ───────────────────────────────────────
 
 def parse_with_docling(file_path: str) -> str:
-    """Convert a document to Markdown using Docling's DocumentConverter."""
+    """Convert a document to Markdown using the fastest reliable path available."""
+    if file_path.lower().endswith(".pdf"):
+        fast_text = _extract_pdf_text_fast(file_path)
+        if len(fast_text) >= 100:
+            return fast_text
+
     converter = _build_converter(file_path)
     result = converter.convert(file_path)
     markdown = result.document.export_to_markdown()
     return markdown
+
+
+def _extract_pdf_text_fast(file_path: str) -> str:
+    """Extract embedded PDF text without loading Docling ML models."""
+    try:
+        doc = pdfium.PdfDocument(file_path)
+        pages = []
+        for index, page in enumerate(doc):
+            text_page = page.get_textpage()
+            page_text = text_page.get_text_range().strip()
+            if page_text:
+                pages.append(f"## Page {index + 1}\n\n{page_text}")
+        return "\n\n".join(pages).strip()
+    except Exception as exc:
+        print(f"[invoice_parser] Fast PDF text extraction failed, falling back to Docling: {exc}")
+        return ""
 
 
 def _build_converter(file_path: str) -> DocumentConverter:

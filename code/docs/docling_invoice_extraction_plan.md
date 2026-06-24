@@ -87,6 +87,10 @@ Validated on 2026-06-24 with Docker Desktop.
 
 Production implication: deploy with a warm-instance strategy and then optimize dependencies before scaling broadly.
 
+## Fast PDF Text Path
+
+Digital PDFs now use pypdfium2 embedded-text extraction before Docling. This avoids Hugging Face runtime model downloads for normal vendor invoices and prevents jobs from hanging behind HF rate limits. Scanned PDFs and image invoices still fall back to Docling/OCR and need either an HF_TOKEN or a pre-baked model cache before high-volume use.
+
 ## Known Production Risks
 
 1. `GOOGLE_API_KEY` / `VERTEX_API_KEY` must be allowed to call Gemini. The current local key returned `API_KEY_SERVICE_BLOCKED` for `generativelanguage.googleapis.com`.
