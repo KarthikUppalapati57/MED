@@ -517,6 +517,29 @@ export default function Recipes() {
       return;
     }
 
+    // Check for circular dependencies
+    if (editingRecipe) {
+      const checkForCycle = (targetRecipeId, ingredientsToCheck, visited = new Set()) => {
+        for (const item of ingredientsToCheck) {
+          if (!item.sub_recipe_id) continue;
+          if (item.sub_recipe_id === targetRecipeId) return true;
+          if (visited.has(item.sub_recipe_id)) continue;
+          
+          visited.add(item.sub_recipe_id);
+          const subRecipe = recipesMap.get(item.sub_recipe_id);
+          if (subRecipe && subRecipe.ingredients) {
+            if (checkForCycle(targetRecipeId, subRecipe.ingredients, visited)) return true;
+          }
+        }
+        return false;
+      };
+
+      if (checkForCycle(editingRecipe.id, formData.ingredients)) {
+        toast.error('Circular dependency detected! A recipe cannot contain itself as an ingredient.');
+        return;
+      }
+    }
+
     const data = {
       ...formData,
       organization_id: organization?.id,

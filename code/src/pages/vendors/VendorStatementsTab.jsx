@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
 
 export default function VendorStatementsTab({ vendors }) {
   const { organization } = useAuth();
@@ -60,6 +61,25 @@ export default function VendorStatementsTab({ vendors }) {
       toast.success(`Auto-matched ${matchedCount} lines`);
     },
     onError: (e) => toast.error(`Matching failed: ${e.message}`)
+  });
+
+  const updateRoutingMutation = useMutation({
+    mutationFn: async ({ vendorId, preference }) => {
+      const { data, error } = await supabase.rpc('update_vendor_ap_routing', {
+        p_vendor_id: vendorId,
+        p_ap_routing_preference: preference,
+        p_organization_id: organization?.id,
+        p_source: 'statement_reconciliation',
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-statements'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Vendor invoice routing updated');
+    },
+    onError: (e) => toast.error(`Routing update failed: ${e.message}`),
   });
 
   const mockUploadMutation = useMutation({
@@ -161,6 +181,8 @@ export default function VendorStatementsTab({ vendors }) {
           const lines = statement.lines || [];
           const matchedLines = lines.filter(l => l.status === 'matched');
           const unmatchedLines = lines.filter(l => l.status === 'unmatched');
+          const vendor = vendors.find(v => v.id === statement.vendor_id) || statement.vendor || {};
+          const currentRouting = normalizeApRouting(vendor.ap_routing_preference);
           
           return (
             <Card key={statement.id} className="overflow-hidden border-0 shadow-sm">
@@ -170,7 +192,7 @@ export default function VendorStatementsTab({ vendors }) {
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg">{statement.vendor?.name} Statement</h3>
+                    <h3 className="font-semibold text-lg">{vendor.name || statement.vendor?.name} Statement</h3>
                     <p className="text-sm text-muted-foreground">
                       Statement Date: {new Date(statement.statement_date).toLocaleDateString()}
                     </p>
@@ -188,6 +210,23 @@ export default function VendorStatementsTab({ vendors }) {
                   }>
                     {statement.status.replace('_', ' ')}
                   </Badge>
+                  <div className="space-y-1 min-w-[240px]">
+                    <p className="text-xs font-medium text-muted-foreground">Vendor Invoice Routing</p>
+                    <Select
+                      value={currentRouting}
+                      onValueChange={(preference) => updateRoutingMutation.mutate({ vendorId: statement.vendor_id, preference })}
+                      disabled={updateRoutingMutation.isPending}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AP_ROUTING_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   
                   {statement.status === 'needs_review' && (
                     <>
@@ -351,3 +390,5 @@ export default function VendorStatementsTab({ vendors }) {
     </div>
   );
 }
+
+

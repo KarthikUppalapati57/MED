@@ -128,6 +128,41 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       await new Promise(r => setTimeout(r, 800));
 
+      const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isLocalDev) {
+        setProgress('Extracting data via local Docling engine...');
+        try {
+          const formData = new FormData();
+          formData.append('file', fileToProcess, fileToProcess.name);
+          
+          const response = await fetch('http://127.0.0.1:8000/extract-invoice', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) throw new Error('Local extraction failed');
+          
+          const extractedData = await response.json();
+          
+          // Pass the extracted data down (we merge the file URL to keep it)
+          onInvoiceExtracted({
+            status: 'pending_review',
+            ap_status: 'processing',
+            file_url: filePath,
+            source,
+            ...extractedData
+          });
+          
+          onOpenChange(false);
+          toast.success('Invoice extracted successfully via local server!');
+          return; // Skip the cloud trigger
+        } catch (localErr) {
+          console.warn('Local extraction failed, falling back to cloud trigger:', localErr);
+          toast.warning('Local extraction failed. Attempting cloud fallback...');
+        }
+      }
+
       const invoiceData = {
         status: 'extracting',
         ap_status: 'processing', // DB Constraint requires ap_status

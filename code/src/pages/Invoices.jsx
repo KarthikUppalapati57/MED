@@ -6,6 +6,7 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
 import { supabase } from '@/lib/supabaseClient';
+import { getApRoutingLabel, isPaymentQueueRouted, normalizeApRouting } from '@/lib/apRouting';
 import { notifyManagers } from '@/lib/notificationService';
 import { sendInvoiceUploadNotification, sendInvoiceStatusEmail } from '@/lib/emailService';
 import posthog from '@/lib/posthog';
@@ -250,7 +251,7 @@ export default function Invoices() {
     queryKey: ['invoices-dashboard', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', { 
       limit: 500,
-      select: 'id, invoice_number, vendor_name, total_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, brand_id, location_id, file_url, source, payment_account_id, scheduled_payment_date'
+      select: 'id, invoice_number, vendor_name, total_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, brand_id, location_id, file_url, source, payment_account_id, scheduled_payment_date, ap_routing_destination'
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
@@ -512,6 +513,12 @@ export default function Invoices() {
 
   const batchScheduleMutation = useMutation({
     mutationFn: async ({ ids, accountId, date }) => {
+      const selectedInvoices = invoices.filter(invoice => ids.includes(invoice.id));
+      const blockedInvoices = selectedInvoices.filter(invoice => !isPaymentQueueRouted(invoice));
+      if (blockedInvoices.length > 0) {
+        throw new Error(`${blockedInvoices.length} selected invoice(s) are not routed to Payments.`);
+      }
+
       return Promise.all(ids.map(async (invoiceId) => {
         const { error } = await api.client.rpc('schedule_invoice_payment', {
           p_invoice_id: invoiceId,
@@ -565,16 +572,38 @@ export default function Invoices() {
 
   const isPaidInvoice = (invoice) => ['paid', 'auto_pay'].includes(invoice?.payment_status) || invoice?.status === 'paid';
 
+  const resolveInvoiceApRouting = async (invoice) => {
+    if (invoice?.ap_routing_destination) return normalizeApRouting(invoice.ap_routing_destination);
+    if (!invoice?.vendor_id) return 'payments';
+
+    try {
+      const vendor = await api.entities.Vendor.get(invoice.vendor_id);
+      return normalizeApRouting(vendor?.ap_routing_preference);
+    } catch (error) {
+      console.warn('Failed to resolve vendor AP routing, defaulting to Payments:', error);
+      return 'payments';
+    }
+  };
+
   const finalizeApprovedInvoiceWorkflow = async (invoice) => {
     await api.client.rpc('sync_invoice_products', { p_invoice_id: invoice.id });
     const { ensureLedgerBill, recordPaymentLedger } = await import('@/lib/workflowService');
+    const apRoutingDestination = await resolveInvoiceApRouting(invoice);
+    const routingUpdate = {
+      organization_id: invoice.organization_id || organization?.id,
+      ap_routing_destination: apRoutingDestination,
+      ap_routing_resolved_at: new Date().toISOString(),
+      file_destination: apRoutingDestination === 'payments' ? 'payments' : 'storage',
+    };
 
     if (!isPaidInvoice(invoice)) {
-      await ensureLedgerBill(invoice, { status: 'pending' });
-      return { redirectedToPayments: false };
+      const routedInvoice = await api.entities.Invoice.update(invoice.id, routingUpdate);
+      await ensureLedgerBill({ ...invoice, ...routedInvoice }, { status: 'pending' });
+      return { redirectedToPayments: false, apRoutingDestination };
     }
 
     const paidInvoice = await api.entities.Invoice.update(invoice.id, {
+      ...routingUpdate,
       status: 'paid',
       payment_status: 'paid',
     });
@@ -596,7 +625,7 @@ export default function Invoices() {
         payment_method: 'manual',
         payment_date: invoice.payment_date || invoice.invoice_date || new Date().toISOString().slice(0, 10),
         transaction_id: `paid-invoice-${invoice.id}`,
-        notes: 'Recorded from an uploaded invoice that was already paid before approval.',
+        notes: `Recorded from an uploaded invoice that was already paid before approval. Vendor routing: ${getApRoutingLabel(apRoutingDestination)}.`,
       });
     }
 
@@ -611,8 +640,8 @@ export default function Invoices() {
     });
 
     queryClient.invalidateQueries({ queryKey: ['payments', organization?.id] });
-    navigate(`/Payments?tab=history&invoice=${invoice.id}`);
-    return { redirectedToPayments: true };
+    navigate(`/Payments/history?invoice=${invoice.id}`);
+    return { redirectedToPayments: true, apRoutingDestination };
   };
 
   const handleInvoiceExtracted = async (data) => {
@@ -683,7 +712,7 @@ export default function Invoices() {
         posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
         toast.success(
           approvalResult.redirectedToPayments
-            ? 'Paid invoice approved and sent to Bill Pay'
+            ? 'Paid invoice approved and recorded in Payment History'
             : 'Invoice approved & products/inventory updated'
         );
       } else if (finalStatus === 'pending_approval') {
@@ -733,7 +762,7 @@ export default function Invoices() {
       posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
       toast.success(
         approvalResult.redirectedToPayments
-          ? 'Paid invoice approved and sent to Bill Pay'
+          ? 'Paid invoice approved and recorded in Payment History'
           : 'Invoice approved & products/inventory updated'
       );
     } catch (err) {
@@ -827,7 +856,7 @@ export default function Invoices() {
       posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
       toast.success(
         approvalResult.redirectedToPayments
-          ? 'Paid invoice approved and sent to Bill Pay'
+          ? 'Paid invoice approved and recorded in Payment History'
           : 'Invoice approved - items staged for 24h review before finalizing in inventory'
       );
 
@@ -1415,8 +1444,8 @@ export default function Invoices() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={invoice.file_destination === 'payments' ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
-                            {invoice.file_destination === 'payments' ? 'Payments' : 'Storage'}
+                          <Badge variant="outline" className={invoice.ap_routing_destination === 'payments' || (!invoice.ap_routing_destination && invoice.file_destination === 'payments') ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
+                            {invoice.ap_routing_destination ? getApRoutingLabel(invoice.ap_routing_destination) : (invoice.file_destination === 'payments' ? 'Payments' : 'Storage')}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1665,5 +1694,3 @@ export default function Invoices() {
     </div>
   );
 }
-
-

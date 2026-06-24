@@ -14,13 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
 import { Calendar as CalendarIcon, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export function BillPayWidget({ invoice }) {
-  const { organization } = useAuth();
+  const { organization, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const [isScheduling, setIsScheduling] = useState(false);
@@ -83,6 +90,40 @@ export function BillPayWidget({ invoice }) {
     onError: (err) => toast.error(err.message)
   });
 
+  const releasePayoutMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('process-payout', {
+        body: { invoice_id: invoice.id }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Funds released via Dwolla successfully");
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+    onError: (err) => toast.error(err.message || "Failed to release funds via Dwolla")
+  });
+
+  const releaseCheckbookMutation = useMutation({
+    mutationFn: async (method) => {
+      const { data, error } = await supabase.functions.invoke('process-checkbook-payout', {
+        body: { invoice_id: invoice.id, payout_method: method }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Check issued via Checkbook.io successfully");
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+    onError: (err) => toast.error(err.message || "Failed to issue check via Checkbook.io")
+  });
+
   const handleSchedule = () => {
     if (!scheduleData.payment_account_id) return toast.error("Select a payment account");
     if (!scheduleData.date) return toast.error("Select a payment date");
@@ -103,6 +144,22 @@ export function BillPayWidget({ invoice }) {
     return null;
   }
 
+  const isPaid = ['paid', 'auto_pay'].includes(invoice.payment_status) || invoice.status === 'paid';
+  if (!isPaid && !isPaymentQueueRouted(invoice)) {
+    return (
+      <Card className="border-border shadow-sm bg-muted/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg">Bill Pay & Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            This vendor is routed to {getApRoutingLabel(invoice.ap_routing_destination)}, so this invoice is excluded from Bill Pay.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const remainingBalance = invoice.total_amount - (invoice.paid_amount || 0);
   const isFullyPaid = remainingBalance <= 0 || invoice.status === 'paid';
   const selectedAccountName = accounts.find(a => a.id === invoice.payment_account_id)?.name || 'Unknown Account';
@@ -121,6 +178,31 @@ export function BillPayWidget({ invoice }) {
                 <CalendarIcon className="w-4 h-4 mr-2" />
                 Schedule
               </Button>
+            )}
+            {!isFullyPaid && invoice.status === 'scheduled' && 
+             ['location_manager', 'branch_manager', 'org_owner', 'owner', 'admin', 'platform_admin'].includes(profile?.role) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    className="bg-blue-600 hover:bg-blue-700" 
+                    disabled={releasePayoutMutation.isPending || releaseCheckbookMutation.isPending}
+                  >
+                    {(releasePayoutMutation.isPending || releaseCheckbookMutation.isPending) ? 'Releasing...' : 'Release Funds'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => releasePayoutMutation.mutate()}>
+                    Send ACH (Dwolla)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => releaseCheckbookMutation.mutate('checkbook_digital')}>
+                    Send Digital Check (Checkbook.io)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => releaseCheckbookMutation.mutate('checkbook_physical')}>
+                    Mail Physical Check (Checkbook.io)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {!isFullyPaid && (
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => {
@@ -281,3 +363,4 @@ export function BillPayWidget({ invoice }) {
     </Card>
   );
 }
+

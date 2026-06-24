@@ -6,7 +6,6 @@ export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 
 async function resolveInvoiceWriteSchema(record, requestedSchema, supabaseClient) {
   const fallbackSchema = requestedSchema || 'public';
@@ -130,6 +129,19 @@ function normalizeExtraction(data = {}) {
   const deliveryFee = firstNumber(data.delivery_fee, data.freight, data.freight_amount, data.delivery_charge);
   const otherCharges = firstNumber(data.other_charges, data.misc_charges, data.other_amount);
   const totalAmount = firstNumber(data.total_amount, data.invoice_total, data.grand_total, data.amount_due);
+  const paidDetectionInput = data.paid_status_detection || {};
+  const explicitPaymentStatus = cleanString(data.payment_status)?.toLowerCase();
+  const confidence = firstNumber(paidDetectionInput.confidence, paidDetectionInput.ai_confidence);
+  const paidDetection = {
+    detected: Boolean(paidDetectionInput.detected || explicitPaymentStatus === 'paid'),
+    confidence: confidence ?? null,
+    evidence: firstValue(paidDetectionInput.evidence, paidDetectionInput.reason, data.payment_status_evidence),
+    should_mark_paid: Boolean(
+      paidDetectionInput.should_mark_paid ||
+      explicitPaymentStatus === 'paid' ||
+      (paidDetectionInput.detected && confidence !== null && confidence >= 0.85)
+    ),
+  };
 
   return {
     vendor_name: firstValue(data.vendor_name, data.supplier_name, data.remit_to_name),
@@ -145,7 +157,19 @@ function normalizeExtraction(data = {}) {
     other_charges: otherCharges,
     total_amount: totalAmount,
     line_items: lineItems,
+    payment_status: paidDetection.should_mark_paid ? 'paid' : 'unpaid',
+    paid_status_detection: paidDetection.detected ? paidDetection : null,
   };
+}
+function getDoclingBackendUrl() {
+  const configuredUrl = Deno.env.get('PYTHON_BACKEND_URL')?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  const isLocalSupabase = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost');
+  if (isLocalSupabase) return 'http://127.0.0.1:8000';
+
+  throw new Error('PYTHON_BACKEND_URL is required for deployed invoice extraction.');
 }
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
@@ -175,96 +199,33 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     await supabaseClient.from('debug_logs').insert({
       log_data: { point: 'download_success', size: fileBlob.size }
     });
+
+    // 2. Route extraction to Python Docling backend
+    console.log("Routing file to Python Docling backend for extraction...");
     
-    const fileBuffer = await fileBlob.arrayBuffer();
-    const finalBase64Data = Buffer.from(fileBuffer).toString('base64');
+    const backendUrl = getDoclingBackendUrl();
+    const formData = new FormData();
+    formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
 
     await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'base64_encoded', length: finalBase64Data.length }
+      log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
     });
 
-    // 2. Vertex / Gemini Extraction Logic
-    console.log("Invoking Gemini Vision API...");
-    
-    // Get the API key from environment variables
-    const apiKey = Deno.env.get('VITE_GEMINI_API_KEY') || Deno.env.get('vertex_api_key');
-    if (!apiKey) throw new Error("Gemini API key is not configured in Edge Function environment.");
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const prompt = `
-      You are an expert AP invoice data extractor for restaurant supplier invoices.
-      Extract every visible header field and every invoice line from the PDF. Preserve the values exactly as printed when possible.
-
-      Return STRICT JSON only. No markdown fences. Use this exact shape:
-      {
-        "vendor_name": "string or null",
-        "invoice_number": "string or null",
-        "account_number": "string or null",
-        "customer_number": "string or null",
-        "invoice_date": "YYYY-MM-DD or MM/DD/YYYY or null",
-        "due_date": "YYYY-MM-DD or MM/DD/YYYY or null",
-        "payment_terms": "string or null",
-        "subtotal": 0.0,
-        "tax_amount": 0.0,
-        "fuel_surcharge": 0.0,
-        "delivery_fee": 0.0,
-        "other_charges": 0.0,
-        "total_amount": 0.0,
-        "line_items": [
-          {
-            "vendor_item_code": "product/item number as printed",
-            "description": "full item description",
-            "quantity": 0,
-            "unit": "CS/EA/LB/etc from pricing unit or UOM",
-            "unit_price": 0.0,
-            "extended_price": 0.0,
-            "pack_size": "pack size if visible",
-            "label": "brand/label if visible",
-            "ai_confidence": 0.0
-          }
-        ]
-      }
-
-      For US Foods invoices, line item columns often include ORDER, SHP, ADJ, SALES UNIT, PRODUCT NUMBER,
-      DESCRIPTION, LABEL, PACK SIZE, CODE, WEIGHT, PRICING UNIT, UNIT PRICE, and EXTENDED PRICE.
-      Use the shipped quantity (SHP) for quantity when present. Use PRODUCT NUMBER for vendor_item_code.
-      Use PRICING UNIT or SALES UNIT for unit. Use UNIT PRICE for unit_price and EXTENDED PRICE for extended_price.
-      Do not leave quantity/unit/unit_price blank if those columns are visible. If a value is unreadable, use null.
-      Include all line rows across all pages, excluding subtotal/summary/footer rows.
-    `;
-
-    await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'invoking_gemini' }
+    const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
+      method: 'POST',
+      body: formData,
     });
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: finalBase64Data,
-          mimeType: "application/pdf"
-        }
-      },
-      prompt
-    ]);
-
-    const responseText = result.response.text();
-    console.log("Raw Gemini Response:", responseText);
-
-    await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'gemini_response', responseText }
-    });
-
-    let extractedData;
-    try {
-      // Clean potential markdown from response
-      const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      extractedData = JSON.parse(cleanJsonStr);
-    } catch (parseError) {
-      console.error("Failed to parse Gemini JSON output:", parseError);
-      throw new Error("AI returned invalid JSON format.");
+    if (!extractionResponse.ok) {
+      const errText = await extractionResponse.text();
+      throw new Error(`Python backend failed: ${extractionResponse.status} ${errText}`);
     }
+
+    const extractedData = await extractionResponse.json();
+
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'docling_response_success' }
+    });
 
     // 3. Update invoice with extracted data securely inside the tenant schema
     console.log(`Updating invoice ${record.id} to pending_review in schema ${schemaName}...`);
@@ -284,10 +245,14 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       delivery_fee: normalized.delivery_fee,
       other_charges: normalized.other_charges,
       line_items: normalized.line_items,
+      payment_status: normalized.payment_status,
       status: 'pending_review',
-      ap_status: 'action_required',
-      raw_text: responseText,
-      extraction_method: 'gemini_vision_api',
+      ap_status: 'processing',
+      raw_text: extractedData.raw_text || '',
+      validation_results: normalized.paid_status_detection
+        ? { ...(record.validation_results || {}), paid_status_detection: normalized.paid_status_detection }
+        : record.validation_results,
+      extraction_method: 'docling+gemini',
     };
 
     let updateError = null;
@@ -400,6 +365,42 @@ serve(async (req) => {
           if (record.total_amount > 1000) {
             console.log(`Sending alert: Large invoice of $${record.total_amount} processed`);
           }
+          
+          if (record.status === 'approved') {
+            const vendorMatch = record.vendor_id ? `id=eq.${record.vendor_id}` : `name=eq.${record.vendor_name}`;
+            const { data: vendors } = await supabaseClient
+               .from('vendors')
+               .select('id, autopay_enabled, default_payment_method')
+               .eq('organization_id', record.organization_id)
+               .or(vendorMatch)
+               .limit(1);
+               
+            const vendor = vendors?.[0];
+            
+            if (vendor?.autopay_enabled) {
+               console.log(`AutoPay enabled for vendor ${vendor.id}, scheduling payment...`);
+               const { error: paymentError } = await supabaseClient
+                  .from('payments')
+                  .insert({
+                     organization_id: record.organization_id,
+                     location_id: record.location_id,
+                     vendor_id: vendor.id,
+                     invoice_id: record.id,
+                     amount: record.total_amount,
+                     status: 'scheduled',
+                     payment_method: vendor.default_payment_method || 'ach',
+                     payment_date: record.due_date || new Date().toISOString().split('T')[0]
+                  });
+               
+               if (!paymentError) {
+                  await supabaseClient.from('invoices')
+                     .update({ payment_status: 'scheduled' })
+                     .eq('id', record.id);
+               } else {
+                  console.error('Failed to create AutoPay payment:', paymentError);
+               }
+            }
+          }
         } else if (record.status === 'rejected') {
           console.log(`Notifying uploader about rejection of Invoice ${record.id}`);
         }
@@ -418,5 +419,3 @@ serve(async (req) => {
     })
   }
 })
-
-

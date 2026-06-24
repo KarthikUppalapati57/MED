@@ -67,21 +67,14 @@ export default function InventoryTransfers({ inventory, updateInventoryMutation,
         quantity: item.transfer_quantity
       }));
 
-      const transfer = await createTransferWorkflow({
-        organizationId: organization?.id,
-        fromLocationId: location?.id || null,
-        toLocationId: destination,
-        items: itemsToTransfer,
-        userId: userProfile?.id || null,
-      });
+      const result = await api.metrics.executeInternalTransfer(
+        organization?.id,
+        location?.id || null,
+        destination,
+        itemsToTransfer,
+        userProfile?.id || null
+      );
 
-      await completeTransferWorkflow({
-        transfer,
-        inventoryRecords: inventory,
-        userId: userProfile?.id || null,
-      });
-
-      // Refetch inventory automatically handled by parent query invalidation if needed, or we just rely on parent
       // Note: we can also manually invalidate the query here if we imported queryClient
       toast.success(`Transfer Complete! Sent ${selectedItems.length} items to ${locations.find(l=>l.id === destination)?.name || 'Destination'}`);
       setSelectedItems([]);
