@@ -1,41 +1,189 @@
 /**
  * moduleConfig.js Central module registry for RBAC & multi-tenant access control
- * 
+ *
  * Each module defines:
  *   - label: Display name for sidebar & UI
- *   - pages: Array of page keys (from pages.config.js) that belong to this module
+ *   - pages: Array of page keys from router.jsx that belong to this module
  *   - minRole: Minimum role required to access this module
  *   - icon: Lucide icon name for UI rendering
- * 
- * The enabled_modules field on the organizations table (jsonb array)
- * stores which module keys an org has access to based on their subscription plan.
+ *
+ * The enabled_modules field on organizations stores which module keys an org has
+ * access to based on its subscription plan.
  */
 
 export const MODULE_DEFINITIONS = {
-  dashboard:  { label: "Dashboard",       pages: ["Dashboard", "MobileApp", "Notifications"],     minRole: "ground_staff",     icon: "LayoutDashboard" },
-  invoices:   { label: "Invoices",        pages: ["Invoices"],                                   minRole: "ground_staff",     icon: "FileText" },
-  payments:   { label: "Bill Pay",        pages: ["Payments"],                                   minRole: "location_manager", icon: "CreditCard" },
-  products:   { label: "Products",        pages: ["Products"],                                   minRole: "ground_staff",     icon: "Package" },
-  inventory:  { label: "Inventory",       pages: ["Inventory", "Commissary"],                    minRole: "ground_staff",     icon: "Warehouse" },
-  orders:     { label: "Orders",          pages: ["AutoOrdering"],                               minRole: "location_manager", icon: "ShoppingCart" },
-  smartprep:  { label: "SmartPrep",       pages: ["SmartPrep"],                                  minRole: "location_manager", icon: "ChefHat" },
-  ai_insights:{ label: "AI Insights",     pages: ["AiInsights"],                                minRole: "manager",          icon: "Sparkles" },
-  recipes:    { label: "Recipes",         pages: ["Recipes", "MenuEngineering", "AvTCosting"], minRole: "location_manager", icon: "ChefHat" },
-  vendors:    { label: "Vendors",         pages: ["Vendors"],             minRole: "location_manager", icon: "Store" },
-  labor:      { label: "Labor",           pages: ["Labor"],                                      minRole: "location_manager", icon: "Users" },
-  admin:      { label: "Organization Admin", pages: ["UserManagement", "OrgManagement", "AuditLogs"], minRole: "org_owner", icon: "Users" },
-  integrations: { label: "Integrations",  pages: ["Integrations", "DeveloperPortal"], minRole: "org_owner", icon: "Settings" },
-  performance:{ label: "Performance",     pages: ["Performance"], minRole: "location_manager", icon: "Activity" },
-  platform:   { label: "Platform Console", pages: ["PlatformAdmin", "PlatformOrganizations", "PlatformUserManagement", "PlatformUsers", "PlatformPlans", "PlatformInvoices", "PlatformAuditLogs"], minRole: "platform_admin", icon: "Shield" },
-  accounting: { label: "Accounting",      pages: ["Accounting"], minRole: "org_owner", icon: "DollarSign" },
-  setup:      { label: "Setup",            pages: ["RestaurantSetup"], minRole: "location_manager", icon: "Settings" },
+  dashboard: {
+    label: "Dashboard",
+    pages: ["Dashboard", "MobileApp", "Notifications", "Profile"],
+    minRole: "ground_staff",
+    icon: "LayoutDashboard",
+  },
+  performance: {
+    label: "Performance",
+    pages: ["Performance"],
+    minRole: "location_manager",
+    icon: "Activity",
+  },
+  executive_bi: {
+    label: "Executive BI",
+    pages: ["ExecutiveBI"],
+    minRole: "org_owner",
+    icon: "Activity",
+  },
+  custom_reports: {
+    label: "Custom Reports",
+    pages: ["CustomReports"],
+    minRole: "manager",
+    icon: "FileBarChart",
+  },
+  invoices: {
+    label: "Invoices",
+    pages: ["Invoices"],
+    minRole: "ground_staff",
+    icon: "FileText",
+  },
+  payments: {
+    label: "Bill Pay",
+    pages: ["Payments"],
+    minRole: "location_manager",
+    icon: "CreditCard",
+  },
+  billing: {
+    label: "Platform Subscription",
+    pages: ["Billing"],
+    minRole: "org_owner",
+    icon: "CreditCard",
+  },
+  products: {
+    label: "Products",
+    pages: ["Products"],
+    minRole: "ground_staff",
+    icon: "Package",
+  },
+  inventory: {
+    label: "Inventory",
+    pages: ["Inventory", "AvTCosting"],
+    minRole: "ground_staff",
+    icon: "Warehouse",
+  },
+  orders: {
+    label: "Orders",
+    pages: ["AutoOrdering"],
+    minRole: "location_manager",
+    icon: "ShoppingCart",
+  },
+  smartprep: {
+    label: "SmartPrep",
+    pages: ["SmartPrep"],
+    minRole: "location_manager",
+    icon: "ChefHat",
+  },
+  commissary: {
+    label: "Commissary",
+    pages: ["Commissary"],
+    minRole: "location_manager",
+    icon: "Building2",
+  },
+  recipes: {
+    label: "Recipes",
+    pages: ["Recipes", "MenuEngineering", "DeliveryAggregator", "OrderOnline"],
+    minRole: "location_manager",
+    icon: "ChefHat",
+  },
+  vendors: {
+    label: "Vendors",
+    pages: ["Vendors", "VendorBidding"],
+    minRole: "location_manager",
+    icon: "Store",
+  },
+  labor: {
+    label: "Labor",
+    pages: ["Labor", "LaborSchedules", "TimeClock", "TipPooling", "PayrollExport", "ShiftBoard"],
+    minRole: "location_manager",
+    icon: "Users",
+  },
+  accounting: {
+    label: "Accounting",
+    pages: ["Accounting"],
+    minRole: "org_owner",
+    icon: "DollarSign",
+  },
+  admin: {
+    label: "Organization Admin",
+    pages: ["UserManagement", "OrgManagement", "AuditLogs", "FranchisorConsole"],
+    minRole: "org_owner",
+    icon: "Users",
+  },
+  setup: {
+    label: "Setup",
+    pages: ["RestaurantSetup"],
+    minRole: "location_manager",
+    icon: "Settings",
+  },
+  food_safety: {
+    label: "Food Safety",
+    pages: ["FoodSafety"],
+    minRole: "manager",
+    icon: "ShieldCheck",
+  },
+  kitchen_displays: {
+    label: "Kitchen Displays",
+    pages: ["KDS", "DigitalMenu"],
+    minRole: "ground_staff",
+    icon: "Monitor",
+  },
+  integrations: {
+    label: "Integrations",
+    pages: ["Integrations", "DeveloperPortal"],
+    minRole: "org_owner",
+    icon: "Settings",
+  },
+  crm_marketing: {
+    label: "CRM & Marketing",
+    pages: ["CRM"],
+    minRole: "location_manager",
+    icon: "MessagesSquare",
+  },
+  ai_insights: {
+    label: "AI Insights",
+    pages: ["AiInsights"],
+    minRole: "manager",
+    icon: "Sparkles",
+  },
+  platform: {
+    label: "Platform Console",
+    pages: [
+      "PlatformAdmin",
+      "PlatformOrganizations",
+      "PlatformUserManagement",
+      "PlatformUsers",
+      "PlatformPlans",
+      "PlatformInvoices",
+      "PlatformAuditLogs",
+      "AuditVault",
+    ],
+    minRole: "platform_admin",
+    icon: "Shield",
+  },
 };
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
-// Core modules that are ALWAYS accessible regardless of subscription plan.
-// These are non-revenue operational essentials.
-const CORE_MODULE_KEYS = ['dashboard', 'setup'];
+// These authenticated setup routes are handled by App.jsx state gates before the
+// normal module router. They are not subscription modules.
+const UNGATED_AUTH_PAGES = new Set(["OnboardingPage", "PaymentVerification"]);
+
+// Core modules that are always accessible regardless of subscription plan.
+const CORE_MODULE_KEYS = ["dashboard", "setup"];
+
+function normalizePageName(pageName) {
+  if (!pageName) return "";
+  return String(pageName).split(/[/?#]/)[0];
+}
+
+export function isUngatedAuthPage(pageName) {
+  return UNGATED_AUTH_PAGES.has(normalizePageName(pageName));
+}
 
 /**
  * Returns the Set of page names that are enabled for the given module list.
@@ -47,10 +195,9 @@ export function getEnabledPages(enabledModules) {
     : CORE_MODULE_KEYS;
   const pages = new Set();
   modulesList.forEach(moduleKey => {
-    const mod = MODULE_DEFINITIONS[moduleKey.toLowerCase()];
+    const mod = MODULE_DEFINITIONS[String(moduleKey).toLowerCase()];
     if (mod) mod.pages.forEach(p => pages.add(p));
   });
-  // Always include core module pages even if not explicitly listed
   CORE_MODULE_KEYS.forEach(key => {
     const mod = MODULE_DEFINITIONS[key];
     if (mod) mod.pages.forEach(p => pages.add(p));
@@ -60,40 +207,40 @@ export function getEnabledPages(enabledModules) {
 
 /**
  * Checks if a specific page is enabled given the org's enabled module list.
- * 
+ *
  * FAIL-CLOSED (secure-by-default):
- * - Ungated pages (not in any module, e.g. Onboarding) allowed
- * - Core modules (dashboard, admin) always allowed
- * - Operational modules ONLY allowed if explicitly in enabledModules
+ * - Only explicitly ungated setup pages are allowed outside module mapping
+ * - Core modules are always allowed
+ * - Org owners bypass subscription module restrictions
+ * - Operational modules require explicit inclusion
  */
 export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);
-  // Ungated pages (not assigned to any module) are always allowed
-  if (!moduleInfo) return true;
-  // Core modules are always allowed
+  if (!moduleInfo) return isUngatedAuthPage(pageName);
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
-  // Org owners bypass module restrictions and can access everything
-  if (userRole === 'org_owner') return true;
-  // Operational modules: require explicit inclusion
+  if (userRole === "org_owner") return true;
   const modulesList = enabledModules || [];
-  const normalizedList = modulesList.map(m => m.toLowerCase());
+  const normalizedList = modulesList.map(m => String(m).toLowerCase());
   return normalizedList.includes(moduleInfo.key.toLowerCase());
 }
 
 /**
- * Reverse lookup: Given a page name, find the module it belongs to.
+ * Reverse lookup: Given a page name, route path, or module key, find the module.
  * Returns { key, label, pages, minRole, icon } or null if not found.
  */
 export function getModuleForPage(pageName) {
+  const normalized = normalizePageName(pageName);
+  const directModule = MODULE_DEFINITIONS[normalized.toLowerCase()];
+  if (directModule) return { key: normalized.toLowerCase(), ...directModule };
+
   for (const [key, mod] of Object.entries(MODULE_DEFINITIONS)) {
-    if (mod.pages.includes(pageName)) return { key, ...mod };
+    if (mod.pages.includes(normalized)) return { key, ...mod };
   }
   return null;
 }
 
 /**
- * Given a plan's features (array of module keys), returns the list of
- * module definitions that are included.
+ * Given a plan's features (array of module keys), returns the list of included modules.
  */
 export function getModulesForPlan(planFeatures) {
   if (!planFeatures || planFeatures.length === 0) return [];
