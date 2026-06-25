@@ -1,4 +1,4 @@
-import { loadStripe } from '@stripe/stripe-js';
+﻿import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 
@@ -6,14 +6,14 @@ import { api } from '@/lib/apiClient';
  * Payment Service unified abstraction for Stripe, PayPal, bank transfer.
  */
 
-// Stripe 
+// Stripe
 let stripePromise = null;
 
 export function getStripe() {
   if (!stripePromise) {
     const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
     if (!key) {
-      console.warn('[PaymentService] VITE_STRIPE_PUBLISHABLE_KEY not set — Stripe payments disabled');
+      console.warn('[PaymentService] VITE_STRIPE_PUBLISHABLE_KEY not set - Stripe payments disabled');
       return null;
     }
     stripePromise = loadStripe(key);
@@ -33,7 +33,6 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
 
     if (error) throw error;
 
-    // Edge function may return an error in the JSON body
     if (data?.error) {
       throw new Error(data.error);
     }
@@ -42,10 +41,9 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
       throw new Error('No client secret returned from payment service');
     }
 
-    return data; // { clientSecret }
+    return data;
   } catch (err) {
     const allowDevMock = !import.meta.env.PROD && import.meta.env.VITE_ALLOW_MOCK_PAYMENTS === 'true';
-    // Only mock in explicitly opted-in local development.
     if (allowDevMock && (err.message?.includes('FunctionsFetchError') || err.message?.includes('Failed to fetch'))) {
       console.warn('[PaymentService] Edge function unreachable, using mock for dev:', err.message);
       return {
@@ -53,17 +51,16 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
         isMock: true,
       };
     }
-    // Re-throw real Stripe/function errors so the UI can display them.
     throw err;
   }
 }
 
-// PayPal 
+// PayPal
 export function getPayPalClientId() {
   return import.meta.env.VITE_PAYPAL_CLIENT_ID || null;
 }
 
-// Bank Transfer 
+// Bank Transfer
 export const BANK_DETAILS = {
   bank_name: 'Restops Business Account',
   account_name: 'Restops Restaurant Solutions Inc.',
@@ -74,20 +71,46 @@ export const BANK_DETAILS = {
   instructions: 'Please include your invoice number as the payment reference.',
 };
 
-// Payment Records 
+export async function recordInvoicePayment({ invoiceId, amount, reference, paymentMethod = 'manual' }) {
+  const { data, error } = await supabase.rpc('record_invoice_payment', {
+    p_invoice_id: invoiceId,
+    p_amount: Number(amount),
+    p_reference: reference,
+    p_payment_method: paymentMethod,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Payment Records
 export async function createPaymentRecord(paymentData) {
-  return api.entities.Payment.create({
-    ...paymentData,
-    payment_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
-    created_at: new Date().toISOString(),
+  if (!paymentData?.invoice_id) {
+    throw new Error('Direct payment creation is disabled. Use an invoice-scoped financial RPC.');
+  }
+
+  return recordInvoicePayment({
+    invoiceId: paymentData.invoice_id,
+    amount: paymentData.amount,
+    reference: paymentData.transaction_id || paymentData.reference || paymentData.bank_reference || `PAY-${Date.now()}`,
+    paymentMethod: paymentData.payment_method || 'manual',
   });
 }
 
-export async function updateInvoicePaymentStatus(invoiceId, status = 'paid', organizationId = null) {
-  const updates = { payment_status: status };
-  if (status === 'paid') updates.status = 'paid';
-  if (organizationId) updates.organization_id = organizationId;
-  await api.entities.Invoice.update(invoiceId, updates);
+export async function updateInvoicePaymentStatus(invoiceId, status = 'paid') {
+  if (status !== 'paid') {
+    throw new Error('Direct invoice payment status updates are disabled. Use a tenant-safe financial RPC.');
+  }
+
+  const invoice = await api.entities.Invoice.get(invoiceId);
+  const remaining = Math.max(0, Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0));
+  if (remaining <= 0) return invoice;
+
+  return recordInvoicePayment({
+    invoiceId,
+    amount: remaining,
+    reference: `STATUS-${Date.now()}`,
+    paymentMethod: 'manual',
+  });
 }
 
 export async function getPaymentsByInvoice(invoiceId, organizationId = null) {
@@ -97,10 +120,7 @@ export async function getPaymentsByInvoice(invoiceId, organizationId = null) {
   );
 }
 
-export async function confirmBankTransfer(paymentId, organizationId = null) {
-  return api.entities.Payment.update(paymentId, {
-    ...(organizationId ? { organization_id: organizationId } : {}),
-    status: 'completed',
-    confirmed_at: new Date().toISOString(),
-  });
+export async function confirmBankTransfer(paymentId) {
+  return api.financial.confirmPayment(paymentId);
 }
+

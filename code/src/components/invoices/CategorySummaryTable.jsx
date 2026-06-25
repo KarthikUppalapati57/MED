@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -58,20 +58,15 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
 
   const saveSplitsMutation = useMutation({
     mutationFn: async ({ originalAllocation, newSplits }) => {
-      // Delete original
-      await api.entities.InvoiceAllocation.delete(originalAllocation.id);
-
-      // Insert new ones
-      const toInsert = newSplits.map(s => ({
-        invoice_id: invoiceId,
-        organization_id: originalAllocation.organization_id,
-        allocation_type: originalAllocation.allocation_type,
-        category_name: s.category_name,
-        gl_code: s.gl_code,
-        amount: s.amount,
-        percentage: s.percentage
-      }));
-      await Promise.all(toInsert.map((row) => api.entities.InvoiceAllocation.create(row)));
+      await api.financial.saveInvoiceAllocationSplits({
+        originalAllocationId: originalAllocation.id,
+        splits: newSplits.map(s => ({
+          category_name: s.category_name,
+          gl_code: s.gl_code,
+          amount: s.amount,
+          percentage: s.percentage
+        })),
+      });
     },
     onSuccess: () => {
       toast.success("Split coding saved.");
@@ -177,3 +172,4 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
     </div>
   );
 }
+

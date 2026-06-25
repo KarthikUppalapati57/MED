@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+﻿import { supabase } from '@/lib/supabaseClient';
 
 const TABLE_SCOPE_COLUMNS = {
   accounting_sync_logs: ['organization_id'],
@@ -51,11 +51,6 @@ const TABLE_SCOPE_COLUMNS = {
   webhook_events_queue: ['organization_id'],
 };
 
-const TENANT_ROUTED_TABLES = new Set(Object.keys(TABLE_SCOPE_COLUMNS));
-const TENANT_SCHEMA_ACCESS_ENABLED = import.meta.env.VITE_TENANT_SCHEMA_ACCESS_ENABLED === 'true';
-const TENANT_SCHEMA_READS_ENABLED = TENANT_SCHEMA_ACCESS_ENABLED || import.meta.env.VITE_TENANT_SCHEMA_READS_ENABLED === 'true';
-const TENANT_SCHEMA_WRITES_ENABLED = TENANT_SCHEMA_ACCESS_ENABLED || import.meta.env.VITE_TENANT_SCHEMA_WRITES_ENABLED === 'true';
-
 function getCachedContextScope() {
   if (typeof sessionStorage === 'undefined') return {};
   try {
@@ -92,10 +87,6 @@ function withActiveScope(table, conditions = {}) {
   return scoped;
 }
 
-function canUseTenantRead(table) {
-  return TENANT_SCHEMA_READS_ENABLED && TENANT_ROUTED_TABLES.has(table);
-}
-
 function projectSelectedColumns(rows, select = '*') {
   if (!rows || select === '*') return rows;
   if (typeof select !== 'string' || select.includes('(')) return rows;
@@ -120,118 +111,8 @@ function projectSelectedColumns(rows, select = '*') {
   return Array.isArray(rows) ? rows.map(projectRow) : projectRow(rows);
 }
 
-async function tenantSelectRows(table, {
-  conditions = {},
-  gte = {},
-  lte = {},
-  search = null,
-  searchColumn = null,
-  orderBy = null,
-  page,
-  pageSize,
-  limit,
-  includeDeleted = false,
-  single = false,
-} = {}) {
-  const scopedConditions = withActiveScope(table, conditions);
-  const scopeColumns = TABLE_SCOPE_COLUMNS[table] || [];
-
-  if (scopeColumns.includes('organization_id') && !scopedConditions.organization_id) {
-    return null;
-  }
-
-  const ascending = orderBy ? !orderBy.startsWith('-') : true;
-  const orderColumn = orderBy ? (ascending ? orderBy : orderBy.slice(1)) : null;
-  const resolvedPageSize = page !== undefined ? (pageSize || limit || 50) : null;
-  const resolvedLimit = single ? 1 : (resolvedPageSize || limit || null);
-  const offset = page !== undefined ? page * resolvedPageSize : null;
-
-  const { data, error } = await supabase.rpc('tenant_select_rows', {
-    p_table_name: table,
-    p_filters: scopedConditions,
-    p_gte: gte || {},
-    p_lte: lte || {},
-    p_search_column: searchColumn || null,
-    p_search: search || null,
-    p_order_by: orderColumn,
-    p_ascending: ascending,
-    p_limit: resolvedLimit,
-    p_offset: offset,
-    p_include_deleted: includeDeleted,
-    p_single: single,
-  });
-
-  if (error) throw error;
-  return data;
-}
-async function tenantInsertRow(table, payload) {
-  const scopedPayload = withActiveScope(table, payload);
-  const scopeColumns = TABLE_SCOPE_COLUMNS[table] || [];
-
-  if (scopeColumns.includes('organization_id') && !scopedPayload.organization_id) {
-    return null;
-  }
-
-  const { data, error } = await supabase.rpc('tenant_insert_row', {
-    p_table_name: table,
-    p_payload: scopedPayload,
-  });
-
-  if (error) throw error;
-  return data;
-}
-
-async function tenantUpdateRow(table, id, payload) {
-  const scopedPayload = withActiveScope(table, payload);
-  const scopeColumns = TABLE_SCOPE_COLUMNS[table] || [];
-
-  if (scopeColumns.includes('organization_id') && !scopedPayload.organization_id) {
-    return null;
-  }
-
-  const { data, error } = await supabase.rpc('tenant_update_row', {
-    p_table_name: table,
-    p_id: String(id),
-    p_payload: scopedPayload,
-  });
-
-  if (error) throw error;
-  return data;
-}
-
-async function tenantDeleteRow(table, id, useSoftDelete = false) {
-  const scopedConditions = withActiveScope(table, {});
-  const scopeColumns = TABLE_SCOPE_COLUMNS[table] || [];
-
-  if (scopeColumns.includes('organization_id') && !scopedConditions.organization_id) {
-    return null;
-  }
-
-  const { data, error } = await supabase.rpc('tenant_delete_row', {
-    p_table_name: table,
-    p_id: String(id),
-    p_organization_id: scopedConditions.organization_id || null,
-    p_soft_delete: useSoftDelete,
-  });
-
-  if (error) throw error;
-  return Boolean(data);
-}
-
-function canUseTenantWrite(table) {
-  return TENANT_SCHEMA_WRITES_ENABLED && TENANT_ROUTED_TABLES.has(table);
-}
-
 const createEntityClient = (table, useSoftDelete = false) => ({
   get: async (id) => {
-    if (canUseTenantRead(table)) {
-      const routed = await tenantSelectRows(table, {
-        conditions: { id },
-        includeDeleted: !useSoftDelete,
-        single: true,
-      });
-      if (routed !== null) return routed;
-    }
     let query = supabase.from(table).select('*').eq('id', id);
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
@@ -241,21 +122,6 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   list: async (orderBy, options = {}) => {
-    if (canUseTenantRead(table)) {
-      const routed = await tenantSelectRows(table, {
-        conditions: {},
-        gte: options.gte,
-        lte: options.lte,
-        search: options.search,
-        searchColumn: options.searchColumn,
-        orderBy,
-        page: options.page,
-        pageSize: options.pageSize,
-        limit: options.limit,
-        includeDeleted: !useSoftDelete,
-      });
-      if (routed !== null) return projectSelectedColumns(routed ?? [], options.select);
-    }
     let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
@@ -296,21 +162,6 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data ?? [];
   },
   filter: async (conditions, options = {}) => {
-    if (canUseTenantRead(table)) {
-      const routed = await tenantSelectRows(table, {
-        conditions,
-        gte: options.gte,
-        lte: options.lte,
-        search: options.search,
-        searchColumn: options.searchColumn,
-        orderBy: options.orderBy,
-        page: options.page,
-        pageSize: options.pageSize,
-        limit: options.limit,
-        includeDeleted: !useSoftDelete,
-      });
-      if (routed !== null) return projectSelectedColumns(routed ?? [], options.select);
-    }
     let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
@@ -350,10 +201,6 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data ?? [];
   },
   create: async (payload) => {
-    if (canUseTenantWrite(table)) {
-      const routed = await tenantInsertRow(table, payload);
-      if (routed !== null) return routed;
-    }
     const { data, error } = await supabase
       .from(table)
       .insert(payload)
@@ -363,10 +210,6 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   update: async (id, payload) => {
-    if (canUseTenantWrite(table)) {
-      const routed = await tenantUpdateRow(table, id, payload);
-      if (routed !== null) return routed;
-    }
     const { data, error } = await supabase
       .from(table)
       .update(payload)
@@ -377,10 +220,6 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   delete: async (id) => {
-    if (canUseTenantWrite(table)) {
-      const routed = await tenantDeleteRow(table, id, useSoftDelete);
-      if (routed !== null) return routed;
-    }
     if (useSoftDelete) {
       const { error } = await supabase.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
       if (error) throw error;
@@ -486,21 +325,102 @@ export const api = {
     MvDailySalesSummary: createEntityClient('mv_daily_sales_summary'),
 
   },
+  financial: {
+    saveInvoice: async ({ invoiceId = null, invoice = {}, lineItems = [] }) => {
+      const { data, error } = await supabase.rpc('save_invoice_workflow', {
+        p_invoice_id: invoiceId,
+        p_invoice: invoice,
+        p_line_items: lineItems,
+      });
+      if (error) throw error;
+      return data;
+    },
+    softDeleteInvoice: async (invoiceId) => {
+      const { data, error } = await supabase.rpc('soft_delete_invoice_workflow', {
+        p_invoice_id: invoiceId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    saveInvoiceAllocationSplits: async ({ originalAllocationId, splits }) => {
+      const { data, error } = await supabase.rpc('save_invoice_allocation_splits', {
+        p_original_allocation_id: originalAllocationId,
+        p_splits: splits,
+      });
+      if (error) throw error;
+      return data;
+    },
+    createPaymentAccount: async (account) => {
+      const { data, error } = await supabase.rpc('create_payment_account_workflow', {
+        p_account: account,
+      });
+      if (error) throw error;
+      return data;
+    },
+    deactivatePaymentAccount: async (paymentAccountId) => {
+      const { data, error } = await supabase.rpc('deactivate_payment_account_workflow', {
+        p_payment_account_id: paymentAccountId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    requestInvoiceCredit: async ({ invoiceId, amount, reason, photoUrl = null }) => {
+      const { data, error } = await supabase.rpc('request_invoice_credit_workflow', {
+        p_invoice_id: invoiceId,
+        p_requested_amount: Number(amount),
+        p_reason: reason,
+        p_photo_url: photoUrl,
+      });
+      if (error) throw error;
+      return data;
+    },
+    recordAdHocVendorPayment: async ({ vendorId, amount, paymentMethod, memo = null, idempotencyKey = null }) => {
+      const { data, error } = await supabase.rpc('record_ad_hoc_vendor_payment', {
+        p_vendor_id: vendorId,
+        p_amount: Number(amount),
+        p_payment_method: paymentMethod,
+        p_memo: memo,
+        p_idempotency_key: idempotencyKey,
+      });
+      if (error) throw error;
+      return data;
+    },
+    ensureLedgerBill: async ({ invoiceId, status = 'pending' }) => {
+      const { data, error } = await supabase.rpc('ensure_ledger_bill_workflow', {
+        p_invoice_id: invoiceId,
+        p_status: status,
+      });
+      if (error) throw error;
+      return data;
+    },
+    confirmPayment: async (paymentId) => {
+      const { data, error } = await supabase.rpc('confirm_payment_workflow', {
+        p_payment_id: paymentId,
+      });
+      if (error) throw error;
+      return data;
+    },
+  },
   tenant: {
     listVendorStatements: async (organizationId) => {
       if (!organizationId) return [];
-      const { data, error } = await supabase.rpc('tenant_select_vendor_statements', {
-        p_organization_id: organizationId,
-      });
+      const { data, error } = await supabase
+        .from('vendor_statements')
+        .select('*, vendor_statement_lines(*)')
+        .eq('organization_id', organizationId)
+        .order('statement_date', { ascending: false })
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
     listWebhookDeliveryLogs: async (organizationId, limit = 100) => {
       if (!organizationId) return [];
-      const { data, error } = await supabase.rpc('tenant_select_webhook_delivery_logs', {
-        p_organization_id: organizationId,
-        p_limit: limit,
-      });
+      const { data, error } = await supabase
+        .from('webhook_delivery_logs')
+        .select('*, webhook_events_queue(*), webhook_endpoints(*)')
+        .eq('webhook_endpoints.organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
       if (error) throw error;
       return data || [];
     },
@@ -705,3 +625,6 @@ export const api = {
     }
   }
 };
+
+
+

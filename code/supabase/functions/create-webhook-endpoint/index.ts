@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -111,14 +111,14 @@ serve(async (req) => {
 
     if (subscriptionError) throw subscriptionError;
 
-    await adminClient.from("audit_logs").insert({
+    await adminClient.rpc("log_audit_event", { p_entry: {
       organization_id,
       user_id: authData.user.id,
       action: "webhook_endpoint.created",
       table_name: "webhook_endpoints",
       record_id: endpoint.id,
       new_data: { url: webhookUrl, events: selectedEvents, secret_prefix: secretPrefix },
-    });
+    }});
 
     return json({ endpoint, signingSecret: secret });
   } catch (error) {
@@ -126,3 +126,4 @@ serve(async (req) => {
     return json({ error: message }, message.includes("HTTPS") ? 400 : 500);
   }
 });
+

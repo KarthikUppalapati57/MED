@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Imap from 'npm:imap-simple';
@@ -89,18 +89,25 @@ serve(async (req) => {
                 
                 // 4. Inject into the approval workflow
                 // We set status to 'extracting' so that the pg_net webhook picks it up for Gemini Processing
-                const { error: insertError } = await supabase.from('invoices').insert({
-                   organization_id: orgId || null,
-                   status: 'extracting', 
-                   file_url: filePath,
-                   vendor_name: parsed.from?.text || 'Unknown Vendor (Auto-Ingested)',
-                   raw_text: parsed.text, // Store email body as context
-                   invoice_number: `EMAIL-${id}-${Date.now()}`,
-                   total_amount: 0,
+                const { error: insertError } = await supabase.rpc('save_invoice_workflow', {
+                  p_invoice_id: null,
+                  p_invoice: {
+                    organization_id: orgId || null,
+                    status: 'extracting',
+                    file_url: filePath,
+                    vendor_name: parsed.from?.text || 'Unknown Vendor (Auto-Ingested)',
+                    raw_text: parsed.text,
+                    invoice_number: `EMAIL-${id}-${Date.now()}`,
+                    total_amount: 0,
+                    source: 'email',
+                  },
+                  p_line_items: [],
                 });
 
                 if (!insertError) {
                    results.push({ email: user, subject: parsed.subject, status: 'processed' });
+                } else {
+                   results.push({ email: user, subject: parsed.subject, status: 'failed', error: insertError.message });
                 }
              }
           }
@@ -118,3 +125,4 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
   }
 })
+

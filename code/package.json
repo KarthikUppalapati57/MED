@@ -27,7 +27,9 @@
     "test:backend": "vitest run tests/backend",
     "test:frontend": "vitest run tests/frontend",
     "test:e2e": "playwright test tests/e2e",
-    "check:modules": "node scripts/module-artifact-audit.mjs"
+    "check:modules": "node scripts/module-artifact-audit.mjs",
+    "check:architecture": "node scripts/architecture-release-gate.mjs",
+    "check:architecture:behavior": "node scripts/architecture-behavior-regression.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSupabaseSystemClient } from '../_shared/supabase.ts'
 import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -9,10 +9,7 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseClient = await getSupabaseSystemClient()
 
     // Stripe signature verification would go here in production
     // const signature = req.headers.get('stripe-signature');
@@ -42,14 +39,14 @@ serve(async (req) => {
         if (orgError) throw orgError;
 
         // 2. Log Audit Event
-        await supabaseClient.from('audit_logs').insert({
+        await supabaseClient.rpc('log_audit_event', { p_entry: {
           organization_id: orgId,
-          user_id: null, // System action
+          user_id: null,
           action: 'subscription_upgraded',
           entity_type: 'organization',
           entity_id: orgId,
           details: { plan_id: planId, session_id: session.id }
-        });
+        }});
       }
     }
 
@@ -65,3 +62,4 @@ serve(async (req) => {
     })
   }
 })
+

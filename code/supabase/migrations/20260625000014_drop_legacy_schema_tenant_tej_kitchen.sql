@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS tenant_tej_s_kitchen_9c65f808 CASCADE;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function JustPayVendorDialog({ open, onOpenChange }) {
-  const { organization, userProfile } = useAuth();
+  const { organization } = useAuth();
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -39,16 +39,12 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
       // Simulate Payment API (Stripe/PayPal/Lob)
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Drop into Ledger directly (no invoice_id)
-      await api.entities.LedgerPayment.create({
-        organization_id: organization?.id,
-        vendor_id: formData.vendor_id,
+      await api.financial.recordAdHocVendorPayment({
+        vendorId: formData.vendor_id,
         amount: parseFloat(formData.amount),
-        payment_date: new Date().toISOString().split('T')[0],
-        payment_method: formData.payment_method,
-        reference: `AD-HOC-${formData.payment_method.toUpperCase()}-${Date.now()}`,
-        status: 'completed',
-        created_by: userProfile?.id || null
+        paymentMethod: formData.payment_method,
+        memo: formData.memo || null,
+        idempotencyKey: `AD-HOC-${organization?.id}-${formData.vendor_id}-${formData.amount}-${Date.now()}`,
       });
 
       toast.success(`Successfully sent $${formData.amount} to vendor via ${formData.payment_method}.`);
@@ -138,3 +134,4 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
     </Dialog>
   );
 }
+

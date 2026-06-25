@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -90,17 +90,18 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    await adminClient.from("audit_logs").insert({
+    await adminClient.rpc("log_audit_event", { p_entry: {
       organization_id,
       user_id: authData.user.id,
       action: "api_key.created",
       table_name: "api_keys",
       record_id: record.id,
       new_data: { name: keyName, prefix },
-    });
+    }});
 
     return json({ apiKey: rawKey, record });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Internal Server Error" }, 500);
   }
 });
+

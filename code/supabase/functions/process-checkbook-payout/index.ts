@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -16,7 +16,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
     }
 
-    const { invoice_id, payout_method = 'checkbook_digital' } = await req.json()
+    const { invoice_id, payout_method = 'checkbook_digital', payment_account_id } = await req.json()
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: 'invoice_id is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
@@ -31,7 +31,8 @@ serve(async (req) => {
     // 1. Call the secure RPC to release funds for Checkbook.io
     const { data: releaseData, error: releaseError } = await supabase.rpc('release_invoice_funds', {
       p_invoice_id: invoice_id,
-      p_payout_method: payout_method
+      p_payout_method: payout_method,
+      p_payment_account_id: payment_account_id || null
     })
 
     if (releaseError) {
@@ -122,8 +123,8 @@ serve(async (req) => {
     await serviceSupabase
       .from('payments')
       .update({ checkbook_check_id: checkbookCheckId })
-      .eq('invoice_id', invoice_id)
-      .eq('payout_status', 'processing')
+      .eq('id', releaseData.payment_id)
+      .eq('organization_id', releaseData.organization_id)
 
     return new Response(JSON.stringify({ success: true, checkbookCheckId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -137,3 +138,5 @@ serve(async (req) => {
     })
   }
 })
+
+

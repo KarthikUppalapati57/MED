@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -133,6 +133,17 @@ const INVOICE_ROW_HEIGHT = 76;
 const INVOICE_TABLE_VIEWPORT_HEIGHT = 684;
 const INVOICE_ROW_OVERSCAN = 8;
 
+const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems.map(item => ({
+  id: item.id || null,
+  inventory_item_id: item.product_id || null,
+  internal_product_id: item.product_id || null,
+  item_name: item.description || 'Unknown Item',
+  quantity: item.quantity || 1,
+  unit_price: item.unit_price || 0,
+  total_price: item.extended_price || 0,
+  vendor_item_code: item.vendor_item_code || null,
+  vendor_unit: item.vendor_unit || null
+}));
 const workflowStages = [
   { key: 'pending_review', label: 'Review', icon: Eye },
   { key: 'action_required', label: 'Action', icon: AlertTriangle },
@@ -430,24 +441,10 @@ export default function Invoices() {
       const cleaned = sanitizeInvoiceData(data);
       delete cleaned.id; // Ensure no id on create
       
-      const invoice = await api.entities.Invoice.create(cleaned);
-      
-      if (lineItems.length > 0) {
-        await api.client.rpc('upsert_invoice_line_items', {
-          p_invoice_id: invoice.id,
-          p_items: lineItems.map(item => ({
-            id: item.id || null,
-            inventory_item_id: item.product_id || null,
-            internal_product_id: item.product_id || null,
-            item_name: item.description || 'Unknown Item',
-            quantity: item.quantity || 1,
-            unit_price: item.unit_price || 0,
-            total_price: item.extended_price || 0,
-            vendor_item_code: item.vendor_item_code || null,
-            vendor_unit: item.vendor_unit || null
-          }))
-        });
-      }
+      const invoice = await api.financial.saveInvoice({
+        invoice: cleaned,
+        lineItems: mapInvoiceLineItemsForRpc(lineItems),
+      });
       return { ...invoice, line_items: lineItems };
     },
     onSuccess: (updatedInvoice) => {
@@ -467,24 +464,11 @@ export default function Invoices() {
       const cleaned = sanitizeInvoiceData(data);
       delete cleaned.id; // Don't update id
       
-      const invoice = await api.entities.Invoice.update(id, cleaned);
-      
-      if (lineItems.length > 0) {
-        await api.client.rpc('upsert_invoice_line_items', {
-          p_invoice_id: invoice.id,
-          p_items: lineItems.map(item => ({
-            id: item.id || null,
-            inventory_item_id: item.product_id || null,
-            internal_product_id: item.product_id || null,
-            item_name: item.description || 'Unknown Item',
-            quantity: item.quantity || 1,
-            unit_price: item.unit_price || 0,
-            total_price: item.extended_price || 0,
-            vendor_item_code: item.vendor_item_code || null,
-            vendor_unit: item.vendor_unit || null
-          }))
-        });
-      }
+      const invoice = await api.financial.saveInvoice({
+        invoiceId: id,
+        invoice: cleaned,
+        lineItems: mapInvoiceLineItemsForRpc(lineItems),
+      });
       return { ...invoice, line_items: lineItems };
     },
     onSuccess: () => {
@@ -540,7 +524,7 @@ export default function Invoices() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => api.entities.Invoice.delete(id),
+    mutationFn: (id) => api.financial.softDeleteInvoice(id),
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ['invoices-dashboard'] });
       const qk = ['invoices-dashboard', organization?.id];
@@ -597,36 +581,39 @@ export default function Invoices() {
     };
 
     if (!isPaidInvoice(invoice)) {
-      const routedInvoice = await api.entities.Invoice.update(invoice.id, routingUpdate);
+      const routedInvoice = await api.financial.saveInvoice({ invoiceId: invoice.id, invoice: routingUpdate });
       await ensureLedgerBill({ ...invoice, ...routedInvoice }, { status: 'pending' });
       return { redirectedToPayments: false, apRoutingDestination };
     }
 
-    const paidInvoice = await api.entities.Invoice.update(invoice.id, {
-      ...routingUpdate,
-      status: 'paid',
-      payment_status: 'paid',
+    const paidInvoice = await api.financial.saveInvoice({
+      invoiceId: invoice.id,
+      invoice: {
+        ...routingUpdate,
+        status: 'approved',
+        payment_status: 'unpaid',
+      },
     });
 
     const existingPayments = await api.entities.Payment.filter({ invoice_id: invoice.id });
     let paymentRecord = existingPayments.find((payment) => payment.status === 'completed');
 
     if (!paymentRecord) {
-      paymentRecord = await api.entities.Payment.create({
-        invoice_id: invoice.id,
-        vendor_id: invoice.vendor_id || null,
-        vendor_name: invoice.vendor_name,
-        invoice_number: invoice.invoice_number,
-        amount: Number(invoice.total_amount || 0),
-        due_date: invoice.due_date || null,
-        organization_id: invoice.organization_id || organization?.id,
-        created_by: userProfile?.id || null,
-        status: 'completed',
-        payment_method: 'manual',
-        payment_date: invoice.payment_date || invoice.invoice_date || new Date().toISOString().slice(0, 10),
-        transaction_id: `paid-invoice-${invoice.id}`,
-        notes: `Recorded from an uploaded invoice that was already paid before approval. Vendor routing: ${getApRoutingLabel(apRoutingDestination)}.`,
+      const paymentResult = await api.client.rpc('record_invoice_payment', {
+        p_invoice_id: invoice.id,
+        p_amount: Number(invoice.total_amount || 0),
+        p_reference: `paid-invoice-${invoice.id}`,
+        p_payment_method: 'manual',
       });
+      if (paymentResult.error) throw paymentResult.error;
+      paymentRecord = {
+        id: paymentResult.data?.payment_id,
+        amount: Number(invoice.total_amount || 0),
+        payment_method: 'manual',
+        status: 'completed',
+        payment_date: invoice.payment_date || invoice.invoice_date || new Date().toISOString().slice(0, 10),
+        organization_id: invoice.organization_id || organization?.id,
+      };
     }
 
     await recordPaymentLedger({
@@ -701,7 +688,7 @@ export default function Invoices() {
           
           if (finalStatus === 'approved') {
             // Update the record with approved_date
-            await api.entities.Invoice.update(savedInvoice.id, { organization_id: savedInvoice.organization_id, approved_date: new Date().toISOString() });
+            await api.financial.saveInvoice({ invoiceId: savedInvoice.id, invoice: { approved_date: new Date().toISOString() } });
             savedInvoice.approved_date = new Date().toISOString();
           }
         }
@@ -1694,3 +1681,5 @@ export default function Invoices() {
     </div>
   );
 }
+
+

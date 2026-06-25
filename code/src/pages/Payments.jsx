@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -62,7 +62,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '../components/payments/PaymentGatewayModal';
-import { confirmBankTransfer } from '@/lib/paymentService';
+import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
 
@@ -290,13 +290,9 @@ export default function Payments() {
     };
   }, [queryClient]);
 
-  const createPayment = useMutation({
-    mutationFn: (data) => api.entities.Payment.create(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payments'] }),
-  });
 
   const updateInvoice = useMutation({
-    mutationFn: (params) => api.entities.Invoice.update(params.id, params.data),
+    mutationFn: (params) => api.financial.saveInvoice({ invoiceId: params.id, invoice: params.data }),
     onSuccess: (updatedInvoice) => {
       queryClient.setQueriesData({ queryKey: ['invoices-payments'] }, (oldData) => {
         if (!oldData?.pages) return oldData;
@@ -1563,27 +1559,17 @@ export default function Payments() {
           due_date: selectedInvoice.due_date,
         } : null}
         onPaymentComplete={async (paymentData) => {
-          const paymentRecord = await createPayment.mutateAsync({
-            invoice_id: selectedInvoice.id,
-            vendor_id: selectedInvoice.vendor_id,
-            vendor_name: selectedInvoice.vendor_name,
-            invoice_number: selectedInvoice.invoice_number,
-            amount: selectedInvoice.total_amount,
-            organization_id: selectedInvoice.organization_id || organization?.id,
-            created_by: userProfile?.id || null,
-            ...paymentData,
-          });
-          // Only mark as paid if payment is completed (not pending bank transfer)
           if (paymentData.status === 'completed') {
-            const fileDestination = await getVendorFileDestination(selectedInvoice.vendor_id);
-
-            await updateInvoice.mutateAsync({
-              id: selectedInvoice.id,
-              data: { payment_status: 'paid', status: 'paid', file_destination: fileDestination },
+            const paymentResult = await recordInvoicePaymentRpc({
+              invoiceId: selectedInvoice.id,
+              amount: selectedInvoice.total_amount,
+              reference: paymentData.transaction_id || paymentData.bank_reference || `GATEWAY-${Date.now()}`,
+              paymentMethod: paymentData.payment_method || 'manual',
             });
+
             await recordPaymentLedger({
               invoice: { ...selectedInvoice, organization_id: selectedInvoice.organization_id || organization?.id },
-              paymentRecord,
+              paymentRecord: { id: paymentResult?.payment_id, ...paymentData },
               userId: userProfile?.id,
             });
           } else if (paymentData.status === 'pending') {
@@ -1602,3 +1588,5 @@ export default function Payments() {
     </div>
   );
 }
+
+

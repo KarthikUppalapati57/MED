@@ -1,4 +1,4 @@
-import { api } from '@/lib/apiClient';
+﻿import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 
 const itemKey = (item) => (
@@ -34,27 +34,7 @@ const itemUnitPrice = (item) => Number(
 
 export async function ensureLedgerBill(invoice, { status = 'pending' } = {}) {
   if (!invoice?.id) throw new Error('Invoice is required to create a bill.');
-
-  const existing = await api.entities.LedgerBill.filter({ invoice_id: invoice.id });
-  const payload = {
-    organization_id: invoice.organization_id,
-    vendor_id: invoice.vendor_id || null,
-    invoice_id: invoice.id,
-    subtotal: Number(invoice.subtotal || 0),
-    tax: Number(invoice.tax_amount || 0),
-    total: Number(invoice.total_amount || 0),
-    due_date: invoice.due_date || null,
-    status,
-  };
-
-  if (existing?.length) {
-    return api.entities.LedgerBill.update(existing[0].id, {
-      ...payload,
-      status: existing[0].status === 'paid' ? 'paid' : status,
-    });
-  }
-
-  return api.entities.LedgerBill.create(payload);
+  return api.financial.ensureLedgerBill({ invoiceId: invoice.id, status });
 }
 
 export async function emitWorkflowEvent(eventName, entityType, entityId, payload = {}) {
@@ -259,13 +239,16 @@ export async function completeTransferWorkflow({ transfer, inventoryRecords = []
 
 export async function approveInvoiceWorkflow({ invoice, order, userId }) {
   if (!invoice?.id) throw new Error('Select an invoice to approve.');
-  const approvedInvoice = await api.entities.Invoice.update(invoice.id, {
-    status: 'approved',
-    approved_by: userId || null,
-    approved_date: new Date().toISOString(),
-    purchase_order_id: order?.id || invoice.purchase_order_id || null,
-    matched_order_id: order?.id || invoice.matched_order_id || null,
-    match_status: order ? 'matched' : invoice.match_status || 'manual_approval',
+  const approvedInvoice = await api.financial.saveInvoice({
+    invoiceId: invoice.id,
+    invoice: {
+      status: 'approved',
+      approved_by: userId || null,
+      approved_date: new Date().toISOString(),
+      purchase_order_id: order?.id || invoice.purchase_order_id || null,
+      matched_order_id: order?.id || invoice.matched_order_id || null,
+      match_status: order ? 'matched' : invoice.match_status || 'manual_approval',
+    },
   });
 
   await ensureLedgerBill(approvedInvoice, { status: 'pending' });
@@ -284,3 +267,5 @@ export async function approveInvoiceWorkflow({ invoice, order, userId }) {
 
   return approvedInvoice;
 }
+
+

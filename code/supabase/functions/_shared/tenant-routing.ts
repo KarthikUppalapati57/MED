@@ -6,48 +6,46 @@ export type TenantRouteRequest = {
 
 export type TenantDataRoute = {
   organization_id: string | null;
-  schema_name: string | null;
-  status: string;
-  read_mode: 'public' | 'dual' | 'tenant_schema';
-  write_mode: 'public' | 'dual' | 'tenant_schema';
-  read_source: string;
-  write_target: string;
+  schema_name: 'public';
+  status: 'shared_public';
+  read_mode: 'public';
+  write_mode: 'public';
+  read_source: 'public';
+  write_target: 'public';
   brand_id?: string | null;
   location_id?: string | null;
 };
 
-export async function getTenantDataRoute(supabase: any, request: TenantRouteRequest = {}): Promise<TenantDataRoute> {
-  const { data, error } = await supabase.rpc('get_tenant_data_route', {
-    p_organization_id: request.organizationId || null,
-    p_brand_id: request.brandId || null,
-    p_location_id: request.locationId || null,
-  });
-
-  if (error) throw error;
-  return data as TenantDataRoute;
+export async function getTenantDataRoute(_supabase: any, request: TenantRouteRequest = {}): Promise<TenantDataRoute> {
+  return {
+    organization_id: request.organizationId || null,
+    brand_id: request.brandId || null,
+    location_id: request.locationId || null,
+    schema_name: 'public',
+    status: 'shared_public',
+    read_mode: 'public',
+    write_mode: 'public',
+    read_source: 'public',
+    write_target: 'public',
+  };
 }
 
-export async function resolveTenantSchema(serviceRoleSupabase: any, organizationId: string): Promise<string> {
-  const { data, error } = await serviceRoleSupabase.rpc('resolve_tenant_schema', {
-    p_organization_id: organizationId,
-  });
-
-  if (error) throw error;
-  return data as string;
+export async function resolveTenantSchema(_serviceRoleSupabase: any, _organizationId: string): Promise<string> {
+  return 'public';
 }
 
-export function getRouteReadSource(route: TenantDataRoute | null | undefined): string {
-  return route?.read_source || 'public';
+export function getRouteReadSource(): string {
+  return 'public';
 }
 
-export function getRouteWriteTarget(route: TenantDataRoute | null | undefined): string {
-  return route?.write_target || 'public';
+export function getRouteWriteTarget(): string {
+  return 'public';
 }
 
-export function shouldReadTenantSchema(route: TenantDataRoute | null | undefined): boolean {
-  return route?.read_mode === 'tenant_schema';
+export function shouldReadTenantSchema(): boolean {
+  return false;
 }
 
-export function shouldWriteTenantSchema(route: TenantDataRoute | null | undefined): boolean {
-  return route?.write_mode === 'tenant_schema';
+export function shouldWriteTenantSchema(): boolean {
+  return false;
 }
