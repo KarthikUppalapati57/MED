@@ -138,7 +138,7 @@ export default function LandingPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/5 bg-[#FAF8F4]/80 dark:bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
               <RestopsLogo className="h-16 ml-4 mt-2" origin="origin-left" />
@@ -170,12 +170,12 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative pt-48 pb-40 overflow-hidden z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <motion.div 
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-            className="max-w-4xl"
+            className="max-w-[34rem] md:max-w-[40rem] xl:max-w-[44rem]"
           >
             <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-sm bg-[#ff5c35]/5 border border-[#ff5c35]/20 text-[10px] font-bold tracking-[3px] uppercase text-[#ff5c35] mb-12">
               <Sparkles className="h-3 w-3" />
@@ -186,7 +186,7 @@ export default function LandingPage() {
               Building <br /> technical <br /> kitchens.
             </h1>
             
-            <p className="max-w-xl text-xl text-black/60 dark:text-white/60 mb-16 leading-relaxed font-medium technical-tracking">
+            <p className="max-w-[32rem] text-xl text-black/60 dark:text-white/60 mb-16 leading-relaxed font-medium technical-tracking">
               RestOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
             </p>
 
@@ -209,7 +209,7 @@ export default function LandingPage() {
 
       {/* Stats Bar (Minimal technical style) */}
       <section className="relative py-12 border-y border-black/5 dark:border-white/10 z-10 bg-[#F2EEE8]/80 dark:bg-background/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-16">
             <StatItem value="99.9%" label="Sync Fidelity" />
             <StatItem value="0.8ms" label="Latency Delta" />
@@ -224,7 +224,7 @@ export default function LandingPage() {
         
         {/* Showcase Section */}
         <section id="showcase">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <div className="flex flex-col lg:flex-row items-center gap-32">
               <motion.div 
                 initial={{ opacity: 0, x: -60 }}
@@ -267,7 +267,7 @@ export default function LandingPage() {
 
         {/* Features Modules */}
         <section id="features">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -291,7 +291,7 @@ export default function LandingPage() {
 
         {/* Pricing (Technical Card style) */}
         <section id="pricing">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <div className="text-center mb-32">
               <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black dark:text-white">Licensing</h2>
               <p className="text-black/40 dark:text-white/60 text-lg font-bold tracking-widest uppercase">Select your tier</p>
@@ -333,7 +333,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative py-40 border-t border-black/5 dark:border-white/10 bg-[#FAF8F4] dark:bg-background z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid md:grid-cols-4 gap-24 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
