@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS tenant_origin_3b4c0025 CASCADE;

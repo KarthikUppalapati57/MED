@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -57,7 +57,7 @@ export default function PaymentAccountsSettings() {
   });
 
   const createAccountMutation = useMutation({
-    mutationFn: (account) => api.entities.PaymentAccount.create({
+    mutationFn: (account) => api.financial.createPaymentAccount({
       organization_id: organization.id,
       name: account.name,
       account_type: account.account_type,
@@ -74,7 +74,7 @@ export default function PaymentAccountsSettings() {
   });
 
   const deleteAccountMutation = useMutation({
-    mutationFn: (id) => api.entities.PaymentAccount.update(id, { is_active: false }),
+    mutationFn: (id) => api.financial.deactivatePaymentAccount(id),
     onSuccess: () => {
       toast.success("Account deactivated");
       queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });
@@ -121,7 +121,7 @@ export default function PaymentAccountsSettings() {
                 <div>
                   <h3 className="font-semibold text-slate-900">{account.name}</h3>
                   <p className="text-xs text-slate-500 capitalize">{account.account_type.replace('_', ' ')} Account</p>
-                  {(account.routing_number_last4 || account.account_number_last4) && (
+                  {((account.metadata?.routing_number_last4 || account.routing_number_last4) || (account.last_four || account.account_number_last4)) && (
                     <p className="text-xs font-mono text-slate-400 mt-1">
                       {account.routing_number_last4 && `RTN: ...${account.routing_number_last4} `}
                       {account.account_number_last4 && `ACC: ...${account.account_number_last4}`}
@@ -286,3 +286,4 @@ export default function PaymentAccountsSettings() {
     </div>
   );
 }
+

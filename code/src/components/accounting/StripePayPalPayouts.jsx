@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Loader2, DollarSign, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import JustPayVendorDialog from './JustPayVendorDialog';
 
 export default function StripePayPalPayouts() {
-  const { organization, userProfile } = useAuth();
+  const { organization } = useAuth();
   const queryClient = useQueryClient();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('stripe'); // 'stripe' or 'paypal'
@@ -72,24 +72,24 @@ export default function StripePayPalPayouts() {
           creditRemaining -= appliedToThisInvoice;
         }
 
-        await api.entities.Invoice.update(id, {
-          status: 'paid',
-          credit_applied: appliedToThisInvoice,
-          credit_reason: appliedToThisInvoice > 0 ? creditReason : null
+        const finalPayoutAmt = invTotal - appliedToThisInvoice;
+
+        await api.financial.saveInvoice({
+          invoiceId: id,
+          invoice: {
+            status: 'paid',
+            payment_status: 'paid',
+            credit_applied: appliedToThisInvoice,
+            credit_reason: appliedToThisInvoice > 0 ? creditReason : null
+          },
         });
 
-        // Record the payment in the ledger
-        const finalPayoutAmt = invTotal - appliedToThisInvoice;
-        
-        await api.entities.LedgerPayment.create({
-          organization_id: organization?.id,
-          vendor_id: inv.vendor_id,
+        await api.financial.recordAdHocVendorPayment({
+          vendorId: inv.vendor_id,
           amount: finalPayoutAmt,
-          payment_date: new Date().toISOString().split('T')[0],
-          payment_method: paymentMethod,
-          reference: `${paymentMethod.toUpperCase()}-PAYOUT-${Date.now()}`,
-          status: 'completed',
-          created_by: userProfile?.id || null
+          paymentMethod,
+          memo: `Invoice payout ${inv.invoice_number || inv.id}`,
+          idempotencyKey: `${paymentMethod}-invoice-payout-${id}-${finalPayoutAmt}`,
         });
       }
 
@@ -268,3 +268,4 @@ export default function StripePayPalPayouts() {
     </div>
   );
 }
+

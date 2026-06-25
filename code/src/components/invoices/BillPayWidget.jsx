@@ -92,8 +92,12 @@ export function BillPayWidget({ invoice }) {
 
   const releasePayoutMutation = useMutation({
     mutationFn: async () => {
+      const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
       const { data, error } = await supabase.functions.invoke('process-payout', {
-        body: { invoice_id: invoice.id }
+        body: { 
+          invoice_id: invoice.id,
+          payment_account_id: invoice.payment_account_id || fallbackAccountId
+        }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -109,8 +113,13 @@ export function BillPayWidget({ invoice }) {
 
   const releaseCheckbookMutation = useMutation({
     mutationFn: async (method) => {
+      const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
       const { data, error } = await supabase.functions.invoke('process-checkbook-payout', {
-        body: { invoice_id: invoice.id, payout_method: method }
+        body: { 
+          invoice_id: invoice.id, 
+          payout_method: method,
+          payment_account_id: invoice.payment_account_id || fallbackAccountId
+        }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -179,7 +188,7 @@ export function BillPayWidget({ invoice }) {
                 Schedule
               </Button>
             )}
-            {!isFullyPaid && invoice.status === 'scheduled' && 
+            {!isFullyPaid && ['approved', 'scheduled'].includes(invoice.status) && 
              ['location_manager', 'branch_manager', 'org_owner', 'owner', 'admin', 'platform_admin'].includes(profile?.role) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

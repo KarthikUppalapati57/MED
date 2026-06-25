@@ -7,31 +7,8 @@ export const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function resolveInvoiceWriteSchema(record, requestedSchema, supabaseClient) {
-  const fallbackSchema = requestedSchema || 'public';
-  const organizationId = record?.organization_id;
-
-  if (!organizationId) return fallbackSchema;
-
-  try {
-    const { data, error } = await supabaseClient.rpc('get_tenant_data_route', {
-      p_organization_id: organizationId,
-      p_brand_id: record?.brand_id || null,
-      p_location_id: record?.location_id || null,
-    });
-
-    if (error) throw error;
-
-    return data?.write_target || fallbackSchema;
-  } catch (error) {
-    console.error('Failed to resolve tenant write schema, using payload schema fallback:', error);
-    return fallbackSchema;
-  }
-}
-
-function assertSafeSchemaName(schemaName) {
-  if (schemaName === 'public' || /^tenant_[a-z0-9_]+$/.test(schemaName)) return;
-  throw new Error(`Unsafe tenant schema name: ${schemaName}`);
+function resolveInvoiceWriteSchema() {
+  return 'public';
 }
 
 function parseMoney(value) {
@@ -174,10 +151,10 @@ function getDoclingBackendUrl() {
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
-    console.log(`Starting background extraction for ${record.id} in schema ${schemaName}...`);
+    console.log(`Starting background extraction for ${record.id} in public schema...`);
     
     await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'start', invoice_id: record.id, schemaName, filePath: record.file_url }
+      log_data: { point: 'start', invoice_id: record.id, schemaName: 'public', filePath: record.file_url }
     });
 
     // 1. Securely fetch file from private bucket using service role client
@@ -227,8 +204,8 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       log_data: { point: 'docling_response_success' }
     });
 
-    // 3. Update invoice with extracted data securely inside the tenant schema
-    console.log(`Updating invoice ${record.id} to pending_review in schema ${schemaName}...`);
+    // 3. Update invoice with extracted data in the shared public table
+    console.log(`Updating invoice ${record.id} to pending_review in public schema...`);
     
     const normalized = normalizeExtraction(extractedData);
     const updatePayload = {
@@ -255,18 +232,11 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       extraction_method: 'docling+gemini',
     };
 
-    let updateError = null;
-    if (schemaName && schemaName !== 'public') {
-      const { error } = await supabaseClient.rpc('tenant_update_row', {
-        p_table_name: 'invoices',
-        p_id: record.id,
-        p_payload: { organization_id: record.organization_id, ...updatePayload }
-      });
-      updateError = error;
-    } else {
-      const { error } = await supabaseClient.from('invoices').update(updatePayload).eq('id', record.id);
-      updateError = error;
-    }
+    const { error: updateError } = await supabaseClient
+      .from('invoices')
+      .update(updatePayload)
+      .eq('id', record.id)
+      .eq('organization_id', record.organization_id);
 
     if (updateError) {
       await supabaseClient.from('debug_logs').insert({
@@ -289,21 +259,11 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     });
 
     const failPayload = { status: 'extract_failed', ap_status: 'action_required', validation_results: { error: err.message } };
-    let failUpdateError = null;
-
-    if (schemaName && schemaName !== 'public') {
-      const { error } = await supabaseClient.rpc('tenant_update_row', {
-        p_table_name: 'invoices',
-        p_id: record.id,
-        p_payload: { organization_id: record.organization_id, ...failPayload }
-      });
-      failUpdateError = error;
-    } else {
-      const { error } = await supabaseClient.from('invoices')
-        .update(failPayload)
-        .eq('id', record.id);
-      failUpdateError = error;
-    }
+    const { error: failUpdateError } = await supabaseClient
+      .from('invoices')
+      .update(failPayload)
+      .eq('id', record.id)
+      .eq('organization_id', record.organization_id);
       
     // Log the failure to event log
     await supabaseClient.from('debug_logs').insert({
@@ -324,10 +284,9 @@ serve(async (req) => {
     )
 
     const payload = await req.json()
-    const { invoice_id, action, type, table, record, old_record, schema } = payload
+    const { invoice_id, action, type, table, record, old_record } = payload
 
-    const targetSchema = await resolveInvoiceWriteSchema(record, schema || 'public', supabaseClient);
-    assertSafeSchemaName(targetSchema);
+    const targetSchema = resolveInvoiceWriteSchema();
 
     // 1. Direct Call logic
     if (action && invoice_id) {

@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
@@ -224,15 +224,15 @@ serve(async (req) => {
             status: 'sent',
           }).eq('id', delivery.id);
 
-          const { error: auditError } = await supabase.from('audit_logs').insert({
+          const { error: auditError } = await supabase.rpc('log_audit_event', { p_entry: {
             action: `dashboard_${reportType}_report_scheduler_sent`,
-            details: JSON.stringify({ scope: preference.scope, scopeKey: preference.scope_key, recipients: recipients.length }),
+            details: { scope: preference.scope, scopeKey: preference.scope_key, recipients: recipients.length },
             entity_id: delivery.id,
             entity_type: 'dashboard_report_delivery',
             module: 'system',
-            org_id: preference.organization_id,
+            organization_id: preference.organization_id,
             table_name: 'dashboard_report_deliveries',
-          });
+          }});
           if (auditError) console.warn('Dashboard report audit insert failed:', auditError.message);
 
           results.push({ delivery_id: delivery.id, notified: recipients.length, report_type: reportType, status: 'sent' });
@@ -257,3 +257,4 @@ serve(async (req) => {
     });
   }
 });
+

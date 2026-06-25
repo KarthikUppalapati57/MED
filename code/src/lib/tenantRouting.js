@@ -1,33 +1,35 @@
-import { supabase } from '@/lib/supabaseClient';
-
 export async function getTenantDataRoute({ organizationId, brandId = null, locationId = null } = {}) {
-  const { data, error } = await supabase.rpc('get_tenant_data_route', {
-    p_organization_id: organizationId || null,
-    p_brand_id: brandId || null,
-    p_location_id: locationId || null,
-  });
-
-  if (error) throw error;
-  return data;
+  return {
+    organization_id: organizationId || null,
+    brand_id: brandId || null,
+    location_id: locationId || null,
+    schema_name: 'public',
+    status: 'shared_public',
+    read_mode: 'public',
+    write_mode: 'public',
+    read_source: 'public',
+    write_target: 'public',
+  };
 }
 
 export async function getTenantRuntime(organizationId = null) {
-  const { data, error } = await supabase.rpc('get_tenant_runtime', {
-    p_organization_id: organizationId,
-  });
-
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] || null : data || null;
+  return {
+    organization_id: organizationId,
+    schema_name: 'public',
+    read_mode: 'public',
+    write_mode: 'public',
+    tenancy_model: 'shared_public',
+  };
 }
 
-export function getRouteReadSource(route) {
-  return route?.read_source || 'public';
+export function getRouteReadSource() {
+  return 'public';
 }
 
-export function getRouteWriteTarget(route) {
-  return route?.write_target || 'public';
+export function getRouteWriteTarget() {
+  return 'public';
 }
 
-export function isTenantSchemaRoute(route) {
-  return route?.read_mode === 'tenant_schema' || route?.write_mode === 'tenant_schema';
+export function isTenantSchemaRoute() {
+  return false;
 }

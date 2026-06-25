@@ -1,0 +1,7 @@
+-- Remote migration history placeholder.
+--
+-- Supabase remote already has migration version 20260624211911 applied, but
+-- the corresponding SQL file was not present in this local workspace when
+-- Phase 4 modernization started. Supabase migration history stores versions,
+-- not migration SQL bodies, so this file preserves local/remote history
+-- alignment without changing database state.

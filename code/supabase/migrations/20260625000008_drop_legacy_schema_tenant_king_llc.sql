@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS tenant_king_llc_942_27cc6676 CASCADE;

@@ -96,14 +96,11 @@ export default function VendorStatementsTab({ vendors }) {
       });
 
       // Mock creating 3 statement lines, one matched, one unmatched, one missing credit
-      const { error: lineErr } = await supabase.rpc('tenant_insert_vendor_statement_lines', {
-        p_organization_id: organization.id,
-        p_lines: [
-          { statement_id: st.id, invoice_number: 'INV-101', amount: Number(uploadAmount) * 0.5, status: 'unmatched' },
-          { statement_id: st.id, invoice_number: 'INV-102', amount: Number(uploadAmount) * 0.6, status: 'unmatched' },
-          { statement_id: st.id, invoice_number: 'CR-99', amount: -Number(uploadAmount) * 0.1, status: 'unmatched' }
-        ]
-      });
+      const { error: lineErr } = await supabase.from('vendor_statement_lines').insert([
+        { statement_id: st.id, invoice_number: 'INV-101', amount: Number(uploadAmount) * 0.5, status: 'unmatched' },
+        { statement_id: st.id, invoice_number: 'INV-102', amount: Number(uploadAmount) * 0.6, status: 'unmatched' },
+        { statement_id: st.id, invoice_number: 'CR-99', amount: -Number(uploadAmount) * 0.1, status: 'unmatched' }
+      ]);
       if (lineErr) throw lineErr;
       
       return st;

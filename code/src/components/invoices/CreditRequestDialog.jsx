@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Camera, Upload, AlertCircle, X, DollarSign, Send, Loader2 } from 'lucide-react';
 import {
@@ -18,7 +18,7 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
-  const { organization, location, userProfile } = useAuth();
+  const { organization } = useAuth();
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -34,40 +34,12 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
         throw new Error("Provide a reason for the credit");
       }
 
-      // 1. Log the Credit Request
-      const creditReq = await api.entities.CreditRequest.create({
-        organization_id: organization?.id,
-        location_id: location?.id || invoice.location_id,
-        invoice_id: invoice.id,
-        vendor_id: invoice.vendor_id,
-        requested_amount: parseFloat(amount),
+      return api.financial.requestInvoiceCredit({
+        invoiceId: invoice.id,
+        amount: parseFloat(amount),
         reason: reason.trim(),
-        photo_url: photo ? "s3://mock-bucket/credit-photo.jpg" : null, // Mocking S3 upload for demo
-        status: 'pending',
-        created_by: userProfile?.id || null
+        photoUrl: photo ? "s3://mock-bucket/credit-photo.jpg" : null,
       });
-
-      // 2. Automatically update the Invoice's total amount (Short Pay)
-      // We assume `amount_due` or `total_amount` needs to be updated.
-      // For the demo, we update the `total_amount` of the invoice.
-      const newTotal = Math.max(0, (invoice.total_amount || 0) - parseFloat(amount));
-      
-      await api.entities.Invoice.update(invoice.id, {
-        total_amount: newTotal,
-        status: 'needs_review', // Flag it for accounting to review the short-pay
-      });
-
-      // 3. Log Audit Event
-      await api.entities.AuditLog.create({
-        organization_id: organization?.id,
-        user_id: userProfile?.id,
-        action: 'credit_request_created',
-        resource_type: 'invoice',
-        resource_id: invoice.id,
-        details: { requested_amount: parseFloat(amount), reason, vendor_id: invoice.vendor_id }
-      });
-
-      return creditReq;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -187,3 +159,4 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
     </Dialog>
   );
 }
+

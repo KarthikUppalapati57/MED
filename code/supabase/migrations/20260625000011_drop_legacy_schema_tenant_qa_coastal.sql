@@ -1,0 +1,1 @@
+DROP SCHEMA IF EXISTS tenant_qa_coastal_restaurants_bf330c83 CASCADE;
