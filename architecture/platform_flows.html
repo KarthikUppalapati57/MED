@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>MED SaaS — Enterprise Architecture Flows</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f1a;--surface:#111827;--surface2:#1a2235;--border:#1f2d45;
+  --text:#e2e8f0;--muted:#64748b;--subtle:#94a3b8;
+  --brand:#3b82f6;--brand2:#6366f1;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--cyan:#06b6d4;--pink:#ec4899;--purple:#8b5cf6;
+  --lane-w:120px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── HEADER ── */
+.header{
+  display:flex;align-items:center;gap:12px;
+  padding:0 20px;height:52px;min-height:52px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:200;
+  box-shadow:0 2px 16px rgba(0,0,0,.5);
+}
+.header-brand{display:flex;align-items:center;gap:10px}
+.header-brand svg{flex-shrink:0}
+.header-title{font-size:14px;font-weight:700;color:var(--text)}
+.header-sub{font-size:10px;color:var(--muted);margin-top:1px}
+.header-divider{width:1px;height:28px;background:var(--border);margin:0 8px}
+.header-controls{display:flex;align-items:center;gap:6px;margin-left:auto}
+.btn{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--subtle);
+  font-size:11px;font-weight:500;cursor:pointer;
+  transition:all .15s;white-space:nowrap;font-family:'Inter',sans-serif;
+}
+.btn:hover{border-color:var(--brand);color:var(--text);background:#1e2d45}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:#2563eb;border-color:#2563eb;color:#fff}
+.zoom-display{
+  padding:4px 10px;border-radius:6px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--subtle);font-size:11px;
+  font-family:'JetBrains Mono',monospace;min-width:52px;text-align:center;
+}
+
+/* ── TABS ── */
+.tabs{
+  display:flex;gap:2px;padding:0 20px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;overflow-x:auto;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  display:flex;align-items:center;gap:7px;
+  padding:10px 14px;border-bottom:2px solid transparent;
+  cursor:pointer;font-size:11.5px;font-weight:500;
+  color:var(--muted);white-space:nowrap;transition:all .15s;
+  user-select:none;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--brand)}
+.tab-num{
+  width:18px;height:18px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;
+  background:var(--border);color:var(--muted);
+}
+.tab.active .tab-num{background:var(--brand);color:#fff}
+
+/* ── CANVAS AREA ── */
+.canvas-wrap{
+  flex:1;overflow:hidden;position:relative;cursor:grab;
+  background:
+    radial-gradient(circle at 1px 1px, #1f2d4530 1px, transparent 0) 0 0 / 24px 24px,
+    var(--bg);
+}
+.canvas-wrap.grabbing{cursor:grabbing}
+.canvas-svg{display:block;width:100%;height:100%;overflow:visible}
+
+/* ── STATUS BAR ── */
+.status-bar{
+  display:flex;align-items:center;gap:16px;
+  padding:0 16px;height:28px;min-height:28px;
+  background:var(--surface);border-top:1px solid var(--border);
+  flex-shrink:0;font-size:10px;color:var(--muted);
+  font-family:'JetBrains Mono',monospace;
+}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* ── TOOLTIP ── */
+.tip{
+  position:fixed;pointer-events:none;z-index:999;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;font-size:11px;
+  color:var(--text);max-width:280px;line-height:1.5;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);opacity:0;transition:opacity .1s;
+}
+.tip.show{opacity:1}
+
+/* ── MINIMAP ── */
+.minimap{
+  position:absolute;bottom:16px;right:16px;
+  width:160px;height:96px;border-radius:8px;
+  background:var(--surface2);border:1px solid var(--border);
+  overflow:hidden;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.minimap-viewport{
+  position:absolute;border:1.5px solid var(--brand);
+  border-radius:2px;pointer-events:none;
+  background:rgba(59,130,246,.08);
+}
+
+/* ── LEGEND ── */
+.legend{
+  position:absolute;top:16px;right:16px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;
+  font-size:10px;min-width:180px;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.legend h4{font-size:10px;font-weight:700;color:var(--subtle);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.legend-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;color:var(--subtle)}
+.legend-shape{flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">
+    <svg width="32" height="32" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="url(#hg)"/>
+      <defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#6366f1"/></linearGradient></defs>
+      <text x="16" y="21" text-anchor="middle" fill="white" font-size="16" font-family="serif">M</text>
+    </svg>
+    <div>
+      <div class="header-title">MED Restaurant SaaS · Enterprise Architecture</div>
+      <div class="header-sub">Multi-Tenant · React + Supabase + AI · 41 Edge Functions · 237 Migrations</div>
+    </div>
+  </div>
+  <div class="header-divider"></div>
+  <div class="header-controls">
+    <button class="btn" onclick="zoomIn()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="4.5" x2="7" y2="9.5" stroke="currentColor" stroke-width="1.5"/><line x1="4.5" y1="7" x2="9.5" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      Zoom In
+    </button>
+    <button class="btn" onclick="zoomOut()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/><line x1="4.5" y1="7" x2="9.5" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      Zoom Out
+    </button>
+    <button class="btn" onclick="resetView()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1 1 1.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><polyline points="2,4 2,8 6,8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Reset
+    </button>
+    <div class="zoom-display" id="zoomLevel">100%</div>
+    <div class="header-divider"></div>
+    <button class="btn btn-primary" onclick="window.print()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="3" y="8" width="10" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 8V3h6v5" stroke="currentColor" stroke-width="1.5"/><rect x="5" y="10" width="2" height="1.5" rx=".5" fill="currentColor"/></svg>
+      Export PDF
+    </button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs" id="tabs"></div>
+
+<!-- CANVAS -->
+<div class="canvas-wrap" id="canvasWrap">
+  <svg class="canvas-svg" id="mainSvg" xmlns="http://www.w3.org/2000/svg">
+    <g id="viewport"></g>
+  </svg>
+  <div class="minimap" id="minimap"><canvas id="minimapCanvas" width="160" height="96"></canvas><div class="minimap-viewport" id="minimapVP"></div></div>
+  <div class="legend" id="legend">
+    <h4>Legend</h4>
+    <div class="legend-row"><svg width="28" height="18"><rect x="1" y="3" width="26" height="12" rx="3" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.2"/></svg>User Actor / System</div>
+    <div class="legend-row"><svg width="28" height="18"><rect x="1" y="3" width="26" height="12" rx="6" fill="#0c2a2a" stroke="#06b6d4" stroke-width="1.2"/></svg>Frontend (React)</div>
+    <div class="legend-row"><svg width="28" height="18"><rect x="1" y="3" width="26" height="12" rx="3" fill="#2d1a00" stroke="#f59e0b" stroke-width="1.2"/><text x="14" y="11" text-anchor="middle" font-size="7" fill="#fcd34d" font-family="Inter">λ</text></svg>Edge Function</div>
+    <div class="legend-row"><svg width="28" height="18"><ellipse cx="14" cy="9" rx="11" ry="5" fill="#1a2e1a" stroke="#22c55e" stroke-width="1.2"/><rect x="3" y="9" width="22" height="7" fill="#1a2e1a"/><ellipse cx="14" cy="14" rx="11" ry="4" fill="none" stroke="#22c55e" stroke-width="1.2"/></svg>PostgreSQL Table</div>
+    <div class="legend-row"><svg width="28" height="18"><rect x="1" y="3" width="26" height="12" rx="3" fill="#2d0a2d" stroke="#ec4899" stroke-width="1.2"/></svg>AI / ML Service</div>
+    <div class="legend-row"><svg width="28" height="18"><polygon points="14,3 27,9 14,15 1,9" fill="#1a1a2a" stroke="#8b5cf6" stroke-width="1.2"/></svg>Decision Gateway</div>
+    <div class="legend-row"><svg width="28" height="18"><path d="M5,12 Q5,6 10,5 Q14,2 18,5 Q23,4 24,9 Q27,10 25,13 Q27,16 22,16 Q5,18 5,13Z" fill="#0a1a2a" stroke="#4f7df3" stroke-width="1.2"/></svg>External Service</div>
+    <div class="legend-row"><svg width="28" height="14"><line x1="2" y1="7" x2="22" y2="7" stroke="#475569" stroke-width="1.5"/><polygon points="22,4 26,7 22,10" fill="#475569"/></svg>Sync Flow</div>
+    <div class="legend-row"><svg width="28" height="14"><line x1="2" y1="7" x2="22" y2="7" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 2"/><polygon points="22,4 26,7 22,10" fill="#475569"/></svg>Async / Event</div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="status-dot"></div>
+  <span id="statusFlow">Platform Overview</span>
+  <span>·</span>
+  <span id="statusSteps">— steps</span>
+  <span>·</span>
+  <span id="statusPos">x:0 y:0</span>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tip" id="tip"></div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+//  ENTERPRISE ARCHITECTURE DIAGRAM ENGINE
+//  Standards: C4 Model · BPMN 2.0 · ArchiMate · Azure Architecture
+// ═══════════════════════════════════════════════════════════════
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// ── COLOUR PALETTE (Enterprise Professional) ──────────────────
+const P = {
+  // Actor / User
+  user:    {bg:'#0d2044',border:'#2563eb',text:'#93c5fd',icon:'#60a5fa'},
+  // Frontend
+  react:   {bg:'#061f2f',border:'#0891b2',text:'#67e8f9',icon:'#22d3ee'},
+  // Auth
+  auth:    {bg:'#1a0f35',border:'#7c3aed',text:'#c4b5fd',icon:'#a78bfa'},
+  // Edge Function / Serverless
+  edge:    {bg:'#1c1000',border:'#d97706',text:'#fbbf24',icon:'#f59e0b'},
+  // Database / PostgreSQL
+  db:      {bg:'#061a0d',border:'#15803d',text:'#4ade80',icon:'#22c55e'},
+  // AI / ML
+  ai:      {bg:'#1a0520',border:'#be185d',text:'#f9a8d4',icon:'#ec4899'},
+  // Storage
+  storage: {bg:'#0d0d2a',border:'#4338ca',text:'#a5b4fc',icon:'#818cf8'},
+  // External (Stripe, POS etc)
+  ext:     {bg:'#0f172a',border:'#334155',text:'#94a3b8',icon:'#64748b'},
+  // Stripe
+  stripe:  {bg:'#0a0f2e',border:'#4f46e5',text:'#a5b4fc',icon:'#818cf8'},
+  // POS
+  pos:     {bg:'#1a0c00',border:'#c2410c',text:'#fdba74',icon:'#f97316'},
+  // Scheduler / Cron
+  cron:    {bg:'#0f1520',border:'#475569',text:'#cbd5e1',icon:'#94a3b8'},
+  // Queue
+  queue:   {bg:'#071717',border:'#0e7490',text:'#67e8f9',icon:'#06b6d4'},
+  // Admin
+  admin:   {bg:'#1a0505',border:'#b91c1c',text:'#fca5a5',icon:'#ef4444'},
+  // Success path
+  ok:      '#15803d',
+  // Error path
+  err:     '#b91c1c',
+  // Neutral path
+  neutral: '#475569',
+  // Async path
+  async:   '#334155',
+};
+
+// ── SVG ICON LIBRARY (brand-accurate inline SVG paths) ─────────
+const ICON = {
+  react: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <circle cx="50" cy="50" r="9" fill="#61dafb"/>
+    <ellipse cx="50" cy="50" rx="45" ry="16" fill="none" stroke="#61dafb" stroke-width="5"/>
+    <ellipse cx="50" cy="50" rx="45" ry="16" fill="none" stroke="#61dafb" stroke-width="5" transform="rotate(60,50,50)"/>
+    <ellipse cx="50" cy="50" rx="45" ry="16" fill="none" stroke="#61dafb" stroke-width="5" transform="rotate(120,50,50)"/>
+  </g>`,
+
+  supabase: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <path d="M56 0L2 60h38L20 100h78L56 0z" fill="#3ecf8e"/>
+  </g>`,
+
+  postgres: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <ellipse cx="50" cy="35" rx="38" ry="28" fill="#336791"/>
+    <rect x="12" y="35" width="76" height="45" fill="#336791"/>
+    <ellipse cx="50" cy="80" rx="38" ry="15" fill="#336791"/>
+    <ellipse cx="50" cy="35" rx="38" ry="12" fill="#fff" opacity=".15"/>
+    <text x="50" y="65" text-anchor="middle" fill="white" font-size="34" font-weight="900" font-family="Arial">🐘</text>
+  </g>`,
+
+  stripe: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="18" fill="#635bff"/>
+    <path d="M50 35c-16 0-22 8-22 16 0 17 26 14 26 22 0 4-4 6-10 6-9 0-16-4-16-4v16s7 4 18 4c17 0 24-8 24-17 0-18-26-15-26-23 0-3 3-5 8-5 8 0 16 4 16 4V39s-6-4-18-4z" fill="white"/>
+  </g>`,
+
+  gemini: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <circle cx="50" cy="50" r="48" fill="#1a73e8"/>
+    <path d="M50 15 Q68 50 50 85 Q32 50 50 15Z" fill="white" opacity=".9"/>
+    <path d="M15 50 Q50 32 85 50 Q50 68 15 50Z" fill="white" opacity=".9"/>
+  </g>`,
+
+  deno: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <circle cx="50" cy="50" r="48" fill="#000"/>
+    <text x="50" y="68" text-anchor="middle" fill="white" font-size="50" font-family="Arial">🦕</text>
+  </g>`,
+
+  quickbooks: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <circle cx="50" cy="50" r="48" fill="#2ca01c"/>
+    <text x="50" y="64" text-anchor="middle" fill="white" font-size="28" font-weight="900" font-family="Arial">QB</text>
+  </g>`,
+
+  docling: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#f97316"/>
+    <text x="50" y="64" text-anchor="middle" fill="white" font-size="36" font-family="Arial">📄</text>
+  </g>`,
+
+  toast: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#ff4500"/>
+    <text x="50" y="66" text-anchor="middle" fill="white" font-size="36" font-weight="900" font-family="Arial">T</text>
+  </g>`,
+
+  square: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#000"/>
+    <rect x="20" y="20" width="60" height="60" rx="8" fill="white"/>
+    <rect x="34" y="34" width="32" height="32" rx="4" fill="#000"/>
+  </g>`,
+
+  azure: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#0078d4"/>
+    <path d="M25 75 L50 25 L75 75 L62 75 L50 50 L38 75Z" fill="white"/>
+  </g>`,
+
+  python: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <text x="50" y="68" text-anchor="middle" font-size="60" font-family="Arial">🐍</text>
+  </g>`,
+
+  mfa: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#7c3aed"/>
+    <text x="50" y="66" text-anchor="middle" font-size="44" font-family="Arial">🔐</text>
+  </g>`,
+
+  email: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <rect width="100" height="100" rx="14" fill="#d97706"/>
+    <rect x="12" y="28" width="76" height="52" rx="4" fill="white" opacity=".9"/>
+    <path d="M12 28 L50 58 L88 28" fill="none" stroke="#d97706" stroke-width="8"/>
+  </g>`,
+
+  whatsapp: (x,y,s=20) => `<g transform="translate(${x},${y}) scale(${s/100})">
+    <circle cx="50" cy="50" r="48" fill="#25d366"/>
+    <text x="50" y="66" text-anchor="middle" font-size="44" font-family="Arial">💬</text>
+  </g>`,
+};
+
+// ── SHAPE BUILDERS ─────────────────────────────────────────────
+function el(tag, attrs, ...children) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  for (const c of children) {
+    if (typeof c === 'string') e.innerHTML += c;
+    else if (c) e.appendChild(c);
+  }
+  return e;
+}
+
+function fEl(tag, attrs, html='') {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  e.innerHTML = html;
+  return e;
+}
+
+// Main DEFS (filters, gradients, markers)
+function buildDefs() {
+  return `<defs>
+    <filter id="shadow" x="-8%" y="-8%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity=".5"/>
+    </filter>
+    <filter id="glow-blue" x="-15%" y="-15%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#3b82f6" flood-opacity=".3" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 Z" fill="#475569"/>
+    </marker>
+    <marker id="arr-ok" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 Z" fill="#15803d"/>
+    </marker>
+    <marker id="arr-err" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 Z" fill="#b91c1c"/>
+    </marker>
+    <marker id="arr-amber" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 Z" fill="#d97706"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 Z" fill="#2563eb"/>
+    </marker>
+    <linearGradient id="grad-brand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="grad-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#0e7490"/>
+    </linearGradient>
+  </defs>`;
+}
+
+// ── COMPONENT PRIMITIVES ───────────────────────────────────────
+
+// Step badge (numbered circle on arrow)
+function stepBadge(x, y, num, color='#1e2d45') {
+  return `<circle cx="${x}" cy="${y}" r="9" fill="${color}" stroke="#334155" stroke-width="1"/>
+    <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" fill="#94a3b8" font-size="8" font-weight="700" font-family="Inter">${num}</text>`;
+}
+
+// Process box (BPMN Task)
+function box(x, y, w, h, p, label, sub='', iconHtml='', step='', tip='') {
+  const {bg, border, text} = p;
+  const lh = sub ? y+h/2-7 : y+h/2+1;
+  const hasStep = step !== '';
+  return `<g class="node" data-tip="${tip}" style="cursor:default">
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${bg}" stroke="${border}" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="${x}" y="${y}" width="4" height="${h}" rx="2" fill="${border}" style="border-radius:2px 0 0 2px"/>
+    ${iconHtml}
+    <text x="${x+w/2+2}" y="${lh}" text-anchor="middle" dominant-baseline="middle" fill="${text}" font-size="10.5" font-weight="600" font-family="Inter">${label}</text>
+    ${sub ? `<text x="${x+w/2+2}" y="${y+h/2+9}" text-anchor="middle" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">${sub}</text>` : ''}
+    ${hasStep ? stepBadge(x+w-10, y-8, step) : ''}
+  </g>`;
+}
+
+// Subprocess box (has [+] indicator)
+function subprocess(x, y, w, h, p, label, sub='', step='') {
+  return box(x,y,w,h,p,label,sub,'',step) + 
+    `<rect x="${x+w/2-8}" y="${y+h-12}" width="16" height="10" rx="2" fill="${p.bg}" stroke="${p.border}" stroke-width="1"/>
+     <text x="${x+w/2}" y="${y+h-6}" text-anchor="middle" dominant-baseline="middle" fill="${p.border}" font-size="8" font-family="Inter">+</text>`;
+}
+
+// Start event (BPMN)
+function startEvent(x, y, r=14, label='Start') {
+  return `<g>
+    <circle cx="${x}" cy="${y}" r="${r}" fill="#061a0d" stroke="#15803d" stroke-width="2" filter="url(#shadow)"/>
+    <circle cx="${x}" cy="${y}" r="${r-5}" fill="#15803d"/>
+    <text x="${x}" y="${y+r+11}" text-anchor="middle" fill="#4ade80" font-size="9" font-weight="600" font-family="Inter">${label}</text>
+  </g>`;
+}
+
+// End event (BPMN)  
+function endEvent(x, y, r=14, label='End') {
+  return `<g>
+    <circle cx="${x}" cy="${y}" r="${r}" fill="#1a0505" stroke="#b91c1c" stroke-width="3"/>
+    <circle cx="${x}" cy="${y}" r="${r-5}" fill="#b91c1c"/>
+    <text x="${x}" y="${y+r+11}" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="600" font-family="Inter">${label}</text>
+  </g>`;
+}
+
+// Gateway diamond
+function gateway(cx, cy, w, h, p, label, tip='') {
+  const pts = `${cx},${cy-h/2} ${cx+w/2},${cy} ${cx},${cy+h/2} ${cx-w/2},${cy}`;
+  return `<g class="node" data-tip="${tip}">
+    <polygon points="${pts}" fill="${p.bg}" stroke="${p.border}" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="${p.text}" font-size="9" font-weight="600" font-family="Inter">${label}</text>
+  </g>`;
+}
+
+// Database cylinder
+function db(x, y, w, h, p, label, sub='', step='', tip='') {
+  const {bg, border, text} = p;
+  const rx = w/2, ry = 10, cx = x+w/2;
+  return `<g class="node" data-tip="${tip}" style="cursor:default">
+    <rect x="${x}" y="${y+ry}" width="${w}" height="${h-ry}" fill="${bg}" stroke="${border}" stroke-width="1.5"/>
+    <ellipse cx="${cx}" cy="${y+ry}" rx="${rx}" ry="${ry}" fill="${bg}" stroke="${border}" stroke-width="1.5"/>
+    <ellipse cx="${cx}" cy="${y+ry}" rx="${rx}" ry="${ry}" fill="${border}" fill-opacity=".12"/>
+    <ellipse cx="${cx}" cy="${y+h}" rx="${rx}" ry="${ry}" fill="${bg}" stroke="${border}" stroke-width="1.5"/>
+    <text x="${cx}" y="${y+ry+(h-ry)*0.45+2}" text-anchor="middle" dominant-baseline="middle" fill="${text}" font-size="10" font-weight="600" font-family="Inter">${label}</text>
+    ${sub ? `<text x="${cx}" y="${y+ry+(h-ry)*0.72}" text-anchor="middle" dominant-baseline="middle" fill="#334155" font-size="8.5" font-family="JetBrains Mono">${sub}</text>` : ''}
+    ${step !== '' ? stepBadge(x+w-8, y-8, step) : ''}
+  </g>`;
+}
+
+// Cloud / external service
+function cloud(x, y, w, h, p, label, sub='', iconHtml='', tip='') {
+  const {bg, border, text} = p;
+  const cx = x+w/2, cy = y+h/2;
+  const path = `M${x+w*.22},${y+h*.78} Q${x-2},${y+h*.82} ${x+4},${y+h*.58} Q${x-4},${y+h*.3} ${x+w*.18},${y+h*.32} Q${x+w*.18},${y-2} ${x+w*.44},${y+4} Q${x+w*.52},${y-4} ${x+w*.72},${y+6} Q${x+w+2},${y+4} ${x+w},${y+h*.32} Q${x+w+4},${y+h*.5} ${x+w-2},${y+h*.6} Q${x+w+4},${y+h*.82} ${x+w*.78},${y+h*.84} Z`;
+  return `<g class="node" data-tip="${tip}" style="cursor:default">
+    <path d="${path}" fill="${bg}" stroke="${border}" stroke-width="1.5" filter="url(#shadow)"/>
+    ${iconHtml}
+    <text x="${cx}" y="${sub?cy-5:cy+1}" text-anchor="middle" dominant-baseline="middle" fill="${text}" font-size="10" font-weight="600" font-family="Inter">${label}</text>
+    ${sub ? `<text x="${cx}" y="${cy+10}" text-anchor="middle" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">${sub}</text>` : ''}
+  </g>`;
+}
+
+// Queue (storage queue shape)
+function queueShape(x, y, w, h, p, label, sub='') {
+  const {bg, border, text} = p;
+  const path = `M${x},${y+8} Q${x+w*.25},${y} ${x+w*.5},${y+8} Q${x+w*.75},${y+16} ${x+w},${y+8} L${x+w},${y+h} L${x},${y+h} Z`;
+  return `<g class="node" style="cursor:default">
+    <path d="${path}" fill="${bg}" stroke="${border}" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="${x+w/2}" y="${y+h/2+8}" text-anchor="middle" dominant-baseline="middle" fill="${text}" font-size="10" font-weight="600" font-family="Inter">${label}</text>
+    ${sub ? `<text x="${x+w/2}" y="${y+h/2+21}" text-anchor="middle" fill="#475569" font-size="8.5" font-family="Inter">${sub}</text>` : ''}
+  </g>`;
+}
+
+// Swimlane container
+function swimlane(x, y, w, h, label, color, subLabel='') {
+  return `<g>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${color}06" stroke="${color}25" stroke-width="1"/>
+    <rect x="${x}" y="${y}" width="6" height="${h}" rx="3" fill="${color}50"/>
+    <rect x="${x+6}" y="${y}" width="${w-6}" height="32" rx="0" fill="${color}12"/>
+    <text x="${x+18}" y="${y+16}" dominant-baseline="middle" fill="${color}" font-size="11" font-weight="700" font-family="Inter" letter-spacing=".5">${label}</text>
+    ${subLabel ? `<text x="${x+18}" y="${y+27}" dominant-baseline="middle" fill="${color}80" font-size="8.5" font-family="Inter">${subLabel}</text>` : ''}
+  </g>`;
+}
+
+// Annotation callout
+function annotation(x, y, w, text, color='#334155') {
+  const lines = text.split('\n');
+  const h = lines.length * 14 + 12;
+  return `<g>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${color}15" stroke="${color}40" stroke-width="1" stroke-dasharray="4 2"/>
+    ${lines.map((l,i) => `<text x="${x+7}" y="${y+13+i*14}" fill="${color}" font-size="8.5" font-family="Inter">${l}</text>`).join('')}
+  </g>`;
+}
+
+// Section title
+function sectionTitle(x, y, w, label, color) {
+  return `<g>
+    <rect x="${x}" y="${y}" width="${w}" height="26" rx="5" fill="${color}15" stroke="${color}30"/>
+    <rect x="${x}" y="${y}" width="4" height="26" rx="2" fill="${color}"/>
+    <text x="${x+12}" y="${y+13}" dominant-baseline="middle" fill="${color}" font-size="11" font-weight="700" font-family="Inter" letter-spacing=".3">${label}</text>
+  </g>`;
+}
+
+// Arrow primitives
+function arrow(x1, y1, x2, y2, label='', type='neutral', step='', dashed=false) {
+  const colors = {neutral:'#475569', ok:'#15803d', err:'#b91c1c', amber:'#d97706', blue:'#2563eb', purple:'#7c3aed'};
+  const markers = {neutral:'arr', ok:'arr-ok', err:'arr-err', amber:'arr-amber', blue:'arr-blue'};
+  const c = colors[type] || colors.neutral;
+  const m = markers[type] || markers.neutral;
+  const dash = dashed ? 'stroke-dasharray="6 3"' : '';
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+  const ex = x2-(dx/len)*9, ey = y2-(dy/len)*9;
+  const mx=(x1+x2)/2, my=(y1+y2)/2;
+  let lbl = '';
+  if (label) {
+    const lw = label.length * 5.5 + 10;
+    lbl = `<rect x="${mx-lw/2}" y="${my-9}" width="${lw}" height="14" rx="3" fill="#0b0f1a" stroke="${c}40" stroke-width=".5"/>
+    <text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" fill="${c}" font-size="8.5" font-weight="500" font-family="Inter">${label}</text>`;
+  }
+  const sb = step !== '' ? stepBadge(mx+(label?18:0), my-(label?0:8), step, '#0b0f1a') : '';
+  return `<g>
+    <line x1="${x1}" y1="${y1}" x2="${ex}" y2="${ey}" stroke="${c}" stroke-width="1.5" ${dash} marker-end="url(#${m})"/>
+    ${lbl}${sb}
+  </g>`;
+}
+
+// Orthogonal connector (L-shape via bend point)
+function orthoArrow(x1, y1, x2, y2, bend, label='', type='neutral', step='', dashed=false) {
+  const colors = {neutral:'#475569',ok:'#15803d',err:'#b91c1c',amber:'#d97706',blue:'#2563eb',purple:'#7c3aed'};
+  const markers = {neutral:'arr',ok:'arr-ok',err:'arr-err',amber:'arr-amber',blue:'arr-blue'};
+  const c = colors[type]||colors.neutral;
+  const m = markers[type]||markers.neutral;
+  const dash = dashed ? 'stroke-dasharray="6 3"' : '';
+  // bend: {x,y} intermediate point
+  const bx = bend?.x ?? (x1+x2)/2;
+  const by = bend?.y ?? y1;
+  const d = `M${x1},${y1} L${bx},${by} L${bx},${y2} L${x2},${y2}`;
+  // shorten last segment for arrowhead
+  const dx = x2-bx, dy2 = y2-by;
+  const mx = (bx+x2)/2, my = (by+y2)/2;
+  let lbl='';
+  if(label){const lw=label.length*5.5+10;lbl=`<rect x="${mx-lw/2}" y="${my-9}" width="${lw}" height="14" rx="3" fill="#0b0f1a" stroke="${c}40" stroke-width=".5"/><text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" fill="${c}" font-size="8.5" font-weight="500" font-family="Inter">${label}</text>`;}
+  const sb = step!=='' ? stepBadge(mx+(label?18:0), my-(label?0:8), step,'#0b0f1a') : '';
+  return `<g><path d="${d}" fill="none" stroke="${c}" stroke-width="1.5" ${dash} marker-end="url(#${m})"/>
+    ${lbl}${sb}</g>`;
+}
+
+// Service logo badge
+function logoBadge(x, y, iconFn, label, p, w=52, h=52, tip='') {
+  const {bg, border, text} = p;
+  return `<g class="node" data-tip="${tip}" style="cursor:default">
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${bg}" stroke="${border}" stroke-width="1.5" filter="url(#shadow)"/>
+    ${iconFn(x+w/2-10, y+4, 20)}
+    <text x="${x+w/2}" y="${y+h-9}" text-anchor="middle" dominant-baseline="middle" fill="${text}" font-size="8" font-weight="600" font-family="Inter">${label}</text>
+  </g>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  WORKFLOW DIAGRAM BUILDERS
+//  Each returns an SVG string for the given flow
+// ════════════════════════════════════════════════════════════════
+
+// ─── WF-0: SYSTEM CONTEXT (C4 Level 1) ──────────────────────────
+function buildSystemContext() {
+  const W=1400, H=980;
+  let s = buildDefs();
+  // Background lanes
+  const laneH = 160;
+  const laneColors = ['#2563eb','#0891b2','#7c3aed','#d97706','#15803d','#be185d'];
+  const laneLabels = ['PRESENTATION LAYER','IDENTITY & SECURITY','API & COMPUTE LAYER','ASYNC PROCESSING','DATA PERSISTENCE','EXTERNAL INTEGRATIONS'];
+  laneColors.forEach((c,i) => {
+    s += `<rect x="0" y="${50+i*laneH}" width="${W}" height="${laneH}" fill="${c}07" stroke="${c}15"/>`;
+    s += `<rect x="0" y="${50+i*laneH}" width="5" height="${laneH}" fill="${c}60"/>`;
+    s += `<text x="16" y="${50+i*laneH+16}" dominant-baseline="middle" fill="${c}" font-size="9.5" font-weight="700" font-family="Inter" letter-spacing=".8">${laneLabels[i]}</text>`;
+  });
+
+  // ① Presentation Layer
+  s += sectionTitle(10,60, 200,'1. PRESENTATION','#2563eb');
+  s += logoBadge(220,75, ICON.react,'React / Vite SPA',P.react,80,64,'Front-end SPA built with React 18 + Vite, served from CDN. Connects to Supabase via JWT.');
+  s += box(340,78,200,56,P.react,'Azure Static Web Apps','Free Tier · CDN · Custom Domain','','','Globally distributed static hosting. Serves React bundle. TLS managed automatically.');
+  s += logoBadge(580,75, ICON.azure,'Azure CDN',P.ext,80,64,'Azure CDN delivers frontend assets globally with <50ms TTFB.');
+  s += box(700,78,160,56,P.react,'Mobile App (Cap.)','iOS + Android · Capacitor','','','Capacitor.js wraps the React SPA for native iOS/Android deployment.');
+
+  // ② Identity
+  s += sectionTitle(10,220,220,'2. IDENTITY','#7c3aed');
+  s += box(220,238,200,68,P.auth,'Microsoft Entra Ext. ID','OAuth2 · OIDC · TOTP MFA',ICON.mfa(230,248,18),'');
+  s += db(460,238,200,68,P.auth,'Supabase Auth Layer','JWT · RLS session vars','','');
+  s += box(700,238,200,68,P.auth,'RBAC / RLS Engine','5 Roles · org+brand+location scope','','');
+  s += box(940,238,200,68,P.auth,'MFA Enforcement Gate','aal1→aal2 · 30-day device trust','','');
+
+  // ③ API & Compute
+  s += sectionTitle(10,380,220,'3. API & COMPUTE','#d97706');
+  s += box(220,398,180,68,P.edge,'restops-core-api','Azure Container Apps · Modular','','','Single modular API container. Scales to zero when idle. Handles all business logic, RLS enforcement, and audit events.');
+  s += box(440,398,160,68,P.edge,'41 Edge Functions','Deno · Supabase Functions',ICON.deno(450,408,18),'','Serverless Deno functions. Key: invoice-processing, stripe-webhook, pos-webhook, smartprep-cron, invite-user.');
+  s += box(640,398,160,68,P.ai,'AI Backend','Python · Docling · Gemini',ICON.python(650,408,18),'','Python FastAPI backend running Docling OCR + Google Gemini Pro for invoice data extraction.');
+  s += box(840,398,160,68,P.edge,'pg_net / pg_cron','DB-native scheduling','','','pg_net for HTTP webhook triggers. pg_cron for scheduled jobs (SmartPrep nightly, report scheduler).');
+  s += logoBadge(1040,395,ICON.gemini,'Gemini Pro',P.ai,80,72,'Google Gemini Pro LLM. Powers: invoice extraction, SmartPrep prep lists, AI Insights chat, labor forecasting.');
+
+  // ④ Async Processing
+  s += sectionTitle(10,540,220,'4. ASYNC PROCESSING','#15803d');
+  s += queueShape(220,558,160,60,P.queue,'Azure Queue Storage','9 named queues');
+  s += box(420,558,180,60,P.edge,'webhook-dispatcher','Outbox pattern · pg_cron','','','Transactional outbox dispatcher. Reads unsent outbox_events, writes to queues, marks published. Prevents lost events.');
+  s += box(640,558,180,60,P.edge,'Event Grid Triggers','Blob events · Domain events','','','Azure Event Grid routes blob-created events (invoice upload) to invoice-processing function.');
+  s += box(860,558,160,60,P.cron,'Scheduled Jobs','pg_cron · Timer triggers','','','Nightly SmartPrep, hourly report snapshots, daily accounting sync, periodic drift detection.');
+
+  // ⑤ Data Persistence
+  s += sectionTitle(10,700,220,'5. DATA PERSISTENCE','#15803d');
+  s += db(220,718,180,68,P.db,'PostgreSQL Flexible','B1ms · 32GiB · Private VNet',ICON.postgres ? '':'');
+  s += db(440,718,180,68,P.storage,'Supabase Storage','invoices · avatars · vendor-docs','','');
+  s += db(660,718,160,68,P.db,'Materialized Views','mv_daily_sales\nmv_invoice_summary','','');
+  s += db(860,718,180,68,P.db,'audit_logs','Immutable · 90-day retention','','');
+  s += db(1080,718,160,68,P.db,'60+ Tables + RLS','237 migrations','','');
+
+  // ⑥ External
+  s += sectionTitle(10,860,220,'6. EXTERNAL','#be185d');
+  const externals = [
+    {x:220,fn:ICON.stripe,label:'Stripe',p:P.stripe,tip:'SaaS subscription billing + vendor payment intents.'},
+    {x:310,fn:ICON.toast,label:'Toast POS',p:P.pos,tip:'POS sales data ingestion via pos-webhook.'},
+    {x:400,fn:ICON.square,label:'Square POS',p:P.pos,tip:'Square POS order webhooks.'},
+    {x:490,fn:ICON.quickbooks,label:'QuickBooks',p:P.ext,tip:'GL journal entry sync via sync-accounting edge function.'},
+    {x:580,fn:ICON.email,label:'SendGrid',p:P.edge,tip:'Transactional email: invitations, invoice notifications, reports.'},
+    {x:670,fn:ICON.whatsapp,label:'WhatsApp',p:P.queue,tip:'Vendor purchase order delivery via WhatsApp Business API.'},
+    {x:760,fn:ICON.gemini,label:'Gemini AI',p:P.ai,tip:'Google Gemini Pro: invoice extraction, SmartPrep, AI chat.'},
+    {x:850,fn:ICON.python,label:'Docling OCR',p:P.ai,tip:'Python Docling PDF extraction backend. Runs on self-hosted container.'},
+    {x:940,fn:ICON.azure,label:'Azure CDN',p:P.ext,tip:'Frontend asset delivery and caching.'},
+  ];
+  externals.forEach(e => s += logoBadge(e.x, 872, e.fn, e.label, e.p, 80, 60, e.tip));
+
+  // Connections (key flows only for clarity)
+  const arrs = [
+    // Presentation → Identity
+    [300,107,300,238,'','blue','1'],
+    [580,107,580,238,'JWT','blue',''],
+    // Identity → API
+    [570,306,420,398,'validated JWT','blue','2'],
+    // API → DB
+    [310,466,310,718,'org+role scoped\nquery','ok','3'],
+    // API → AI
+    [720,466,760,458,'extract invoice\nPDF','amber',''],
+    // Edge Fn → Queue
+    [520,466,380,558,'async job','neutral','4',true],
+    // Edge Fn → DB
+    [600,466,600,718,'','ok',''],
+    // External → Edge Fn
+    [600,872,600,466,'webhook\n(Stripe/POS)','neutral','',true],
+    // DB → Mat Views
+    [400,718,660,752,'CDC trigger','neutral','',true],
+  ];
+  arrs.forEach(([x1,y1,x2,y2,lbl,type,step,dashed]) => s += arrow(x1,y1,x2,y2,lbl,type||'neutral',step||'',!!dashed));
+
+  // Title block
+  s += `<rect x="8" y="8" width="480" height="38" rx="6" fill="#111827" stroke="#1f2d45"/>`;
+  s += `<text x="16" y="23" dominant-baseline="middle" fill="#e2e8f0" font-size="13" font-weight="700" font-family="Inter">MED Restaurant SaaS — System Context Diagram (C4 L1)</text>`;
+  s += `<text x="16" y="37" dominant-baseline="middle" fill="#475569" font-size="9" font-family="Inter">Multi-tenant · React + Supabase + Azure · AI-Powered · Production Architecture</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-1: INVOICE LIFECYCLE (Crown Jewel) ───────────────────────
+function buildInvoiceFlow() {
+  const W=1500, H=1100;
+  let s = buildDefs();
+
+  // ── SWIMLANE COLUMNS ──
+  s += swimlane(20,20, 220,1060,'Ground Staff','#2563eb','Role: ground_staff');
+  s += swimlane(260,20, 220,1060,'React Frontend','#0891b2','Invoices.jsx · React Query');
+  s += swimlane(500,20, 220,1060,'Supabase Storage','#4338ca','Private Bucket · Signed URLs');
+  s += swimlane(740,20, 260,1060,'Edge Function: invoice-processing','#d97706','Deno · Service Role · pg_net trigger');
+  s += swimlane(1020,20, 220,1060,'AI Extraction Backend','#be185d','Python · Docling · Gemini Pro');
+  s += swimlane(1260,20, 220,1060,'PostgreSQL','#15803d','invoices + payments tables');
+
+  // ── FLOW STEPS ──
+
+  // START
+  s += startEvent(130,62,12,'Start');
+
+  // Step 1 — Opens Invoices page
+  s += box(30,88,200,48,P.user,'Opens Invoices.jsx','Invoices · Payments page','',1,'Ground staff navigates to Invoices page. React loads invoice list scoped to their location_id via RLS.');
+  s += arrow(130,136,370,136,'','blue','');
+
+  // Step 2 — File picker
+  s += box(270,116,200,48,P.react,'File Upload Dialog','PDF · JPEG · PNG · max 20MB','',2,'Frontend validates file type and size before upload. Shows progress indicator.');
+  s += arrow(370,164,610,164,'file selected','blue','');
+
+  // Step 3 — Create invoice record first
+  s += arrow(1370,180,1370,230,'','ok','3');
+  s += db(1270,230,200,64,P.db,'invoices INSERT','status = uploading','3','RLS ensures org_id matches authenticated user\'s organization. invoice_id generated by UUID.');
+
+  // Step 4 — Get signed upload URL  
+  s += box(270,188,200,52,P.react,'Request Upload URL','POST /uploads/invoice-auth','',4,'API validates org membership, location assignment, and role. Returns short-lived SAS URL for direct upload.');
+  s += arrow(370,214,610,214,'validate+generate URL','amber','');
+  s += box(510,200,200,52,P.storage,'Generate SAS URL','Short-lived · org-scoped path','','SAS URL expires in 300 seconds. Path: {org_id}/{loc_id}/{timestamp}_{file}');
+
+  // Step 5 — Direct browser upload
+  s += arrow(610,226,610,310,'','blue','5');
+  s += box(510,310,200,64,P.storage,'Upload to Bucket','invoices/{org}/{loc}/{file}','',5,'Browser uploads directly to Azure Blob / Supabase Storage. Bypasses API for efficiency. Path persisted to invoices.file_url.');
+
+  // Step 6 — Update status to extracting
+  s += arrow(610,374,1370,374,'file_url saved','ok','6');
+  s += db(1270,362,200,56,P.db,'invoices UPDATE','status = extracting','6','Atomic update: file_url + status = extracting triggers pg_net webhook in the same transaction.');
+
+  // Step 7 — pg_net fires Edge Function
+  s += arrow(1270,390,1000,410,'pg_net webhook','amber','7',true);
+  s += box(750,396,250,64,P.edge,'invoice-processing','Deno Edge Function · Service Role',ICON.deno ? '' : '','7','Triggered by DB INSERT/UPDATE where status = extracting. Service role key bypasses RLS for processing. Logs to debug_logs table throughout.');
+
+  // Step 8 — Download file
+  s += arrow(750,428,610,428,'download file','amber','8');
+  s += box(510,414,200,52,P.storage,'Download from Bucket','service_role client','',8,'Edge function downloads PDF using service_role key (bypasses public access restriction).');
+
+  // Step 9 — Send to AI backend
+  s += arrow(1000,428,1030,428,'POST /extract-invoice','pink','9');
+  s += box(1030,414,200,60,P.ai,'Python Docling Backend','multipart/form-data · PDF','',9,'FastAPI endpoint receives PDF. Docling parses document structure. Gemini Pro extracts fields. PYTHON_BACKEND_URL env var configures endpoint.');
+
+  // Step 10 — AI processing
+  s += arrow(1030,474,1030,534,'','pink','10');
+  s += box(1030,534,200,72,P.ai,'Docling + Gemini Pro','OCR → Structured JSON extraction',ICON.gemini ? '' : '','10','Extracts: vendor_name, invoice_number, account_number, invoice_date, due_date, payment_terms, subtotal, tax, fuel_surcharge, delivery_fee, line_items[]');
+
+  // Step 11 — Normalize
+  s += arrow(1030,606,1030,660,'raw JSON','pink','11');
+  s += box(1030,660,200,64,P.ai,'normalizeExtraction()','Field aliases · Money parsing · Dates','','Handles field name variations across vendors. parseMoney() strips currency symbols. normalizeDate() handles multiple date formats. Confidence threshold: 0.85 for paid detection.');
+
+  // Step 12 — Update DB
+  s += arrow(1030,724,1370,724,'normalized data','ok','12');
+  s += db(1270,712,200,80,P.db,'invoices UPDATE','status=pending_review\nline_items JSONB\nextraction_method=docling+gemini','12','');
+
+  // Step 13 — React Query polls
+  s += arrow(370,380,370,460,'poll every 10s','blue','13',true);
+  s += box(270,460,200,52,P.react,'React Query Polling','refetchInterval: 10,000ms','',13,'Frontend polls /invoices/{id} every 10 seconds while status = extracting. Stops polling when status changes to pending_review.');
+
+  // Step 14 — Manager reviews
+  s += arrow(130,460,130,560,'','blue','');
+  s += box(30,560,200,56,P.user,'Manager Reviews','Validates extracted fields','',14,'Manager verifies: vendor name, invoice number, line items, total amount. Can edit any field before approval.');
+
+  // Step 15 — Decision gateway
+  s += gateway(370,600,160,56,P.auth,'Approve or Reject?','Manager explicitly approves or rejects the invoice after review.');
+  s += arrow(450,600,1270,600,'Approve','ok','15');
+  s += arrow(290,600,130,640,'Reject','err','');
+
+  // Rejected path
+  s += box(30,640,200,52,P.user,'Rejection Notes','Reason required','','');
+  s += arrow(130,692,1370,692,'','err','');
+  s += db(1270,680,200,56,P.db,'invoices UPDATE','status=rejected\nrejection_reason','','');
+
+  // Approved path
+  s += db(1270,588,200,56,P.db,'invoices UPDATE','status=approved\nap_status=approved','15','');
+  s += arrow(1370,644,1370,688,'','ok','');
+
+  // Step 16 — AutoPay check
+  s += arrow(1370,588,1370,540,'','ok','');
+  s += gateway(1220,510,200,56,P.db,'vendor.autopay_enabled?','If vendor has AutoPay enabled, a payment record is automatically created without manual intervention.');
+  s += arrow(1120,510,1030,510,'Yes','ok','16');
+  s += db(850,496,160,56,P.db,'payments INSERT','status=scheduled\nmethod=vendor.default\ndate=due_date','16','AutoPay creates payment with status=scheduled. payment_date=invoice.due_date. No human intervention required.');
+  s += arrow(1320,510,1500,510,'No','neutral','');
+  s += box(1370,496,120,42,P.cron,'Manual Payment','Payments.jsx','','');
+
+  // Step 17 — Notification
+  s += arrow(850,496,370,520,'notify manager','blue','17',true);
+  s += box(270,510,200,52,P.react,'Notification Created','Invoice ready · in-app badge','',17,'notifications INSERT: user_id=manager, type=invoice, priority=medium. Bell badge increments on next poll.');
+
+  // END
+  s += endEvent(130,800,12,'Complete');
+
+  // Annotation boxes
+  s += annotation(510,820,220,'FILE STORAGE PATH:\ninvoices/{org_id}/{loc_id}/\n{YYYY-MM-DD}_{filename}.pdf\n\nAccess: Private\nMethod: Service Role only\nURL: Short-lived SAS (300s)','#4338ca');
+  s += annotation(750,820,250,'IDEMPOTENCY:\n• invoice_id checked before re-process\n• source_blob_etag validated\n• processing_attempt tracked\n• status guard: only process if extracting','#d97706');
+  s += annotation(1030,820,220,'AI CONFIDENCE:\n• paid_status_detection JSONB\n• confidence ≥ 0.85 → auto-mark paid\n• evidence field stored for audit\n• extraction_method=docling+gemini','#be185d');
+
+  // Title
+  s += `<rect x="8" y="8" width="480" height="36" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s += `<text x="16" y="20" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">Invoice Lifecycle — Upload · AI Extraction · AP Approval</text>`;
+  s += `<text x="16" y="34" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">17 steps · Supabase Storage → Docling+Gemini → PostgreSQL · AutoPay trigger</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-2: AUTH & ONBOARDING ───────────────────────────────────
+function buildAuthFlow() {
+  const W=1400, H=1050;
+  let s = buildDefs();
+
+  // Swimlanes
+  s += swimlane(20,20,200,1020,'Public / Visitor','#64748b','Unauthenticated browser session');
+  s += swimlane(240,20,200,1020,'Supabase Auth','#7c3aed','PKCE · JWT · OAuth2 · MFA');
+  s += swimlane(460,20,200,1020,'App Router (App.jsx)','#0891b2','State-based routing logic');
+  s += swimlane(680,20,200,1020,'Stripe Checkout','#4f46e5','SaaS subscription gate');
+  s += swimlane(900,20,220,1020,'PostgreSQL','#15803d','profiles · invitations · orgs');
+  s += swimlane(1140,20,240,1020,'MFA Gate','#7c3aed','TOTP · AAL2 · Device Trust');
+
+  // PATH A — Self Signup (Owner)
+  s += sectionTitle(30,52,700,'PATH A — New Organization Owner (Stripe-Gated Signup)','#2563eb');
+  s += startEvent(120,90,12,'Visitor');
+  s += box(30,110,180,48,P.user,'Landing Page','app.domain.com / Pricing','',1,'');
+  s += arrow(120,158,120,210,'click Get Started','blue','1');
+  s += box(30,210,180,52,P.user,'Login Page','/login · Email + Password','',2,'supabase.auth.signUp() called with email, password, and metadata: {full_name, role, invite_token}');
+  s += arrow(120,262,350,262,'signUp()','blue','2');
+  s += box(250,248,180,56,P.auth,'Supabase Auth','Creates auth.users row\nSends verification email','',3,'');
+  s += arrow(350,304,350,360,'trigger fires','ok','3');
+  s += db(910,348,200,52,P.db,'handle_new_user() trigger','profiles INSERT auto','3','Postgres AFTER INSERT trigger on auth.users. Creates profiles row with role from raw_user_meta_data.');
+  s += arrow(350,304,910,360,'','ok','',true);
+  s += box(30,320,180,52,P.user,'Email Verification','User clicks email link','',4,'');
+  s += arrow(120,372,350,372,'verified','blue','4');
+  s += box(250,358,180,52,P.auth,'Session Created','JWT issued · org_id = null','','');
+  s += arrow(350,410,570,410,'redirect','blue','5');
+  s += gateway(570,458,180,56,P.auth,'payment_verified?','AuthContext checks userProfile.payment_verified. New org owners must pay before onboarding.');
+  s += arrow(660,458,790,458,'No → need Stripe','err','5');
+  s += box(690,440,180,52,P.stripe,'Stripe Checkout','/verify-payment\ncreate-checkout-session',ICON.stripe ? '' : '','');
+  s += arrow(790,458,870,458,'paid','ok','6');
+  s += box(790,440,100,52,P.auth,'stripe-webhook','org UPDATE','','stripe-webhook edge function updates: organizations.stripe_customer_id, stripe_subscription_id, plan_id');
+  s += arrow(570,486,570,540,'Yes → paid','ok','6');
+  s += box(480,540,180,56,P.react,'Onboarding Page','/onboarding\nCreate Org+Brand+Location','',7,'OnboardingPage.jsx: multi-step form. Step 1: Organization name. Step 2: Brand. Step 3: First location. Step 4: Logo upload.');
+  s += arrow(570,596,910,596,'create entities','ok','7');
+  s += db(910,582,200,56,P.db,'organizations + brands\n+ locations INSERT','org_id now set on profile','','');
+  s += arrow(570,596,570,660,'complete','ok','8');
+  s += box(480,660,180,52,P.react,'Dashboard','/  · Fully operational','',8,'org_id now populated. RLS scopes all queries to organization. All modules unlocked per plan.');
+
+  // PATH B — Invited User
+  s += sectionTitle(30,730,700,'PATH B — Invited Team Member','#8b5cf6');
+  s += box(30,762,180,52,P.user,'Manager sends invite','UserManagement.jsx','',9,'invite-user edge function: INSERT invitations {email, role, org_id, brand_id, location_id, token, expires_at=+7d}');
+  s += arrow(120,814,910,814,'INSERT invitation','amber','9');
+  s += db(910,800,200,52,P.db,'invitations table','token · email · role · org_id\nbrand_id · location_id · expires_at','','');
+  s += arrow(910,800,120,840,'EmailJS sends invite email','blue','',true);
+  s += box(30,840,180,52,P.user,'Invitee: /signup/:token','get_invite_details RPC','',10,'SignupPage reads token from URL. Calls get_invite_details(token) RPC. Validates: not expired, not accepted, org exists.');
+  s += arrow(120,892,350,892,'signUp + role mapping','blue','10');
+  s += box(250,878,180,52,P.auth,'Role Mapping','owner→org_owner\nmanager→branch_manager','','Legacy role name mapping in signup handler.');
+  s += arrow(350,930,910,930,'accept_invitation RPC','ok','11');
+  s += db(910,918,200,52,P.db,'organization_memberships\n+ user_location_assignments','user linked to org+location','11','');
+
+  // MFA GATE SECTION
+  s += sectionTitle(1150,52,220,'MFA ENFORCEMENT GATE','#7c3aed');
+  s += box(1150,88,220,60,P.auth,'Authenticated Session','role ∈ {platform_admin\norg_owner, branch_manager}','',12,'High-privilege roles MUST enroll TOTP. Enforced in AuthenticatedApp.jsx. Cannot be skipped or bypassed.');
+  s += gateway(1260,196,180,52,P.auth,'MFA enrolled?','isMfaReady + factor status check');
+  s += arrow(1350,196,1500,196,'No','err','');
+  s += arrow(1260,222,1260,268,'Yes','ok','');
+  s += box(1150,268,220,56,P.auth,'MFA Challenge','TOTP · AAL1 → AAL2','',13,'MFAChallenge.jsx verifies TOTP code. On success: mfaLevel.current = aal2. Device trust token (30d) stored in localStorage.');
+  s += gateway(1260,368,180,52,P.auth,'Device trusted?','localStorage restops_mfa_trust token checked. Expiry validated. userId validated.');
+  s += arrow(1260,394,1260,444,'Yes (30-day trust)','ok','');
+  s += arrow(1350,368,1450,368,'No → re-challenge','amber','');
+  s += box(1150,444,220,56,P.react,'App Loads','Dashboard / PlatformAdmin','',14,'Fully authenticated. All routes available per role. RLS enforces data scope.');
+
+  // Routing table
+  s += sectionTitle(460,730,400,'APP.JSX ROUTING STATE MACHINE','#0891b2');
+  const routes=[
+    {state:'No session',path:'/ or /login',comp:'LandingPage',c:'#64748b'},
+    {state:'Auth + no org + owner + unpaid',path:'/verify-payment',comp:'PaymentVerification',c:'#4f46e5'},
+    {state:'Auth + no org + owner + paid',path:'/onboarding',comp:'OnboardingPage',c:'#d97706'},
+    {state:'Auth + no org + non-owner',path:'/pending-assignment',comp:'PendingAssignment',c:'#94a3b8'},
+    {state:'Auth + has org_id + !MFA',path:'*',comp:'MFAChallenge or MFASetupPage',c:'#7c3aed'},
+    {state:'Auth + has org_id + MFA ✓',path:'/*',comp:'Full Application',c:'#15803d'},
+    {state:'platform_admin role',path:'/PlatformAdmin',comp:'PlatformAdmin.jsx',c:'#b91c1c'},
+  ];
+  routes.forEach((r,i)=>{
+    const ry = 762+i*37;
+    s+=`<rect x="468" y="${ry}" width="384" height="32" rx="5" fill="${r.c}10" stroke="${r.c}25"/>`;
+    s+=`<rect x="468" y="${ry}" width="4" height="32" rx="2" fill="${r.c}80"/>`;
+    s+=`<text x="480" y="${ry+11}" fill="${r.c}" font-size="8.5" font-weight="600" font-family="Inter">${r.state}</text>`;
+    s+=`<text x="480" y="${ry+23}" fill="#475569" font-size="8" font-family="Inter">→ ${r.path}  <tspan fill="#94a3b8">[${r.comp}]</tspan></text>`;
+  });
+
+  s+=`<rect x="8" y="8" width="450" height="34" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s+=`<text x="16" y="19" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">Authentication &amp; Onboarding — BPMN Flow</text>`;
+  s+=`<text x="16" y="33" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">14 steps · Supabase Auth · MFA AAL2 Gate · Stripe Subscription · Role Mapping</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-3: PAYMENT WORKFLOW ─────────────────────────────────────
+function buildPaymentFlow() {
+  const W=1500, H=980;
+  let s = buildDefs();
+
+  s += swimlane(20,20,220,940,'Manager / Org Owner','#2563eb','role: branch_manager+');
+  s += swimlane(260,20,260,940,'Payments.jsx (React)','#0891b2','Bill pay · Payment history');
+  s += swimlane(540,20,260,940,'Payment Gateway','#4f46e5','Stripe · Checkbook · Dwolla');
+  s += swimlane(820,20,260,940,'Edge Functions','#d97706','payout-webhook · billing-worker');
+  s += swimlane(1100,20,380,940,'PostgreSQL','#15803d','payments · invoices · ledger');
+
+  // ── PATH A — Manual Vendor Payment ──
+  s += sectionTitle(30,52,700,'PATH A — Manual Vendor Payment (Bill Pay)','#2563eb');
+  s += startEvent(130,92,12,'Start');
+  s += box(30,112,200,52,P.user,'Open Payments.jsx','Approved invoices · AP dashboard','',1,'User sees list of approved invoices with payment_status=unpaid. Filtered by their org+location scope via RLS.');
+  s += arrow(130,164,390,164,'','blue','1');
+  s += box(270,150,220,52,P.react,'Invoice List','status=approved · payment_status=unpaid','',2,'React Query fetches invoices. Shows: vendor name, amount, due date, days overdue. Sorted by due_date ASC.');
+  s += arrow(390,202,390,250,'select invoice','blue','2');
+  s += gateway(390,290,200,56,P.auth,'Payment Method?','Manager selects: ACH/Bank Transfer, Check, or scheduled payment');
+  // ACH branch
+  s += arrow(290,290,270,370,'ACH / Bank','ok','3');
+  s += db(1110,358,200,60,P.db,'payment_accounts','bank_routing · account_number\nencrypted at rest','3','Bank account details stored per vendor. Encrypted. Only org_owner can view account numbers.');
+  // Check branch
+  s += arrow(390,318,390,370,'Check','amber','');
+  s += box(270,370,220,56,P.react,'Payment Details Form','amount · date · notes · ref','',4,'');
+  // Approval gate
+  s += arrow(390,426,390,476,'submit','blue','4');
+  s += gateway(390,510,200,56,P.auth,'Amount > Approval Limit?','rbac_approval_limits table. E.g., branch_manager may only approve up to $5,000. org_owner required above.');
+  s += arrow(290,510,270,560,'Needs Approval','err','5');
+  s += box(270,560,220,52,P.react,'Approval Request','Notify org_owner · hold payment','',5,'');
+  s += arrow(390,560,390,610,'org_owner approves','ok','');
+  s += arrow(490,510,490,560,'Within Limit','ok','');
+  s += arrow(490,560,490,610,'','ok','');
+  // Payments INSERT
+  s += arrow(390,610,1110,620,'INSERT payment','ok','6');
+  s += db(1110,608,200,64,P.db,'payments INSERT','status=pending\nvendor_id, invoice_id, amount\npayment_method, payment_date','6','');
+  s += arrow(1210,672,1210,720,'','ok','');
+  // Gateway dispatch
+  s += gateway(680,660,200,56,P.auth,'Gateway Dispatch','Stripe vs Checkbook vs Dwolla');
+  s += arrow(590,660,590,720,'Stripe','blue','7');
+  s += arrow(680,688,680,720,'Checkbook','amber','');
+  s += arrow(780,660,780,720,'Dwolla ACH','ok','');
+  s += cloud(540,720,220,60,P.stripe,'Stripe Payment Intent','create-payment-intent','',ICON.stripe?'':'','Stripe processes card/bank payment. Returns payment_intent.id as transaction reference.');
+  s += cloud(770,720,220,60,P.stripe,'Checkbook.io','process-checkbook-payout','','','Checkbook.io sends physical or digital check. Returns check number.');
+  // Webhook back
+  s += arrow(650,780,650,820,'webhook','amber','8',true);
+  s += box(830,808,200,56,P.edge,'payout-webhook / checkbook-webhook','Edge Function receives status','',8,'Verifies webhook signature. Checks idempotency (event_id). Updates payment status. Creates ledger entry.');
+  s += arrow(1030,836,1110,836,'','ok','');
+  s += db(1110,820,200,60,P.db,'payments UPDATE','status=completed\ntransaction_id','8','');
+  s += arrow(1210,880,1210,910,'','ok','');
+  s += db(1110,898,200,52,P.db,'invoices UPDATE\nledger_entries INSERT','payment_status=paid\ndouble-entry GL','','ledger_entries: debit=accounts_payable, credit=cash/bank. Maintains accurate financial position.');
+  s += endEvent(130,880,12,'Complete');
+
+  // ── PATH B — AutoPay ──
+  s += sectionTitle(30,700,700,'PATH B — Vendor AutoPay (System-Triggered)','#15803d');
+  s += box(30,730,200,48,P.db,'Trigger: invoice.status = approved','invoice-processing edge fn','','AutoPay check runs inside invoice-processing edge function immediately after status update to approved.');
+  s += arrow(130,778,130,810,'','ok','');
+  s += box(30,810,200,48,P.db,'vendor.autopay_enabled = true','payment_method configured','','vendor.default_payment_method: ach | check | wire');
+  s += arrow(130,858,1110,858,'AUTO: create payment','ok','');
+  s += db(1110,845,200,56,P.db,'payments INSERT (AutoPay)','status=scheduled\ndate=invoice.due_date\nno human approval needed','','');
+
+  // ── STRIPE SAAS BILLING ──
+  s += sectionTitle(1100,52,380,'STRIPE SaaS SUBSCRIPTION BILLING','#4f46e5');
+  s += box(1110,88,200,52,P.user,'Org Owner: Billing Page','PlatformPlans.jsx · Upgrade','','create-checkout-session edge function called. Passes: plan_id, org_id as client_reference_id.');
+  s += arrow(1210,140,1210,180,'','blue','');
+  s += cloud(1110,180,200,64,P.stripe,'Stripe Hosted Checkout','checkout.session.created','',ICON.stripe?'':'','Stripe collects payment securely. No card data touches MED servers. Returns: session.id, customer, subscription.');
+  s += arrow(1210,244,1210,290,'payment success','ok','');
+  s += box(1110,290,200,56,P.edge,'stripe-webhook Edge Fn','checkout.session.completed','','stripe-webhook verifies Stripe-Signature header. Idempotency: checks webhook_event_id for duplicates.');
+  s += arrow(1210,346,1210,390,'','ok','');
+  s += db(1110,390,200,64,P.db,'organizations UPDATE','plan_id · stripe_customer_id\nstripe_subscription_id','','Plan upgrade complete. Feature entitlements activated based on new plan_id.');
+  s += arrow(1210,454,1210,496,'','ok','');
+  s += db(1110,496,200,52,P.db,'audit_logs INSERT','log_audit_event RPC\naction=subscription_upgraded','','');
+
+  // Annotations
+  s += annotation(270,740,240,'IDEMPOTENCY RULES:\n• Stripe webhook_event_id checked\n• payments de-duped by invoice_id\n• AutoPay: one payment per invoice\n• Retries safe: guard status checks','#d97706');
+
+  s+=`<rect x="8" y="8" width="450" height="34" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s+=`<text x="16" y="19" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">Payment &amp; Bill Pay — Vendor AP + SaaS Subscription</text>`;
+  s+=`<text x="16" y="33" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">8 steps · Stripe · Checkbook · Dwolla · AutoPay · Double-Entry GL · Idempotency</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-4: DATA ARCHITECTURE ────────────────────────────────────
+function buildDataModel() {
+  const W=1600, H=1050;
+  let s = buildDefs();
+
+  function tableBox(x, y, name, pk, cols, color) {
+    const lineH = 18, hdrH = 32, w = 220;
+    const h = hdrH + cols.length * lineH + 10;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${color}10" stroke="${color}35" filter="url(#shadow)"/>`;
+    s += `<rect x="${x}" y="${y}" width="${w}" height="${hdrH}" rx="6" fill="${color}25"/>`;
+    s += `<rect x="${x}" y="${y+hdrH-4}" width="${w}" height="4" fill="${color}25"/>`;
+    s += `<text x="${x+10}" y="${y+hdrH/2}" dominant-baseline="middle" fill="${color}" font-size="10.5" font-weight="700" font-family="JetBrains Mono">${name}</text>`;
+    s += `<text x="${x+w-8}" y="${y+hdrH/2}" text-anchor="end" dominant-baseline="middle" fill="${color}80" font-size="8" font-family="Inter">PK: ${pk}</text>`;
+    cols.forEach((c, i) => {
+      const cy = y + hdrH + 8 + i * lineH;
+      const isFK = c.includes('→') || c.includes('FK');
+      s += `<text x="${x+10}" y="${cy}" dominant-baseline="middle" fill="${isFK?'#94a3b8':'#64748b'}" font-size="8.5" font-family="JetBrains Mono">${c}</text>`;
+    });
+    return {x,y,w,h,cx:x+w/2,cy:y+h/2,right:x+w,bottom:y+h};
+  }
+
+  function fk(x1,y1,x2,y2,label='') {
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#334155" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#arr)"/>`;
+    if(label){const mx=(x1+x2)/2,my=(y1+y2)/2;s+=`<text x="${mx}" y="${my-4}" text-anchor="middle" fill="#475569" font-size="7.5" font-family="Inter">${label}</text>`;}
+  }
+
+  // GROUP HEADERS
+  s += `<rect x="10" y="10" width="400" height="490" rx="10" fill="#2563eb08" stroke="#2563eb20"/>`;
+  s += `<text x="22" y="28" dominant-baseline="middle" fill="#2563eb" font-size="10" font-weight="700" font-family="Inter" letter-spacing=".5">IDENTITY &amp; ACCESS CONTROL</text>`;
+
+  s += `<rect x="420" y="10" width="450" height="490" rx="10" fill="#15803d08" stroke="#15803d20"/>`;
+  s += `<text x="432" y="28" dominant-baseline="middle" fill="#15803d" font-size="10" font-weight="700" font-family="Inter" letter-spacing=".5">FINANCIAL — ACCOUNTS PAYABLE</text>`;
+
+  s += `<rect x="880" y="10" width="710" height="490" rx="10" fill="#d97706 08" stroke="#d97706 20"/>`;
+  s += `<text x="892" y="28" dominant-baseline="middle" fill="#d97706" font-size="10" font-weight="700" font-family="Inter" letter-spacing=".5">INVENTORY, PROCUREMENT &amp; RECIPES</text>`;
+
+  s += `<rect x="10" y="510" width="620" height="450" rx="10" fill="#be185d08" stroke="#be185d20"/>`;
+  s += `<text x="22" y="528" dominant-baseline="middle" fill="#be185d" font-size="10" font-weight="700" font-family="Inter" letter-spacing=".5">POS, INTEGRATIONS &amp; AI</text>`;
+
+  s += `<rect x="640" y="510" width="960" height="450" rx="10" fill="#0891b208" stroke="#0891b220"/>`;
+  s += `<text x="652" y="528" dominant-baseline="middle" fill="#0891b2" font-size="10" font-weight="700" font-family="Inter" letter-spacing=".5">AUDIT, NOTIFICATIONS &amp; SCHEDULING</text>`;
+
+  // ── IDENTITY TABLES ──
+  const t_users = tableBox(20,40,'auth.users','id:UUID',['email TEXT','created_at TIMESTAMPTZ','raw_user_meta_data JSONB','(Supabase managed)'],'#7c3aed');
+  const t_profiles = tableBox(20,190,'profiles','id → auth.users',['full_name TEXT','email TEXT','role TEXT  ← RLS key','organization_id UUID → orgs','brand_id UUID → brands','location_id UUID → locations','is_active BOOLEAN','invited_by UUID'],'#7c3aed');
+  const t_orgs = tableBox(250,40,'organizations','id:UUID',['name TEXT','plan_id UUID → plans','stripe_customer_id TEXT','stripe_subscription_id TEXT','is_active BOOLEAN','created_at TIMESTAMPTZ'],'#2563eb');
+  const t_brands = tableBox(250,200,'brands','id:UUID',['name TEXT','organization_id → orgs (FK)','logo_url TEXT','is_active BOOLEAN'],'#2563eb');
+  const t_locs = tableBox(250,320,'locations','id:UUID',['name TEXT','brand_id → brands (FK)','organization_id → orgs (FK)','address, city, state','timezone TEXT'],'#2563eb');
+  const t_invites = tableBox(20,420,'invitations','id:UUID',['email TEXT','role TEXT','token TEXT UNIQUE','organization_id → orgs (FK)','brand_id → brands (FK)','location_id → locations (FK)','invited_by → auth.users','expires_at TIMESTAMPTZ','status: pending|accepted|expired'],'#7c3aed');
+
+  // FK arrows (identity)
+  fk(t_profiles.right, 210, t_orgs.x, 60,'org_id');
+  fk(t_orgs.right, 60, t_brands.x, 220,'');
+  fk(t_brands.right, 260, t_locs.x, 340,'');
+  fk(t_invites.right, 460, t_orgs.x, 80,'');
+
+  // ── FINANCIAL TABLES ──
+  const t_invoices = tableBox(430,40,'invoices','id:UUID',['vendor_id → vendors (FK)','vendor_name TEXT','invoice_number TEXT','invoice_date DATE','due_date DATE','total_amount NUMERIC(12,2)','status: uploading|extracting|pending_review\n|validated|approved|rejected|flagged','ap_status TEXT','file_url TEXT  ← Storage path','line_items JSONB  ← AI extracted','organization_id → orgs','location_id → locations','extraction_method TEXT'],'#15803d');
+  const t_payments = tableBox(430,340,'payments','id:UUID',['invoice_id → invoices (FK)','vendor_id → vendors (FK)','amount NUMERIC(12,2)','payment_method: ach|check|stripe|wire','status: pending|processing|completed|failed','payment_date DATE','transaction_id TEXT','organization_id → orgs'],'#15803d');
+  const t_ledger = tableBox(680,40,'ledger_entries','id:UUID',['debit_account TEXT','credit_account TEXT','amount NUMERIC(12,2)','reference_type: invoice|payment','reference_id UUID','organization_id → orgs'],'#22c55e');
+  const t_vendstmt = tableBox(680,260,'vendor_statements','vendor_id + period',['total_invoiced NUMERIC','total_paid NUMERIC','outstanding_balance NUMERIC','last_invoice_date DATE'],'#22c55e');
+  fk(t_payments.x+110, t_payments.y, t_invoices.right, t_invoices.bottom-30,'');
+  fk(t_ledger.x, t_ledger.cy, t_invoices.right, t_invoices.cy,'');
+
+  // ── INVENTORY TABLES ──
+  const t_products = tableBox(890,40,'products','id:UUID',['name TEXT','category TEXT','accounting_category TEXT','latest_price NUMERIC','par_level NUMERIC','price_history JSONB','preferred_vendor_id → vendors','organization_id → orgs'],'#d97706');
+  const t_vendors = tableBox(890,280,'vendors','id:UUID',['name TEXT','email, phone TEXT','autopay_enabled BOOLEAN','default_payment_method TEXT','payment_terms TEXT','bank_details JSONB (encrypted)','whatsapp_number TEXT'],'#f97316');
+  const t_inventory = tableBox(1130,40,'inventory','product_id+location_id',['current_quantity NUMERIC','current_value NUMERIC','unit_cost NUMERIC','par_level NUMERIC','last_counted_date DATE','last_counted_by → auth.users'],'#d97706');
+  const t_autoorders = tableBox(1130,260,'auto_orders','id:UUID',['vendor_id → vendors (FK)','status: draft|approved|sent|received','items JSONB','total_amount NUMERIC','sent_via: email|whatsapp|both','delivery_date DATE'],'#d97706');
+  const t_recipes = tableBox(1370,40,'recipes','id:UUID',['name TEXT','ingredients JSONB','total_cost NUMERIC','cost_per_serving NUMERIC','suggested_price NUMERIC','margin_pct NUMERIC (computed)','yield_quantity NUMERIC'],'#f59e0b');
+  const t_wastage = tableBox(1370,260,'wastage_logs','id:UUID',['product_name TEXT','quantity NUMERIC','reason: expired|damaged|spoiled\n|overproduction|other','value NUMERIC','location_id → locations','logged_by → auth.users'],'#ef4444');
+  fk(t_inventory.x, t_inventory.cy, t_products.right, t_products.cy,'');
+  fk(t_autoorders.x, t_autoorders.cy, t_vendors.right, t_vendors.cy,'');
+  fk(t_invoices.right, t_invoices.cy, t_vendors.x+110, t_vendors.y,'FK:vendor_id');
+
+  // ── POS / AI TABLES ──
+  const t_posorders = tableBox(20,545,'pos_orders','id:UUID',['pos_provider: toast|square|clover','pos_order_id TEXT UNIQUE','total_amount NUMERIC','order_date TIMESTAMPTZ','organization_id → orgs','location_id → locations'],'#be185d');
+  const t_positems = tableBox(20,740,'pos_order_items','id:UUID',['order_id → pos_orders (FK)','pos_item_id TEXT','item_name TEXT','quantity NUMERIC','price NUMERIC'],'#be185d');
+  const t_posmap = tableBox(280,545,'pos_item_mappings','pos_item_id + org_id',['product_id → products (FK)','pos_provider TEXT','last_mapped_at TIMESTAMPTZ'],'#f97316');
+  const t_aiinsights = tableBox(280,740,'ai_insights','id:UUID',['insight_type: smart_prep_list\n|labor_forecast|anomaly','title TEXT','metadata JSONB','severity: info|warning|critical','organization_id → orgs'],'#ec4899');
+  fk(t_positems.right, t_positems.cy, t_posmap.x, t_posmap.cy,'');
+  fk(t_posorders.right, t_posorders.cy+20, t_positems.x+110, t_positems.y,'');
+
+  // ── AUDIT / NOTIF TABLES ──
+  const t_audit = tableBox(650,545,'audit_logs','id:UUID',['organization_id → orgs','user_id → auth.users','action TEXT  ← enum','entity_type TEXT','entity_id UUID','details JSONB','created_at TIMESTAMPTZ\n(IMMUTABLE — no UPDATE/DELETE)'],'#0891b2');
+  const t_notif = tableBox(900,545,'notifications','id:UUID',['user_id → auth.users (FK)','title TEXT','message TEXT','type: invoice|payment|order|system','priority: low|medium|high','is_read BOOLEAN','reference_id UUID','link TEXT'],'#06b6d4');
+  const t_evenlog = tableBox(1150,545,'event_logs','id:UUID',['organization_id → orgs','event_name TEXT','entity_type TEXT','payload JSONB  ← raw webhook','created_at TIMESTAMPTZ'],'#94a3b8');
+  const t_outbox = tableBox(650,780,'outbox_events','id:UUID',['event_type TEXT','payload JSONB','published BOOLEAN','published_at TIMESTAMPTZ','organization_id → orgs'],'#0891b2');
+  const t_reports = tableBox(900,780,'report_snapshots','id:UUID',['report_type TEXT','generated_at TIMESTAMPTZ','organization_id → orgs','data JSONB','status: pending|complete|failed'],'#06b6d4');
+  const t_glmap = tableBox(1150,780,'gl_mappings','id:UUID',['category TEXT','expense_account TEXT','revenue_account TEXT','organization_id → orgs'],'#22c55e');
+
+  s+=`<rect x="8" y="8" width="500" height="34" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s+=`<text x="16" y="19" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">Data Architecture — Core Tables &amp; Relationships</text>`;
+  s+=`<text x="16" y="33" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">60+ tables · 237 migrations · PostgreSQL RLS enforced on ALL tables · JSONB for AI-extracted data</text>`;
+
+  // Storage buckets legend
+  s += sectionTitle(10, 1000, 1580, 'SUPABASE STORAGE BUCKETS', '#4338ca');
+  const buckets=[
+    {name:'invoices',path:'{org_id}/{loc_id}/{date}_{file}.pdf',access:'PRIVATE · Signed URL · Service Role only',c:'#4338ca'},
+    {name:'avatars',path:'{user_id}/avatar.{ext}',access:'PUBLIC READ · 5MB limit',c:'#22c55e'},
+    {name:'vendor-documents',path:'{org_id}/vendors/{id}/{file}',access:'PRIVATE · org-scoped RLS',c:'#f59e0b'},
+    {name:'exports',path:'{org_id}/reports/{date}/{report}.csv',access:'PRIVATE · Temporary signed URL · 1h expiry',c:'#06b6d4'},
+  ];
+  buckets.forEach((b,i)=>{
+    const bx=10+i*400;
+    s+=`<rect x="${bx}" y="1030" width="385" height="42" rx="6" fill="${b.c}10" stroke="${b.c}30"/>`;
+    s+=`<text x="${bx+10}" y="1046" dominant-baseline="middle" fill="${b.c}" font-size="10" font-weight="700" font-family="JetBrains Mono">${b.name}</text>`;
+    s+=`<text x="${bx+10}" y="1062" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">Path: ${b.path}</text>`;
+    s+=`<rect x="${bx+10}" y="1065" width="${b.access.includes('PUBLIC')?52:46}" height="10" rx="2" fill="${b.access.includes('PUBLIC')?'#15803d30':'#b91c1c25'}" stroke="${b.access.includes('PUBLIC')?'#15803d40':'#b91c1c40'}"/>`;
+    s+=`<text x="${bx+13}" y="1071" dominant-baseline="middle" fill="${b.access.includes('PUBLIC')?'#4ade80':'#fca5a5'}" font-size="6.5" font-weight="700" font-family="Inter">${b.access.includes('PUBLIC')?'PUBLIC':'PRIVATE'}</text>`;
+  });
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-5: PLATFORM ADMIN ───────────────────────────────────────
+function buildPlatformAdmin() {
+  const W=1400, H=960;
+  let s = buildDefs();
+
+  s += swimlane(20,20,200,920,'Platform Admin','#b91c1c','service_role · bypasses RLS · all orgs');
+  s += swimlane(240,20,260,920,'PlatformAdmin.jsx','#0891b2','React · role=platform_admin');
+  s += swimlane(520,20,260,920,'Edge Functions','#d97706','service_role key');
+  s += swimlane(800,20,280,920,'External APIs','#4f46e5','Stripe · SendGrid');
+  s += swimlane(1100,20,280,920,'PostgreSQL (All Tenants)','#15803d','No RLS restriction for platform_admin');
+
+  s += sectionTitle(30,52,800,'PLATFORM ADMIN CONTROL PLANE — Full Tenant Visibility','#b91c1c');
+  s += startEvent(120,92,12,'Admin');
+
+  // Org management
+  s += box(30,116,180,52,P.admin,'PlatformOrganizations.jsx','All tenants · plan · status','',1,'Platform admin sees ALL organizations across all tenants. Can: suspend, change plan, view billing, view audit logs. NOT scoped by RLS.');
+  s += arrow(120,168,370,168,'','err','1');
+  s += box(250,154,240,52,P.react,'View All Organizations','SELECT * FROM organizations (no RLS)','',2,'RLS bypassed for platform_admin role. Queries return all rows across all tenants. Only safe because role validated in Supabase Auth.');
+  s += arrow(370,206,370,250,'','blue','2');
+  s += gateway(370,282,180,52,P.admin,'Admin Action?','Platform admin selects action type from dropdown');
+
+  // Suspend org
+  s += arrow(280,282,250,340,'Suspend Org','err','3');
+  s += db(1110,328,260,56,P.db,'organizations UPDATE','is_active=false\n→ ALL org user queries blocked','3','RLS policy: WHERE is_active=true on organizations. Suspending instantly locks out all org users.');
+
+  // Change plan
+  s += arrow(370,308,370,360,'Change Plan','amber','4');
+  s += box(250,360,240,52,P.react,'PlatformPlans.jsx','plans table · features[]','',4,'');
+  s += arrow(490,386,1110,386,'','ok','');
+  s += db(1110,374,260,52,P.db,'organizations UPDATE','plan_id → activates features','4','Feature entitlements tied to plan_id. Immediate effect on org users.');
+
+  // User management
+  s += arrow(460,282,490,340,'Manage Users','blue','5');
+  s += box(530,326,240,56,P.edge,'admin_delete_user RPC','Removes auth.users entry\n→ cascade: profiles+memberships','',5,'Only platform_admin can call this RPC. CASCADE removes: profiles, organization_memberships, user_location_assignments, invitations.');
+
+  // Billing portal
+  s += arrow(280,282,250,460,'View Billing','blue','6');
+  s += box(250,460,240,52,P.edge,'create-portal-session','Edge Function → Stripe API','',6,'');
+  s += arrow(490,486,810,486,'','blue','');
+  s += cloud(810,470,240,56,P.stripe,'Stripe Billing Portal','Org subscriptions · invoices','',ICON.stripe?'':'','Self-service portal. Org owners manage their own subscription. Platform admin views all.');
+
+  // Invite new org / tenant
+  s += arrow(460,282,490,460,'Invite Tenant','purple','7');
+  s += box(530,460,240,52,P.edge,'invite-client Edge Function','Creates org_owner invitation','',7,'');
+  s += arrow(770,486,810,510,'','amber','');
+  s += cloud(810,498,240,56,P.ext,'SendGrid Email','Platform invitation email','',ICON.email?'':'','Sends Stripe-gated invite. New org owner must pay to activate account.');
+  s += arrow(490,512,1110,512,'','ok','');
+  s += db(1110,500,260,52,P.db,'invitations INSERT','role=org_owner\nonboarding_type=invited','','');
+
+  // Audit
+  s += box(30,560,180,52,P.admin,'PlatformAuditLogs.jsx','All orgs · all events','',8,'');
+  s += arrow(120,612,370,612,'','err','8');
+  s += box(250,598,240,52,P.react,'audit_logs (ALL)','organization_id · user_id · action\nentity_type · entity_id · details JSONB','','');
+  s += arrow(490,624,1110,624,'','ok','');
+  s += db(1110,610,260,56,P.db,'audit_logs SELECT','No WHERE org_id filter\nImmutable · 90d retention','8','');
+
+  // AuditVault
+  s += box(250,680,240,52,P.react,'AuditVault.jsx','Immutable archive view','','Archive: no UPDATE, no DELETE policies on audit_logs. Even platform_admin cannot modify audit records.');
+
+  // RBAC matrix
+  s += sectionTitle(30,760,1360,'ROLE-BASED ACCESS CONTROL MATRIX','#b91c1c');
+  const matrix=[
+    {role:'platform_admin',rls:'Bypasses RLS (service_role)',orgs:'ALL',data:'ALL tables · all tenants',can:'Suspend orgs · change plans · delete users · view all audit · invite tenants',c:'#b91c1c'},
+    {role:'org_owner',rls:'RLS: org_id = auth.org_id()',orgs:'Own org only',data:'All brands/locations/users in org',can:'Manage brand/location/users · view billing · approve payments · full org audit',c:'#22c55e'},
+    {role:'branch_manager',rls:'RLS: brand_id ∈ accessible_brands()',orgs:'Own brand(s)',data:'Locations under their brand',can:'Manage location staff · approve invoices · view brand analytics · send orders',c:'#d97706'},
+    {role:'location_manager',rls:'RLS: location_id ∈ accessible_locations()',orgs:'Own location(s)',data:'Single location data',can:'Manage ground staff · approve invoices · count inventory · view reports',c:'#3b82f6'},
+    {role:'ground_staff',rls:'RLS: location_id = auth.location_id()',orgs:'Own location',data:'Own profile + location operations',can:'Upload invoices · log waste · view inventory · read SmartPrep',c:'#475569'},
+  ];
+  matrix.forEach((r,i)=>{
+    const ry = 790+i*32;
+    s+=`<rect x="28" y="${ry}" width="1344" height="28" rx="4" fill="${r.c}08" stroke="${r.c}20"/>`;
+    s+=`<rect x="28" y="${ry}" width="5" height="28" fill="${r.c}80"/>`;
+    s+=`<text x="42" y="${ry+14}" dominant-baseline="middle" fill="${r.c}" font-size="9.5" font-weight="700" font-family="JetBrains Mono">${r.role}</text>`;
+    s+=`<text x="200" y="${ry+14}" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">${r.rls}</text>`;
+    s+=`<text x="540" y="${ry+14}" dominant-baseline="middle" fill="#64748b" font-size="8.5" font-family="Inter">Scope: ${r.orgs}</text>`;
+    s+=`<text x="720" y="${ry+14}" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">${r.data}</text>`;
+    s+=`<text x="980" y="${ry+14}" dominant-baseline="middle" fill="#64748b" font-size="8.5" font-family="Inter">${r.can}</text>`;
+  });
+
+  s+=`<rect x="8" y="8" width="450" height="34" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s+=`<text x="16" y="19" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">Platform Admin Control Plane — Multi-Tenant Governance</text>`;
+  s+=`<text x="16" y="33" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">8 steps · service_role bypass · RBAC matrix · Stripe billing · Audit vault · Cross-tenant visibility</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WF-6: SMARTPREP + AI ────────────────────────────────────────
+function buildAIFlow() {
+  const W=1400, H=920;
+  let s = buildDefs();
+
+  s += swimlane(20,20,200,880,'Scheduler / Event','#475569','pg_cron · db trigger · user action');
+  s += swimlane(240,20,260,880,'Edge Functions (Deno)','#d97706','smartprep-cron · ai-insights-chat');
+  s += swimlane(520,20,260,880,'AI Backend','#be185d','Python · Docling · Gemini Pro');
+  s += swimlane(800,20,260,880,'PostgreSQL','#15803d','ai_insights · invoices · orgs');
+  s += swimlane(1080,20,300,880,'Frontend (React)','#0891b2','SmartPrep.jsx · AiInsights.jsx');
+
+  s += sectionTitle(30,52,800,'A — SmartPrep Nightly Kitchen Prep List (AI-Generated)','#be185d');
+  s += startEvent(120,92,12,'pg_cron');
+  s += box(30,112,180,52,P.cron,'pg_cron: Nightly','0 2 * * *  (2am UTC)','',1,'pg_cron fires nightly. Calls smartprep-cron edge function via pg_net HTTP call. Runs for ALL active organizations.');
+  s += arrow(120,164,370,164,'','amber','1');
+  s += box(250,150,220,52,P.edge,'smartprep-cron Edge Fn','Fetches all active orgs','',2,'Creates separate prep list for each active organization based on their product catalog and sales history.');
+  s += arrow(370,202,370,250,'for each org','amber','2');
+  s += db(810,238,220,52,P.db,'mv_daily_sales_summary','Rolling 7-day avg · by product','3','Materialized view refreshed hourly. Contains: item_name, avg_quantity_sold, day_of_week patterns, seasonal adjustments.');
+  s += arrow(810,238,490,270,'sales data','amber','3');
+  s += box(250,260,220,72,P.edge,'Build Gemini Prompt','Org name + product catalog\n+ historical sales + date','',4,'Prompt engineering: Includes top 20 products, avg daily usage, tomorrow\'s date, day-of-week context. Requests structured JSON output.');
+  s += arrow(470,296,520,296,'prompt','pink','4');
+  s += box(530,280,220,56,P.ai,'Gemini Pro API','gemini-pro:generateContent\nGEMINI_API_KEY','',5,'API call: models/gemini-pro:generateContent. Returns markdown-wrapped JSON. Edge function strips code fences.');
+  s += arrow(750,308,810,308,'JSON response','pink','5');
+  s += box(250,370,220,52,P.edge,'Parse + Validate','Strip markdown · JSON.parse()\nitem_name · prep_amount · unit · priority','',6,'Strips ```json``` fences. Validates structure. Handles partial/malformed responses gracefully.');
+  s += arrow(470,396,810,396,'validated data','ok','6');
+  s += db(810,384,220,56,P.db,'ai_insights INSERT','insight_type=smart_prep_list\nmetadata.items[] · date · org_id','6','');
+  s += arrow(810,412,1090,480,'next morning','blue','7',true);
+  s += box(1090,468,260,56,P.react,'SmartPrep.jsx','Kitchen staff views prioritized\nprep list for the day','',7,'');
+
+  // AI INVOICE EXTRACTION
+  s += sectionTitle(30,460,800,'B — Invoice AI Extraction (Real-Time, Event-Driven)','#d97706');
+  s += box(30,490,180,52,P.cron,'DB Trigger: pg_net','invoices.status = extracting\n→ HTTP call to edge function','',8,'pg_net pg extension fires HTTP webhook when invoices row is inserted/updated with status=extracting. Async, non-blocking.');
+  s += arrow(120,542,370,542,'','amber','8');
+  s += box(250,528,220,52,P.edge,'invoice-processing Fn','Service Role · downloads file\nPOST /extract-invoice','',9,'');
+  s += arrow(470,554,520,554,'PDF file','pink','9');
+  s += box(530,540,220,64,P.ai,'Docling PDF Parser','Structural layout analysis\nTable detection · Field extraction','',10,'Docling (IBM open-source) parses PDF layout. Identifies: header block, line item table, totals section. Handles multi-page invoices, scanned PDFs.');
+  s += arrow(750,572,810,572,'raw text','pink','');
+  s += box(530,618,220,64,P.ai,'Gemini Pro: Structure','Converts raw Docling output\nto typed invoice JSON fields','',11,'Gemini interprets extracted text in context. Resolves abbreviations, handles vendor-specific formats. Returns structured JSON with confidence scores.');
+  s += arrow(750,650,810,650,'structured JSON','ok','11');
+  s += db(810,638,220,56,P.db,'invoices UPDATE','line_items JSONB\nstatus=pending_review','','');
+
+  // AI CHAT
+  s += sectionTitle(30,700,800,'C — AI Insights Copilot Chat','#8b5cf6');
+  s += box(30,730,180,52,P.user,'Manager asks question','AiInsights.jsx · text input','','');
+  s += arrow(120,782,370,782,'','blue','');
+  s += box(250,768,220,52,P.edge,'ai-insights-chat Fn','Builds prompt with org context\ninvoices · inventory · labor data','','');
+  s += arrow(470,794,520,794,'','pink','');
+  s += box(530,780,220,52,P.ai,'Gemini Pro: Chat','Multi-turn · org-aware\nno hallucination guardrails','','');
+  s += arrow(750,806,1090,806,'AI response','blue','');
+  s += box(1090,792,260,52,P.react,'Chat Response','Rendered in AiInsights.jsx','','');
+
+  // Edge Function catalog
+  s += sectionTitle(1090,52,290,'AI EDGE FUNCTION CATALOG','#be185d');
+  const fns=[
+    {name:'smartprep-cron',trigger:'pg_cron: nightly',model:'Gemini Pro'},
+    {name:'invoice-processing',trigger:'pg_net: status=extracting',model:'Docling + Gemini'},
+    {name:'ai-insights-chat',trigger:'Frontend POST',model:'Gemini Pro'},
+    {name:'voice-copilot-parser',trigger:'Frontend POST (audio)',model:'Speech-to-text + Gemini'},
+    {name:'forecast-labor',trigger:'Frontend POST',model:'Gemini + time-series'},
+    {name:'calculate-depletion',trigger:'Frontend POST',model:'Gemini + inventory data'},
+    {name:'evaluate-vendor-bids',trigger:'Frontend POST',model:'Gemini + vendor data'},
+  ];
+  fns.forEach((f,i)=>{
+    const fy=88+i*58;
+    s+=`<rect x="1090" y="${fy}" width="290" height="50" rx="6" fill="#be185d0a" stroke="#be185d25"/>`;
+    s+=`<rect x="1090" y="${fy}" width="4" height="50" rx="2" fill="#be185d60"/>`;
+    s+=`<text x="1102" y="${fy+16}" dominant-baseline="middle" fill="#f9a8d4" font-size="9.5" font-weight="700" font-family="JetBrains Mono">${f.name}</text>`;
+    s+=`<text x="1102" y="${fy+29}" dominant-baseline="middle" fill="#475569" font-size="8" font-family="Inter">Trigger: ${f.trigger}</text>`;
+    s+=`<text x="1102" y="${fy+41}" dominant-baseline="middle" fill="#be185d80" font-size="8" font-family="Inter">Model: ${f.model}</text>`;
+  });
+
+  s+=`<rect x="8" y="8" width="450" height="34" rx="5" fill="#111827" stroke="#1f2d45"/>`;
+  s+=`<text x="16" y="19" dominant-baseline="middle" fill="#e2e8f0" font-size="12" font-weight="700" font-family="Inter">AI Flows — SmartPrep · Invoice Extraction · Copilot</text>`;
+  s+=`<text x="16" y="33" dominant-baseline="middle" fill="#475569" font-size="8.5" font-family="Inter">Gemini Pro · Docling OCR · pg_cron · 7 AI edge functions · Nightly batch + real-time inference</text>`;
+
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
+
+// ─── WORKFLOW REGISTRY ──────────────────────────────────────────
+const FLOWS = [
+  {id:'system',  label:'System Context',     icon:'🏗',  color:'#3b82f6',  steps:6,  builder: buildSystemContext},
+  {id:'invoice', label:'Invoice Lifecycle',  icon:'📄',  color:'#d97706',  steps:17, builder: buildInvoiceFlow},
+  {id:'auth',    label:'Auth & Onboarding',  icon:'🔐',  color:'#7c3aed',  steps:14, builder: buildAuthFlow},
+  {id:'payment', label:'Payment & Bill Pay', icon:'💰',  color:'#22c55e',  steps:8,  builder: buildPaymentFlow},
+  {id:'data',    label:'Data Architecture',  icon:'🗄',  color:'#0891b2',  steps:0,  builder: buildDataModel},
+  {id:'admin',   label:'Platform Admin',     icon:'🛡',  color:'#ef4444',  steps:8,  builder: buildPlatformAdmin},
+  {id:'ai',      label:'AI & SmartPrep',     icon:'🤖',  color:'#ec4899',  steps:11, builder: buildAIFlow},
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER ENGINE — Zoom/Pan + Tab Switching
+// ═══════════════════════════════════════════════════════════════
+let currentFlow = FLOWS[0];
+let scale = 1, panX = 20, panY = 20;
+let isDragging = false, dragStart = {x:0,y:0}, panStart = {x:0,y:0};
+const vp = document.getElementById('viewport');
+const wrap = document.getElementById('canvasWrap');
+const mainSvg = document.getElementById('mainSvg');
+
+function renderFlow(flow) {
+  const svgStr = flow.builder();
+  vp.innerHTML = svgStr;
+  // parse dimensions from built svg
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgStr,'image/svg+xml');
+  const root = doc.querySelector('svg');
+  const w = parseFloat(root?.getAttribute('width')||'1400');
+  const h = parseFloat(root?.getAttribute('height')||'900');
+  currentFlow = flow;
+  document.getElementById('statusFlow').textContent = flow.label;
+  document.getElementById('statusSteps').textContent = flow.steps ? `${flow.steps} process steps` : 'Entity diagram';
+  // Fit to view
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  const fitScale = Math.min((cw-40)/w, (ch-40)/h, 1);
+  scale = fitScale;
+  panX = (cw - w*scale)/2;
+  panY = 20;
+  updateTransform();
+  setupTooltips();
+}
+
+function updateTransform() {
+  vp.setAttribute('transform',`translate(${panX},${panY}) scale(${scale})`);
+  document.getElementById('zoomLevel').textContent = Math.round(scale*100)+'%';
+}
+
+function zoomIn() { scale = Math.min(scale*1.25, 4); updateTransform(); }
+function zoomOut(){ scale = Math.max(scale/1.25, 0.1); updateTransform(); }
+function resetView(){ renderFlow(currentFlow); }
+
+// Mouse wheel zoom
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const ns = Math.min(Math.max(scale*factor, 0.1), 4);
+  panX = mx - (mx-panX)*(ns/scale);
+  panY = my - (my-panY)*(ns/scale);
+  scale = ns;
+  updateTransform();
+}, {passive:false});
+
+// Drag pan
+wrap.addEventListener('mousedown', e => {
+  if(e.button!==0) return;
+  isDragging=true; wrap.classList.add('grabbing');
+  dragStart={x:e.clientX,y:e.clientY};
+  panStart={x:panX,y:panY};
+});
+window.addEventListener('mousemove', e => {
+  if(!isDragging) return;
+  panX=panStart.x+(e.clientX-dragStart.x);
+  panY=panStart.y+(e.clientY-dragStart.y);
+  updateTransform();
+  document.getElementById('statusPos').textContent=`x:${Math.round(-panX/scale)} y:${Math.round(-panY/scale)}`;
+});
+window.addEventListener('mouseup', () => { isDragging=false; wrap.classList.remove('grabbing'); });
+
+// Tooltip
+const tip = document.getElementById('tip');
+function setupTooltips() {
+  vp.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', e => {
+      const txt = el.getAttribute('data-tip');
+      if(!txt) return;
+      tip.textContent = txt;
+      tip.classList.add('show');
+    });
+    el.addEventListener('mousemove', e => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-10)+'px'; });
+    el.addEventListener('mouseleave', () => tip.classList.remove('show'));
+  });
+}
+
+// Build tabs
+const tabsEl = document.getElementById('tabs');
+FLOWS.forEach((flow,i) => {
+  const t = document.createElement('div');
+  t.className = 'tab' + (i===0?' active':'');
+  t.id = 'tab-'+flow.id;
+  t.innerHTML = `<span class="tab-num">${i+1}</span>${flow.icon}&nbsp;${flow.label}`;
+  t.style.setProperty('--c', flow.color);
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    renderFlow(flow);
+  });
+  tabsEl.appendChild(t);
+});
+
+// Initial render
+renderFlow(FLOWS[0]);
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  if(e.key==='+'||e.key==='=') zoomIn();
+  if(e.key==='-') zoomOut();
+  if(e.key==='0') resetView();
+  if(e.key>='1'&&e.key<='9') {
+    const idx=parseInt(e.key)-1;
+    if(FLOWS[idx]){
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.getElementById('tab-'+FLOWS[idx].id)?.classList.add('active');
+      renderFlow(FLOWS[idx]);
+    }
+  }
+});
+</script>
+</body>
+</html>
