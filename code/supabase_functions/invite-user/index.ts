@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { getSupabaseClient, getSupabaseAuthAdminClient } from "../../supabase/functions/_shared/supabase.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,16 +19,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const adminClient = getSupabaseAuthAdminClient();
+    const userClient = getSupabaseClient(authorization);
 
     // Verify caller
     const token = authorization.replace("Bearer ", "");
-    const { data: { user: caller }, error: callerErr } = await adminClient.auth.getUser(token);
+    const { data: { user: caller }, error: callerErr } = await userClient.auth.getUser(token);
     if (callerErr || !caller) {
       console.error("[invite-user] Caller verification failed:", callerErr);
       return new Response(JSON.stringify({ error: "Invalid token" }), {
@@ -37,7 +33,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Verify caller role
-    const { data: callerProfile, error: profileErr } = await adminClient
+    const { data: callerProfile, error: profileErr } = await userClient
       .from("profiles")
       .select("role, organization_id")
       .eq("id", caller.id)
@@ -82,7 +78,7 @@ Deno.serve(async (req: Request) => {
     const loginLink = `${frontendUrl}/login`;
 
     // ── Safety check: was this user previously deleted/archived? ──────────
-    const { data: existingProfile } = await adminClient
+    const { data: existingProfile } = await userClient
       .from("profiles")
       .select("id, status, role, organization_id, email")
       .eq("email", email.toLowerCase())
@@ -201,7 +197,7 @@ Deno.serve(async (req: Request) => {
       profilePayload.signing_privileges = signing_privileges;
     }
 
-    const { error: upsertErr } = await adminClient
+    const { error: upsertErr } = await userClient
       .from("profiles")
       .upsert(profilePayload, { onConflict: "id" });
     if (upsertErr) console.error("[invite-user] Profile upsert error:", upsertErr);
@@ -209,7 +205,7 @@ Deno.serve(async (req: Request) => {
     // 3. Log invitation in DB — generate a proper token for the frontend
     console.log(`[invite-user] Logging invitation in DB`);
     const invitationToken = crypto.randomUUID();
-    const { error: invInsertErr } = await adminClient.from("invitations").insert({
+    const { error: invInsertErr } = await userClient.from("invitations").insert({
       email: email.toLowerCase(),
       organization_id: targetOrgId || null,
       role: targetRole,
@@ -225,7 +221,7 @@ Deno.serve(async (req: Request) => {
       console.error("[invite-user] Invitation insert error:", invInsertErr);
       // If duplicate, try to fetch existing token
       if (invInsertErr.code === "23505") {
-        let query = adminClient
+        let query = userClient
           .from("invitations")
           .select("token")
           .eq("email", email.toLowerCase())

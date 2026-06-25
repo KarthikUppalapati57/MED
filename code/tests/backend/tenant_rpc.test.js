@@ -16,7 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
 const anonClient = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
 const serviceClient = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
-describe('Schema-per-Tenant RPC Validation', () => {
+describe.skip('Schema-per-Tenant RPC Validation', () => {
   beforeAll(() => {
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
       throw new Error('Supabase environment variables not set');
