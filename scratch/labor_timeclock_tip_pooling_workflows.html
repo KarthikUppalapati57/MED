@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Labor Workflows: Time Clock + Tip Pooling</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #647084;
+      --line: #dce2ea;
+      --blue: #2563eb;
+      --green: #059669;
+      --amber: #b45309;
+      --red: #dc2626;
+      --soft-blue: #e8f0ff;
+      --soft-green: #e8f7f1;
+      --soft-amber: #fff3df;
+      --soft-red: #feecec;
+      --shadow: 0 18px 45px rgba(20, 31, 50, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 18px 28px;
+      background: rgba(246, 247, 249, 0.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand strong {
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .brand span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eef2f7;
+    }
+
+    .tab {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 13px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 6px rgba(20, 31, 50, 0.08);
+    }
+
+    main {
+      width: min(1180px, calc(100vw - 40px));
+      margin: 28px auto 60px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
+
+    .summary,
+    .status-panel,
+    .panel,
+    .workflow-step,
+    .metric,
+    .swimlane-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .summary {
+      padding: 28px;
+    }
+
+    .summary h1 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .summary p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .status-panel {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .status-panel h2,
+    .panel h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 28px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .badge.blue {
+      color: var(--blue);
+      background: var(--soft-blue);
+    }
+
+    .badge.green {
+      color: var(--green);
+      background: var(--soft-green);
+    }
+
+    .badge.amber {
+      color: var(--amber);
+      background: var(--soft-amber);
+    }
+
+    .badge.red {
+      color: var(--red);
+      background: var(--soft-red);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .metric {
+      padding: 18px;
+      min-height: 132px;
+    }
+
+    .metric span {
+      display: block;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 23px;
+      letter-spacing: 0;
+    }
+
+    .metric p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .content {
+      display: none;
+    }
+
+    .content.active {
+      display: block;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .workflow-step {
+      position: relative;
+      min-height: 180px;
+      padding: 18px;
+    }
+
+    .step-num {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 14px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .workflow-step h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .workflow-step p,
+    .panel p,
+    .status-panel p,
+    .swimlane-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .panel {
+      padding: 22px;
+    }
+
+    .panel h2 {
+      margin-bottom: 14px;
+    }
+
+    .data-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .data-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .data-list li:last-child {
+      border-bottom: 0;
+    }
+
+    .data-list strong {
+      color: var(--ink);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .swimlane {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .swimlane-card {
+      padding: 18px;
+      min-height: 150px;
+    }
+
+    .swimlane-card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .formula {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #0f172a;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 900px) {
+      .topbar,
+      .hero,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: stretch;
+      }
+
+      .tabs {
+        overflow-x: auto;
+      }
+
+      .grid,
+      .workflow,
+      .swimlane {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>Labor Workflow Artifact</strong>
+      <span>Time Clock and Tip Pooling operational flows</span>
+    </div>
+    <nav class="tabs" aria-label="Workflow modules">
+      <button class="tab active" data-target="overview">Overview</button>
+      <button class="tab" data-target="timeclock">Time Clock</button>
+      <button class="tab" data-target="tips">Tip Pooling</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="summary">
+        <h1>Live workflow map for labor capture and tip distribution.</h1>
+        <p>This artifact documents the current product behavior, the intended operator flow, and the wiring gaps that need to be closed before the modules behave end to end in production.</p>
+      </div>
+      <aside class="status-panel">
+        <span class="badge amber">Partially Wired</span>
+        <h2>Implementation Status</h2>
+        <p>Time Clock can write punches to Supabase. Tip Pooling has the distribution UI and math, but needs API registration, schema field alignment, and real date filtering.</p>
+      </aside>
+    </section>
+
+    <section id="overview" class="content active">
+      <div class="grid">
+        <article class="metric">
+          <span>Source Data</span>
+          <strong>time_clocks</strong>
+          <p>Stores organization, location, employee profile, clock-in time, clock-out time, and punch status.</p>
+        </article>
+        <article class="metric">
+          <span>Distribution Rule</span>
+          <strong>Hours-Based Split</strong>
+          <p>Each eligible employee receives tips proportional to completed hours worked in the selected period.</p>
+        </article>
+        <article class="metric">
+          <span>Operator Input</span>
+          <strong>Date + POS Tips</strong>
+          <p>Manager selects the shift date and enters total credit card tips collected from the POS.</p>
+        </article>
+      </div>
+
+      <div class="swimlane">
+        <article class="swimlane-card">
+          <span class="badge blue">Employee</span>
+          <h3>Capture Labor</h3>
+          <p>Employee enters PIN, clocks in, works shift, then clocks out. The system creates and completes the punch record.</p>
+        </article>
+        <article class="swimlane-card">
+          <span class="badge green">Manager</span>
+          <h3>Review Tips</h3>
+          <p>Manager opens Tip Pooling, chooses the shift date, enters total tips, and reviews the calculated distribution.</p>
+        </article>
+        <article class="swimlane-card">
+          <span class="badge amber">System</span>
+          <h3>Prepare Payroll</h3>
+          <p>Completed punches feed tip allocation and payroll export once schema and API mappings are aligned.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="timeclock" class="content">
+      <div class="workflow">
+        <article class="workflow-step">
+          <div class="step-num">1</div>
+          <h3>Open Time Clock</h3>
+          <p>Employee lands on the Time Clock screen and sees a PIN field with Clock In and Clock Out actions.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">2</div>
+          <h3>Enter PIN</h3>
+          <p>The UI requires a PIN before action, but current code does not validate the PIN against employee records.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">3</div>
+          <h3>Clock In</h3>
+          <p>The app inserts a `time_clocks` row for the authenticated user with `status = clocked_in`.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">4</div>
+          <h3>Clock Out</h3>
+          <p>The app updates active punches for the employee with `clock_out_time` and `status = clocked_out`.</p>
+        </article>
+      </div>
+
+      <div class="two-col">
+        <article class="panel">
+          <h2>Data Written</h2>
+          <ul class="data-list">
+            <li><span>Organization scope</span><strong>organization_id</strong></li>
+            <li><span>Location scope</span><strong>location_id</strong></li>
+            <li><span>Employee link</span><strong>employee_profile_id</strong></li>
+            <li><span>Start timestamp</span><strong>clock_in_time</strong></li>
+            <li><span>End timestamp</span><strong>clock_out_time</strong></li>
+            <li><span>Punch state</span><strong>status</strong></li>
+          </ul>
+        </article>
+        <article class="panel">
+          <h2>Production Gaps</h2>
+          <ul class="data-list">
+            <li><span>PIN lookup and validation</span><strong>Needed</strong></li>
+            <li><span>Prevent duplicate open punches</span><strong>Needed</strong></li>
+            <li><span>Location assignment on punch</span><strong>Needed</strong></li>
+            <li><span>Break workflow</span><strong>Schema only</strong></li>
+            <li><span>Manager corrections</span><strong>Needed</strong></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="tips" class="content">
+      <div class="workflow">
+        <article class="workflow-step">
+          <div class="step-num">1</div>
+          <h3>Select Date</h3>
+          <p>Manager chooses the shift date for the pool. The UI state exists, but the query still needs date-range filtering.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">2</div>
+          <h3>Enter POS Tips</h3>
+          <p>Manager enters total credit card tips collected for the shift or day.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">3</div>
+          <h3>Load Punches</h3>
+          <p>The intended query fetches completed employee punches with profile names and roles.</p>
+        </article>
+        <article class="workflow-step">
+          <div class="step-num">4</div>
+          <h3>Calculate Split</h3>
+          <p>The app totals labor hours, calculates each employee ratio, and multiplies that ratio by total tips.</p>
+        </article>
+      </div>
+
+      <div class="two-col">
+        <article class="panel">
+          <h2>Distribution Formula</h2>
+          <div class="formula">employee_hours = clock_out_time - clock_in_time
+total_hours = sum(employee_hours)
+employee_ratio = employee_hours / total_hours
+tip_share = total_credit_card_tips * employee_ratio</div>
+        </article>
+        <article class="panel">
+          <h2>Production Gaps</h2>
+          <ul class="data-list">
+            <li><span>Register TimeClock API entity</span><strong>Needed</strong></li>
+            <li><span>Use `clock_in_time` / `clock_out_time`</span><strong>Needed</strong></li>
+            <li><span>Use `employee_profile_id`</span><strong>Needed</strong></li>
+            <li><span>Filter selected date and location</span><strong>Needed</strong></li>
+            <li><span>Persist approved tip pool</span><strong>Needed</strong></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const panels = Array.from(document.querySelectorAll(".content"));
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.target;
+
+        tabs.forEach((item) => item.classList.toggle("active", item === tab));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === target));
+      });
+    });
+  </script>
+</body>
+</html>
