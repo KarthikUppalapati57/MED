@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visio Style Labor Workflow Artifacts</title>
+  <style>
+    :root {
+      --page: #f3f5f8;
+      --canvas: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #b8c2d1;
+      --grid: #e8edf3;
+      --blue: #1d4ed8;
+      --blue-fill: #eaf1ff;
+      --green: #047857;
+      --green-fill: #e7f7ef;
+      --amber: #b45309;
+      --amber-fill: #fff3df;
+      --red: #b91c1c;
+      --red-fill: #feecec;
+      --store: #f8fafc;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: var(--page);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 26px;
+      background: rgba(243, 245, 248, 0.94);
+      border-bottom: 1px solid #d9e0ea;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 9px 12px;
+      background: #fff;
+      color: #344054;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.active {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: #fff;
+    }
+
+    main {
+      width: min(1280px, calc(100vw - 32px));
+      margin: 20px auto 48px;
+    }
+
+    .sheet {
+      display: none;
+      background: var(--canvas);
+      border: 1px solid #cbd5e1;
+      box-shadow: var(--shadow);
+    }
+
+    .sheet.active {
+      display: block;
+    }
+
+    .sheet-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #d9e0ea;
+      background: #fbfcfe;
+    }
+
+    .sheet-title h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .sample {
+      width: 18px;
+      height: 12px;
+      border: 1px solid var(--line);
+      background: var(--blue-fill);
+    }
+
+    .sample.decision {
+      width: 14px;
+      height: 14px;
+      transform: rotate(45deg);
+      background: var(--amber-fill);
+    }
+
+    .sample.store {
+      border-radius: 50% / 18%;
+      background: var(--store);
+    }
+
+    .diagram-wrap {
+      overflow: auto;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    svg {
+      display: block;
+      min-width: 1160px;
+      height: auto;
+    }
+
+    .lane-fill {
+      fill: rgba(248, 250, 252, 0.88);
+      stroke: #d9e0ea;
+      stroke-width: 1;
+    }
+
+    .lane-head {
+      fill: #eef2f7;
+      stroke: #d9e0ea;
+      stroke-width: 1;
+    }
+
+    .lane-label {
+      fill: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .box {
+      rx: 6;
+      ry: 6;
+      stroke-width: 1.4;
+    }
+
+    .process {
+      fill: var(--blue-fill);
+      stroke: var(--blue);
+    }
+
+    .system {
+      fill: var(--green-fill);
+      stroke: var(--green);
+    }
+
+    .warning {
+      fill: var(--red-fill);
+      stroke: var(--red);
+    }
+
+    .store-shape {
+      fill: var(--store);
+      stroke: #475467;
+      stroke-width: 1.4;
+    }
+
+    .decision {
+      fill: var(--amber-fill);
+      stroke: var(--amber);
+      stroke-width: 1.4;
+    }
+
+    .shape-title {
+      fill: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .shape-body {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .connector {
+      fill: none;
+      stroke: #475467;
+      stroke-width: 1.6;
+      marker-end: url(#arrow);
+    }
+
+    .connector-dashed {
+      fill: none;
+      stroke: #b91c1c;
+      stroke-width: 1.6;
+      stroke-dasharray: 6 5;
+      marker-end: url(#arrow-red);
+    }
+
+    .note {
+      fill: #fffbeb;
+      stroke: #d97706;
+      stroke-width: 1.2;
+    }
+
+    .note-text {
+      fill: #92400e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .footer {
+      padding: 12px 20px 16px;
+      border-top: 1px solid #d9e0ea;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      header {
+        display: none;
+      }
+
+      main {
+        width: 100%;
+        margin: 0;
+      }
+
+      .sheet,
+      .sheet.active {
+        display: block;
+        page-break-after: always;
+        border: 0;
+        box-shadow: none;
+      }
+
+      .diagram-wrap {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Visio Style Artifacts</h1>
+      <p>Labor module workflow diagrams for Time Clock and Tip Pooling</p>
+    </div>
+    <nav class="tabs" aria-label="Artifacts">
+      <button class="active" data-sheet="timeclock">Time Clock</button>
+      <button data-sheet="tips">Tip Pooling</button>
+      <button data-sheet="dataflow">Data Flow</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="timeclock" class="sheet active">
+      <div class="sheet-title">
+        <h2>Time Clock Workflow</h2>
+        <div class="legend">
+          <span><i class="sample"></i>Process</span>
+          <span><i class="sample decision"></i>Decision</span>
+          <span><i class="sample store"></i>Data Store</span>
+        </div>
+      </div>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 1200 760" role="img" aria-label="Time Clock Visio style workflow">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+            <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#b91c1c"></path>
+            </marker>
+          </defs>
+
+          <rect class="lane-fill" x="20" y="40" width="1160" height="180"></rect>
+          <rect class="lane-head" x="20" y="40" width="120" height="180"></rect>
+          <text class="lane-label" x="80" y="135" text-anchor="middle">Employee</text>
+
+          <rect class="lane-fill" x="20" y="220" width="1160" height="250"></rect>
+          <rect class="lane-head" x="20" y="220" width="120" height="250"></rect>
+          <text class="lane-label" x="80" y="350" text-anchor="middle">App UI</text>
+
+          <rect class="lane-fill" x="20" y="470" width="1160" height="250"></rect>
+          <rect class="lane-head" x="20" y="470" width="120" height="250"></rect>
+          <text class="lane-label" x="80" y="600" text-anchor="middle">Supabase</text>
+
+          <rect class="box process" x="180" y="84" width="150" height="76"></rect>
+          <text class="shape-title" x="255" y="115" text-anchor="middle">Enter PIN</text>
+          <text class="shape-body" x="255" y="137" text-anchor="middle">4 digit input</text>
+
+          <rect class="box process" x="390" y="84" width="150" height="76"></rect>
+          <text class="shape-title" x="465" y="115" text-anchor="middle">Choose Action</text>
+          <text class="shape-body" x="465" y="137" text-anchor="middle">Clock in / out</text>
+
+          <polygon class="decision" points="620,80 710,122 620,164 530,122"></polygon>
+          <text class="shape-title" x="620" y="118" text-anchor="middle">PIN</text>
+          <text class="shape-title" x="620" y="136" text-anchor="middle">present?</text>
+
+          <rect class="box system" x="780" y="84" width="155" height="76"></rect>
+          <text class="shape-title" x="857" y="115" text-anchor="middle">Get Auth User</text>
+          <text class="shape-body" x="857" y="137" text-anchor="middle">supabase.auth</text>
+
+          <polygon class="decision" points="1010,80 1100,122 1010,164 920,122"></polygon>
+          <text class="shape-title" x="1010" y="118" text-anchor="middle">Clock</text>
+          <text class="shape-title" x="1010" y="136" text-anchor="middle">in?</text>
+
+          <rect class="box system" x="260" y="292" width="190" height="84"></rect>
+          <text class="shape-title" x="355" y="323" text-anchor="middle">Insert Punch</text>
+          <text class="shape-body" x="355" y="345" text-anchor="middle">status = clocked_in</text>
+
+          <rect class="box system" x="580" y="292" width="205" height="84"></rect>
+          <text class="shape-title" x="682" y="323" text-anchor="middle">Update Open Punch</text>
+          <text class="shape-body" x="682" y="345" text-anchor="middle">set clock_out_time</text>
+
+          <rect class="box process" x="910" y="292" width="170" height="84"></rect>
+          <text class="shape-title" x="995" y="323" text-anchor="middle">Show Toast</text>
+          <text class="shape-body" x="995" y="345" text-anchor="middle">Success / error</text>
+
+          <path class="store-shape" d="M430 560 C430 535 650 535 650 560 L650 650 C650 675 430 675 430 650 Z"></path>
+          <path class="store-shape" d="M430 560 C430 585 650 585 650 560"></path>
+          <text class="shape-title" x="540" y="606" text-anchor="middle">time_clocks</text>
+          <text class="shape-body" x="540" y="628" text-anchor="middle">employee_profile_id, status</text>
+
+          <rect class="note" x="760" y="550" width="300" height="86"></rect>
+          <text class="note-text" x="780" y="582">Gap: PIN is collected but not validated.</text>
+          <text class="note-text" x="780" y="604">Gap: duplicate open punches are not blocked.</text>
+
+          <path class="connector" d="M330 122 H390"></path>
+          <path class="connector" d="M540 122 H530"></path>
+          <path class="connector" d="M710 122 H780"></path>
+          <path class="connector" d="M935 122 H920"></path>
+          <path class="connector" d="M1010 164 V260 H355 V292"></path>
+          <path class="connector" d="M1100 122 H1135 V430 H682 V376"></path>
+          <path class="connector" d="M355 376 V530 H495 V560"></path>
+          <path class="connector" d="M682 376 V530 H585 V560"></path>
+          <path class="connector" d="M650 606 H910 V376"></path>
+          <path class="connector-dashed" d="M620 164 V210 H180 V160"></path>
+        </svg>
+      </div>
+      <div class="footer">Artifact notes: current implementation writes `employee_profile_id`, `clock_in_time`, `clock_out_time`, and `status` to `time_clocks`. PIN verification and open-punch safeguards are not yet production-complete.</div>
+    </section>
+
+    <section id="tips" class="sheet">
+      <div class="sheet-title">
+        <h2>Tip Pooling Workflow</h2>
+        <div class="legend">
+          <span><i class="sample"></i>Process</span>
+          <span><i class="sample decision"></i>Calculation</span>
+          <span><i class="sample store"></i>Data Store</span>
+        </div>
+      </div>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 1200 760" role="img" aria-label="Tip Pooling Visio style workflow">
+          <defs>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+            <marker id="arrow-red2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#b91c1c"></path>
+            </marker>
+          </defs>
+
+          <rect class="lane-fill" x="20" y="40" width="1160" height="180"></rect>
+          <rect class="lane-head" x="20" y="40" width="120" height="180"></rect>
+          <text class="lane-label" x="80" y="135" text-anchor="middle">Manager</text>
+
+          <rect class="lane-fill" x="20" y="220" width="1160" height="250"></rect>
+          <rect class="lane-head" x="20" y="220" width="120" height="250"></rect>
+          <text class="lane-label" x="80" y="350" text-anchor="middle">Tip UI</text>
+
+          <rect class="lane-fill" x="20" y="470" width="1160" height="250"></rect>
+          <rect class="lane-head" x="20" y="470" width="120" height="250"></rect>
+          <text class="lane-label" x="80" y="600" text-anchor="middle">Data</text>
+
+          <rect class="box process" x="180" y="84" width="150" height="76"></rect>
+          <text class="shape-title" x="255" y="115" text-anchor="middle">Select Date</text>
+          <text class="shape-body" x="255" y="137" text-anchor="middle">Shift date</text>
+
+          <rect class="box process" x="390" y="84" width="170" height="76"></rect>
+          <text class="shape-title" x="475" y="115" text-anchor="middle">Enter Tips</text>
+          <text class="shape-body" x="475" y="137" text-anchor="middle">POS credit tips</text>
+
+          <rect class="box system" x="650" y="84" width="190" height="76"></rect>
+          <text class="shape-title" x="745" y="115" text-anchor="middle">Fetch Punches</text>
+          <text class="shape-body" x="745" y="137" text-anchor="middle">completed records</text>
+
+          <path class="store-shape" d="M920 74 C920 52 1100 52 1100 74 L1100 152 C1100 174 920 174 920 152 Z"></path>
+          <path class="store-shape" d="M920 74 C920 96 1100 96 1100 74"></path>
+          <text class="shape-title" x="1010" y="111" text-anchor="middle">time_clocks</text>
+          <text class="shape-body" x="1010" y="133" text-anchor="middle">completed shifts</text>
+
+          <polygon class="decision" points="260,276 370,334 260,392 150,334"></polygon>
+          <text class="shape-title" x="260" y="323" text-anchor="middle">Calculate</text>
+          <text class="shape-title" x="260" y="341" text-anchor="middle">hours</text>
+
+          <rect class="box system" x="455" y="292" width="190" height="84"></rect>
+          <text class="shape-title" x="550" y="323" text-anchor="middle">Group by Employee</text>
+          <text class="shape-body" x="550" y="345" text-anchor="middle">sum labor hours</text>
+
+          <polygon class="decision" points="755,276 870,334 755,392 640,334"></polygon>
+          <text class="shape-title" x="755" y="323" text-anchor="middle">Apply Ratio</text>
+          <text class="shape-body" x="755" y="343" text-anchor="middle">hours / total</text>
+
+          <rect class="box process" x="945" y="292" width="170" height="84"></rect>
+          <text class="shape-title" x="1030" y="323" text-anchor="middle">Show Breakdown</text>
+          <text class="shape-body" x="1030" y="345" text-anchor="middle">tip share by staff</text>
+
+          <rect class="box warning" x="260" y="555" width="220" height="84"></rect>
+          <text class="shape-title" x="370" y="584" text-anchor="middle">Schema Mismatch</text>
+          <text class="shape-body" x="370" y="606" text-anchor="middle">UI expects old fields</text>
+
+          <rect class="box warning" x="560" y="555" width="250" height="84"></rect>
+          <text class="shape-title" x="685" y="584" text-anchor="middle">Persistence Missing</text>
+          <text class="shape-body" x="685" y="606" text-anchor="middle">approved pool not saved</text>
+
+          <rect class="note" x="870" y="540" width="260" height="110"></rect>
+          <text class="note-text" x="890" y="574">Formula:</text>
+          <text class="note-text" x="890" y="596">tip_share = total_tips *</text>
+          <text class="note-text" x="890" y="618">(employee_hours / total_hours)</text>
+
+          <path class="connector" style="marker-end:url(#arrow2)" d="M330 122 H390"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M560 122 H650"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M840 122 H920"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M1010 174 V245 H260 V276"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M370 334 H455"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M645 334 H640"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M870 334 H945"></path>
+          <path class="connector-dashed" style="marker-end:url(#arrow-red2)" d="M745 160 V520 H370 V555"></path>
+          <path class="connector-dashed" style="marker-end:url(#arrow-red2)" d="M1030 376 V520 H685 V555"></path>
+        </svg>
+      </div>
+      <div class="footer">Artifact notes: Tip Pooling currently has the UI and calculation model. Production wiring needs `TimeClock` entity registration, date/location filtering, field alignment to `clock_in_time`, `clock_out_time`, `employee_profile_id`, and persisted approval records.</div>
+    </section>
+
+    <section id="dataflow" class="sheet">
+      <div class="sheet-title">
+        <h2>Labor Module Data Flow</h2>
+        <div class="legend">
+          <span><i class="sample"></i>Module</span>
+          <span><i class="sample store"></i>Storage</span>
+          <span><i class="sample decision"></i>Derived Output</span>
+        </div>
+      </div>
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 1200 620" role="img" aria-label="Labor data flow Visio style artifact">
+          <defs>
+            <marker id="arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+          </defs>
+
+          <rect class="box process" x="70" y="95" width="180" height="86"></rect>
+          <text class="shape-title" x="160" y="130" text-anchor="middle">Time Clock UI</text>
+          <text class="shape-body" x="160" y="152" text-anchor="middle">employee punch capture</text>
+
+          <path class="store-shape" d="M355 90 C355 62 595 62 595 90 L595 195 C595 223 355 223 355 195 Z"></path>
+          <path class="store-shape" d="M355 90 C355 118 595 118 595 90"></path>
+          <text class="shape-title" x="475" y="136" text-anchor="middle">time_clocks</text>
+          <text class="shape-body" x="475" y="158" text-anchor="middle">raw labor records</text>
+
+          <rect class="box process" x="720" y="95" width="190" height="86"></rect>
+          <text class="shape-title" x="815" y="130" text-anchor="middle">Tip Pooling UI</text>
+          <text class="shape-body" x="815" y="152" text-anchor="middle">manager enters POS tips</text>
+
+          <polygon class="decision" points="1030,78 1135,138 1030,198 925,138"></polygon>
+          <text class="shape-title" x="1030" y="128" text-anchor="middle">Tip Split</text>
+          <text class="shape-body" x="1030" y="150" text-anchor="middle">hours-based</text>
+
+          <rect class="box system" x="210" y="350" width="205" height="92"></rect>
+          <text class="shape-title" x="312" y="384" text-anchor="middle">Payroll Export</text>
+          <text class="shape-body" x="312" y="407" text-anchor="middle">regular / overtime hours</text>
+
+          <rect class="box system" x="520" y="350" width="205" height="92"></rect>
+          <text class="shape-title" x="622" y="384" text-anchor="middle">Labor Reporting</text>
+          <text class="shape-body" x="622" y="407" text-anchor="middle">actual hours and variance</text>
+
+          <rect class="box warning" x="830" y="350" width="230" height="92"></rect>
+          <text class="shape-title" x="945" y="384" text-anchor="middle">Approval Ledger</text>
+          <text class="shape-body" x="945" y="407" text-anchor="middle">recommended future table</text>
+
+          <path class="connector" style="marker-end:url(#arrow3)" d="M250 138 H355"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M595 138 H720"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M910 138 H925"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M475 223 V290 H312 V350"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M475 223 V290 H622 V350"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M1030 198 V290 H945 V350"></path>
+
+          <rect class="note" x="70" y="510" width="1060" height="58"></rect>
+          <text class="note-text" x="92" y="545">Recommended production addition: persist each approved tip pool run with date, location, source POS total, employee allocations, approving manager, and audit timestamp.</text>
+        </svg>
+      </div>
+      <div class="footer">Artifact notes: this data-flow page shows how Time Clock becomes the source of truth for tip distribution, payroll export, and labor reporting.</div>
+    </section>
+  </main>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll("button[data-sheet]"));
+    const sheets = Array.from(document.querySelectorAll(".sheet"));
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.sheet;
+        buttons.forEach((item) => item.classList.toggle("active", item === button));
+        sheets.forEach((sheet) => sheet.classList.toggle("active", sheet.id === target));
+      });
+    });
+  </script>
+</body>
+</html>

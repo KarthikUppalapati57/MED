@@ -119,23 +119,6 @@ export default function PlatformUserManagement() {
     try {
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
-
-      const { data: userCurrent } = await supabase.auth.getUser();
-      const { error: insertErr } = await supabase
-        .from("invitations")
-        .insert([{
-          email: platformInviteEmail,
-          token,
-          role: "platform_admin",
-          access_level: "platform",
-          invited_by: userCurrent?.user?.id,
-          expires_at: expiresAt.toISOString(),
-        }]);
-
-      if (insertErr) throw insertErr;
-
-      const link = `${window.location.origin}/signup/${token}`;
       setGeneratedInviteLink(link);
       setShowPlatformInviteModal(false);
       setIsInviteLinkDialogOpen(true);

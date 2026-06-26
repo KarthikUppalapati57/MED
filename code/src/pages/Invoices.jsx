@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -631,6 +631,16 @@ export default function Invoices() {
     return { redirectedToPayments: true, apRoutingDestination };
   };
 
+  const triggerInvoiceExtraction = async (invoice) => {
+    if (!invoice?.id || invoice.status !== 'extracting') return;
+
+    try {
+      await api.financial.startInvoiceExtraction(invoice.id);
+    } catch (error) {
+      console.error('Failed to queue invoice extraction:', error);
+      toast.error('Invoice saved, but extraction did not queue. Please refresh and try again.');
+    }
+  };
   const handleInvoiceExtracted = async (data) => {
     console.log('Invoices Page received extraction data:', data);
     try {
@@ -642,6 +652,7 @@ export default function Invoices() {
         // Open the editor immediately with saved data
         setEditingInvoice(savedInvoice);
         setEditorOpen(true);
+        void triggerInvoiceExtraction(savedInvoice);
       }
     } catch (err) {
       console.error('Failed to create invoice:', err);

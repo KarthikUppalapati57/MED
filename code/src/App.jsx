@@ -12,14 +12,15 @@ import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import RestopsLogo from '@/components/RestopsLogo';
-import { legacyRoutes as Pages, Layout, mainPage } from './router';
+import { legacyRoutes as Pages, canonicalRoutes, setupRoutes, Layout, mainPage } from './router';
 import LegacyRedirectHandler from '@/lib/LegacyRedirectHandler';
 import { useUrlHierarchy } from '@/hooks/useUrlHierarchy';
 
 initGlobalErrorHandlers();
 
-const OnboardingPage = Pages.OnboardingPage;
-const PaymentVerification = Pages.PaymentVerification;
+const OnboardingPage = setupRoutes.OnboardingPage;
+const PaymentVerification = setupRoutes.PaymentVerification;
+const BusinessVerification = setupRoutes.BusinessVerification;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
@@ -445,7 +446,7 @@ function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
-              placeholder="••••••••"
+              placeholder="Password"
               required
             />
           </div>
@@ -633,7 +634,7 @@ function UpdatePasswordPage() {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
-                  placeholder="••••••••"
+                  placeholder="Password"
                   required
                 />
               </div>
@@ -647,7 +648,7 @@ function UpdatePasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
-                placeholder="••••••••"
+                placeholder="Password"
                 required
               />
               <button
@@ -670,7 +671,7 @@ function UpdatePasswordPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
-              placeholder="••••••••"
+              placeholder="Password"
               required
             />
           </div>
@@ -753,9 +754,11 @@ const AuthenticatedApp = () => {
   // Setup is required for any non-platform-admin without an organization
   const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && mfaStatusKnown;
   
-  // Within the setup flow, we distinguish between payment, organization creation, and pending assignment
-  const needsPaymentVerification = needsSetupFlow && isTenantOwner && !userProfile?.payment_verified;
-  const needsOnboarding = needsSetupFlow && isTenantOwner && userProfile?.payment_verified;
+  // Within the setup flow, we distinguish between business verification, payment, organization creation, and pending assignment
+  const businessVerificationStatus = userProfile?.business_verification_status || 'not_started';
+  const needsBusinessVerification = needsSetupFlow && isTenantOwner && businessVerificationStatus !== 'verified';
+  const needsPaymentVerification = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified' && !userProfile?.payment_verified;
+  const needsOnboarding = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified' && userProfile?.payment_verified;
   const needsAssignment = needsSetupFlow && !isTenantOwner;
 
   if (isLoadingAuth) {
@@ -817,13 +820,15 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : (needsPaymentVerification || needsOnboarding || needsAssignment) ? (
+      ) : (needsBusinessVerification || needsPaymentVerification || needsOnboarding || needsAssignment) ? (
         <>
+          {needsBusinessVerification && <Route path="/business-verification" element={<BusinessVerification />} />}
           {needsPaymentVerification && <Route path="/verify-payment" element={<PaymentVerification />} />}
           {needsOnboarding && <Route path="/onboarding" element={<OnboardingPage />} />}
           {needsAssignment && <Route path="/pending-assignment" element={<PendingAssignmentPage />} />}
           <Route path="*" element={
             <Navigate to={
+              needsBusinessVerification ? "/business-verification" :
               needsPaymentVerification ? "/verify-payment" :
               needsOnboarding ? "/onboarding" :
               "/pending-assignment"
@@ -834,6 +839,7 @@ const AuthenticatedApp = () => {
         <>
           {/* Redirect away from onboarding/payment pages once fully set up */}
           <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/business-verification" element={<Navigate to="/" replace />} />
           <Route path="/verify-payment" element={<Navigate to="/" replace />} />
           <Route path="/onboarding" element={<Navigate to="/" replace />} />
           <Route path="/pending-assignment" element={<Navigate to="/" replace />} />
@@ -856,6 +862,28 @@ const AuthenticatedApp = () => {
               </LayoutWrapper>
             }
           />
+          {canonicalRoutes.map(({ path, pageName, Page }) => (
+            <Route
+              key={`canonical-${path}`}
+              path={`/${path}/*`}
+              element={
+                <LayoutWrapper currentPageName={pageName}>
+                  <ProtectedModule pageName={pageName}>
+                    <React.Suspense fallback={
+                      <div className="flex-1 flex items-center justify-center p-12 min-h-[60vh]">
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 className="w-8 h-8 text-foreground animate-spin" />
+                          <p className="text-xs text-muted-foreground font-medium">Loading {pageName.replace(/([A-Z])/g, ' $1').trim()}...</p>
+                        </div>
+                      </div>
+                    }>
+                      <Page />
+                    </React.Suspense>
+                  </ProtectedModule>
+                </LayoutWrapper>
+              }
+            />
+          ))}
           {Object.entries(Pages).map(([path, Page]) => (
             <Route
               key={path}

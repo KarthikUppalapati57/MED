@@ -144,10 +144,13 @@ export default function OnboardingPage() {
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponResult, setCouponResult] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     const fetchPlans = async () => {
-      const { data } = await supabase.from('plans').select('id, name, price_monthly, features').eq('is_active', true).order('price_monthly', { ascending: true });
+      const { data } = await supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true });
       if (data) setPlans(data);
     };
     fetchPlans();
@@ -206,6 +209,9 @@ export default function OnboardingPage() {
     return <Navigate to="/" replace />;
   }
 
+  if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) {
+    return <Navigate to="/business-verification" replace />;
+  }
   if (userProfile && !userProfile.payment_verified && !completed) {
     return <Navigate to="/verify-payment" replace />;
   }
@@ -369,84 +375,42 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      if (finalOrganizations.length === 0) {
+      if (!Array.isArray(finalOrganizations) || finalOrganizations.length === 0) {
         throw new Error('No valid organizations to create');
       }
 
-      let primaryOrgId = null;
-
-      for (const org of finalOrganizations) {
-        if (!org.name || !org.slug || org.brands.length === 0) {
-          throw new Error('Please fill in all required fields for each organization');
-        }
-
-        const firstBrand = org.brands[0];
-        const firstLocation = firstBrand.locations[0];
-
-        if (!firstBrand || !firstLocation) {
-           throw new Error('You need at least one brand and one location per organization');
-        }
-
-        const result = await api.onboarding.setupOrgAndFirstLocation(
-          user.id,
-          { name: org.name, slug: org.slug },
-          firstBrand.name,
-          { name: firstLocation.name, address: firstLocation.address }
-        );
-        
-        posthog.capture('workspace_created', { orgName: org.name });
-
-        if (!primaryOrgId) primaryOrgId = result.org.id;
-
-        const orgId = result.org.id;
-        const firstBrandId = result.brand.brand_id || result.brand.id;
-
-        if (firstBrand.locations.length > 1) {
-          const extraLocations = firstBrand.locations.slice(1)
-            .filter(loc => loc.name.trim())
-            .map(loc => ({
-              organization_id: orgId,
-              brand_id: firstBrandId,
+      const hierarchy = finalOrganizations.map((org) => {
+        const brands = (org.brands || []).map((brand) => {
+          const locations = (brand.locations || [])
+            .filter((loc) => loc.name?.trim())
+            .map((loc) => ({
               name: loc.name.trim(),
-              address: loc.address.trim() || 'Address pending',
+              address: loc.address?.trim() || 'Address pending',
             }));
 
-          if (extraLocations.length > 0) {
-            const { error } = await supabase.from('locations').insert(extraLocations);
-            if (error) console.warn('Extra locations insert warning:', error.message);
-          }
-        }
+          return {
+            name: brand.name?.trim() || '',
+            locations,
+          };
+        }).filter((brand) => brand.name && brand.locations.length > 0);
 
-        for (let i = 1; i < org.brands.length; i++) {
-          const brand = org.brands[i];
-          if (!brand.name.trim()) continue;
+        return {
+          name: org.name?.trim() || '',
+          slug: org.slug?.trim() || '',
+          brands,
+        };
+      });
 
-          const { data: newBrand, error: brandErr } = await supabase
-            .from('brands')
-            .insert({ organization_id: orgId, name: brand.name.trim() })
-            .select()
-            .single();
-
-          if (brandErr) {
-            console.warn(`Brand "${brand.name}" creation warning:`, brandErr.message);
-            continue;
-          }
-
-          const locs = brand.locations
-            .filter(loc => loc.name.trim())
-            .map(loc => ({
-              organization_id: orgId,
-              brand_id: newBrand.brand_id,
-              name: loc.name.trim(),
-              address: loc.address.trim() || 'Address pending',
-            }));
-
-          if (locs.length > 0) {
-            const { error: locErr } = await supabase.from('locations').insert(locs);
-            if (locErr) console.warn('Locations insert warning:', locErr.message);
-          }
-        }
+      if (hierarchy.some((org) => !org.name || !org.slug || org.brands.length === 0)) {
+        throw new Error('Please fill in all required fields for each organization');
       }
+
+      const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
+      const primaryOrgId = result.primary_org_id || result.primaryOrganization?.id;
+
+      hierarchy.forEach((org) => {
+        posthog.capture('workspace_created', { orgName: org.name });
+      });
 
       await supabase.auth.refreshSession();
 
@@ -473,23 +437,8 @@ export default function OnboardingPage() {
         console.warn('Failed to apply invitation metadata:', err);
       }
 
-      toast.success(`Organization(s) created! Proceed to select a plan.`);
-      
+      toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s). Proceed to select a plan.`);
       await refreshProfile();
-      
-      // Emit Domain Event
-      try {
-        const { error } = await supabase.rpc('log_frontend_event', {
-          p_event_name: 'user.onboarding.completed',
-          p_entity_type: 'user',
-          p_entity_id: user.id,
-          p_payload: { step: 'organizations_created' }
-        });
-        if (error) console.warn('Failed to log onboarding completion:', error);
-      } catch (err) {
-        console.warn('Failed to log onboarding completion:', err);
-      }
-
       setStep(4);
     } catch (error) {
       console.error('Onboarding failed:', error);
@@ -590,6 +539,30 @@ export default function OnboardingPage() {
     await performOnboarding(parsedOrganizations);
   };
 
+  const handleApplyCoupon = async () => {
+    const trimmedCode = couponCode.trim();
+    if (!trimmedCode) {
+      toast.error('Enter a coupon or trial code first.');
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const result = await api.onboarding.applyCoupon({
+        code: trimmedCode,
+        planId: selectedPlan?.id || null,
+      });
+      setCouponResult(result?.coupon || null);
+      toast.success(`Applied ${result?.coupon?.code || trimmedCode}`);
+      await refreshProfile();
+    } catch (err) {
+      console.error('Coupon apply failed:', err);
+      setCouponResult(null);
+      toast.error(err.message || 'Coupon could not be applied.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
   const handleSubscribe = async () => {
     if (!selectedPlan) {
       toast.error('Please select a plan to continue');
@@ -994,7 +967,7 @@ export default function OnboardingPage() {
                           <span className="text-sm font-medium text-muted-foreground">/mo</span>
                         </div>
                         <ul className="space-y-2 text-sm text-muted-foreground">
-                          {plan.features?.slice(0, 4).map((feat, idx) => (
+                          {(Array.isArray(plan.features) ? plan.features : Object.entries(plan.features || {}).map(([key, value]) => value === true ? key : key + ': ' + value)).slice(0, 4).map((feat, idx) => (
                             <li key={idx} className="flex items-center gap-2">
                               <Check className="w-4 h-4 text-primary shrink-0" />
                               <span className="truncate">{feat}</span>
@@ -1003,6 +976,36 @@ export default function OnboardingPage() {
                         </ul>
                       </div>
                     ))
+                  )}
+                </div>
+
+                <div className="rounded-xl border bg-secondary/40 p-4">
+                  <Label htmlFor="coupon-code">Coupon or Trial Code</Label>
+                  <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      id="coupon-code"
+                      value={couponCode}
+                      onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                      placeholder="RESTOPS30"
+                      className="h-11 bg-card"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponCode.trim()}
+                      className="h-11 sm:min-w-[120px]"
+                    >
+                      {couponLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying</> : 'Apply'}
+                    </Button>
+                  </div>
+                  {couponResult && (
+                    <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
+                      <span className="font-semibold">{couponResult.code}</span>
+                      <span className="text-muted-foreground"> applied</span>
+                      {couponResult.trial_days > 0 && <span className="text-muted-foreground"> for {couponResult.trial_days} trial days</span>}
+                      {couponResult.discount_type === 'percent' && <span className="text-muted-foreground"> for {couponResult.discount_value}% off</span>}
+                    </div>
                   )}
                 </div>
               </div>

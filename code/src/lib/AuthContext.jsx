@@ -36,6 +36,20 @@ function setCachedProfile(profile) {
         full_name: profile.full_name,
         email: profile.email,
         payment_verified: profile.payment_verified,
+        business_verification_status: profile.business_verification_status,
+        business_email: profile.business_email,
+        business_email_verified_at: profile.business_email_verified_at,
+        business_phone: profile.business_phone,
+        business_phone_verified_at: profile.business_phone_verified_at,
+        business_verification_score: profile.business_verification_score,
+        business_verification_provider: profile.business_verification_provider,
+        business_verified_at: profile.business_verified_at,
+        onboarding_status: profile.onboarding_status,
+        onboarding_current_step: profile.onboarding_current_step,
+        coupon_code: profile.coupon_code,
+        trial_ends_at: profile.trial_ends_at,
+        payment_method_type: profile.payment_method_type,
+        payment_method_verified_at: profile.payment_method_verified_at,
         organization: profile.organization,
         brand: profile.brand,
         location: profile.location,
@@ -301,8 +315,7 @@ export const AuthProvider = ({ children }) => {
         // This prevents the application from getting stuck in an inconsistent state
         const role = sessionUser.app_metadata?.role || 'org_owner';
         
-        // Ensure new users start with base layout unless overridden
-        const access_level = sessionUser.app_metadata?.access_level || 'organization';
+        // Create a skeleton profile
         const { data: newProfile, error } = await supabase
           .from('profiles')
           .insert([{
@@ -310,7 +323,10 @@ export const AuthProvider = ({ children }) => {
             email: sessionUser.email,
             full_name: sessionUser.user_metadata?.full_name || 'User',
             role: role,
-            payment_verified: false
+            payment_verified: false,
+            business_verification_status: 'not_started',
+            onboarding_status: 'not_started',
+            onboarding_current_step: 'business_verification'
           }])
           .select()
           .single();

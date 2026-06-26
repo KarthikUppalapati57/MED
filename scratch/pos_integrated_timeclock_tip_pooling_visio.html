@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS Integrated Time Clock and Tip Pooling</title>
+  <style>
+    :root {
+      --page: #f4f6f9;
+      --paper: #fff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #b8c2d1;
+      --grid: #e8edf3;
+      --blue: #1d4ed8;
+      --blue-fill: #eaf1ff;
+      --green: #047857;
+      --green-fill: #e7f7ef;
+      --amber: #b45309;
+      --amber-fill: #fff4df;
+      --red: #b91c1c;
+      --red-fill: #feecec;
+      --gray-fill: #f8fafc;
+      --shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 26px;
+      border-bottom: 1px solid #d9e0ea;
+      background: rgba(244, 246, 249, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 9px 12px;
+      background: #fff;
+      color: #344054;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.active {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    main {
+      width: min(1280px, calc(100vw - 32px));
+      margin: 20px auto 48px;
+    }
+
+    .sheet {
+      display: none;
+      border: 1px solid #cbd5e1;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .sheet.active {
+      display: block;
+    }
+
+    .sheet-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #d9e0ea;
+      background: #fbfcfe;
+    }
+
+    .sheet-title h2 {
+      font-size: 18px;
+    }
+
+    .sheet-title p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--green-fill);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .diagram {
+      overflow: auto;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    svg {
+      display: block;
+      min-width: 1160px;
+      height: auto;
+    }
+
+    .lane-fill {
+      fill: rgba(248, 250, 252, 0.86);
+      stroke: #d9e0ea;
+    }
+
+    .lane-head {
+      fill: #eef2f7;
+      stroke: #d9e0ea;
+    }
+
+    .lane-label {
+      fill: #344054;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .box {
+      rx: 6;
+      ry: 6;
+      stroke-width: 1.5;
+    }
+
+    .external {
+      fill: var(--blue-fill);
+      stroke: var(--blue);
+    }
+
+    .system {
+      fill: var(--green-fill);
+      stroke: var(--green);
+    }
+
+    .decision {
+      fill: var(--amber-fill);
+      stroke: var(--amber);
+      stroke-width: 1.5;
+    }
+
+    .warning {
+      fill: var(--red-fill);
+      stroke: var(--red);
+    }
+
+    .store {
+      fill: var(--gray-fill);
+      stroke: #475467;
+      stroke-width: 1.5;
+    }
+
+    .shape-title {
+      fill: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .shape-body {
+      fill: var(--muted);
+      font-size: 12px;
+    }
+
+    .connector {
+      fill: none;
+      stroke: #475467;
+      stroke-width: 1.7;
+      marker-end: url(#arrow);
+    }
+
+    .dashed {
+      fill: none;
+      stroke: var(--red);
+      stroke-width: 1.6;
+      stroke-dasharray: 6 5;
+      marker-end: url(#arrow-red);
+    }
+
+    .note {
+      fill: #fffbeb;
+      stroke: #d97706;
+      stroke-width: 1.2;
+    }
+
+    .note-text {
+      fill: #92400e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .footer {
+      padding: 13px 20px 16px;
+      border-top: 1px solid #d9e0ea;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 760px) {
+      header,
+      .sheet-title {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .tabs {
+        overflow-x: auto;
+      }
+    }
+
+    @media print {
+      header {
+        display: none;
+      }
+
+      body {
+        background: #fff;
+      }
+
+      main {
+        width: 100%;
+        margin: 0;
+      }
+
+      .sheet,
+      .sheet.active {
+        display: block;
+        border: 0;
+        box-shadow: none;
+        page-break-after: always;
+      }
+
+      .diagram {
+        overflow: visible;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>POS Integrated Labor Artifacts</h1>
+      <p>Toast/Clover capture clock-in, clock-out, and tip data; RestOps ingests, normalizes, and displays it.</p>
+    </div>
+    <nav class="tabs" aria-label="Artifact tabs">
+      <button class="active" data-sheet="target">Target Workflow</button>
+      <button data-sheet="intake">Webhook Intake</button>
+      <button data-sheet="app">App Views</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="target" class="sheet active">
+      <div class="sheet-title">
+        <div>
+          <h2>Target Workflow: No In-App PIN Entry</h2>
+          <p>Employees use Toast/Clover hardware or POS apps. RestOps becomes the back-office labor and tip visibility layer.</p>
+        </div>
+        <span class="badge">Integration First</span>
+      </div>
+      <div class="diagram">
+        <svg viewBox="0 0 1200 760" role="img" aria-label="Target POS integrated labor workflow">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+            <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#b91c1c"></path>
+            </marker>
+          </defs>
+
+          <rect class="lane-fill" x="20" y="40" width="1160" height="160"></rect>
+          <rect class="lane-head" x="20" y="40" width="120" height="160"></rect>
+          <text class="lane-label" x="80" y="124" text-anchor="middle">Employee</text>
+
+          <rect class="lane-fill" x="20" y="200" width="1160" height="190"></rect>
+          <rect class="lane-head" x="20" y="200" width="120" height="190"></rect>
+          <text class="lane-label" x="80" y="300" text-anchor="middle">Toast/Clover</text>
+
+          <rect class="lane-fill" x="20" y="390" width="1160" height="170"></rect>
+          <rect class="lane-head" x="20" y="390" width="120" height="170"></rect>
+          <text class="lane-label" x="80" y="480" text-anchor="middle">RestOps</text>
+
+          <rect class="lane-fill" x="20" y="560" width="1160" height="160"></rect>
+          <rect class="lane-head" x="20" y="560" width="120" height="160"></rect>
+          <text class="lane-label" x="80" y="644" text-anchor="middle">Manager</text>
+
+          <rect class="box external" x="185" y="82" width="180" height="78"></rect>
+          <text class="shape-title" x="275" y="113" text-anchor="middle">Clock In/Out</text>
+          <text class="shape-body" x="275" y="135" text-anchor="middle">on POS terminal</text>
+
+          <rect class="box external" x="435" y="82" width="190" height="78"></rect>
+          <text class="shape-title" x="530" y="113" text-anchor="middle">Complete Shift</text>
+          <text class="shape-body" x="530" y="135" text-anchor="middle">sales and tips captured</text>
+
+          <rect class="box external" x="205" y="252" width="190" height="84"></rect>
+          <text class="shape-title" x="300" y="282" text-anchor="middle">Labor Event</text>
+          <text class="shape-body" x="300" y="304" text-anchor="middle">clock_in / clock_out</text>
+
+          <rect class="box external" x="465" y="252" width="190" height="84"></rect>
+          <text class="shape-title" x="560" y="282" text-anchor="middle">Tip Event</text>
+          <text class="shape-body" x="560" y="304" text-anchor="middle">card tips / gratuity</text>
+
+          <rect class="box external" x="725" y="252" width="210" height="84"></rect>
+          <text class="shape-title" x="830" y="282" text-anchor="middle">Employee Mapping</text>
+          <text class="shape-body" x="830" y="304" text-anchor="middle">provider employee ids</text>
+
+          <rect class="box system" x="190" y="432" width="180" height="82"></rect>
+          <text class="shape-title" x="280" y="463" text-anchor="middle">Webhook Intake</text>
+          <text class="shape-body" x="280" y="485" text-anchor="middle">verify provider event</text>
+
+          <rect class="box system" x="440" y="432" width="190" height="82"></rect>
+          <text class="shape-title" x="535" y="463" text-anchor="middle">Normalize Labor</text>
+          <text class="shape-body" x="535" y="485" text-anchor="middle">standard time_clocks</text>
+
+          <rect class="box system" x="700" y="432" width="210" height="82"></rect>
+          <text class="shape-title" x="805" y="463" text-anchor="middle">Normalize Tips</text>
+          <text class="shape-body" x="805" y="485" text-anchor="middle">standard tip totals</text>
+
+          <rect class="box system" x="250" y="606" width="210" height="78"></rect>
+          <text class="shape-title" x="355" y="636" text-anchor="middle">Review Labor</text>
+          <text class="shape-body" x="355" y="658" text-anchor="middle">punches, exceptions</text>
+
+          <rect class="box system" x="570" y="606" width="230" height="78"></rect>
+          <text class="shape-title" x="685" y="636" text-anchor="middle">Review Tip Pool</text>
+          <text class="shape-body" x="685" y="658" text-anchor="middle">distribution and payroll export</text>
+
+          <rect class="box warning" x="900" y="606" width="190" height="78"></rect>
+          <text class="shape-title" x="995" y="636" text-anchor="middle">No PIN UI</text>
+          <text class="shape-body" x="995" y="658" text-anchor="middle">display only in RestOps</text>
+
+          <path class="connector" d="M365 121 H435"></path>
+          <path class="connector" d="M275 160 V252"></path>
+          <path class="connector" d="M530 160 V252 H560"></path>
+          <path class="connector" d="M625 121 H830 V252"></path>
+          <path class="connector" d="M300 336 V395 H280 V432"></path>
+          <path class="connector" d="M560 336 V395 H805 V432"></path>
+          <path class="connector" d="M830 336 V390 H535 V432"></path>
+          <path class="connector" d="M370 473 H440"></path>
+          <path class="connector" d="M630 473 H700"></path>
+          <path class="connector" d="M535 514 V575 H355 V606"></path>
+          <path class="connector" d="M805 514 V575 H685 V606"></path>
+          <path class="dashed" d="M995 606 V530 H930 V335"></path>
+        </svg>
+      </div>
+      <div class="footer">Decision: RestOps should not ask restaurant employees to enter a PIN unless a customer has no POS labor integration. Toast/Clover remain the employee-facing clock device; RestOps ingests labor and tips for reporting, reconciliation, exception review, and payroll workflows.</div>
+    </section>
+
+    <section id="intake" class="sheet">
+      <div class="sheet-title">
+        <div>
+          <h2>Webhook/API Intake Workflow</h2>
+          <p>Provider payloads must be verified, mapped to locations/employees, made idempotent, and stored as normalized records.</p>
+        </div>
+        <span class="badge">Backend Flow</span>
+      </div>
+      <div class="diagram">
+        <svg viewBox="0 0 1200 760" role="img" aria-label="Webhook intake workflow">
+          <defs>
+            <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+          </defs>
+
+          <rect class="box external" x="60" y="92" width="190" height="84"></rect>
+          <text class="shape-title" x="155" y="124" text-anchor="middle">Toast/Clover</text>
+          <text class="shape-body" x="155" y="146" text-anchor="middle">webhook or scheduled API</text>
+
+          <rect class="box system" x="330" y="92" width="190" height="84"></rect>
+          <text class="shape-title" x="425" y="124" text-anchor="middle">pos-webhook</text>
+          <text class="shape-body" x="425" y="146" text-anchor="middle">provider endpoint</text>
+
+          <polygon class="decision" points="630,76 735,134 630,192 525,134"></polygon>
+          <text class="shape-title" x="630" y="124" text-anchor="middle">Verify</text>
+          <text class="shape-body" x="630" y="146" text-anchor="middle">signature + config</text>
+
+          <rect class="box system" x="815" y="92" width="220" height="84"></rect>
+          <text class="shape-title" x="925" y="124" text-anchor="middle">Event Log</text>
+          <text class="shape-body" x="925" y="146" text-anchor="middle">raw payload audit trail</text>
+
+          <rect class="box system" x="90" y="290" width="205" height="88"></rect>
+          <text class="shape-title" x="192" y="323" text-anchor="middle">Map Provider IDs</text>
+          <text class="shape-body" x="192" y="345" text-anchor="middle">location + employee</text>
+
+          <rect class="box system" x="385" y="290" width="205" height="88"></rect>
+          <text class="shape-title" x="487" y="323" text-anchor="middle">Idempotency</text>
+          <text class="shape-body" x="487" y="345" text-anchor="middle">provider event id</text>
+
+          <polygon class="decision" points="720,276 835,334 720,392 605,334"></polygon>
+          <text class="shape-title" x="720" y="324" text-anchor="middle">Event Type?</text>
+          <text class="shape-body" x="720" y="346" text-anchor="middle">labor or tips</text>
+
+          <path class="store" d="M150 515 C150 488 390 488 390 515 L390 625 C390 652 150 652 150 625 Z"></path>
+          <path class="store" d="M150 515 C150 542 390 542 390 515"></path>
+          <text class="shape-title" x="270" y="560" text-anchor="middle">time_clocks</text>
+          <text class="shape-body" x="270" y="582" text-anchor="middle">normalized punch records</text>
+
+          <path class="store" d="M495 515 C495 488 735 488 735 515 L735 625 C735 652 495 652 495 625 Z"></path>
+          <path class="store" d="M495 515 C495 542 735 542 735 515"></path>
+          <text class="shape-title" x="615" y="560" text-anchor="middle">tip_pool_inputs</text>
+          <text class="shape-body" x="615" y="582" text-anchor="middle">POS tips by date/location</text>
+
+          <path class="store" d="M835 515 C835 488 1075 488 1075 515 L1075 625 C1075 652 835 652 835 625 Z"></path>
+          <path class="store" d="M835 515 C835 542 1075 542 955 515"></path>
+          <text class="shape-title" x="955" y="560" text-anchor="middle">integration_events</text>
+          <text class="shape-body" x="955" y="582" text-anchor="middle">status, retry, errors</text>
+
+          <path class="connector" style="marker-end:url(#arrow2)" d="M250 134 H330"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M520 134 H525"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M735 134 H815"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M630 192 V245 H192 V290"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M295 334 H385"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M590 334 H605"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M690 392 V470 H270 V515"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M750 392 V470 H615 V515"></path>
+          <path class="connector" style="marker-end:url(#arrow2)" d="M835 334 H955 V515"></path>
+
+          <rect class="note" x="815" y="250" width="300" height="98"></rect>
+          <text class="note-text" x="835" y="284">Existing function names can stay:</text>
+          <text class="note-text" x="835" y="306">pos-webhook / pos-sync</text>
+          <text class="note-text" x="835" y="328">Add labor + tip event handlers.</text>
+        </svg>
+      </div>
+      <div class="footer">Implementation implication: extend provider transforms so Toast/Clover labor events upsert `time_clocks`, while tip/sales events populate a normalized tip input table that Tip Pooling reads from.</div>
+    </section>
+
+    <section id="app" class="sheet">
+      <div class="sheet-title">
+        <div>
+          <h2>RestOps App Views After Integration</h2>
+          <p>The app becomes a display, reconciliation, and approval layer instead of a second employee time clock terminal.</p>
+        </div>
+        <span class="badge">Display Layer</span>
+      </div>
+      <div class="diagram">
+        <svg viewBox="0 0 1200 700" role="img" aria-label="RestOps display and approval views">
+          <defs>
+            <marker id="arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475467"></path>
+            </marker>
+          </defs>
+
+          <path class="store" d="M95 80 C95 52 335 52 335 80 L335 190 C335 218 95 218 95 190 Z"></path>
+          <path class="store" d="M95 80 C95 108 335 108 335 80"></path>
+          <text class="shape-title" x="215" y="126" text-anchor="middle">time_clocks</text>
+          <text class="shape-body" x="215" y="148" text-anchor="middle">Toast/Clover punches</text>
+
+          <path class="store" d="M480 80 C480 52 720 52 720 80 L720 190 C720 218 480 218 480 190 Z"></path>
+          <path class="store" d="M480 80 C480 108 720 108 600 80"></path>
+          <text class="shape-title" x="600" y="126" text-anchor="middle">tip_pool_inputs</text>
+          <text class="shape-body" x="600" y="148" text-anchor="middle">POS tip totals</text>
+
+          <path class="store" d="M865 80 C865 52 1105 52 1105 80 L1105 190 C1105 218 865 218 865 190 Z"></path>
+          <path class="store" d="M865 80 C865 108 1105 108 985 80"></path>
+          <text class="shape-title" x="985" y="126" text-anchor="middle">employee_mappings</text>
+          <text class="shape-body" x="985" y="148" text-anchor="middle">provider employee IDs</text>
+
+          <rect class="box system" x="110" y="330" width="220" height="92"></rect>
+          <text class="shape-title" x="220" y="364" text-anchor="middle">Time Clock View</text>
+          <text class="shape-body" x="220" y="386" text-anchor="middle">punch list, late/missing flags</text>
+
+          <rect class="box system" x="490" y="330" width="220" height="92"></rect>
+          <text class="shape-title" x="600" y="364" text-anchor="middle">Tip Pooling View</text>
+          <text class="shape-body" x="600" y="386" text-anchor="middle">auto-loaded tips and hours</text>
+
+          <rect class="box system" x="870" y="330" width="220" height="92"></rect>
+          <text class="shape-title" x="980" y="364" text-anchor="middle">Exceptions View</text>
+          <text class="shape-body" x="980" y="386" text-anchor="middle">unmapped staff, sync errors</text>
+
+          <rect class="box external" x="255" y="535" width="220" height="86"></rect>
+          <text class="shape-title" x="365" y="568" text-anchor="middle">Manager Approval</text>
+          <text class="shape-body" x="365" y="590" text-anchor="middle">lock period / approve pool</text>
+
+          <rect class="box external" x="710" y="535" width="220" height="86"></rect>
+          <text class="shape-title" x="820" y="568" text-anchor="middle">Payroll Export</text>
+          <text class="shape-body" x="820" y="590" text-anchor="middle">hours + tips to provider</text>
+
+          <path class="connector" style="marker-end:url(#arrow3)" d="M215 218 V330"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M600 218 V330"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M985 218 V330"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M330 376 H490"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M710 376 H870"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M600 422 V485 H365 V535"></path>
+          <path class="connector" style="marker-end:url(#arrow3)" d="M475 578 H710"></path>
+
+          <rect class="note" x="88" y="250" width="1024" height="46"></rect>
+          <text class="note-text" x="112" y="278">RestOps UX change: replace employee PIN clock screen with integration status, synced punch display, exception handling, and manager correction/approval workflows.</text>
+        </svg>
+      </div>
+      <div class="footer">Recommended UI direction: Time Clock page should become a synced labor dashboard. Tip Pooling should auto-load POS tips and completed hours, then let managers review, adjust with audit trail, approve, and export.</div>
+    </section>
+  </main>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll("button[data-sheet]"));
+    const sheets = Array.from(document.querySelectorAll(".sheet"));
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        buttons.forEach((item) => item.classList.toggle("active", item === button));
+        sheets.forEach((sheet) => sheet.classList.toggle("active", sheet.id === button.dataset.sheet));
+      });
+    });
+  </script>
+</body>
+</html>

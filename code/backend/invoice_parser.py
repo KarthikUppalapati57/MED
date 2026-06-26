@@ -48,11 +48,10 @@ def _extract_pdf_text_fast(file_path: str) -> str:
 
 
 def _build_converter(file_path: str) -> DocumentConverter:
-    """Build a fast converter for digital PDFs and keep defaults for image OCR inputs."""
+    """Build a converter with OCR enabled for scanned PDFs and images."""
     if file_path.lower().endswith(".pdf"):
         pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = False
-        pipeline_options.force_backend_text = True
+        pipeline_options.do_ocr = True
 
         return DocumentConverter(
             format_options={
