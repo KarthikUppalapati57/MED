@@ -431,7 +431,22 @@ export const api = {
       if (error) throw error;
       return data;
     },
-    submitBusinessVerification: async (payload) => {
+    requestContactOtp: async ({ channel, target }) => {
+      const { data, error } = await supabase.rpc('request_onboarding_contact_otp', {
+        p_channel: channel,
+        p_target: target,
+      });
+      if (error) throw error;
+      return data;
+    },
+    verifyContactOtp: async ({ otpId, code }) => {
+      const { data, error } = await supabase.rpc('verify_onboarding_contact_otp', {
+        p_otp_id: otpId,
+        p_code: code,
+      });
+      if (error) throw error;
+      return data;
+    },    submitBusinessVerification: async (payload) => {
       const { data, error } = await supabase.rpc('submit_business_verification', {
         p_payload: payload,
       });

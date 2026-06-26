@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Building2, CheckCircle2, FileCheck2, Loader2, MapPin, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,23 @@ const BUSINESS_TYPES = [
   { value: 'independent_contractor', label: 'Independent Contractor' },
 ];
 
+const INDIVIDUAL_OWNER_TYPES = new Set(['sole_proprietor', 'independent_contractor']);
+
+function identifierTypeForBusinessType(businessType) {
+  return INDIVIDUAL_OWNER_TYPES.has(businessType) ? 'ssn' : 'ein';
+}
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'];
 
+function normalizeEmail(value) {
+  return value.trim().toLowerCase();
+}
+
+function normalizePhone(value) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return digits;
+}
 const initialAddress = {
   line1: '',
   line2: '',
@@ -60,6 +75,24 @@ export default function BusinessVerification() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [sameMailing, setSameMailing] = useState(true);
+  const [contactOtp, setContactOtp] = useState({
+    email: {
+      otpId: null,
+      code: '',
+      verifiedTarget: userProfile?.business_email_verified_at ? userProfile.business_email || '' : '',
+      sending: false,
+      verifying: false,
+      devCode: '',
+    },
+    phone: {
+      otpId: null,
+      code: '',
+      verifiedTarget: userProfile?.business_phone_verified_at ? userProfile.business_phone || '' : '',
+      sending: false,
+      verifying: false,
+      devCode: '',
+    },
+  });
   const [form, setForm] = useState({
     legalName: userProfile?.organization_name || '',
     businessType: 'llc',
@@ -74,15 +107,20 @@ export default function BusinessVerification() {
     serviceLocationName: '',
   });
 
+  const requiredIdentifierType = identifierTypeForBusinessType(form.businessType);
+  const isIndividualOwner = requiredIdentifierType === 'ssn';
+  const contactEmailLabel = isIndividualOwner ? 'Contact Email' : 'Business Email';
+  const emailVerified = contactOtp.email.verifiedTarget === normalizeEmail(form.email);
+  const phoneVerified = contactOtp.phone.verifiedTarget === normalizePhone(form.phone);
+
   const trustScore = useMemo(() => scoreBusiness({
-    identifierType: form.identifierType,
+    identifierType: requiredIdentifierType,
     website: form.website,
     phone: form.phone,
     email: form.email,
     businessAddress: form.businessAddress,
     serviceAddress: form.serviceAddress,
-  }), [form]);
-
+  }), [form, requiredIdentifierType]);
   if (userProfile?.organization_id) {
     return <Navigate to="/" replace />;
   }
@@ -103,9 +141,12 @@ export default function BusinessVerification() {
 
   const validate = () => {
     if (!form.legalName.trim()) return 'Legal business name is required.';
-    if (!form.taxIdentifier.trim()) return form.identifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
+    if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
+    if (!form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
     if (!form.email.includes('@')) return 'A valid business email is required.';
     if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
+    if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
+    if (!phoneVerified) return 'Verify the business phone with OTP before continuing.';
     for (const [label, address] of [['Business address', form.businessAddress], ['Service address', form.serviceAddress]]) {
       if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
         return `${label} must include street, city, state, and ZIP.`;
@@ -120,6 +161,84 @@ export default function BusinessVerification() {
     return null;
   };
 
+  const requestOtp = async (channel) => {
+    const target = channel === 'email' ? form.email : form.phone;
+    const normalizedTarget = channel === 'email' ? normalizeEmail(target) : normalizePhone(target);
+
+    if (channel === 'email' && !normalizedTarget.includes('@')) {
+      toast.error('Enter a valid business email first.');
+      return;
+    }
+    if (channel === 'phone' && normalizedTarget.replace(/\D/g, '').length < 10) {
+      toast.error('Enter a valid business phone first.');
+      return;
+    }
+
+    setContactOtp((prev) => ({
+      ...prev,
+      [channel]: { ...prev[channel], sending: true, otpId: null, code: '', devCode: '' },
+    }));
+
+    try {
+      const result = await api.onboarding.requestContactOtp({ channel, target });
+      setContactOtp((prev) => ({
+        ...prev,
+        [channel]: {
+          ...prev[channel],
+          otpId: result.otp_id,
+          code: '',
+          devCode: result.dev_code || '',
+          verifiedTarget: '',
+          sending: false,
+        },
+      }));
+      toast.success(`${channel === 'email' ? 'Email' : 'Phone'} OTP sent.`);
+    } catch (err) {
+      console.error('OTP request failed:', err);
+      toast.error(err.message || 'Failed to send OTP.');
+      setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], sending: false } }));
+    }
+  };
+
+  const verifyOtp = async (channel) => {
+    const state = contactOtp[channel];
+    if (!state.otpId) {
+      toast.error('Request an OTP first.');
+      return;
+    }
+    if (state.code.trim().length < 6) {
+      toast.error('Enter the 6-digit OTP code.');
+      return;
+    }
+
+    setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], verifying: true } }));
+
+    try {
+      const result = await api.onboarding.verifyContactOtp({ otpId: state.otpId, code: state.code });
+      setContactOtp((prev) => ({
+        ...prev,
+        [channel]: {
+          ...prev[channel],
+          verifiedTarget: result.target,
+          verifying: false,
+          code: '',
+        },
+      }));
+      await refreshProfile();
+      toast.success(`${channel === 'email' ? 'Email' : 'Phone'} verified.`);
+    } catch (err) {
+      console.error('OTP verification failed:', err);
+      toast.error(err.message || 'Invalid OTP code.');
+      setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], verifying: false } }));
+    }
+  };
+
+  const updateOtpCode = (channel, code) => {
+    setContactOtp((prev) => ({
+      ...prev,
+      [channel]: { ...prev[channel], code: code.replace(/\D/g, '').slice(0, 6) },
+    }));
+  };
   const saveVerification = async () => {
     const validationMessage = validate();
     if (validationMessage) {
@@ -136,6 +255,7 @@ export default function BusinessVerification() {
     try {
       const result = await api.onboarding.submitBusinessVerification({
         ...form,
+        identifierType: requiredIdentifierType,
         sameMailing,
       });
 
@@ -217,32 +337,77 @@ export default function BusinessVerification() {
               </div>
               <div className="space-y-1">
                 <Label>Business Type</Label>
-                <Select value={form.businessType} onValueChange={(value) => setForm({ ...form, businessType: value })}>
+                <Select value={form.businessType} onValueChange={(value) => setForm({ ...form, businessType: value, identifierType: identifierTypeForBusinessType(value), taxIdentifier: '' })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{BUSINESS_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
                 <Label>Tax Identifier Type</Label>
-                <Select value={form.identifierType} onValueChange={(value) => setForm({ ...form, identifierType: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ein">EIN</SelectItem>
-                    <SelectItem value="ssn">SSN</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex h-10 items-center rounded-md border bg-secondary/50 px-3 text-sm font-medium text-foreground">
+                  {requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}
+                </div>
+                <p className="text-xs text-muted-foreground">{isIndividualOwner ? 'Individual owner tenants verify SSN.' : 'Business entity tenants verify EIN.'}</p>
               </div>
               <div className="space-y-1">
-                <Label>{form.identifierType === 'ein' ? 'EIN' : 'SSN'}</Label>
-                <Input value={form.taxIdentifier} onChange={(e) => setForm({ ...form, taxIdentifier: e.target.value })} placeholder={form.identifierType === 'ein' ? '12-3456789' : '123-45-6789'} />
+                <Label>{requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}</Label>
+                <Input value={form.taxIdentifier} onChange={(e) => setForm({ ...form, taxIdentifier: e.target.value, identifierType: requiredIdentifierType })} placeholder={requiredIdentifierType === 'ein' ? '12-3456789' : '123-45-6789'} />
               </div>
-              <div className="space-y-1">
-                <Label>Business Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="owner@restaurant.com" />
+              <div className="space-y-2">
+                <Label>{contactEmailLabel}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={form.email}
+                    onChange={(e) => {
+                      setForm({ ...form, email: e.target.value });
+                      setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '' } }));
+                    }}
+                    placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
+                  />
+                  <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending || emailVerified} className="shrink-0">
+                    {contactOtp.email.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : emailVerified ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {!emailVerified && contactOtp.email.otpId && (
+                  <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
+                    <div className="flex gap-2">
+                      <Input value={contactOtp.email.code} onChange={(e) => updateOtpCode('email', e.target.value)} placeholder="Email OTP" inputMode="numeric" />
+                      <Button type="button" onClick={() => verifyOtp('email')} disabled={contactOtp.email.verifying} className="shrink-0">
+                        {contactOtp.email.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                      </Button>
+                    </div>
+                    {contactOtp.email.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.email.devCode}</p>}
+                  </div>
+                )}
+                {emailVerified && <p className="text-xs font-medium text-resend-green">Email verified.</p>}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(865) 555-0142" />
+                <div className="flex gap-2">
+                  <Input
+                    value={form.phone}
+                    onChange={(e) => {
+                      setForm({ ...form, phone: e.target.value });
+                      setContactOtp((prev) => ({ ...prev, phone: { ...prev.phone, verifiedTarget: '' } }));
+                    }}
+                    placeholder="(865) 555-0142"
+                  />
+                  <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending || phoneVerified} className="shrink-0">
+                    {contactOtp.phone.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneVerified ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {!phoneVerified && contactOtp.phone.otpId && (
+                  <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
+                    <div className="flex gap-2">
+                      <Input value={contactOtp.phone.code} onChange={(e) => updateOtpCode('phone', e.target.value)} placeholder="Phone OTP" inputMode="numeric" />
+                      <Button type="button" onClick={() => verifyOtp('phone')} disabled={contactOtp.phone.verifying} className="shrink-0">
+                        {contactOtp.phone.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                      </Button>
+                    </div>
+                    {contactOtp.phone.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.phone.devCode}</p>}
+                  </div>
+                )}
+                {phoneVerified && <p className="text-xs font-medium text-resend-green">Phone verified.</p>}
               </div>
               <div className="space-y-1">
                 <Label>Website</Label>
