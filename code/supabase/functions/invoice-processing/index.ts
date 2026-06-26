@@ -222,6 +222,30 @@ async function extractWithGeminiVision(fileBlob) {
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
     console.log(`Starting background extraction for ${record.id} in public schema...`);
+
+    const { data: claimedInvoice, error: claimError } = await supabaseClient
+      .from('invoices')
+      .update({ extraction_started_at: new Date().toISOString() })
+      .eq('id', record.id)
+      .eq('organization_id', record.organization_id)
+      .eq('status', 'extracting')
+      .is('extraction_started_at', null)
+      .select('*')
+      .maybeSingle();
+
+    if (claimError) {
+      throw claimError;
+    }
+
+    if (!claimedInvoice) {
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'extraction_claim_skipped', invoice_id: record.id }
+      });
+      console.log(`Skipping extraction for ${record.id}; invoice is already claimed or no longer extracting.`);
+      return;
+    }
+
+    record = claimedInvoice;
     
     await supabaseClient.from('debug_logs').insert({
       log_data: { point: 'start', invoice_id: record.id, schemaName: 'public', filePath: record.file_url }
@@ -401,9 +425,33 @@ serve(async (req) => {
       );
 
     if (shouldProcessExtraction) {
+      if (authHeader) {
+        const { data: authorizedInvoice, error: authorizeError } = await supabaseClient
+          .from('invoices')
+          .select('id')
+          .eq('id', record.id)
+          .eq('organization_id', record.organization_id)
+          .maybeSingle();
+
+        if (authorizeError || !authorizedInvoice) {
+          return new Response(JSON.stringify({ success: false, error: 'Invoice not found or not accessible' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403
+          });
+        }
+      }
+
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      const isServiceRoleRequest = Boolean(serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`);
+      let processingClient = supabaseClient;
+
+      if (!isServiceRoleRequest) {
+        processingClient = await getSupabaseSystemClient();
+      }
+
       // We must AWAIT this! Deno Edge Functions terminate when the response is sent.
       // pg_net handles the timeout asynchronously from the database side.
-      await processInvoiceBackground(record, targetSchema, supabaseClient);
+      await processInvoiceBackground(record, targetSchema, processingClient);
       
       return new Response(JSON.stringify({ success: true, message: 'Processing complete' }), { headers: corsHeaders, status: 200 })
     } 
