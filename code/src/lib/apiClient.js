@@ -1,4 +1,4 @@
-﻿import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 const TABLE_SCOPE_COLUMNS = {
   accounting_sync_logs: ['organization_id'],
@@ -426,6 +426,62 @@ export const api = {
     },
   },
   onboarding: {
+    getState: async () => {
+      const { data, error } = await supabase.rpc('get_my_onboarding_state');
+      if (error) throw error;
+      return data;
+    },
+    submitBusinessVerification: async (payload) => {
+      const { data, error } = await supabase.rpc('submit_business_verification', {
+        p_payload: payload,
+      });
+      if (error) throw error;
+      return data;
+    },
+    verifyPaymentMethod: async ({
+      methodType,
+      provider = 'stripe',
+      providerPaymentMethodId = null,
+      last4 = null,
+      brand = null,
+      bankName = null,
+      metadata = {},
+    }) => {
+      const { data, error } = await supabase.rpc('verify_onboarding_payment_method', {
+        p_method_type: methodType,
+        p_provider: provider,
+        p_provider_payment_method_id: providerPaymentMethodId,
+        p_last4: last4,
+        p_brand: brand,
+        p_bank_name: bankName,
+        p_metadata: metadata,
+      });
+      if (error) throw error;
+      return data;
+    },
+    applyCoupon: async ({ code, planId = null }) => {
+      const { data, error } = await supabase.rpc('apply_onboarding_coupon', {
+        p_code: code,
+        p_plan_id: planId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    setupHierarchy: async (userId, organizations) => {
+      const { data, error } = await supabase.rpc('setup_onboarding_hierarchy', {
+        p_user_id: userId,
+        p_hierarchy: organizations,
+      });
+
+      if (error) throw error;
+
+      return {
+        ...data,
+        primaryOrganization: data?.organizations?.find((org) => org.id === data.primary_org_id) || data?.organizations?.[0],
+        primaryBrand: data?.brands?.find((brand) => brand.id === data.primary_brand_id) || data?.brands?.[0],
+        primaryLocation: data?.locations?.find((location) => location.id === data.primary_location_id) || data?.locations?.[0],
+      };
+    },
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
       // Execute the entire onboarding process as a single atomic transaction.
       // If any step fails, all steps are rolled back to prevent orphaned records.

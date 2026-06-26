@@ -3,6 +3,9 @@
 
 BEGIN;
 
+ALTER TABLE public.profiles
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
+
 DO $$
 DECLARE
     system_uid UUID := '99999999-9999-9999-9999-999999999999';
