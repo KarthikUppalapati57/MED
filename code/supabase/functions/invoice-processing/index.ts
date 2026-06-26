@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'node:buffer'
 import { getSupabaseClient, getSupabaseSystemClient } from '../_shared/supabase.ts'
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -148,6 +149,75 @@ function getDoclingBackendUrl() {
 
   throw new Error('PYTHON_BACKEND_URL is required for deployed invoice extraction.');
 }
+
+async function extractWithGeminiVision(fileBlob) {
+  const apiKey = Deno.env.get('VITE_GEMINI_API_KEY') || Deno.env.get('vertex_api_key') || Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) throw new Error('Gemini API key is not configured for invoice extraction fallback.');
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const fileBuffer = await fileBlob.arrayBuffer();
+  const base64Data = Buffer.from(fileBuffer).toString('base64');
+
+  const prompt = `
+    You are an expert AP invoice data extractor for restaurant supplier invoices.
+    Extract every visible header field and every invoice line from the PDF or image.
+    Return STRICT JSON only. No markdown fences. Use this exact shape:
+    {
+      "vendor_name": "string or null",
+      "invoice_number": "string or null",
+      "account_number": "string or null",
+      "customer_number": "string or null",
+      "invoice_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+      "due_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+      "payment_terms": "string or null",
+      "subtotal": 0.0,
+      "tax_amount": 0.0,
+      "fuel_surcharge": 0.0,
+      "delivery_fee": 0.0,
+      "other_charges": 0.0,
+      "total_amount": 0.0,
+      "payment_status": "paid, unpaid, or unknown",
+      "paid_status_detection": {
+        "detected": true,
+        "confidence": 0.0,
+        "evidence": "visible paid stamp/check/payment confirmation text, or null",
+        "should_mark_paid": true
+      },
+      "line_items": [
+        {
+          "vendor_item_code": "product/item number as printed",
+          "description": "full item description",
+          "quantity": 0,
+          "unit": "CS/EA/LB/etc from pricing unit or UOM",
+          "unit_price": 0.0,
+          "extended_price": 0.0,
+          "pack_size": "pack size if visible",
+          "label": "brand/label if visible",
+          "ai_confidence": 0.0
+        }
+      ]
+    }
+    For US Foods invoices, use shipped quantity (SHP), PRODUCT NUMBER, LABEL, PACK SIZE, PRICING UNIT, UNIT PRICE, and EXTENDED PRICE when visible.
+    Include all line rows across all pages, excluding subtotal/summary/footer rows.
+    If the invoice visibly says PAID, paid by check, paid by ACH, balance due 0, payment received, or contains a payment confirmation,
+    set payment_status to paid and paid_status_detection.should_mark_paid to true. If no paid signal is visible, set payment_status to unpaid.
+  `;
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        data: base64Data,
+        mimeType: fileBlob.type || 'application/pdf',
+      },
+    },
+    prompt,
+  ]);
+
+  const responseText = result.response.text();
+  const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+  return { data: JSON.parse(cleanJsonStr), rawText: responseText };
+}
 // Background processing function
 async function processInvoiceBackground(record, schemaName, supabaseClient) {
   try {
@@ -177,34 +247,54 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       log_data: { point: 'download_success', size: fileBlob.size }
     });
 
-    // 2. Route extraction to Python Docling backend
+    // 2. Try Docling first, then fall back to Gemini Vision for scanned/image-heavy invoices.
     console.log("Routing file to Python Docling backend for extraction...");
     
-    const backendUrl = getDoclingBackendUrl();
-    const formData = new FormData();
-    formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
+    let extractedData;
+    let rawText = '';
+    let extractionMethod = 'docling+gemini';
 
-    await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
-    });
+    try {
+      const backendUrl = getDoclingBackendUrl();
+      const formData = new FormData();
+      formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
 
-    const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
-      method: 'POST',
-      body: formData,
-    });
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
+      });
 
-    if (!extractionResponse.ok) {
-      const errText = await extractionResponse.text();
-      throw new Error(`Python backend failed: ${extractionResponse.status} ${errText}`);
+      const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!extractionResponse.ok) {
+        const errText = await extractionResponse.text();
+        throw new Error(`Python backend failed: ${extractionResponse.status} ${errText}`);
+      }
+
+      extractedData = await extractionResponse.json();
+      rawText = extractedData.raw_text || '';
+
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'docling_response_success' }
+      });
+    } catch (doclingError) {
+      console.warn('Docling extraction failed, falling back to Gemini Vision:', doclingError);
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'docling_failed_gemini_fallback', error: doclingError.message }
+      });
+
+      const geminiResult = await extractWithGeminiVision(fileBlob);
+      extractedData = geminiResult.data;
+      rawText = geminiResult.rawText;
+      extractionMethod = 'gemini_vision_fallback';
+
+      await supabaseClient.from('debug_logs').insert({
+        log_data: { point: 'gemini_fallback_success' }
+      });
     }
-
-    const extractedData = await extractionResponse.json();
-
-    await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'docling_response_success' }
-    });
-
-    // 3. Update invoice with extracted data in the shared public table
+// 3. Update invoice with extracted data in the shared public table
     console.log(`Updating invoice ${record.id} to pending_review in public schema...`);
     
     const normalized = normalizeExtraction(extractedData);
@@ -225,11 +315,11 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       payment_status: normalized.payment_status,
       status: 'pending_review',
       ap_status: 'processing',
-      raw_text: extractedData.raw_text || '',
+      raw_text: rawText || extractedData.raw_text || '',
       validation_results: normalized.paid_status_detection
         ? { ...(record.validation_results || {}), paid_status_detection: normalized.paid_status_detection }
         : record.validation_results,
-      extraction_method: 'docling+gemini',
+      extraction_method: extractionMethod,
     };
 
     const { error: updateError } = await supabaseClient
