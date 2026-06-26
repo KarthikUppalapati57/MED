@@ -70,6 +70,131 @@ function firstNumber(...values) {
   return null;
 }
 
+function parseUsFoodsRawText(rawText = '') {
+  if (!/US\s*Foods/i.test(rawText)) return null;
+
+  const source = rawText.replace(/\u00a0/g, ' ');
+  const invoiceNumber = firstValue(
+    source.match(/INVOICE DATE\s*\r?\n\s*(\d{4,})\s*\r?\n\s*ACCOUNT NUMBER INVOICE NUMBER/i)?.[1],
+    source.match(/ACCOUNT NUMBER\s+INVOICE NUMBER\s*\r?\n\s*\d+\s+\r?\n?\s*(\d{4,})/i)?.[1]
+  );
+  const accountNumber = firstValue(
+    source.match(/Page \d+ of \d+\s*\r?\n\s*(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1],
+    source.match(/(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1]
+  );
+  const invoiceDate = normalizeDate(source.match(/(\d{2}\/\d{2}\/\d{4})\s*\r?\n\s*INVOICE DATE/i)?.[1]);
+  const paymentTerms = firstValue(
+    source.match(/ORDER NUMBER PAYMENT TERMS ROUTE NUMBER\s*\r?\n\s*\d+\s+(NET\s+\d+\s+DAYS|NET\s+\d+|DUE\s+ON\s+RECEIPT|[A-Z ]+?)\s+\d+/i)?.[1]
+  );
+  const dueDate = normalizeDate(
+    source.match(/PLEASE REMIT THIS AMOUNT BY[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+\$[\d,]+\.\d{2}/i)?.[1]
+  );
+  const totalAmount = firstNumber(
+    source.match(/Product Total\s+\$?([\d,]+\.\d{2})/i)?.[1],
+    source.match(/DELIVERY SUMMARY TOTALS[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]
+  );
+  const taxAmount = firstNumber(source.match(/Rate:\s*[\d.]+\s+\$([\d,]+\.\d{2})/i)?.[1]);
+  const fuelSurcharge = firstNumber(source.match(/FUEL SURCHARGE\s+\$([\d,]+\.\d{2})/i)?.[1]);
+  const allowance = firstNumber(source.match(/INVENTORY ALLOWANCE\s+-\$([\d,]+\.\d{2})/i)?.[1]);
+  const grossAmount = firstNumber(source.match(/TOTAL GROSS WEIGHT SHIPPED[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]);
+
+  const lineSectionEnd = source.search(/HAZARD MATERIALS SUMMARY|STORAGE LOCATION TOTAL|DELIVERY SUMMARY/i);
+  const lineSource = lineSectionEnd > -1 ? source.slice(0, lineSectionEnd) : source;
+  const lineItems = [];
+  const seen = new Set();
+  const rowPattern = /^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+([A-Z]+)\s+(\d{5,})\s+(.+?)\s+\$([\d,]+\.\d{2,4})\s+\$(-?[\d,]+\.\d{2})\s*$/gm;
+  let match;
+
+  while ((match = rowPattern.exec(lineSource)) !== null) {
+    const [, ordered, shipped, adjusted, salesUnit, productNumber, rawMiddle, unitPriceRaw, extendedRaw] = match;
+    const middleTokens = rawMiddle.trim().split(/\s+/);
+    let pricingUnit = salesUnit;
+    let packSize = '';
+
+    if (middleTokens.length && /^[A-Z]{1,4}$/.test(middleTokens[middleTokens.length - 1])) {
+      pricingUnit = middleTokens.pop();
+    }
+
+    if (middleTokens.length && /^[A-Z]$/.test(middleTokens[middleTokens.length - 1])) {
+      middleTokens.pop();
+    }
+
+    if (middleTokens.length >= 2 && /\d/.test(middleTokens[middleTokens.length - 2])) {
+      const unitToken = middleTokens[middleTokens.length - 1];
+      if (/^(GA|GAL|LB|OZ|EA|CT|CS|PK|BG|SL|DZ)$/i.test(unitToken)) {
+        packSize = `${middleTokens[middleTokens.length - 2]} ${middleTokens[middleTokens.length - 1]}`;
+        middleTokens.splice(middleTokens.length - 2, 2);
+      }
+    }
+
+    const description = middleTokens.join(' ').replace(/\s+/g, ' ').trim();
+    const key = `${productNumber}:${extendedRaw}`;
+    if (!description || seen.has(key)) continue;
+    seen.add(key);
+
+    lineItems.push({
+      vendor_item_code: productNumber,
+      description,
+      quantity: parseQuantity(shipped) ?? parseQuantity(ordered) ?? 0,
+      unit: pricingUnit,
+      unit_price: firstNumber(unitPriceRaw) ?? 0,
+      extended_price: firstNumber(extendedRaw) ?? 0,
+      pack_size: packSize,
+      label: '',
+      discount: 0,
+      adjustment: parseQuantity(adjusted) || 0,
+      ai_confidence: 0.98,
+    });
+  }
+
+  return {
+    vendor_name: 'US Foods',
+    invoice_number: invoiceNumber,
+    account_number: accountNumber,
+    customer_number: accountNumber,
+    invoice_date: invoiceDate,
+    due_date: null,
+    payment_terms: paymentTerms,
+    subtotal: totalAmount,
+    tax_amount: taxAmount,
+    fuel_surcharge: fuelSurcharge,
+    delivery_fee: 0,
+    other_charges: allowance ? -allowance : 0,
+    total_amount: grossAmount ?? totalAmount,
+    payment_status: 'unpaid',
+    line_items: lineItems,
+  };
+}
+
+function repairExtractionFromRawText(data = {}, rawText = '') {
+  const usFoods = parseUsFoodsRawText(rawText);
+  if (usFoods) {
+    const currentLineCount = Array.isArray(data.line_items) ? data.line_items.length : 0;
+    const repairedLineCount = Array.isArray(usFoods.line_items) ? usFoods.line_items.length : 0;
+    const currentVendor = cleanString(data.vendor_name) || '';
+    const vendorLooksLikeBillTo = /CRAVEN|WING|CHOTO|CUSTOMER|BILL TO/i.test(currentVendor);
+
+    return {
+      ...data,
+      ...Object.fromEntries(Object.entries(usFoods).filter(([, value]) => value !== null && value !== undefined && value !== '')),
+      vendor_name: vendorLooksLikeBillTo || !currentVendor ? usFoods.vendor_name : (usFoods.vendor_name || data.vendor_name),
+      line_items: repairedLineCount > currentLineCount ? usFoods.line_items : data.line_items,
+    };
+  }
+
+  return data;
+}
+
+function mapLineItemsForRpc(lineItems = []) {
+  return lineItems.map((item) => ({
+    item_name: item.description || item.item_name || '',
+    quantity: parseQuantity(item.quantity) || 0,
+    unit_price: firstNumber(item.unit_price, item.price) || 0,
+    total_price: firstNumber(item.extended_price, item.total_price, item.amount) || 0,
+    vendor_item_code: item.vendor_item_code || item.product_number || '',
+    vendor_unit: item.unit || item.vendor_unit || '',
+  })).filter((item) => item.item_name || item.vendor_item_code);
+}
 function normalizeLineItem(item = {}) {
   const quantity = firstNumber(
     item.quantity,
@@ -299,6 +424,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
 
       extractedData = await extractionResponse.json();
       rawText = extractedData.raw_text || '';
+      extractedData = repairExtractionFromRawText(extractedData, rawText);
 
       await supabaseClient.from('debug_logs').insert({
         log_data: { point: 'docling_response_success' }
@@ -310,7 +436,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       });
 
       const geminiResult = await extractWithGeminiVision(fileBlob);
-      extractedData = geminiResult.data;
+      extractedData = repairExtractionFromRawText(geminiResult.data, geminiResult.rawText);
       rawText = geminiResult.rawText;
       extractionMethod = 'gemini_vision_fallback';
 
@@ -358,12 +484,27 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
       });
       console.error(`Failed to update invoice ${record.id}:`, updateError);
       throw updateError;
-    } else {
-      console.log(`Successfully processed invoice ${record.id}`);
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'success', invoice_id: record.id }
-      });
     }
+
+    const lineItemsForRpc = mapLineItemsForRpc(normalized.line_items || []);
+    if (lineItemsForRpc.length > 0) {
+      const { error: lineItemError } = await supabaseClient.rpc('upsert_invoice_line_items', {
+        p_invoice_id: record.id,
+        p_items: lineItemsForRpc,
+      });
+
+      if (lineItemError) {
+        await supabaseClient.from('debug_logs').insert({
+          log_data: { point: 'line_items_upsert_failed', error: lineItemError }
+        });
+        throw lineItemError;
+      }
+    }
+
+    console.log(`Successfully processed invoice ${record.id}`);
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'success', invoice_id: record.id, line_items_count: lineItemsForRpc.length }
+    });
 
   } catch (err) {
     console.error(`Error in background extraction for invoice ${record.id}:`, err);
