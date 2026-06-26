@@ -635,18 +635,10 @@ export default function Invoices() {
     if (!invoice?.id || invoice.status !== 'extracting') return;
 
     try {
-      const { error } = await supabase.functions.invoke('invoice-processing', {
-        body: {
-          type: 'INSERT',
-          table: 'invoices',
-          record: invoice,
-        },
-      });
-
-      if (error) throw error;
+      await api.financial.startInvoiceExtraction(invoice.id);
     } catch (error) {
-      console.error('Failed to start invoice extraction:', error);
-      toast.error('Invoice saved, but extraction did not start. Refresh the invoice and upload again if it remains stuck.');
+      console.error('Failed to queue invoice extraction:', error);
+      toast.error('Invoice saved, but extraction did not queue. Please refresh and try again.');
     }
   };
   const handleInvoiceExtracted = async (data) => {

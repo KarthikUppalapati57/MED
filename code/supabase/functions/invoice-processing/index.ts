@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'node:buffer'
-import { getSupabaseClient, getSupabaseSystemClient } from '../_shared/supabase.ts'
+import { getSupabaseAuthAdminClient, getSupabaseClient } from '../_shared/supabase.ts'
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -393,9 +393,14 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization')
-    const supabaseClient = authHeader
-      ? getSupabaseClient(authHeader)
-      : await getSupabaseSystemClient()
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing Authorization header' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
+      })
+    }
+
+    const supabaseClient = getSupabaseClient(authHeader)
 
     const payload = await req.json()
     const { invoice_id, action, type, table, record, old_record } = payload
@@ -441,13 +446,7 @@ serve(async (req) => {
         }
       }
 
-      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      const isServiceRoleRequest = Boolean(serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`);
-      let processingClient = supabaseClient;
-
-      if (!isServiceRoleRequest) {
-        processingClient = await getSupabaseSystemClient();
-      }
+      const processingClient = getSupabaseAuthAdminClient();
 
       // We must AWAIT this! Deno Edge Functions terminate when the response is sent.
       // pg_net handles the timeout asynchronously from the database side.
