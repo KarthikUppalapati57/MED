@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { email, full_name, role, org_id, resend, page_permissions, signing_privileges } = body;
+    const { email, full_name, role, org_id, organization_id, resend } = body;
 
     if (!email) {
       return new Response(JSON.stringify({ error: "Missing email" }), {
@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
       manager: 'branch_manager',
     };
     const targetRole = roleMapping[rawRole] || rawRole;
-    const targetOrgId = org_id || callerProfile.organization_id;
+    const targetOrgId = organization_id || org_id || callerProfile.organization_id;
 
     const frontendUrl = Deno.env.get("FRONTEND_URL") || Deno.env.get("SITE_URL") || "http://localhost:5173";
     const loginLink = `${frontendUrl}/login`;
@@ -189,13 +189,7 @@ Deno.serve(async (req: Request) => {
       organization_id: targetOrgId || null,
       status: "invited",
     };
-    // Attach page permissions & signing privileges if provided
-    if (page_permissions && Object.keys(page_permissions).length > 0) {
-      profilePayload.permissions = page_permissions;
-    }
-    if (signing_privileges && Object.keys(signing_privileges).length > 0) {
-      profilePayload.signing_privileges = signing_privileges;
-    }
+
 
     const { error: upsertErr } = await userClient
       .from("profiles")
@@ -212,10 +206,7 @@ Deno.serve(async (req: Request) => {
       token: invitationToken,
       invited_by: caller.id,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      metadata: {
-        page_permissions: page_permissions || {},
-        signing_privileges: signing_privileges || {},
-      },
+      metadata: {},
     });
     if (invInsertErr) {
       console.error("[invite-user] Invitation insert error:", invInsertErr);

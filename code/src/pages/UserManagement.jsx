@@ -378,7 +378,7 @@ function InviteDialog({ open, onClose, orgId }) {
         body: {
           email,
           role,
-          org_id: orgId || userProfile?.organization_id,
+          organization_id: orgId || userProfile?.organization_id,
           onboarding_type: 'invited',
         }
       });
@@ -602,7 +602,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
         if (!email) continue;
 
         const { error: fnError } = await supabase.functions.invoke('invite-user', {
-          body: { email, role, org_id: orgId, onboarding_type: 'invited' }
+          body: { email, role, organization_id: orgId, onboarding_type: 'invited' }
         });
         if (fnError) {
           // Fallback
