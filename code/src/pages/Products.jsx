@@ -69,6 +69,53 @@ import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
 import ProductsLiveDashboard from '@/components/ProductsLiveDashboard';
 
+const MIN_NETWORK_MAPPING_COUNT = 50;
+const MIN_NETWORK_CONFIDENCE = 90;
+const LEGACY_GLOBAL_CATEGORY_ALIASES = {
+  food_cogs: '5100',
+  beverage_cogs: '5200',
+  merchandise_cogs: '5300',
+};
+const TRUSTED_COA_CODES = new Set(getFlattenedCOA().filter(c => c.code.startsWith('5')).map(c => c.code));
+
+function normalizeGlobalCategory(category) {
+  const normalized = LEGACY_GLOBAL_CATEGORY_ALIASES[category] || category;
+  return TRUSTED_COA_CODES.has(normalized) ? normalized : null;
+}
+
+function tokenizeItemName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function itemNamesLikelyMatch(productName, globalItemName) {
+  const productTokens = new Set(tokenizeItemName(productName));
+  const globalTokens = new Set(tokenizeItemName(globalItemName));
+  if (!productTokens.size || !globalTokens.size) return false;
+
+  const sharedCount = [...productTokens].filter(token => globalTokens.has(token)).length;
+  const requiredShared = Math.min(2, productTokens.size, globalTokens.size);
+  const coverage = sharedCount / Math.min(productTokens.size, globalTokens.size);
+  return sharedCount >= requiredShared && coverage >= 0.8;
+}
+
+function isTrustedGlobalMapping(item) {
+  return Boolean(
+    item &&
+    normalizeGlobalCategory(item.most_common_category) &&
+    Number(item.mapping_count || 0) >= MIN_NETWORK_MAPPING_COUNT &&
+    Number(item.confidence_score || 0) >= MIN_NETWORK_CONFIDENCE
+  );
+}
+
+function findTrustedGlobalMatch(product, globalItems) {
+  return globalItems.find(item => isTrustedGlobalMapping(item) && itemNamesLikelyMatch(product.name, item.item_name));
+}
+
 const categoryColors = {
   food: 'bg-resend-green/10 text-resend-green',
   beverage: 'bg-resend-blue/10 text-resend-blue',
@@ -179,10 +226,7 @@ export default function Products() {
     queryKey: ['global_vendor_items'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('global_vendor_items')
-        .select('id, item_name, mapping_count, most_common_category, confidence_score')
-        .order('mapping_count', { ascending: false })
-        .limit(500);
+        .rpc('get_trusted_global_vendor_item_suggestions');
       if (error) {
         console.warn('global_vendor_items error', error);
         return [];
@@ -297,6 +341,31 @@ export default function Products() {
       location_specific: product.location_specific ?? false,
     });
     setDialogOpen(true);
+  };
+
+  const handleReviewNetworkMapping = (product, globalMatch) => {
+    const trustedCategory = normalizeGlobalCategory(globalMatch?.most_common_category);
+    if (!trustedCategory) {
+      toast.error('This network suggestion needs platform review before it can be used.');
+      return;
+    }
+
+    setEditingProduct(product);
+    setFormData({
+      name: product.name || '',
+      product_id: product.product_id || '',
+      description: product.description || '',
+      category: product.category || '',
+      accounting_category: trustedCategory,
+      is_inventoried: product.is_inventoried ?? true,
+      is_tax_exempt: product.is_tax_exempt ?? false,
+      report_by_unit: product.report_by_unit || 'ea',
+      base_unit: product.base_unit || 'ea',
+      latest_price: product.latest_price || 0,
+      location_specific: product.location_specific ?? false,
+    });
+    setDialogOpen(true);
+    toast.info('Network suggestion loaded for review. Confirm the category before saving.');
   };
 
   const handleSubmit = () => {
@@ -676,8 +745,8 @@ export default function Products() {
                         const confidence = 95 - (idx * 15);
                         const isLowConfidence = confidence < 90;
 
-                        // Check if we have a global crowdsourced match
-                        const globalMatch = globalItems.find(g => g.item_name.toLowerCase().includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(g.item_name.toLowerCase()));
+                        const globalMatch = findTrustedGlobalMatch(p, globalItems);
+                        const globalCategory = normalizeGlobalCategory(globalMatch?.most_common_category);
 
                         return (
                           <TableRow key={p.id} className={isLowConfidence ? "bg-resend-yellow/5" : ""}>
@@ -695,7 +764,7 @@ export default function Products() {
                               {globalMatch && (
                                 <div className="mt-1 text-[10px] text-primary flex items-center gap-1">
                                   <Wand2 className="h-3 w-3" />
-                                  Crowdsourced Match: {globalMatch.mapping_count}+ restaurants map this to {getCOALabel(globalMatch.most_common_category)}
+                                  Trusted Network Match: {globalMatch.mapping_count}+ restaurants map this to {getCOALabel(globalCategory)}
                                 </div>
                               )}
                             </TableCell>
@@ -710,18 +779,18 @@ export default function Products() {
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(globalMatch?.most_common_category || p.accounting_category)}</Badge></TableCell>
+                            <TableCell><Badge variant="secondary" className="font-mono text-[10px]">{getCOALabel(globalCategory || p.accounting_category)}</Badge></TableCell>
                             <TableCell>
                               {!isGroundStaff && (
                                 <div className="flex gap-2">
                                   <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
-                                    if(globalMatch) {
-                                      updateMutation.mutate({ id: p.id, data: { accounting_category: globalMatch.most_common_category } });
-                                    } else {
-                                      toast.success('Approved');
+                                    if (globalMatch) {
+                                      handleReviewNetworkMapping(p, globalMatch);
+                                      return;
                                     }
+                                    toast.success('Approved');
                                   }}>
-                                    {globalMatch ? 'Accept Network Mapping' : 'Approve'}
+                                    {globalMatch ? 'Review Network Mapping' : 'Approve'}
                                   </Button>
                                   {(isLowConfidence || globalMatch) && (
                                     <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(p)}>
