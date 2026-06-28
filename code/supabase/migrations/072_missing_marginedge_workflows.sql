@@ -102,6 +102,9 @@ SET features = (
 WHERE id IN ('pro', 'enterprise')
   AND jsonb_typeof(features) = 'array';
 
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS enabled_modules JSONB NOT NULL DEFAULT '[]'::jsonb;
+
 UPDATE public.organizations
 SET enabled_modules = (
   SELECT jsonb_agg(DISTINCT module_key)

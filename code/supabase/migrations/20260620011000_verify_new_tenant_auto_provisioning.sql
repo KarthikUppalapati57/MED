@@ -4,6 +4,8 @@
 
 BEGIN;
 
+ALTER TABLE public.organizations DISABLE TRIGGER trg_org_deleted_webhook;
+
 DO $$
 DECLARE
   validation_org_id UUID := '00000000-0000-4000-8000-000000011000';

@@ -27,6 +27,21 @@ CREATE TRIGGER set_updated_at
 -- 4. Enable RLS
 ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
 
+-- Compatibility helpers for fresh migration replay after 002 drops the initial helpers.
+CREATE OR REPLACE FUNCTION public.is_manager_or_above()
+RETURNS BOOLEAN AS $func$
+  SELECT public.get_auth_role() IN ('manager', 'owner', 'admin', 'platform_admin');
+$func$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $func$
+  SELECT public.get_auth_role() IN ('admin', 'platform_admin');
+$func$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION public.is_owner_or_admin()
+RETURNS BOOLEAN AS $func$
+  SELECT public.get_auth_role() IN ('owner', 'admin', 'platform_admin');
+$func$ LANGUAGE sql SECURITY DEFINER STABLE;
 -- 5. RLS Policies
 DROP POLICY IF EXISTS "All users can view invoice line items" ON public.invoice_line_items;
 CREATE POLICY "All users can view invoice line items" ON public.invoice_line_items 
@@ -34,15 +49,15 @@ CREATE POLICY "All users can view invoice line items" ON public.invoice_line_ite
 
 DROP POLICY IF EXISTS "Manager+ can manage invoice line items" ON public.invoice_line_items;
 CREATE POLICY "Manager+ can manage invoice line items" ON public.invoice_line_items 
-    FOR INSERT WITH CHECK (is_manager_or_above() AND organization_id = public.get_auth_org());
+    FOR INSERT WITH CHECK (public.is_manager_or_above() AND organization_id = public.get_auth_org());
 
 DROP POLICY IF EXISTS "Manager+ can update invoice line items" ON public.invoice_line_items;
 CREATE POLICY "Manager+ can update invoice line items" ON public.invoice_line_items 
-    FOR UPDATE USING (is_manager_or_above() AND organization_id = public.get_auth_org());
+    FOR UPDATE USING (public.is_manager_or_above() AND organization_id = public.get_auth_org());
 
 DROP POLICY IF EXISTS "Admin can delete invoice line items" ON public.invoice_line_items;
 CREATE POLICY "Admin can delete invoice line items" ON public.invoice_line_items 
-    FOR DELETE USING (is_admin() AND organization_id = public.get_auth_org());
+    FOR DELETE USING (public.is_admin() AND organization_id = public.get_auth_org());
 
 -- 6. Indexes
 CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id ON public.invoice_line_items(invoice_id);

@@ -129,11 +129,16 @@ USING (
   )
 );
 
-DROP POLICY IF EXISTS debug_logs_platform_admin_select ON public.debug_logs;
-CREATE POLICY debug_logs_platform_admin_select
-ON public.debug_logs
-FOR SELECT
-USING (public.is_platform_admin());
+DO $guard$
+BEGIN
+  IF to_regclass('public.debug_logs') IS NOT NULL THEN
+    DROP POLICY IF EXISTS debug_logs_platform_admin_select ON public.debug_logs;
+    CREATE POLICY debug_logs_platform_admin_select
+    ON public.debug_logs
+    FOR SELECT
+    USING (public.is_platform_admin());
+  END IF;
+END $guard$;
 
 DROP POLICY IF EXISTS "System can insert audit logs" ON public.audit_logs;
 DROP POLICY IF EXISTS audit_logs_authenticated_insert ON public.audit_logs;

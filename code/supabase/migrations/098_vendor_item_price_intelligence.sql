@@ -12,7 +12,8 @@ ALTER TABLE public.vendor_items
   ADD COLUMN IF NOT EXISTS price_variance_threshold_percent NUMERIC(8,2) DEFAULT 10,
   ADD COLUMN IF NOT EXISTS mapping_status TEXT DEFAULT 'unmapped'
     CHECK (mapping_status IN ('unmapped', 'suggested', 'verified')),
-  ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,2) DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS price_variance_flag BOOLEAN DEFAULT false;
 
 ALTER TABLE public.invoice_line_items
   ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id) ON DELETE SET NULL,

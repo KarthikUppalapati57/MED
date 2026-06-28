@@ -1,4 +1,8 @@
 -- Add missing foreign key indexes to fix performance bottlenecks (O(N) sequential scans)
+-- Fresh replay prerequisites for indexes introduced before their source columns in later migrations.
+ALTER TABLE public.vendors ADD COLUMN IF NOT EXISTS default_payment_account_id UUID REFERENCES public.payment_accounts(id) ON DELETE SET NULL;
+
+
 CREATE INDEX IF NOT EXISTS idx_vendor_aliases_canonical_vendor_id ON public.vendor_aliases (canonical_vendor_id);
 CREATE INDEX IF NOT EXISTS idx_vendor_aliases_organization_id ON public.vendor_aliases (organization_id);
 CREATE INDEX IF NOT EXISTS idx_vendor_item_mappings_internal_product_id ON public.vendor_item_mappings (internal_product_id);
@@ -87,6 +91,18 @@ CREATE INDEX IF NOT EXISTS idx_pos_menu_mapping_recipe_id ON public.pos_menu_map
 CREATE INDEX IF NOT EXISTS idx_pos_sales_data_location_id ON public.pos_sales_data (location_id);
 CREATE INDEX IF NOT EXISTS idx_pos_sales_data_organization_id ON public.pos_sales_data (organization_id);
 CREATE INDEX IF NOT EXISTS idx_pos_sales_data_pos_item_id ON public.pos_sales_data (pos_item_id);
+CREATE TABLE IF NOT EXISTS public.vendor_issues (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  vendor_id UUID NOT NULL REFERENCES public.vendors(id) ON DELETE CASCADE,
+  issue_type TEXT NOT NULL CHECK (issue_type IN ('late_delivery', 'missing_item', 'price_mismatch', 'invoice_dispute', 'other')),
+  description TEXT NOT NULL,
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'ignored')),
+  reported_by UUID REFERENCES auth.users(id),
+  resolved_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 CREATE INDEX IF NOT EXISTS idx_vendor_issues_organization_id ON public.vendor_issues (organization_id);
 CREATE INDEX IF NOT EXISTS idx_vendor_issues_reported_by ON public.vendor_issues (reported_by);
 CREATE INDEX IF NOT EXISTS idx_vendor_issues_resolved_by ON public.vendor_issues (resolved_by);
@@ -148,18 +164,26 @@ CREATE INDEX IF NOT EXISTS idx_budget_targets_created_by ON public.budget_target
 CREATE INDEX IF NOT EXISTS idx_budget_targets_location_id ON public.budget_targets (location_id);
 CREATE INDEX IF NOT EXISTS idx_budget_targets_organization_id ON public.budget_targets (organization_id);
 CREATE INDEX IF NOT EXISTS idx_budget_targets_updated_by ON public.budget_targets (updated_by);
-CREATE INDEX IF NOT EXISTS idx_purchase_cards_brand_id ON public.purchase_cards (brand_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_cards_created_by ON public.purchase_cards (created_by);
-CREATE INDEX IF NOT EXISTS idx_purchase_cards_location_id ON public.purchase_cards (location_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_cards_organization_id ON public.purchase_cards (organization_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_cards_vendor_id ON public.purchase_cards (vendor_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_brand_id ON public.purchase_card_transactions (brand_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_card_id ON public.purchase_card_transactions (card_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_created_by ON public.purchase_card_transactions (created_by);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_invoice_id ON public.purchase_card_transactions (invoice_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_location_id ON public.purchase_card_transactions (location_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_organization_id ON public.purchase_card_transactions (organization_id);
-CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_vendor_id ON public.purchase_card_transactions (vendor_id);
+DO $guard$
+BEGIN
+  IF to_regclass('public.purchase_cards') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_purchase_cards_brand_id ON public.purchase_cards (brand_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_cards_created_by ON public.purchase_cards (created_by);
+    CREATE INDEX IF NOT EXISTS idx_purchase_cards_location_id ON public.purchase_cards (location_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_cards_organization_id ON public.purchase_cards (organization_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_cards_vendor_id ON public.purchase_cards (vendor_id);
+  END IF;
+
+  IF to_regclass('public.purchase_card_transactions') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_brand_id ON public.purchase_card_transactions (brand_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_card_id ON public.purchase_card_transactions (card_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_created_by ON public.purchase_card_transactions (created_by);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_invoice_id ON public.purchase_card_transactions (invoice_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_location_id ON public.purchase_card_transactions (location_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_organization_id ON public.purchase_card_transactions (organization_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_card_transactions_vendor_id ON public.purchase_card_transactions (vendor_id);
+  END IF;
+END $guard$;
 CREATE INDEX IF NOT EXISTS idx_smart_prep_plans_assigned_to ON public.smart_prep_plans (assigned_to);
 CREATE INDEX IF NOT EXISTS idx_smart_prep_plans_brand_id ON public.smart_prep_plans (brand_id);
 CREATE INDEX IF NOT EXISTS idx_smart_prep_plans_completed_by ON public.smart_prep_plans (completed_by);

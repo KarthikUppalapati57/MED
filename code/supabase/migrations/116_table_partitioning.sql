@@ -107,7 +107,7 @@ SELECT
     id, organization_id, user_id, action, table_name, record_id, 
     old_data, new_data, ip_address, user_agent, COALESCE(created_at, now()), 
     entity_type, entity_id, module, field_changed, old_value, new_value, 
-    user_email, details, org_id 
+    user_email, details, organization_id 
 FROM public.audit_logs_old;
 
 INSERT INTO public.error_logs 

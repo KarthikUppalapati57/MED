@@ -51,10 +51,15 @@ END;
 $$;
 
 -- 2. process-onboarding Triggers
-DROP TRIGGER IF EXISTS trg_demo_requests_webhook ON public.demo_requests;
-CREATE TRIGGER trg_demo_requests_webhook
-  AFTER INSERT OR UPDATE ON public.demo_requests
-  FOR EACH ROW EXECUTE FUNCTION public.invoke_edge_function('process-onboarding');
+DO $guard$
+BEGIN
+  IF to_regclass('public.demo_requests') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_demo_requests_webhook ON public.demo_requests;
+    CREATE TRIGGER trg_demo_requests_webhook
+      AFTER INSERT OR UPDATE ON public.demo_requests
+      FOR EACH ROW EXECUTE FUNCTION public.invoke_edge_function('process-onboarding');
+  END IF;
+END $guard$;
 
 DROP TRIGGER IF EXISTS trg_org_deleted_webhook ON public.organizations;
 CREATE TRIGGER trg_org_deleted_webhook

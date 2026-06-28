@@ -12,14 +12,19 @@ INSERT INTO public.locations (id, organization_id, name, type)
 VALUES ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Downtown Flagship', 'restaurant')
 ON CONFLICT DO NOTHING;
 
--- Insert global items (ingredients)
-INSERT INTO public.global_items (id, organization_id, name, category, standard_uom, base_cost)
-VALUES 
-('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Chicken Breast (Raw)', 'Proteins', 'lb', 3.50),
-('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Romaine Lettuce', 'Produce', 'head', 1.20),
-('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Tomatoes', 'Produce', 'lb', 0.80),
-('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'Cheddar Cheese', 'Dairy', 'lb', 4.10)
-ON CONFLICT DO NOTHING;
+-- Insert global items (ingredients) when the legacy global_items table exists.
+DO $seed$
+BEGIN
+  IF to_regclass('public.global_items') IS NOT NULL THEN
+    INSERT INTO public.global_items (id, organization_id, name, category, standard_uom, base_cost)
+    VALUES
+    ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Chicken Breast (Raw)', 'Proteins', 'lb', 3.50),
+    ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Romaine Lettuce', 'Produce', 'head', 1.20),
+    ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'Tomatoes', 'Produce', 'lb', 0.80),
+    ('30000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'Cheddar Cheese', 'Dairy', 'lb', 4.10)
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $seed$;
 
 -- Insert Vendors
 INSERT INTO public.vendors (id, organization_id, name, email, phone)
