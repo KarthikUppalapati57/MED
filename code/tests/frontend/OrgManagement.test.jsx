@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import OrgManagement from '../../src/pages/OrgManagement';
+import OrgManagement from '../../src/modules/admin/pages/OrgManagement';
 import { BrowserRouter } from 'react-router-dom';
 
 // Mock the AuthContext

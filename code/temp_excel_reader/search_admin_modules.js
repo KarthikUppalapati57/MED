@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.resolve('c:/Users/ukart/OneDrive - University of Tennessee/M/INtern/MECURSOR/MEVS/code/src/pages/PlatformAdmin.jsx');
+const filePath = path.resolve('c:/Users/ukart/OneDrive - University of Tennessee/M/INtern/MECURSOR/MEVS/code/src/modules/platform/pages/PlatformAdmin.jsx');
 const content = fs.readFileSync(filePath, 'utf8');
 
 const lines = content.split('\n');

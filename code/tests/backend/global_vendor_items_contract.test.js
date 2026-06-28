@@ -7,7 +7,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 describe('Global vendor item recommendation hardening contract', () => {
   it('keeps tenant clients on trusted global mapping suggestions only', () => {
-    const productsSource = read('src/pages/Products.jsx');
+    const productsSource = read('src/modules/products/pages/Products.jsx');
 
     expect(productsSource).toContain(".rpc('get_trusted_global_vendor_item_suggestions')");
     expect(productsSource).not.toContain(".from('global_vendor_items')");
@@ -18,7 +18,7 @@ describe('Global vendor item recommendation hardening contract', () => {
   });
 
   it('does not allow one-click application of crowdsourced mappings', () => {
-    const productsSource = read('src/pages/Products.jsx');
+    const productsSource = read('src/modules/products/pages/Products.jsx');
 
     expect(productsSource).toContain('Review Network Mapping');
     expect(productsSource).not.toContain('Accept Network Mapping');

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import Invoices from '../../src/pages/Invoices';
+import Invoices from '../../src/modules/invoices/pages/Invoices';
 import { BrowserRouter } from 'react-router-dom';
 
 // Mock the AuthContext

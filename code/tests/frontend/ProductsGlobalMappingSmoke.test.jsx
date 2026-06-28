@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import Products from '../../src/pages/Products';
+import Products from '../../src/modules/products/pages/Products';
 import { MemoryRouter } from 'react-router-dom';
 
 const mutate = vi.fn();

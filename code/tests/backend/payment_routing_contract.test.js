@@ -7,8 +7,8 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 describe('Payment routing regression contract', () => {
   it('keeps paid invoice approvals out of payable queue navigation', () => {
-    const invoicesSource = read('src/pages/Invoices.jsx');
-    const paymentsSource = read('src/pages/Payments.jsx');
+    const invoicesSource = read('src/modules/invoices/pages/Invoices.jsx');
+    const paymentsSource = read('src/modules/payments/pages/Payments.jsx');
     const legacyRedirectSource = read('src/lib/LegacyRedirectHandler.jsx');
 
     expect(invoicesSource).toContain('navigate(`/Payments/history?invoice=${invoice.id}`)');

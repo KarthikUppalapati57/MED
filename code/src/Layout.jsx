@@ -59,7 +59,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
-import AiInsightsAssistant from '@/components/AiInsightsAssistant';
+import AiInsightsAssistant from '@/modules/ai_insights/components/AiInsightsAssistant';
 import i18n from '@/i18n';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
 

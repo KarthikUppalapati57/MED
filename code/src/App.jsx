@@ -23,12 +23,12 @@ const PaymentVerification = setupRoutes.PaymentVerification;
 const BusinessVerification = setupRoutes.BusinessVerification;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
-const LandingPage = React.lazy(() => import('./pages/LandingPage'));
-const MFASetupPage = React.lazy(() => import('./pages/MFASetupPage'));
-const TermsOfService = React.lazy(() => import('./pages/TermsOfService'));
-const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
-const CookiePolicy = React.lazy(() => import('./pages/CookiePolicy'));
-const Documentation = React.lazy(() => import('./pages/Documentation'));
+const LandingPage = React.lazy(() => import('./modules/public/pages/LandingPage'));
+const MFASetupPage = React.lazy(() => import('./modules/setup/pages/MFASetupPage'));
+const TermsOfService = React.lazy(() => import('./modules/public/pages/TermsOfService'));
+const PrivacyPolicy = React.lazy(() => import('./modules/public/pages/PrivacyPolicy'));
+const CookiePolicy = React.lazy(() => import('./modules/public/pages/CookiePolicy'));
+const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
 const notify = async (type, message, options) => {

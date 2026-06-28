@@ -565,10 +565,10 @@ BEGIN
         NEW.location_id,
         NEW.location,
         NEW.current_quantity,
-        NULL AS current_value,
-        NULL AS unit_cost,
-        NULL AS par_level,
-        NULL AS reorder_point
+        NULL,
+        NULL,
+        NULL,
+        NULL
     )
     ON CONFLICT (source_inventory_id) DO UPDATE SET
         snapshot_date_key = EXCLUDED.snapshot_date_key,
