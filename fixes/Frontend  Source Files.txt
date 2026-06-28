@@ -1,0 +1,58 @@
+Frontend / Source Files
+Main files:
+src/pages/Invoices.jsx, src/pages/Payments.jsx, src/pages/Accounting.jsx, src/pages/PlatformInvoices.jsx
+Invoice components:
+ApprovalPolicySettings.jsx, ApprovalWorkflowEngine.jsx, BillPayWidget.jsx, CategorySummaryTable.jsx, CreditRequestDialog.jsx, DocumentViewer.jsx, EmailIngestionDialog.jsx, InvoiceAuditLog.jsx, InvoiceEditor.jsx, InvoiceUploader.jsx, ItemMappingSelect.jsx, MobileReceiptCapture.jsx, PaymentAccountsSettings.jsx, ReconciliationVarianceTable.jsx, SplitCodingDialog.jsx, ValidationDialog.jsx
+Service/config files:
+src/lib/apiClient.js, src/lib/invoiceAp.js, src/lib/apRouting.js, src/lib/paymentService.js, src/lib/accountingConfig.js
+Edge Functions
+invoice-processing
+process-email-invoices
+create-stripe-invoice
+Core DB Tables
+invoices, invoice_line_items, invoice_allocations, invoice_documents, invoice_ingestion_jobs, invoice_action_reasons, invoice_audit_events, invoice_event_log, invoice_processing_jobs, invoice_sync_log, invoice_line_matches
+Related AP / Payment Tables
+payment_accounts, scheduled_payments, scheduled_payment_invoices, ledger_bills, ledger_payments, credit_requests, accounting_export_queue
+Approval / Reconciliation Tables
+approval_policies, approval_instances, approval_steps, reconciliation_variances, tolerance_configurations
+Vendor Statement Links
+vendor_statements, vendor_statement_lines
+Analytics / Archive
+fact_invoices, tenant_template.archived_invoices
+Main Triggers
+trg_invoices_webhook
+archive_invoice_on_delete
+enforce_line_item_total
+invoice_status_audit_trigger
+trg_invoice_documents_updated_at
+trg_invoice_ingestion_jobs_updated_at
+trg_invoice_action_reasons_updated_at
+trigger_queue_approved_invoice
+trigger_three_way_match_invoice
+trg_sync_fact_invoices
+trg_payment_accounts_updated_at
+update_accounting_export_queue_modtime
+update_scheduled_payments_modtime
+Main RPC / DB Functions
+save_invoice_workflow
+soft_delete_invoice_workflow
+start_invoice_extraction_workflow
+calculate_invoice_allocations
+save_invoice_allocation_splits
+request_invoice_credit_workflow
+record_invoice_payment
+schedule_invoice_payment
+schedule_payment_batch
+ensure_ledger_bill_workflow
+confirm_payment_workflow
+evaluate_invoice_approval_policy
+execute_approval_step
+get_three_way_match_status
+reconcile_invoice_lines
+check_three_way_match_before_invoice_approval
+queue_approved_invoice
+log_invoice_audit_event
+archive_deleted_invoice
+Key Migration Files
+Most invoice schema/workflow logic lives in:
+026_normalize_invoice_line_items.sql, 078_unified_invoice_ap_ledger.sql, 080_invoice_document_intake.sql, 082_three_way_reconciliation.sql, 083_invoice_allocations.sql, 084_approval_workflows.sql, 086_invoice_audit_events.sql, 100_scheduled_payments.sql, 102_accounting_sync.sql, 20260624000000_invoice_schema_upgrade.sql, 20260625000021_financial_workflow_rpc_migration.sql, 20260626000007_start_invoice_extraction_workflow.sql, 20260626000009_extend_invoice_processing_pg_net_timeout.sql
