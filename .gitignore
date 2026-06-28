@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 venv/
+
+# Ignore temporary/output folders
+outputs/
+scratch/
