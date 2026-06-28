@@ -18,7 +18,15 @@ import {
 import { toast } from "sonner";
 import { supabase } from '@/lib/supabaseClient';
 
-export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted, organizationId }) {
+export default function InvoiceUploader({
+  open,
+  onOpenChange,
+  onInvoiceExtracted,
+  onCreateUploadDraft,
+  onFinalizeUploadDraft,
+  onUploadDraftFailed,
+  organizationId
+}) {
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState('');
@@ -100,8 +108,11 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
   const processFile = async (fileToProcess, source) => {
     setUploading(true);
-    setProgress('Uploading file...');
+    setProgress('Preparing invoice record...');
     setExtractionDone(false);
+
+    let draftInvoice = null;
+    let uploadedFilePath = null;
 
     try {
       if (fileUrl) {
@@ -112,13 +123,28 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
 
       const fileExt = fileToProcess.name?.split('.').pop() || 'pdf';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${organizationId || 'unassigned'}/${fileName}`;
+
+      if (onCreateUploadDraft) {
+        draftInvoice = await onCreateUploadDraft({
+          source,
+          fileType: fileToProcess.type,
+          fileName,
+        });
+      }
+
+      setProgress('Uploading file...');
+
+      const pathOwner = draftInvoice?.organization_id || organizationId || 'unassigned';
+      const filePath = draftInvoice?.id
+        ? `${pathOwner}/${draftInvoice.id}/${fileName}`
+        : `${pathOwner}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('invoices')
         .upload(filePath, fileToProcess);
 
       if (uploadError) throw uploadError;
+      uploadedFilePath = filePath;
 
       // Removed getPublicUrl because the bucket is now private.
       // We store the raw filePath directly in the database.
@@ -127,41 +153,6 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
       setProgress('Upload complete! Extraction started...');
 
       await new Promise(r => setTimeout(r, 800));
-
-      const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      
-      if (isLocalDev) {
-        setProgress('Extracting data via local Docling engine...');
-        try {
-          const formData = new FormData();
-          formData.append('file', fileToProcess, fileToProcess.name);
-          
-          const response = await fetch('http://127.0.0.1:8000/extract-invoice', {
-            method: 'POST',
-            body: formData,
-          });
-          
-          if (!response.ok) throw new Error('Local extraction failed');
-          
-          const extractedData = await response.json();
-          
-          // Pass the extracted data down (we merge the file URL to keep it)
-          onInvoiceExtracted({
-            status: 'pending_review',
-            ap_status: 'processing',
-            file_url: filePath,
-            source,
-            ...extractedData
-          });
-          
-          onOpenChange(false);
-          toast.success('Invoice extracted successfully via local server!');
-          return; // Skip the cloud trigger
-        } catch (localErr) {
-          console.warn('Local extraction failed, falling back to cloud trigger:', localErr);
-          toast.warning('Local extraction failed. Attempting cloud fallback...');
-        }
-      }
 
       const invoiceData = {
         status: 'extracting',
@@ -174,10 +165,31 @@ export default function InvoiceUploader({ open, onOpenChange, onInvoiceExtracted
         total_amount: 0,
       };
 
-      onInvoiceExtracted(invoiceData);
+      if (draftInvoice?.id && onFinalizeUploadDraft) {
+        await onFinalizeUploadDraft(draftInvoice.id, invoiceData);
+      } else {
+        onInvoiceExtracted(invoiceData);
+      }
       onOpenChange(false);
       toast.success('Invoice uploaded. Extraction is running in the background.');
     } catch (error) {
+      if (uploadedFilePath) {
+        const { error: removeError } = await supabase.storage
+          .from('invoices')
+          .remove([uploadedFilePath]);
+        if (removeError) {
+          console.error('Failed to remove invoice file after DB update failure:', removeError);
+        }
+      }
+
+      if (draftInvoice?.id && onUploadDraftFailed) {
+        try {
+          await onUploadDraftFailed(draftInvoice.id, error);
+        } catch (draftError) {
+          console.error('Failed to mark invoice upload draft as failed:', draftError);
+        }
+      }
+
       toast.error('Error uploading invoice: ' + (error.message || 'Unknown error'));
       console.error('Invoice upload error:', error);
     } finally {

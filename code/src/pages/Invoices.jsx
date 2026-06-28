@@ -98,6 +98,7 @@ function InlineLoader({ label = 'Loading...' }) {
 }
 
 const statusColors = {
+  uploading: 'bg-resend-blue/10 text-resend-blue',
   extracting: 'bg-resend-purple/10 text-resend-purple',
   extract_failed: 'bg-resend-red/10 text-resend-red',
   manual_review_required: 'bg-resend-orange/10 text-resend-orange',
@@ -132,6 +133,7 @@ const intakeMethods = [
 const INVOICE_ROW_HEIGHT = 76;
 const INVOICE_TABLE_VIEWPORT_HEIGHT = 684;
 const INVOICE_ROW_OVERSCAN = 8;
+const IN_FLIGHT_INVOICE_STATUSES = new Set(['uploading', 'extracting']);
 
 const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems.map(item => ({
   id: item.id || null,
@@ -269,8 +271,8 @@ export default function Invoices() {
     refetchInterval: (query) => {
       const data = query?.state?.data;
       if (!data) return false;
-      const isExtracting = Array.isArray(data) ? data.some(i => i.status === 'extracting') : false;
-      return isExtracting ? 1000 : false;
+      const hasInFlightInvoice = Array.isArray(data) ? data.some(i => IN_FLIGHT_INVOICE_STATUSES.has(i.status)) : false;
+      return hasInFlightInvoice ? 1000 : false;
     }
   });
 
@@ -329,10 +331,10 @@ export default function Invoices() {
 
   useEffect(() => {
     if (previousInvoicesRef.current.length > 0 && invoices.length > 0) {
-      const previouslyExtracting = previousInvoicesRef.current.filter(i => i.status === 'extracting');
-      for (const prev of previouslyExtracting) {
+      const previouslyInFlight = previousInvoicesRef.current.filter(i => IN_FLIGHT_INVOICE_STATUSES.has(i.status));
+      for (const prev of previouslyInFlight) {
         const current = invoices.find(i => i.id === prev.id);
-        if (current && current.status !== 'extracting') {
+        if (current && !IN_FLIGHT_INVOICE_STATUSES.has(current.status)) {
           if (['pending_approval', 'pending_review', 'validated', 'processed'].includes(current.status)) {
             toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
             setIsMinimized(false);
@@ -457,6 +459,89 @@ export default function Invoices() {
       toast.success('Invoice saved successfully');
     },
   });
+
+  const upsertInvoiceInDashboardCache = useCallback((updatedInvoice) => {
+    if (!updatedInvoice?.id) return;
+    queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
+      if (!oldData) return [updatedInvoice];
+      const exists = oldData.some(inv => inv.id === updatedInvoice.id);
+      if (exists) return oldData.map(inv => inv.id === updatedInvoice.id ? { ...inv, ...updatedInvoice } : inv);
+      return [updatedInvoice, ...oldData];
+    });
+  }, [organization?.id, queryClient]);
+
+  const handleCreateUploadDraft = useCallback(async ({ source, fileType, fileName }) => {
+    const draftPayload = sanitizeInvoiceData({
+      status: 'uploading',
+      ap_status: 'processing',
+      payment_status: 'unpaid',
+      source,
+      file_type: fileType,
+      vendor_name: 'Uploading...',
+      invoice_number: `UPLOAD-${Date.now()}`,
+      total_amount: 0,
+      validation_results: {
+        upload_state: 'pending_storage',
+        original_file_name: fileName,
+      },
+    });
+
+    const draftInvoice = await api.financial.saveInvoice({
+      invoice: draftPayload,
+      lineItems: [],
+    });
+
+    upsertInvoiceInDashboardCache(draftInvoice);
+    return draftInvoice;
+  }, [sanitizeInvoiceData, upsertInvoiceInDashboardCache]);
+
+  const handleFinalizeUploadDraft = useCallback(async (invoiceId, data) => {
+    const lineItems = data.line_items || [];
+    const cleaned = sanitizeInvoiceData({
+      ...data,
+      validation_results: {
+        ...(data.validation_results || {}),
+        upload_state: 'stored',
+      },
+    });
+
+    const invoice = await api.financial.saveInvoice({
+      invoiceId,
+      invoice: cleaned,
+      lineItems: mapInvoiceLineItemsForRpc(lineItems),
+    });
+    const updatedInvoice = { ...invoice, line_items: lineItems };
+
+    upsertInvoiceInDashboardCache(updatedInvoice);
+    queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+    setEditingInvoice(updatedInvoice);
+    setEditorOpen(true);
+    if (updatedInvoice.status === 'extracting') {
+      api.financial.startInvoiceExtraction(updatedInvoice.id).catch((error) => {
+        console.error('Failed to queue invoice extraction:', error);
+        toast.error('Invoice saved, but extraction did not queue. Please refresh and try again.');
+      });
+    }
+    return updatedInvoice;
+  }, [organization?.id, queryClient, sanitizeInvoiceData, upsertInvoiceInDashboardCache]);
+
+  const handleUploadDraftFailed = useCallback(async (invoiceId, error) => {
+    const failureInvoice = await api.financial.saveInvoice({
+      invoiceId,
+      invoice: {
+        status: 'extract_failed',
+        ap_status: 'action_required',
+        validation_results: {
+          upload_state: 'failed',
+          error: error?.message || 'Invoice upload failed',
+        },
+      },
+    });
+
+    upsertInvoiceInDashboardCache(failureInvoice);
+    queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
+    return failureInvoice;
+  }, [organization?.id, queryClient, upsertInvoiceInDashboardCache]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -1183,6 +1268,8 @@ export default function Invoices() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="uploading">Uploading</SelectItem>
+                <SelectItem value="extracting">Extracting</SelectItem>
                 <SelectItem value="pending_review">Pending Review</SelectItem>
                 <SelectItem value="pending_match_approval">Match Approval</SelectItem>
                 <SelectItem value="validated">Validated</SelectItem>
@@ -1527,6 +1614,9 @@ export default function Invoices() {
             open={uploadOpen}
             onOpenChange={setUploadOpen}
             onInvoiceExtracted={handleInvoiceExtracted}
+            onCreateUploadDraft={handleCreateUploadDraft}
+            onFinalizeUploadDraft={handleFinalizeUploadDraft}
+            onUploadDraftFailed={handleUploadDraftFailed}
             organizationId={organization?.id}
           />
         </React.Suspense>
