@@ -19,9 +19,10 @@ serve(async (req) => {
     )
 
     // Parse the request body
-    const { org_id, sales_data } = await req.json()
-    if (!org_id || !sales_data) {
-      throw new Error('Missing org_id or sales_data in request payload')
+    const { org_id, organization_id, sales_data } = await req.json()
+    const targetOrganizationId = organization_id || org_id
+    if (!targetOrganizationId || !sales_data) {
+      throw new Error('Missing organization_id or sales_data in request payload')
     }
 
     // 1. Fetch current inventory levels
@@ -30,7 +31,7 @@ serve(async (req) => {
     // Note: This logic replaces the heavy PL/pgSQL calculate_theoretical_depletion function
     
     // Example logic execution
-    console.log(`Processing theoretical depletion for org ${org_id} with ${sales_data.length} sales items.`)
+    console.log(`Processing theoretical depletion for organization ${targetOrganizationId} with ${sales_data.length} sales items.`)
     
     // Return success
     return new Response(

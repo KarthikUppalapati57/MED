@@ -47,7 +47,7 @@ export default function PlatformInvoices() {
     try {
       const { data, error } = await supabase.functions.invoke('create-stripe-invoice', {
         body: {
-          org_id: org.id,
+          organization_id: org.id,
           description: `Platform Billing Invoice for ${plan.name} Tier`
         }
       });

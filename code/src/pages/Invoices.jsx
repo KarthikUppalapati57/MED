@@ -306,9 +306,15 @@ export default function Invoices() {
   }, [searchParams]);
 
   useEffect(() => {
-    const targetSchema = organization ? `tenant_${organization.slug.replace(/[^a-z0-9_]/gi, '_')}_${organization.id.substring(0, 8)}` : 'public';
-    const channel = supabase.channel(`invoices-realtime-${targetSchema}`)
-      .on('postgres_changes', { event: '*', schema: targetSchema, table: 'invoices' }, (payload) => {
+    if (!organization?.id) return undefined;
+
+    const channel = supabase.channel(`invoices-realtime-${organization.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'invoices',
+        filter: `organization_id=eq.${organization.id}`,
+      }, (payload) => {
         queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
           if (!oldData) return [];
           const invoice = payload.new;

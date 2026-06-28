@@ -8,9 +8,6 @@ export const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function resolveInvoiceWriteSchema() {
-  return 'public';
-}
 
 function parseMoney(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -344,7 +341,7 @@ async function extractWithGeminiVision(fileBlob) {
   return { data: JSON.parse(cleanJsonStr), rawText: responseText };
 }
 // Background processing function
-async function processInvoiceBackground(record, schemaName, supabaseClient) {
+async function processInvoiceBackground(record, supabaseClient) {
   try {
     console.log(`Starting background extraction for ${record.id} in public schema...`);
 
@@ -373,7 +370,7 @@ async function processInvoiceBackground(record, schemaName, supabaseClient) {
     record = claimedInvoice;
     
     await supabaseClient.from('debug_logs').insert({
-      log_data: { point: 'start', invoice_id: record.id, schemaName: 'public', filePath: record.file_url }
+      log_data: { point: 'start', invoice_id: record.id, schema: 'public', filePath: record.file_url }
     });
 
     // 1. Securely fetch file from private bucket using service role client
@@ -546,7 +543,6 @@ serve(async (req) => {
     const payload = await req.json()
     const { invoice_id, action, type, table, record, old_record } = payload
 
-    const targetSchema = resolveInvoiceWriteSchema();
 
     // 1. Direct Call logic
     if (action && invoice_id) {
@@ -591,7 +587,7 @@ serve(async (req) => {
 
       // We must AWAIT this! Deno Edge Functions terminate when the response is sent.
       // pg_net handles the timeout asynchronously from the database side.
-      await processInvoiceBackground(record, targetSchema, processingClient);
+      await processInvoiceBackground(record, processingClient);
       
       return new Response(JSON.stringify({ success: true, message: 'Processing complete' }), { headers: corsHeaders, status: 200 })
     } 

@@ -1062,7 +1062,7 @@ export default function UserManagement() {
                                             email: member.email || member.profiles?.email,
                                             full_name: member.full_name || member.profiles?.full_name,
                                             role: member.role || member.profiles?.role,
-                                            org_id: activeOrgId,
+                                            organization_id: activeOrgId,
                                             resend: true
                                           }
                                         });

@@ -713,16 +713,16 @@ export const AuthProvider = ({ children }) => {
   const role = userProfile?.role || cachedProfile?.role || user?.app_metadata?.role || null;
   const isAuthenticated = !!user;
 
- // Permission helpers new role hierarchy with backward-compatible aliases
+ // Role action helpers with backward-compatible aliases
   const hasPermission = useCallback((action) => {
-    const permissions = {
+    const roleActionMap = {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
       branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       org_owner:        ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
       platform_admin:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform', 'manage_subscriptions', 'manage_accounting'],
     };
-    return (permissions[role] || []).includes(action);
+    return (roleActionMap[role] || []).includes(action);
   }, [role]);
 
   const switchContext = useCallback(async (type, entity) => {

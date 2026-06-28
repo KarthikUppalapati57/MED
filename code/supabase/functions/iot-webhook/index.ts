@@ -14,11 +14,12 @@ serve(async (req) => {
     )
 
     const payload = await req.json()
-    // Expected generic payload: { org_id, location_id, sensor_id, sensor_name, temperature, unit }
+    // Expected generic payload: { organization_id, location_id, sensor_id, sensor_name, temperature, unit }
     
-    const { org_id, location_id, sensor_id, sensor_name, temperature, unit } = payload;
+    const { org_id, organization_id, location_id, sensor_id, sensor_name, temperature, unit } = payload;
+    const targetOrganizationId = organization_id || org_id;
 
-    if (!org_id || !sensor_id || temperature === undefined) {
+    if (!targetOrganizationId || !sensor_id || temperature === undefined) {
       throw new Error("Missing required payload fields");
     }
 
@@ -29,7 +30,7 @@ serve(async (req) => {
     if (unit === 'C' && temperature > 5) isAlert = true;
 
     const { error } = await supabaseClient.from('temperature_logs').insert({
-      organization_id: org_id,
+      organization_id: targetOrganizationId,
       location_id: location_id,
       sensor_id: sensor_id,
       sensor_name: sensor_name || 'Unknown Sensor',
@@ -43,7 +44,7 @@ serve(async (req) => {
     if (isAlert) {
       // Create a notification for managers
       await supabaseClient.from('notifications').insert({
-        organization_id: org_id,
+        organization_id: targetOrganizationId,
         type: 'alert',
         title: 'Temperature Danger Zone',
         message: `${sensor_name} reported ${temperature}°${unit}`,

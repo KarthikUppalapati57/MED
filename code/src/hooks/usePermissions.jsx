@@ -2,12 +2,12 @@ import { useAuth } from '@/lib/AuthContext';
 import React, { useMemo } from 'react';
 
 /**
- * Custom hook for role-based permission checks.
+ * Custom hook for role-based capability checks.
  * 
  * Roles hierarchy:
  *   ground_staff < location_manager < branch_manager < org_owner < platform_admin
  * 
- * Permissions:
+ * Capabilities:
  *   ground_staff:     View data, upload invoices
  *   location_manager: Edit, approve invoices/payments, manage local inventory
  *   branch_manager:   Manage multiple locations, access reports, manage staff
@@ -36,7 +36,7 @@ export function usePermissions() {
     userProfile,
     roleLevel: ROLE_LEVEL,
 
-    // Basic permissions
+    // Basic capabilities
     canView: true, 
     canUpload: true, 
     canCreate: currentLevel >= 1,            // location_manager+
@@ -50,7 +50,7 @@ export function usePermissions() {
     canManageSubscriptions: currentLevel >= 4, // platform_admin only
     canManageAccounting: currentLevel >= 3,  // org_owner+
 
-    // Module-specific permissions
+    // Module-specific capabilities
     canEditInventory: currentLevel >= 1,     // location_manager+
     canManageRecipes: currentLevel >= 1,     // location_manager+
     canManageOrders: currentLevel >= 1,      // location_manager+

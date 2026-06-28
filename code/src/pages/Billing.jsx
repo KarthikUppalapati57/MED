@@ -40,12 +40,12 @@ export default function Billing() {
     setSelectedPlan(plan.id);
 
     try {
-      const response = await supabase.functions.invoke('create-checkout-session', { 
-        body: { plan_id: plan.id, org_id: organization.id } 
+      const response = await supabase.functions.invoke('create-checkout-session', {
+        body: { plan_id: plan.id, organization_id: organization.id }
       });
-      
+
       if (response.error) throw response.error;
-      
+
       const { url } = response.data;
       if (url) {
         // Redirect to Stripe checkout (or simulated success URL)
@@ -88,7 +88,7 @@ export default function Billing() {
           <div className="col-span-3 py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
         ) : plans.map(plan => {
           const isCurrentPlan = organization?.plan_id === plan.id;
-          
+
           return (
             <Card key={plan.id} className={cn(
               "border-0 shadow-sm relative group overflow-hidden transition-all hover:shadow-md",
@@ -115,7 +115,7 @@ export default function Billing() {
                     </div>
                   ))}
                 </div>
-                <Button 
+                <Button
                   className={cn(
                     "w-full rounded-xl mt-auto",
                     isCurrentPlan ? "bg-secondary text-foreground hover:bg-secondary" : "bg-indigo-600 hover:bg-indigo-700 text-white"

@@ -42,6 +42,7 @@ serve(async (req) => {
       cancelUrl,
       plan_id,
       org_id,
+      organization_id,
     } = await req.json()
 
     const selectedPlanId = planId || plan_id
@@ -57,7 +58,7 @@ serve(async (req) => {
     if (profile.business_verification_status !== 'verified') throw new Error('Business verification is required before checkout')
     if (!profile.payment_verified) throw new Error('Payment method verification is required before checkout')
 
-    const organizationId = org_id || profile.organization_id
+    const organizationId = organization_id || org_id || profile.organization_id
     if (!organizationId) throw new Error('Organization setup must be completed before checkout')
 
     const { data: plan, error: planError } = await adminClient

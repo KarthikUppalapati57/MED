@@ -35,14 +35,15 @@ serve(async (req) => {
       throw new Error('Only platform admins can trigger invoices')
     }
 
-    const { org_id, description } = await req.json()
-    if (!org_id) throw new Error('Missing org_id')
+    const { org_id, organization_id, description } = await req.json()
+    const targetOrganizationId = organization_id || org_id
+    if (!targetOrganizationId) throw new Error('Missing organization_id')
 
     // Get organization details
     const { data: org, error: orgError } = await supabaseClient
       .from('organizations')
       .select('name, primary_contact_email, plan_id, stripe_customer_id')
-      .eq('id', org_id)
+      .eq('id', targetOrganizationId)
       .single()
 
     if (orgError || !org) throw new Error('Organization not found')
@@ -51,7 +52,7 @@ serve(async (req) => {
     if (!customerId) {
       customerId = await createOrRetrieveCustomer({
         email: org.primary_contact_email || '',
-        uuid: org_id
+        uuid: targetOrganizationId
       })
     }
 
