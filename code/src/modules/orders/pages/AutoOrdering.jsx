@@ -189,7 +189,7 @@ export default function AutoOrdering() {
     queryKey: ['order-invoice-approval', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', {
       limit: 300,
-      select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, purchase_order, purchase_order_id, matched_order_id',
+      select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, purchase_order_number, purchase_order_id, matched_order_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsInvoices,
@@ -550,7 +550,7 @@ export default function AutoOrdering() {
       const order = orders.find((item) =>
         item.id === invoice.purchase_order_id ||
         item.id === invoice.matched_order_id ||
-        item.order_number === invoice.purchase_order ||
+        item.order_number === invoice.purchase_order_number ||
         (
           vendorName &&
           item.vendor_name?.toLowerCase() === vendorName &&

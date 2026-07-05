@@ -2,8 +2,16 @@
 -- This migration removes existing invoice data and creates a normalized invoice_line_items table.
 
 -- 1. Remove existing invoice data (and cascading dependencies like payments) to start fresh.
-TRUNCATE TABLE public.invoices CASCADE;
-
+-- Guard the destructive reset path so migration replay cannot wipe a populated database.
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.invoices) = 0 THEN
+    TRUNCATE TABLE public.invoices CASCADE;
+  ELSE
+    RAISE NOTICE '026: invoices table not empty (% rows); skipping TRUNCATE to protect data',
+      (SELECT count(*) FROM public.invoices);
+  END IF;
+END $$;
 -- 2. Create the invoice_line_items table
 CREATE TABLE IF NOT EXISTS public.invoice_line_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

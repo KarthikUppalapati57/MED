@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.webhook-dispatcher]
 verify_jwt = false
 
+[functions.vendor-banking-submit]
+verify_jwt = false
+
 [functions.pos-webhook]
 verify_jwt = false
 

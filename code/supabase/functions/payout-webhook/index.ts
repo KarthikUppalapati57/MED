@@ -66,10 +66,17 @@ serve(async (req) => {
       // Vendor Onboarding status updates
       const newStatus = topic === 'customer_verified' ? 'verified' : 'suspended'
       
-      await supabase
-        .from('vendors')
-        .update({ dwolla_onboarding_status: newStatus })
-        .eq('dwolla_customer_url', resourceUrl)
+      const { error: providerLinkError } = await supabase
+        .from('vendor_payment_provider_links')
+        .update({ provider_status: newStatus, updated_at: new Date().toISOString() })
+        .eq('provider', 'dwolla')
+        .eq('provider_customer_ref', resourceUrl)
+        .is('deleted_at', null)
+
+      if (providerLinkError) {
+        console.error('Failed to update Dwolla provider link status:', providerLinkError)
+        return new Response('OK', { status: 200 })
+      }
     }
 
     return new Response(JSON.stringify({ received: true }), {

@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
 import { Client } from 'npm:dwolla-v2'
@@ -29,6 +29,64 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Preflight Dwolla routing before mutating invoice/payment state.
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('id, total_amount, paid_amount, vendor_id, payment_account_id')
+      .eq('id', invoice_id)
+      .single()
+
+    if (invoiceError || !invoice?.vendor_id) {
+      return new Response(JSON.stringify({ error: 'Invoice not found or missing vendor routing information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 })
+    }
+
+    const finalPaymentAccountId = payment_account_id || invoice.payment_account_id
+    if (!finalPaymentAccountId) {
+      return new Response(JSON.stringify({ error: 'A payment account is required to release funds.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
+    const { data: paymentAccount, error: accountError } = await serviceSupabase
+      .from('payment_accounts')
+      .select('dwolla_funding_source_url')
+      .eq('id', finalPaymentAccountId)
+      .maybeSingle()
+
+    if (accountError) {
+      console.error('Payment account lookup error:', accountError)
+      return new Response(JSON.stringify({ error: 'Unable to resolve Dwolla source funding information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
+    }
+
+    if (!paymentAccount?.dwolla_funding_source_url) {
+      return new Response(JSON.stringify({ error: 'Missing Dwolla source funding information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
+    const { data: dwollaLink, error: linkError } = await serviceSupabase
+      .rpc('get_vendor_provider_link', {
+        p_vendor_id: invoice.vendor_id,
+        p_provider: 'dwolla'
+      })
+      .maybeSingle()
+
+    if (linkError) {
+      console.error('Dwolla provider link lookup error:', linkError)
+      return new Response(JSON.stringify({ error: 'Unable to resolve Dwolla vendor routing information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
+    }
+
+    // ponytail: fail closed before release_invoice_funds mutates payment state.
+    // Upgrade path: when Dwolla registration is real, guide users to re-onboard.
+    if (!dwollaLink?.provider_customer_ref) {
+       return new Response(JSON.stringify({ error: 'Missing Dwolla vendor provider link.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
+    if (dwollaLink.provider_status !== 'verified') {
+       return new Response(JSON.stringify({ error: 'Vendor must complete Dwolla onboarding first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
     // 1. Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Owner).
     const { data: releaseData, error: releaseError } = await supabase.rpc('release_invoice_funds', {
       p_invoice_id: invoice_id,
@@ -40,29 +98,9 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: releaseError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
     }
 
-    // 2. Fetch required details to initiate Dwolla Transfer
-    // (e.g. source funding URL, destination customer URL, amount)
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select(`
-        id, total_amount, paid_amount,
-        vendor:vendor_id ( dwolla_customer_url, dwolla_onboarding_status ),
-        payment_account:payment_account_id ( dwolla_funding_source_url )
-      `)
-      .eq('id', invoice_id)
-      .single()
-
-    if (!invoice || !invoice.vendor?.dwolla_customer_url || !invoice.payment_account?.dwolla_funding_source_url) {
-       return new Response(JSON.stringify({ error: 'Missing Dwolla routing information for vendor or source account.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
-
-    if (invoice.vendor.dwolla_onboarding_status !== 'verified') {
-       return new Response(JSON.stringify({ error: 'Vendor must complete Dwolla onboarding first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
-
     const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0);
 
-    // 3. Initiate Dwolla Transfer
+    // 2. Initiate Dwolla Transfer
     const dwollaClient = new Client({
       key: Deno.env.get('DWOLLA_KEY') ?? '',
       secret: Deno.env.get('DWOLLA_SECRET') ?? '',
@@ -71,8 +109,8 @@ serve(async (req) => {
 
     const requestBody = {
       _links: {
-        source: { href: invoice.payment_account.dwolla_funding_source_url },
-        destination: { href: invoice.vendor.dwolla_customer_url }
+        source: { href: paymentAccount.dwolla_funding_source_url },
+        destination: { href: dwollaLink.provider_customer_ref }
       },
       amount: { currency: "USD", value: transferAmount.toFixed(2) },
       metadata: { invoiceId: invoice_id }
@@ -81,13 +119,8 @@ serve(async (req) => {
     const transferResponse = await dwollaClient.post('transfers', requestBody);
     const transferUrl = transferResponse.headers.get('location');
 
-    // 4. Update the payment record with the Dwolla transfer URL
+    // 3. Update the payment record with the Dwolla transfer URL
     // We use a service role client to bypass RLS for this internal system update
-    const serviceSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
     await serviceSupabase
       .from('payments')
       .update({ dwolla_transfer_url: transferUrl })
@@ -106,5 +139,3 @@ serve(async (req) => {
     })
   }
 })
-
-

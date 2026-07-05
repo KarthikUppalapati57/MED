@@ -612,6 +612,10 @@ serve(async (req) => {
             
             if (vendor?.autopay_enabled) {
                console.log(`AutoPay enabled for vendor ${vendor.id}, scheduling payment...`);
+               const paymentMethod = vendor.default_payment_method === 'check'
+                  ? 'cheque'
+                  : (vendor.default_payment_method || 'bank_transfer');
+               
                const { error: paymentError } = await supabaseClient
                   .from('payments')
                   .insert({
@@ -620,14 +624,26 @@ serve(async (req) => {
                      vendor_id: vendor.id,
                      invoice_id: record.id,
                      amount: record.total_amount,
-                     status: 'scheduled',
-                     payment_method: vendor.default_payment_method || 'ach',
+                     // ponytail: scheduledness lives on invoices/scheduled_payments.
+                     // payments.status has no sanctioned 'scheduled' state; pending is the queued row state.
+                     status: 'pending',
+                     // ponytail: normalize vendor default tokens to payments.payment_method vocabulary.
+                     // Ceiling: supports current vendor defaults only; add mappings here if vendor methods grow.
+                     payment_method: paymentMethod,
                      payment_date: record.due_date || new Date().toISOString().split('T')[0]
                   });
                
                if (!paymentError) {
                   await supabaseClient.from('invoices')
-                     .update({ payment_status: 'scheduled' })
+                     .update({
+                        // ponytail: mirror schedule_invoice_payment's invoice read-channel markers.
+                        // Ceiling: this branch cannot set payment_account_id because autopay has no account argument here.
+                        // Upgrade path: factor a shared mark-invoice-scheduled helper if the scheduled shape changes.
+                        scheduled_payment_date: record.due_date || new Date().toISOString().split('T')[0],
+                        status: record.status === 'approved' ? 'scheduled' : record.status,
+                        ap_status: record.ap_status === 'approved' ? 'scheduled' : record.ap_status,
+                        updated_at: new Date().toISOString()
+                     })
                      .eq('id', record.id);
                } else {
                   console.error('Failed to create AutoPay payment:', paymentError);
