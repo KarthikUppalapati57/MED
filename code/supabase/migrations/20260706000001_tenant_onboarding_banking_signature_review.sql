@@ -939,6 +939,7 @@ CREATE TRIGGER trg_link_onboarding_bank_to_payment_account
   AFTER UPDATE OF organization_id ON public.onboarding_payment_methods
   FOR EACH ROW EXECUTE FUNCTION public.link_onboarding_bank_to_payment_account();
 
+DROP FUNCTION IF EXISTS public.get_invite_details(text);
 CREATE OR REPLACE FUNCTION public.get_invite_details(invite_token text)
 RETURNS TABLE (
   id uuid,
@@ -977,7 +978,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_invite RECORD;
   v_user_id UUID;
@@ -1028,7 +1029,7 @@ BEGIN
     'organization_id', v_invite.organization_id
   );
 END;
-$;
+$$;
 
 REVOKE EXECUTE ON FUNCTION public.store_onboarding_bank_secret(UUID, TEXT, TEXT) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.store_onboarding_bank_secret(UUID, TEXT, TEXT) TO service_role;
