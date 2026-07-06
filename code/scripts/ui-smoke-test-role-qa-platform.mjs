@@ -201,7 +201,7 @@ async function waitForAppSettled(page) {
 async function login(page, account) {
   await page.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByPlaceholder('you@restaurant.com').fill(account.email);
-  await page.getByPlaceholder('••••••••').fill(password);
+  await page.locator('input[type="password"]').fill(password);
   await Promise.all([
     page.waitForLoadState('domcontentloaded').catch(() => {}),
     page.getByRole('button', { name: 'Sign In' }).click(),

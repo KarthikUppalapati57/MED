@@ -15,6 +15,7 @@ import RestopsLogo from '@/components/RestopsLogo';
 import { legacyRoutes as Pages, canonicalRoutes, setupRoutes, Layout, mainPage } from './router';
 import LegacyRedirectHandler from '@/lib/LegacyRedirectHandler';
 import { useUrlHierarchy } from '@/hooks/useUrlHierarchy';
+import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
 
 initGlobalErrorHandlers();
 
@@ -124,12 +125,17 @@ function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (form.password !== form.confirm) {
-      setError('Passwords do not match');
+    const passwordMatch = validatePasswordConfirmation(form.password, form.confirm);
+    if (!passwordMatch.isValid) {
+      setError(passwordMatch.message);
       return;
     }
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const passwordPolicy = validatePasswordPolicy(form.password, {
+      email: form.email,
+      fullName: form.full_name,
+    });
+    if (!passwordPolicy.isValid) {
+      setError(passwordPolicy.message);
       return;
     }
     if (!inviteInfo) {
@@ -224,16 +230,19 @@ function SignupPage() {
               <label className="block text-sm font-medium text-foreground">Password</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
               />
+              <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
             </div>
             <div className="space-y-1">
               <label className="block text-sm font-medium text-foreground">Confirm Password</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={form.confirm}
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
@@ -576,12 +585,17 @@ function UpdatePasswordPage() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (password !== confirm) {
-      setError('Passwords do not match');
+    const passwordMatch = validatePasswordConfirmation(password, confirm);
+    if (!passwordMatch.isValid) {
+      setError(passwordMatch.message);
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const passwordPolicy = validatePasswordPolicy(password, {
+      email: user?.email,
+      currentPassword: isRecovery ? '' : currentPassword,
+    });
+    if (!passwordPolicy.isValid) {
+      setError(passwordPolicy.message);
       return;
     }
 
@@ -631,6 +645,7 @@ function UpdatePasswordPage() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
@@ -645,6 +660,7 @@ function UpdatePasswordPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 pl-3 pr-10 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
@@ -663,11 +679,13 @@ function UpdatePasswordPage() {
                 )}
               </button>
             </div>
+            <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-semibold text-foreground">Confirm Password</label>
             <input
               type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"

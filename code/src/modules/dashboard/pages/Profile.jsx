@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,15 +88,20 @@ export default function Profile() {
       toast.error('Please enter a new password.');
       return;
     }
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters.');
+    const passwordMatch = validatePasswordConfirmation(password, confirmPassword);
+    if (!passwordMatch.isValid) {
+      toast.error(passwordMatch.message);
       return;
     }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match.');
+    const passwordPolicy = validatePasswordPolicy(password, {
+      email: user?.email,
+      fullName: userProfile?.full_name,
+      currentPassword,
+    });
+    if (!passwordPolicy.isValid) {
+      toast.error(passwordPolicy.message);
       return;
     }
-
     setIsSavingPassword(true);
     try {
       // Step 1: Verify current password before allowing the change
@@ -288,6 +294,7 @@ export default function Profile() {
                     <Input
                       id="currentPassword"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       placeholder="********"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
@@ -304,6 +311,7 @@ export default function Profile() {
                     <Input
                       id="newPassword"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       placeholder="********"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -318,6 +326,7 @@ export default function Profile() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -327,6 +336,7 @@ export default function Profile() {
                     <Input
                       id="confirmPassword"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       placeholder="********"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
