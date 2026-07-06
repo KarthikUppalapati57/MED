@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, ClipboardCheck, XCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -57,6 +58,7 @@ export default function PlatformOrganizations() {
   const invalidateLocations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_locations']], []), 1500);
   const invalidateUsers = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_users']], []), 1500);
   const invalidatePlans = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_plans']], []), 1500);
+  const invalidateOnboardingReviews = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_onboarding_reviews']], []), 1500);
 
   const { data: orgsData, isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['platform_organizations_paginated', page, searchTerm],
@@ -107,13 +109,45 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_org_users', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
-      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status').eq('organization_id', selectedOrgId);
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status, onboarding_status, onboarding_current_step, business_verification_status').eq('organization_id', selectedOrgId);
       if (error) throw error;
       return data;
     },
     enabled: !!selectedOrgId
   });
 
+  const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews } = useAuthQuery({
+    queryKey: ['platform_onboarding_reviews'],
+    queryFn: async () => {
+      const [verificationsResult, profilesResult, addressesResult, bankAccountsResult, signaturesResult, eventsResult, invitesResult] = await Promise.all([
+        supabase.from('business_verifications').select('*').in('verification_status', ['pending_review', 'failed', 'verified']).order('created_at', { ascending: false }).limit(100),
+        supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified').in('business_verification_status', ['pending_review', 'failed', 'verified']),
+        supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
+        supabase.from('onboarding_bank_accounts').select('id, user_id, organization_id, bank_name, account_type, account_number_last4, routing_number_last4, is_default, status, payment_account_id, created_at').order('created_at', { ascending: false }).limit(200),
+        supabase.from('tenant_payment_authorizations').select('id, user_id, organization_id, onboarding_bank_account_id, payment_account_id, signer_full_name, signer_title, consent_version, signed_at, status').order('signed_at', { ascending: false }).limit(200),
+        supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, event_data, created_at').order('created_at', { ascending: false }).limit(200),
+        supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_owner']).order('created_at', { ascending: false }).limit(100),
+      ]);
+
+      const results = [verificationsResult, profilesResult, addressesResult, bankAccountsResult, signaturesResult, eventsResult, invitesResult];
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+
+      const profilesById = new Map((profilesResult.data || []).map((profile) => [profile.id, profile]));
+      return (verificationsResult.data || []).map((verification) => {
+        const profile = profilesById.get(verification.user_id) || null;
+        return {
+          verification,
+          profile,
+          addresses: (addressesResult.data || []).filter((address) => address.user_id === verification.user_id),
+          bankAccounts: (bankAccountsResult.data || []).filter((account) => account.user_id === verification.user_id),
+          signatures: (signaturesResult.data || []).filter((signature) => signature.user_id === verification.user_id),
+          events: (eventsResult.data || []).filter((event) => event.user_id === verification.user_id).slice(0, 5),
+          invites: (invitesResult.data || []).filter((invite) => invite.email?.toLowerCase() === profile?.email?.toLowerCase()),
+        };
+      });
+    }
+  });
   const { data: plans = [] } = useAuthQuery({
     queryKey: ['platform_plans'],
     queryFn: async () => {
@@ -130,12 +164,15 @@ export default function PlatformOrganizations() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, invalidateLocations)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateUsers)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'business_verifications' }, invalidateOnboardingReviews)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'onboarding_bank_accounts' }, invalidateOnboardingReviews)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tenant_payment_authorizations' }, invalidateOnboardingReviews)
       .subscribe();
       
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [invalidateBrands, invalidateLocations, invalidateOrganizations, invalidatePlans, invalidateUsers]);
+  }, [invalidateBrands, invalidateLocations, invalidateOrganizations, invalidatePlans, invalidateUsers, invalidateOnboardingReviews]);
 
   React.useEffect(() => {
     const org = orgs.find(o => o.id === selectedOrgId);
@@ -397,7 +434,38 @@ export default function PlatformOrganizations() {
   };
 
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
+  const selectedOrgReviewItems = selectedOrgId
+    ? onboardingReviews.filter((item) => item.verification.organization_id === selectedOrgId || item.profile?.organization_id === selectedOrgId)
+    : onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
+
+  const refreshOnboardingReview = () => {
+    queryClient.invalidateQueries({ queryKey: ['platform_onboarding_reviews'] });
+    queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
+  };
+
+  const handleOnboardingAction = async (item, action) => {
+    try {
+      if (action === 'approve') {
+        const note = window.prompt('Approval note, optional') || null;
+        await api.onboarding.approveBusinessVerification({ userId: item.verification.user_id, note });
+        toast.success('Business verification approved');
+      } else if (action === 'reject') {
+        const reason = window.prompt('Reason sent to the tenant') || '';
+        if (!reason.trim()) return;
+        await api.onboarding.rejectBusinessVerification({ userId: item.verification.user_id, reason });
+        toast.success('Business verification rejected');
+      } else if (action === 'more_info') {
+        const reason = window.prompt('What information should the tenant provide?') || '';
+        if (!reason.trim()) return;
+        await api.onboarding.requestMoreInfo({ userId: item.verification.user_id, reason });
+        toast.success('More information requested');
+      }
+      refreshOnboardingReview();
+    } catch (err) {
+      toast.error(err.message || 'Could not update onboarding review');
+    }
+  };
 
   return (
     <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden bg-secondary/20 rounded-xl border border-border">
@@ -583,6 +651,7 @@ export default function PlatformOrganizations() {
                 <TabsList className="bg-card border shadow-sm p-1 rounded-xl h-auto mb-6">
                   <TabsTrigger value="hierarchy" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Brand & Location Hierarchy</TabsTrigger>
                   <TabsTrigger value="directory" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">User Directory</TabsTrigger>
+                  <TabsTrigger value="onboarding" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Onboarding Review</TabsTrigger>
                   <TabsTrigger value="billing" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Billing & Plan</TabsTrigger>
                   <TabsTrigger value="settings" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Configuration</TabsTrigger>
                 </TabsList>
@@ -724,6 +793,105 @@ export default function PlatformOrganizations() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="onboarding" className="mt-0 space-y-4">
+                  {isLoadingOnboardingReviews ? (
+                    <Card className="border-0 shadow-sm bg-card">
+                      <CardContent className="py-10 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-3 h-5 w-5 animate-spin" /> Loading onboarding reviews...</CardContent>
+                    </Card>
+                  ) : selectedOrgReviewItems.length === 0 ? (
+                    <Card className="border-0 shadow-sm bg-card">
+                      <CardContent className="py-12 text-center">
+                        <ClipboardCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
+                        <p className="font-bold text-foreground">No onboarding reviews for this scope</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Pending and failed business verification items will appear here.</p>
+                      </CardContent>
+                    </Card>
+                  ) : selectedOrgReviewItems.map((item) => {
+                    const verification = item.verification;
+                    const statusTone = verification.verification_status === 'failed' ? 'bg-red-50 text-red-700 border-red-100' : verification.verification_status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100';
+                    return (
+                      <Card key={verification.id} className="border-0 shadow-sm bg-card overflow-hidden">
+                        <CardHeader className="border-b border-border/50 bg-secondary/20">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <CardTitle className="text-base flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-primary" /> {item.profile?.full_name || verification.legal_business_name || 'Pending tenant'}</CardTitle>
+                              <p className="mt-1 text-xs text-muted-foreground">{item.profile?.email || verification.business_email || 'No email'} | Step: {item.profile?.onboarding_current_step || 'business_verification'}</p>
+                            </div>
+                            <Badge variant="outline" className={`w-fit text-[10px] font-bold uppercase ${statusTone}`}>{verification.verification_status}</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-5 p-5">
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Trust score</p>
+                              <p className="mt-1 text-lg font-black text-foreground">{verification.trust_score ?? 'N/A'}</p>
+                            </div>
+                            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Bank auth</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{item.bankAccounts.some((account) => ['authorized', 'verified'].includes(account.status)) ? 'Complete' : 'Missing'}</p>
+                            </div>
+                            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Signature</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{item.signatures.some((signature) => signature.status === 'active') ? 'Captured' : 'Missing'}</p>
+                            </div>
+                            <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Payment</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.payment_verified ? 'Verified' : 'Not verified'}</p>
+                            </div>
+                          </div>
+
+                          {(verification.rejection_reason || verification.metadata?.review_reason) && (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                              <AlertTriangle className="mr-2 inline h-4 w-4" /> {verification.rejection_reason || verification.metadata?.review_reason}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                            <div>
+                              <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Addresses</p>
+                              <div className="space-y-2 text-xs text-muted-foreground">
+                                {item.addresses.length === 0 ? <p>No addresses linked yet.</p> : item.addresses.map((address) => (
+                                  <div key={address.id} className="rounded-lg border border-border bg-secondary/20 p-2">
+                                    <p className="font-bold text-foreground">{address.address_type}</p>
+                                    <p>{[address.line1, address.line2, address.city, address.state, address.postal_code].filter(Boolean).join(', ')}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Bank accounts</p>
+                              <div className="space-y-2 text-xs text-muted-foreground">
+                                {item.bankAccounts.length === 0 ? <p>No bank account collected.</p> : item.bankAccounts.map((account) => (
+                                  <div key={account.id} className="rounded-lg border border-border bg-secondary/20 p-2">
+                                    <p className="font-bold text-foreground">{account.bank_name} ****{account.account_number_last4}</p>
+                                    <p>{account.account_type} | {account.status} | routing ****{account.routing_number_last4}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Latest events</p>
+                              <div className="space-y-2 text-xs text-muted-foreground">
+                                {item.events.length === 0 ? <p>No onboarding events yet.</p> : item.events.map((event) => (
+                                  <div key={event.id} className="rounded-lg border border-border bg-secondary/20 p-2">
+                                    <p className="font-bold text-foreground">{event.step_key} | {event.event_type}</p>
+                                    <p>{new Date(event.created_at).toLocaleString()}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                            <Button size="sm" variant="outline" onClick={() => handleOnboardingAction(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
+                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleOnboardingAction(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                            <Button size="sm" onClick={() => handleOnboardingAction(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </TabsContent>
                  <TabsContent value="settings" className="mt-0">
                    <Card className="border-0 shadow-sm bg-card">
                      <CardHeader>
@@ -1114,3 +1282,6 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
+
+

@@ -481,6 +481,85 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    listOnboardingBankAccounts: async () => {
+      const { data, error } = await supabase
+        .from('onboarding_bank_accounts')
+        .select('id, bank_name, account_holder_name, account_type, nickname, routing_number_last4, account_number_last4, billing_address_source, is_default, status, created_at')
+        .neq('status', 'inactive')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    submitBankAccount: async (payload) => {
+      const { data, error } = await supabase.rpc('submit_onboarding_bank_account', {
+        p_payload: payload,
+      });
+      if (error) throw error;
+      return data;
+    },
+    setDefaultBankAccount: async (bankAccountId) => {
+      const { data, error } = await supabase.rpc('set_default_onboarding_bank_account', {
+        p_bank_account_id: bankAccountId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    capturePaymentSignature: async ({
+      bankAccountId,
+      signerFullName,
+      signerTitle = '',
+      consentVersion,
+      consentText,
+      signatureSha256,
+      signaturePayload = {},
+      signatureStoragePath = null,
+      userAgent = null,
+    }) => {
+      const { data, error } = await supabase.rpc('capture_tenant_payment_signature', {
+        p_bank_account_id: bankAccountId,
+        p_signer_full_name: signerFullName,
+        p_signer_title: signerTitle,
+        p_consent_version: consentVersion,
+        p_consent_text: consentText,
+        p_signature_sha256: signatureSha256,
+        p_signature_payload: signaturePayload,
+        p_signature_storage_path: signatureStoragePath,
+        p_user_agent: userAgent,
+      });
+      if (error) throw error;
+      return data;
+    },
+    approveBusinessVerification: async ({ userId, note = null }) => {
+      const { data, error } = await supabase.rpc('approve_business_verification', {
+        p_user_id: userId,
+        p_note: note,
+      });
+      if (error) throw error;
+      return data;
+    },
+    rejectBusinessVerification: async ({ userId, reason }) => {
+      const { data, error } = await supabase.rpc('reject_business_verification', {
+        p_user_id: userId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return data;
+    },
+    requestMoreInfo: async ({ userId, reason }) => {
+      const { data, error } = await supabase.rpc('request_onboarding_more_info', {
+        p_user_id: userId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return data;
+    },
+    reissueOwnerInvitation: async (invitationId) => {
+      const { data, error } = await supabase.rpc('reissue_owner_invitation', {
+        p_invitation_id: invitationId,
+      });
+      if (error) throw error;
+      return data;
+    },
     applyCoupon: async ({ code, planId = null }) => {
       const { data, error } = await supabase.rpc('apply_onboarding_coupon', {
         p_code: code,
@@ -703,6 +782,7 @@ export const api = {
     }
   }
 };
+
 
 
 

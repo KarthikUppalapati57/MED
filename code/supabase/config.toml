@@ -86,4 +86,6 @@ entrypoint = "./functions/sync-delivery-menus/index.ts"
 
 [db.seed]
 enabled = false
+[functions.onboarding-expiry-monitor]
+verify_jwt = false
 
