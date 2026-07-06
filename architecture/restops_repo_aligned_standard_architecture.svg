@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1400" viewBox="0 0 2000 1400">
+  <defs>
+    <style>
+      .page{fill:#f6f9fd}
+      .top{fill:#073b78}
+      .top2{fill:#0b559d}
+      .shared{fill:#eef7ff;stroke:#0759ad;stroke-width:2.3}
+      .tenant{fill:#effbf1;stroke:#11883a;stroke-width:2.3}
+      .card{fill:#fff;stroke:#0759ad;stroke-width:2.1;rx:13;filter:url(#shadow)}
+      .tenantCard{fill:#fff;stroke:#11883a;stroke-width:2.2;rx:13;filter:url(#shadow)}
+      .dataCard{fill:#fffaf0;stroke:#d97706;stroke-width:2.1;rx:13;filter:url(#shadow)}
+      .secCard{fill:#faf5ff;stroke:#7c3aed;stroke-width:2.1;rx:13;filter:url(#shadow)}
+      .eventCard{fill:#ecfeff;stroke:#0891b2;stroke-width:2.1;rx:13;filter:url(#shadow)}
+      .title{font:800 35px Arial,Helvetica,sans-serif;fill:#fff}
+      .subtitle{font:500 20px Arial,Helvetica,sans-serif;fill:#e7f2ff}
+      .band{font:800 28px Arial,Helvetica,sans-serif;fill:#fff}
+      .h{font:800 20px Arial,Helvetica,sans-serif;fill:#10253f}
+      .h2{font:800 17px Arial,Helvetica,sans-serif;fill:#10253f}
+      .text{font:500 15.5px Arial,Helvetica,sans-serif;fill:#1d2b3f}
+      .small{font:500 13.5px Arial,Helvetica,sans-serif;fill:#43546a}
+      .tiny{font:500 11.5px Arial,Helvetica,sans-serif;fill:#526174}
+      .mono{font:700 12.5px Consolas,Menlo,monospace;fill:#24364d}
+      .note{font:800 24px Arial,Helvetica,sans-serif;fill:#092f69}
+      .noteText{font:700 21px Arial,Helvetica,sans-serif;fill:#092f69}
+      .line{stroke:#0759ad;stroke-width:3;fill:none;marker-end:url(#arrow)}
+      .dash{stroke:#0759ad;stroke-width:2.2;fill:none;stroke-dasharray:7 7;marker-end:url(#arrow)}
+      .greenLine{stroke:#11883a;stroke-width:3;fill:none;marker-end:url(#greenArrow)}
+      .labelBlue{font:700 13px Arial,Helvetica,sans-serif;fill:#0759ad}
+      .labelGreen{font:700 13px Arial,Helvetica,sans-serif;fill:#11883a}
+    </style>
+    <filter id="shadow" x="-8%" y="-8%" width="116%" height="124%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#0f172a" flood-opacity=".11"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="10" refX="10.5" refY="5" orient="auto">
+      <path d="M0,0 L12,5 L0,10 Z" fill="#0759ad"/>
+    </marker>
+    <marker id="greenArrow" markerWidth="12" markerHeight="10" refX="10.5" refY="5" orient="auto">
+      <path d="M0,0 L12,5 L0,10 Z" fill="#11883a"/>
+    </marker>
+  </defs>
+
+  <rect class="page" width="2000" height="1400"/>
+
+  <rect x="18" y="15" width="1964" height="112" rx="15" class="top"/>
+  <text x="1000" y="62" text-anchor="middle" class="title">RestOps / MED Restaurant SaaS - Repo-Aligned Standard Architecture</text>
+  <text x="1000" y="100" text-anchor="middle" class="subtitle">React modules + Supabase workflows today, Azure standard target with identical isolated data plane for every client</text>
+
+  <!-- actual repo facts -->
+  <rect x="50" y="155" width="1900" height="85" rx="13" fill="#fff" stroke="#cfe0f4" stroke-width="2"/>
+  <text x="85" y="188" class="h2">Current repo facts used in this architecture:</text>
+  <text x="360" y="188" class="small">51 registered app routes in pages.config.js</text>
+  <text x="665" y="188" class="small">71 module page files under code/src/modules</text>
+  <text x="1000" y="188" class="small">40 Supabase edge functions</text>
+  <text x="1240" y="188" class="small">251 Supabase migration files</text>
+  <text x="1500" y="188" class="small">Tenant scope in apiClient: organization_id, brand_id, location_id</text>
+  <text x="85" y="220" class="tiny">Source anchors: code/src/pages.config.js, code/src/modules, code/src/lib/apiClient.js, code/supabase/functions, code/supabase/migrations</text>
+
+  <!-- shared platform -->
+  <rect x="35" y="285" width="1930" height="485" rx="14" class="shared"/>
+  <rect x="690" y="265" width="620" height="58" rx="12" class="top2"/>
+  <text x="1000" y="303" text-anchor="middle" class="band">Shared RestOps Application and Automation Plane</text>
+
+  <rect x="70" y="360" width="270" height="245" class="card"/>
+  <text x="156" y="400" class="h">React SPA</text>
+  <text x="95" y="436" class="text">• Dashboard</text>
+  <text x="95" y="464" class="text">• Invoices / Payments</text>
+  <text x="95" y="492" class="text">• Inventory / Products</text>
+  <text x="95" y="520" class="text">• AutoOrdering / Recipes</text>
+  <text x="95" y="548" class="text">• Platform Admin / Billing</text>
+  <text x="95" y="576" class="small">Vite + lazy module routing</text>
+
+  <rect x="385" y="360" width="270" height="245" class="secCard"/>
+  <text x="465" y="400" class="h">Auth Context</text>
+  <text x="410" y="436" class="text">• user profile</text>
+  <text x="410" y="464" class="text">• org / brand / location</text>
+  <text x="410" y="492" class="text">• MFA state</text>
+  <text x="410" y="520" class="text">• role permissions</text>
+  <text x="410" y="548" class="small">Maps to Entra External ID</text>
+  <text x="410" y="576" class="small">in Azure target</text>
+
+  <rect x="700" y="360" width="270" height="245" class="card"/>
+  <text x="780" y="400" class="h">Core API</text>
+  <text x="725" y="436" class="text">• apiClient entity layer</text>
+  <text x="725" y="464" class="text">• withActiveScope()</text>
+  <text x="725" y="492" class="text">• Product, Invoice, Payment</text>
+  <text x="725" y="520" class="text">• Inventory, Vendor, Recipe</text>
+  <text x="725" y="548" class="small">Target: Container Apps</text>
+  <text x="725" y="576" class="small">behind API Management</text>
+
+  <rect x="1015" y="360" width="310" height="245" class="eventCard"/>
+  <text x="1092" y="400" class="h">Event Workflows</text>
+  <text x="1040" y="436" class="text">• invoice-processing</text>
+  <text x="1040" y="464" class="text">• process-email-invoices</text>
+  <text x="1040" y="492" class="text">• pos-webhook / pos-sync</text>
+  <text x="1040" y="520" class="text">• payment webhooks</text>
+  <text x="1040" y="548" class="text">• notifications / reports</text>
+  <text x="1040" y="576" class="small">Target: Functions + Service Bus</text>
+
+  <rect x="1370" y="360" width="270" height="245" class="dataCard"/>
+  <text x="1440" y="400" class="h">Tenant Registry</text>
+  <text x="1395" y="436" class="text">• organizations</text>
+  <text x="1395" y="464" class="text">• brands / locations</text>
+  <text x="1395" y="492" class="text">• client DB endpoint</text>
+  <text x="1395" y="520" class="text">• client storage endpoint</text>
+  <text x="1395" y="548" class="small">Control-plane metadata</text>
+  <text x="1395" y="576" class="small">not invoice file storage</text>
+
+  <rect x="1685" y="360" width="245" height="245" class="card"/>
+  <text x="1750" y="400" class="h">Platform Ops</text>
+  <text x="1710" y="436" class="text">• logs / metrics</text>
+  <text x="1710" y="464" class="text">• usage metering</text>
+  <text x="1710" y="492" class="text">• budget alerts</text>
+  <text x="1710" y="520" class="text">• CI/CD pipelines</text>
+  <text x="1710" y="548" class="text">• IaC templates</text>
+  <text x="1710" y="576" class="small">One standard deploy path</text>
+
+  <path d="M340 482 L385 482" class="line"/>
+  <path d="M655 482 L700 482" class="line"/>
+  <path d="M970 482 L1015 482" class="line"/>
+  <path d="M1325 482 L1370 482" class="line"/>
+  <path d="M1640 482 L1685 482" class="line"/>
+
+  <rect x="170" y="650" width="360" height="78" rx="11" class="card"/>
+  <text x="200" y="682" class="h2">API Gateway Boundary</text>
+  <text x="200" y="710" class="small">Azure Front Door + WAF + API Management</text>
+
+  <rect x="620" y="650" width="360" height="78" rx="11" class="eventCard"/>
+  <text x="650" y="682" class="h2">Service Bus Backbone</text>
+  <text x="650" y="710" class="small">email, message, notification, workflow events</text>
+
+  <rect x="1070" y="650" width="360" height="78" rx="11" class="secCard"/>
+  <text x="1100" y="682" class="h2">Key Vault and Managed Identity</text>
+  <text x="1100" y="710" class="small">secrets, webhook keys, DB credentials, CMK</text>
+
+  <rect x="1520" y="650" width="360" height="78" rx="11" class="card"/>
+  <text x="1550" y="682" class="h2">Monitoring and Governance</text>
+  <text x="1550" y="710" class="small">App Insights, Log Analytics, cost and quota alerts</text>
+
+  <!-- tenant plane -->
+  <rect x="35" y="835" width="1930" height="400" rx="14" class="tenant"/>
+  <rect x="630" y="810" width="740" height="58" rx="12" fill="#0b7f32"/>
+  <text x="1000" y="848" text-anchor="middle" class="band">Standard Client Data Plane - Same Template For Every Restaurant Client</text>
+
+  <path d="M1505 605 C1505 750 1000 745 1000 835" class="dash"/>
+  <text x="1110" y="790" class="labelBlue">tenant registry resolves each request to its dedicated client data plane</text>
+
+  <!-- client cards -->
+  <rect x="90" y="905" width="500" height="270" class="tenantCard"/>
+  <rect x="240" y="880" width="200" height="44" rx="9" fill="#0b7f32"/>
+  <text x="340" y="909" text-anchor="middle" class="band" font-size="23">Client 1</text>
+  <text x="340" y="957" text-anchor="middle" class="h">Restaurant Client RG</text>
+  <text x="130" y="995" class="small">• Dedicated Azure Blob Storage: invoices, receipts, exports</text>
+  <text x="130" y="1025" class="small">• Dedicated PostgreSQL Flexible Server: invoices, payments, products, inventory</text>
+  <text x="130" y="1055" class="small">• Client Key Vault key / private endpoints / RBAC boundary</text>
+  <text x="130" y="1085" class="small">• Per-client DB size, blob bytes, invoice count, cost tracking</text>
+  <text x="130" y="1115" class="small">• Same schema and migrations as every other client</text>
+  <text x="130" y="1145" class="mono">rg-restops-client-{client_id}-prod</text>
+
+  <rect x="750" y="905" width="500" height="270" class="tenantCard"/>
+  <rect x="900" y="880" width="200" height="44" rx="9" fill="#0b7f32"/>
+  <text x="1000" y="909" text-anchor="middle" class="band" font-size="23">Client 2</text>
+  <text x="1000" y="957" text-anchor="middle" class="h">Identical Resource Template</text>
+  <text x="790" y="995" class="small">• Dedicated Azure Blob Storage: invoices, receipts, exports</text>
+  <text x="790" y="1025" class="small">• Dedicated PostgreSQL Flexible Server: invoices, payments, products, inventory</text>
+  <text x="790" y="1055" class="small">• Client Key Vault key / private endpoints / RBAC boundary</text>
+  <text x="790" y="1085" class="small">• Per-client DB size, blob bytes, invoice count, cost tracking</text>
+  <text x="790" y="1115" class="small">• Same schema and migrations as every other client</text>
+  <text x="790" y="1145" class="mono">rg-restops-client-{client_id}-prod</text>
+
+  <text x="1345" y="1048" text-anchor="middle" font="800 48px Arial" fill="#0b7f32">...</text>
+
+  <rect x="1410" y="905" width="500" height="270" class="tenantCard"/>
+  <rect x="1560" y="880" width="200" height="44" rx="9" fill="#0b7f32"/>
+  <text x="1660" y="909" text-anchor="middle" class="band" font-size="23">Client N</text>
+  <text x="1660" y="957" text-anchor="middle" class="h">Identical Resource Template</text>
+  <text x="1450" y="995" class="small">• Dedicated Azure Blob Storage: invoices, receipts, exports</text>
+  <text x="1450" y="1025" class="small">• Dedicated PostgreSQL Flexible Server: invoices, payments, products, inventory</text>
+  <text x="1450" y="1055" class="small">• Client Key Vault key / private endpoints / RBAC boundary</text>
+  <text x="1450" y="1085" class="small">• Per-client DB size, blob bytes, invoice count, cost tracking</text>
+  <text x="1450" y="1115" class="small">• Same schema and migrations as every other client</text>
+  <text x="1450" y="1145" class="mono">rg-restops-client-{client_id}-prod</text>
+
+  <!-- workflow band -->
+  <rect x="60" y="1260" width="1880" height="92" rx="13" fill="#fff" stroke="#0759ad" stroke-width="2.2"/>
+  <circle cx="120" cy="1306" r="34" fill="#0b559d"/>
+  <text x="120" y="1318" text-anchor="middle" font-family="Arial" font-size="35" font-weight="800" fill="#fff">✓</text>
+  <text x="180" y="1294" class="note">Repo-specific architectural point of view:</text>
+  <text x="625" y="1286" class="noteText">RestOps app modules stay shared and centrally operated; every restaurant client gets the same isolated data plane.</text>
+  <text x="625" y="1320" class="noteText">This supports high invoice volume, payment isolation, per-client usage tracking, and one repeatable architecture standard.</text>
+</svg>

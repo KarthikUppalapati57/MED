@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RestOps / MED Azure Migration Strategy and Execution Plan</title>
+<style>
+  @page { size: Letter; margin: 0.65in; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, Arial, Helvetica, sans-serif;
+    color: #172033;
+    background: #fff;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+  h1, h2, h3, h4 { color: #0b2f63; line-height: 1.15; page-break-after: avoid; }
+  h1 {
+    font-size: 25pt;
+    margin: 0 0 10px;
+    padding-bottom: 10px;
+    border-bottom: 4px solid #0b559d;
+  }
+  h2 {
+    margin-top: 26px;
+    font-size: 17pt;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 5px;
+  }
+  h3 { font-size: 13.5pt; margin-top: 18px; }
+  h4 { font-size: 11.5pt; margin-top: 14px; }
+  p { margin: 8px 0; }
+  ul { margin: 8px 0 10px 22px; padding: 0; }
+  li { margin: 4px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px;
+    page-break-inside: avoid;
+    font-size: 9.2pt;
+  }
+  th {
+    background: #0b559d;
+    color: #fff;
+    text-align: left;
+    font-weight: 700;
+    padding: 7px;
+    border: 1px solid #0b559d;
+  }
+  td {
+    padding: 7px;
+    border: 1px solid #d8e1ee;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fbff; }
+  code {
+    font-family: Consolas, Menlo, monospace;
+    color: #18324f;
+    background: #eef4fb;
+    border: 1px solid #d6e2ef;
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+  pre {
+    background: #0f172a;
+    color: #e5edf8;
+    padding: 12px;
+    border-radius: 7px;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    page-break-inside: avoid;
+    font-size: 8.5pt;
+  }
+  pre code { background: transparent; border: 0; color: inherit; padding: 0; }
+  hr {
+    border: 0;
+    border-top: 1px solid #d8e1ee;
+    margin: 18px 0;
+  }
+  body > h1:first-of-type {
+    margin-top: 0;
+  }
+  body > h1:first-of-type + h1 {
+    font-size: 20pt;
+    color: #17406f;
+    border: 0;
+    margin-top: 6px;
+  }
+  strong { color: #10253f; }
+</style>
+</head>
+<body>
+<h1>RestOps / MED Restaurant SaaS</h1><h1>Azure Migration Strategy and Execution Plan</h1><p><strong>Audience:</strong> CEO, board, product leadership, engineering leadership  </p><p><strong>Prepared by:</strong> Enterprise Architecture  </p><p><strong>Date:</strong> July 3, 2026  </p><p><strong>Decision Required:</strong> Approve target Azure architecture, migration funding, and phased execution plan.</p><hr><h2>1. Executive Summary</h2><p>RestOps / MED is currently implemented as a React/Vite restaurant SaaS platform with Supabase-backed data, storage, authentication, edge functions, realtime events, and PostgreSQL migrations. The platform already contains the core product domains required for restaurant operations: invoices, payments, inventory, products, vendors, auto-ordering, recipes, labor, SmartPrep, reporting, billing, platform administration, integrations, and AI workflows.</p><p>The proposed migration moves RestOps to a standardized Azure SaaS architecture that keeps the application/control plane shared while giving <strong>every restaurant client the same isolated data plane</strong>:</p><ul><li>Dedicated Azure Resource Group per client.</li><li>Dedicated Azure Blob Storage per client for invoices, receipts, exports, and document-heavy workloads.</li><li>Dedicated Azure PostgreSQL Flexible Server per client for invoices, payments, products, inventory, ledgers, POS data, audit logs, and operational records.</li><li>Shared Azure application plane for frontend, APIs, workers, orchestration, notifications, CI/CD, governance, and tenant routing.</li><li>Azure Service Bus event backbone for email, notifications, messages, webhooks, invoice processing, and other event-driven workflows.</li><li>Terraform-driven provisioning so every client receives the same repeatable, governed architecture.</li></ul><p>This approach is intentionally more isolated than a traditional shared-database SaaS model. It is the correct fit for the stated business requirement: predictable client isolation, heavy invoice/file upload support, per-client storage/database usage visibility, independent scaling, and enterprise credibility.</p><hr><h2>2. Current Platform Architecture</h2><h3>2.1 Current Repo Facts</h3><p>The current codebase contains:</p><table><thead><tr><th>Area</th><th>Current Repo Evidence</th></tr></thead><tbody><tr><td>Registered application routes</td><td>51 routes in <code>code/src/pages.config.js</code></td></tr><tr><td>Module page files</td><td>71 page components under <code>code/src/modules</code></td></tr><tr><td>Supabase edge functions</td><td>40 functions under <code>code/supabase/functions</code></td></tr><tr><td>Database migrations</td><td>251 SQL migration files under <code>code/supabase/migrations</code></td></tr><tr><td>Tenant scoping model</td><td><code>organization_id</code>, <code>brand_id</code>, <code>location_id</code> in <code>code/src/lib/apiClient.js</code></td></tr></tbody></table><h3>2.2 Current Application Modules</h3><p>The current React application includes these major functional domains:</p><ul><li>Dashboard and executive reporting.</li><li>Invoice intake, AI extraction, approval, allocations, and AP workflow.</li><li>Payments, payment accounts, payment verification, and billing.</li><li>Products, inventory, wastage, AvT costing, auto-ordering, and receiving workflows.</li><li>Vendors, vendor item mapping, vendor bidding, and vendor onboarding.</li><li>Recipes, menu engineering, digital menu, delivery aggregation, KDS, and online ordering.</li><li>Labor, labor schedules, payroll export, tip pooling, shift board, and time clock.</li><li>SmartPrep, AI insights, custom reports, performance, CRM, food safety, commissary.</li><li>Platform admin, platform organizations, platform users, platform plans, audit logs, and billing operations.</li><li>Integrations and developer portal.</li></ul><h3>2.3 Current Runtime Model</h3><p>Current architecture is primarily:</p><pre data-lang="text"><code>React/Vite SPA
+  -&gt; Supabase Auth
+  -&gt; Supabase PostgreSQL
+  -&gt; Supabase Storage
+  -&gt; Supabase Edge Functions
+  -&gt; External systems: Stripe, Dwolla, Checkbook, POS, SendGrid, Gemini, QuickBooks</code></pre><p>Current Supabase edge functions include:</p><ul><li>Invoice and document workflows: <code>invoice-processing</code>, <code>process-email-invoices</code>.</li><li>Payments and billing: <code>stripe-webhook</code>, <code>create-checkout-session</code>, <code>create-payment-intent</code>, <code>create-portal-session</code>, <code>process-payout</code>, <code>payout-webhook</code>, <code>process-checkbook-payout</code>, <code>checkbook-webhook</code>, <code>billing-worker</code>.</li><li>POS and operational integrations: <code>pos-webhook</code>, <code>pos-sync</code>, <code>sync-delivery-menus</code>, <code>sync-accounting</code>.</li><li>AI workflows: <code>ai-insights-chat</code>, <code>smartprep-cron</code>, <code>generate-prep-sheet</code>, <code>forecast-labor</code>, <code>evaluate-vendor-bids</code>, <code>voice-copilot-parser</code>.</li><li>Platform workflows: <code>invite-user</code>, <code>invite-client</code>, <code>vendor-onboarding</code>, <code>process-onboarding</code>, <code>webhook-dispatcher</code>, <code>team-worker</code>, <code>schedule-reports</code>, <code>dashboard-report-scheduler</code>.</li><li>Infrastructure/ops: <code>api-gateway</code>, <code>pg-backup</code>, <code>create-api-key</code>, <code>create-webhook-endpoint</code>, <code>iot-ingest</code>, <code>iot-webhook</code>, <code>notify-demo-request</code>, <code>process-marketing</code>, <code>calculate-royalties</code>.</li></ul><h3>2.4 Current Architecture Strengths</h3><ul><li>Product modules are already separated by business capability.</li><li>Tenant context exists in the application model through organization, brand, and location.</li><li>The database migration footprint is mature and extensive.</li><li>The system already has event-driven behavior through edge functions, webhooks, scheduled functions, and database triggers.</li><li>AI workflows are already identified and separated into functions/workers.</li><li>The product domain is operationally broad enough to justify an enterprise cloud architecture.</li></ul><h3>2.5 Current Architecture Limitations</h3><ul><li>Supabase-centric architecture limits control over dedicated per-client infrastructure.</li><li>File-heavy invoice workloads are not isolated per client by default.</li><li>Database-heavy clients can create noisy-neighbor risk in a shared database model.</li><li>Edge function workflows need a stronger queue, retry, dead-letter, and observability model.</li><li>Tenant routing and resource mapping must become explicit before per-client data planes can scale.</li><li>Production-grade secrets, private endpoints, cost metering, and infrastructure governance need Azure-native implementation.</li></ul><hr><h2>3. Target Azure Architecture</h2><h3>3.1 Architectural Principle</h3><p>The final design uses <strong>one standard architecture for every client</strong>.</p><p>It is not a custom design per client. It is a repeatable architecture template:</p><pre data-lang="text"><code>Shared RestOps Application / Control Plane
+  +
+Standard Per-Client Isolated Data Plane</code></pre><p>Every restaurant client receives the same standard resource pattern:</p><pre data-lang="text"><code>rg-restops-client-{client_id}-{env}
+  - Dedicated Blob Storage
+  - Dedicated PostgreSQL Flexible Server
+  - Client Key Vault references or client-specific keys
+  - Private endpoints
+  - Diagnostic settings
+  - Budget alerts
+  - Usage metering</code></pre><h3>3.2 Target Architecture Diagram</h3><p>Primary image artifact:</p><p><code>architecture/restops_repo_aligned_standard_architecture.svg</code></p><p>This diagram shows:</p><ul><li>Shared application and automation plane.</li><li>Repo-specific application modules and functions.</li><li>Event backbone.</li><li>Tenant registry.</li><li>Standard isolated client data plane.</li><li>Dedicated storage and PostgreSQL per client.</li><li>Usage/cost visibility.</li></ul><h3>3.3 Shared Application and Control Plane</h3><p>The shared platform plane is operated centrally and reused by every client.</p><table><thead><tr><th>Capability</th><th>Azure Target</th><th>Purpose</th></tr></thead><tbody><tr><td>Frontend hosting</td><td>Azure Static Web Apps</td><td>Hosts React/Vite SPA with global CDN and TLS.</td></tr><tr><td>Global ingress</td><td>Azure Front Door + WAF</td><td>Edge routing, TLS, WAF, global protection.</td></tr><tr><td>API gateway</td><td>Azure API Management</td><td>JWT validation, throttling, API policies, versioning, CORS.</td></tr><tr><td>Core application API</td><td>Azure Container Apps</td><td>Runs RestOps domain services and tenant routing logic.</td></tr><tr><td>Webhook receivers</td><td>Azure Functions</td><td>Handles Stripe, Dwolla, Checkbook, POS, IoT, and external callbacks.</td></tr><tr><td>Async workers</td><td>Azure Functions or Container Apps Jobs</td><td>Processes invoice extraction, notifications, reports, sync jobs.</td></tr><tr><td>Event backbone</td><td>Azure Service Bus</td><td>Durable event-driven workflows, fan-out, retries, DLQ.</td></tr><tr><td>Control database</td><td>Azure PostgreSQL Flexible Server or Azure SQL</td><td>Tenant registry, plans, provisioning status, routing endpoints, usage summaries.</td></tr><tr><td>Secrets</td><td>Azure Key Vault</td><td>Secrets, API keys, webhook secrets, DB credentials, encryption keys.</td></tr><tr><td>Identity</td><td>Microsoft Entra External ID</td><td>Auth, MFA, SSO, token claims, external tenant users.</td></tr><tr><td>Observability</td><td>Application Insights + Log Analytics</td><td>Traces, metrics, dependency telemetry, alerts, SLOs.</td></tr><tr><td>IaC</td><td>Terraform</td><td>Repeatable provisioning for shared and client resources.</td></tr></tbody></table><h3>3.4 Standard Per-Client Data Plane</h3><p>Each client receives an identical resource group architecture.</p><table><thead><tr><th>Component</th><th>Purpose</th></tr></thead><tbody><tr><td>Dedicated Resource Group</td><td>Logical and operational isolation per client.</td></tr><tr><td>Dedicated Blob Storage</td><td>Stores invoices, receipts, exports, reports, vendor documents.</td></tr><tr><td>Dedicated PostgreSQL Flexible Server</td><td>Stores client operational tables: invoices, payments, products, inventory, recipes, vendors, audit logs, POS, ledgers.</td></tr><tr><td>Private Endpoints</td><td>Keeps database and storage off the public internet where feasible.</td></tr><tr><td>Client-scoped Key Vault keys</td><td>Supports per-client encryption policy and enterprise requirements.</td></tr><tr><td>Diagnostic Settings</td><td>Push metrics/logs into central monitoring.</td></tr><tr><td>Budget Alert</td><td>Tracks and alerts on per-client cloud spend.</td></tr><tr><td>Usage Metering</td><td>Tracks invoice count, blob bytes, DB size, row counts, event counts, estimated cost.</td></tr></tbody></table><h3>3.5 Why This Architecture Is Appropriate</h3><p>This model solves the central business concern: some clients may upload very large numbers of invoices and generate significant database and storage growth.</p><p>With dedicated Blob Storage:</p><ul><li>File growth is isolated.</li><li>Per-client storage usage is easy to track.</li><li>Lifecycle policies can be enforced per client.</li><li>Storage cost can be reported per client.</li></ul><p>With dedicated PostgreSQL:</p><ul><li>Heavy invoice/payment tables are isolated.</li><li>Large clients cannot degrade other clients.</li><li>Backup/restore can be done per client.</li><li>Database storage and performance metrics are visible per client.</li><li>Scaling decisions are independent.</li></ul><p>With shared application/control plane:</p><ul><li>Engineering operates one application.</li><li>Clients all receive the same standard platform.</li><li>CI/CD remains centralized.</li><li>Business logic remains consistent.</li><li>No client-specific code forks are required.</li></ul><hr><h2>4. Azure Replacement Mapping</h2><table><thead><tr><th>Current Service / Pattern</th><th>Azure Replacement</th><th>Notes</th></tr></thead><tbody><tr><td>React/Vite SPA</td><td>Azure Static Web Apps</td><td>Same SPA build, Azure-hosted.</td></tr><tr><td>Supabase Auth</td><td>Microsoft Entra External ID</td><td>Enterprise-ready identity, MFA, SSO, token claims.</td></tr><tr><td>Browser-to-Supabase direct data access</td><td>API Management + Container Apps API</td><td>Moves data access behind a controlled API boundary.</td></tr><tr><td>Supabase PostgreSQL</td><td>Azure PostgreSQL Flexible Server per client</td><td>Dedicated DB server per client data plane.</td></tr><tr><td>Supabase Storage</td><td>Azure Blob Storage per client</td><td>Dedicated storage account/container strategy per client.</td></tr><tr><td>Supabase Edge Functions</td><td>Azure Functions / Container Apps workers</td><td>Webhooks, async jobs, scheduled jobs.</td></tr><tr><td>pg_net webhooks</td><td>Azure Service Bus / Event Grid</td><td>Durable event routing instead of direct DB-to-HTTP coupling.</td></tr><tr><td>pg_cron scheduled jobs</td><td>Azure Timer Functions</td><td>Scheduled SmartPrep, reports, backups, billing workers.</td></tr><tr><td>Supabase Realtime</td><td>Azure Web PubSub or SignalR</td><td>Live product/margin/notification updates if needed.</td></tr><tr><td>Supabase environment secrets</td><td>Azure Key Vault + Managed Identity</td><td>Centralized, auditable secrets management.</td></tr><tr><td>Supabase logs</td><td>Application Insights + Log Analytics</td><td>Central enterprise observability.</td></tr><tr><td>Supabase backups</td><td>PostgreSQL Flexible Server PITR/backups</td><td>Per-client restore and retention policies.</td></tr></tbody></table><hr><h2>5. Control Plane Design</h2><h3>5.1 Control Plane Purpose</h3><p>The control plane is the operational brain of the SaaS platform.</p><p>It does not hold client invoice files or client operational data. It holds metadata needed to route, provision, bill, monitor, and govern clients.</p><h3>5.2 Control Plane Responsibilities</h3><ul><li>Client onboarding and provisioning.</li><li>Tenant registry and routing.</li><li>Subscription and plan management.</li><li>User and organization metadata.</li><li>Client resource status.</li><li>Resource endpoint registry.</li><li>Usage and cost summary.</li><li>Deployment status.</li><li>Platform-level audit.</li><li>Feature flags and entitlement rules.</li></ul><h3>5.3 Tenant Registry</h3><p>Suggested core table:</p><pre data-lang="text"><code>tenant_registry
+  id
+  client_id
+  organization_id
+  tenant_slug
+  environment
+  status
+  plan_id
+  azure_subscription_id
+  resource_group_name
+  postgres_server_name
+  postgres_database_name
+  postgres_fqdn
+  storage_account_name
+  blob_endpoint
+  key_vault_name
+  service_bus_namespace
+  provisioning_state
+  schema_version
+  created_at
+  updated_at</code></pre><h3>5.4 Request Routing</h3><p>Runtime request flow:</p><pre data-lang="text"><code>User JWT
+  -&gt; API Management validates token
+  -&gt; Container Apps API extracts organization/client claim
+  -&gt; API queries tenant_registry
+  -&gt; API opens connection to that client's PostgreSQL
+  -&gt; API uses that client's Blob Storage endpoint for documents
+  -&gt; Response returns to frontend</code></pre><h3>5.5 Control Plane Database</h3><p>The control plane database should be small, highly governed, and independent from client data planes.</p><p>It should contain:</p><ul><li>Organizations.</li><li>Plans.</li><li>Provisioning jobs.</li><li>Tenant registry.</li><li>Usage daily summaries.</li><li>Billing mapping.</li><li>Feature entitlements.</li><li>Platform audit logs.</li><li>Schema migration status per client.</li></ul><hr><h2>6. Terraform and Infrastructure Automation</h2><h3>6.1 Why Terraform Is Required</h3><p>Because every client receives an identical isolated data plane, manual provisioning is not viable.</p><p>Terraform is required for:</p><ul><li>Consistent client resource groups.</li><li>Repeatable storage/database/security configuration.</li><li>Standard tags.</li><li>Cost and budget policies.</li><li>Private endpoint configuration.</li><li>Diagnostic settings.</li><li>Drift detection.</li><li>Approval workflow before production changes.</li></ul><h3>6.2 Terraform Repository Structure</h3><p>Recommended structure:</p><pre data-lang="text"><code>infra/
+  modules/
+    shared-platform/
+      static-web-app/
+      front-door-waf/
+      api-management/
+      container-apps/
+      functions/
+      service-bus/
+      key-vault/
+      monitoring/
+      control-db/
+    client-data-plane/
+      resource-group/
+      blob-storage/
+      postgres-flexible-server/
+      private-endpoints/
+      diagnostics/
+      budget-alerts/
+      key-vault-access/
+  envs/
+    dev/
+      shared.tfvars
+    staging/
+      shared.tfvars
+    prod/
+      shared.tfvars
+  tenants/
+    prod/
+      client-template.tfvars
+      client-{tenant_slug}.tfvars</code></pre><h3>6.3 Client Data Plane Terraform Module</h3><p>The client module should create:</p><ul><li>Resource group.</li><li>Storage account.</li><li>Blob containers.</li><li>PostgreSQL Flexible Server.</li><li>PostgreSQL database.</li><li>Firewall/private endpoint settings.</li><li>Diagnostic settings.</li><li>Budget alert.</li><li>Tags.</li><li>Key Vault access policies / RBAC assignments.</li><li>Outputs written back to tenant registry.</li></ul><h3>6.4 Required Terraform Outputs</h3><p>Each client provisioning run must output:</p><pre data-lang="text"><code>client_id
+resource_group_name
+storage_account_name
+blob_endpoint
+postgres_server_name
+postgres_fqdn
+postgres_database_name
+key_vault_name
+private_endpoint_ids
+diagnostic_workspace_id
+budget_id</code></pre><p>These outputs are stored in the control plane tenant registry.</p><h3>6.5 Provisioning Flow</h3><pre data-lang="text"><code>Client onboarding request
+  -&gt; Client Portal writes provisioning request
+  -&gt; Provisioning Worker validates metadata
+  -&gt; Terraform plan generated
+  -&gt; Approval gate
+  -&gt; Terraform apply
+  -&gt; Azure resources created
+  -&gt; Database migrations applied
+  -&gt; Seed baseline data
+  -&gt; Tenant registry updated
+  -&gt; Client status = active</code></pre><h3>6.6 CI/CD</h3><p>Recommended deployment pipeline:</p><pre data-lang="text"><code>Pull Request
+  -&gt; terraform fmt
+  -&gt; terraform validate
+  -&gt; security scan
+  -&gt; terraform plan
+  -&gt; architecture approval
+  -&gt; terraform apply
+  -&gt; smoke tests
+  -&gt; update tenant registry</code></pre><p>Production changes require approval.</p><hr><h2>7. Event-Driven Architecture</h2><h3>7.1 Event Backbone</h3><p>Use Azure Service Bus for business events.</p><p>Use Event Grid for Azure infrastructure events such as Blob-created events.</p><p>Do not use direct synchronous processing for webhooks, invoice extraction, emails, notifications, or report jobs.</p><h3>7.2 Event Types</h3><p>Initial event catalog:</p><table><thead><tr><th>Event</th><th>Producer</th><th>Consumers</th></tr></thead><tbody><tr><td><code>invoice.uploaded</code></td><td>API / Blob event worker</td><td>invoice extraction worker</td></tr><tr><td><code>invoice.extracted</code></td><td>invoice worker</td><td>notification worker, audit worker</td></tr><tr><td><code>invoice.approved</code></td><td>API</td><td>AP workflow, payment scheduler, notification worker</td></tr><tr><td><code>payment.initiated</code></td><td>API</td><td>payment worker, audit worker</td></tr><tr><td><code>payment.completed</code></td><td>payment webhook worker</td><td>invoice update worker, notification worker, accounting sync</td></tr><tr><td><code>pos.order.received</code></td><td>POS webhook</td><td>POS sync worker, inventory/AvT worker</td></tr><tr><td><code>product.price_changed</code></td><td>invoice/variance worker</td><td>recipe costing, margin alerts</td></tr><tr><td><code>inventory.low_stock</code></td><td>inventory workflow</td><td>notification worker, auto-ordering worker</td></tr><tr><td><code>report.requested</code></td><td>dashboard/report API</td><td>report worker</td></tr><tr><td><code>email.requested</code></td><td>application workflows</td><td>email worker</td></tr><tr><td><code>sms.requested</code></td><td>application workflows</td><td>SMS worker</td></tr><tr><td><code>webhook.delivery_requested</code></td><td>platform integrations</td><td>webhook dispatcher</td></tr></tbody></table><h3>7.3 Standard Event Envelope</h3><p>All events must use the same envelope:</p><pre data-lang="json"><code>{
+  &quot;event_id&quot;: &quot;uuid&quot;,
+  &quot;event_type&quot;: &quot;invoice.approved&quot;,
+  &quot;event_version&quot;: &quot;1.0&quot;,
+  &quot;client_id&quot;: &quot;client_123&quot;,
+  &quot;organization_id&quot;: &quot;org_123&quot;,
+  &quot;brand_id&quot;: &quot;brand_123&quot;,
+  &quot;location_id&quot;: &quot;loc_123&quot;,
+  &quot;correlation_id&quot;: &quot;trace_123&quot;,
+  &quot;idempotency_key&quot;: &quot;invoice_123_approved&quot;,
+  &quot;occurred_at&quot;: &quot;2026-07-03T12:00:00Z&quot;,
+  &quot;producer&quot;: &quot;restops-core-api&quot;,
+  &quot;payload&quot;: {}
+}</code></pre><h3>7.4 Queueing Pattern</h3><p>Recommended pattern:</p><pre data-lang="text"><code>API transaction
+  -&gt; writes business data
+  -&gt; writes outbox_events row
+  -&gt; outbox dispatcher publishes Service Bus message
+  -&gt; worker consumes message
+  -&gt; worker updates client DB
+  -&gt; worker emits next event
+  -&gt; DLQ captures failures</code></pre><h3>7.5 Notification Workflow</h3><pre data-lang="text"><code>Business event
+  -&gt; notification topic
+  -&gt; email subscription
+  -&gt; SMS subscription
+  -&gt; push subscription
+  -&gt; WhatsApp subscription
+  -&gt; audit subscription</code></pre><p>This supports:</p><ul><li>Email notifications.</li><li>SMS.</li><li>WhatsApp/vendor messages.</li><li>Mobile push.</li><li>In-app notifications.</li><li>Audit logging.</li></ul><hr><h2>8. Data Architecture</h2><h3>8.1 Client PostgreSQL</h3><p>Each client receives a dedicated PostgreSQL Flexible Server.</p><p>It stores:</p><ul><li>invoices</li><li>invoice_line_items</li><li>invoice_allocations</li><li>payments</li><li>ledger entries</li><li>products</li><li>inventory</li><li>vendors</li><li>recipes</li><li>auto_orders</li><li>POS data</li><li>wastage logs</li><li>audit logs</li><li>notifications</li><li>operational settings</li></ul><h3>8.2 Why Keep Tenant Columns Inside Dedicated DBs</h3><p>Even with a dedicated client database, keep:</p><pre data-lang="text"><code>organization_id
+brand_id
+location_id</code></pre><p>Reason:</p><ul><li>A client may have multiple brands.</li><li>A client may have multiple locations.</li><li>Franchise groups need hierarchy.</li><li>Role access still needs brand/location boundaries.</li><li>Current code already uses those scopes.</li></ul><h3>8.3 Database Migration Management</h3><p>Because every client has a database, schema management must become a first-class platform capability.</p><p>Required table:</p><pre data-lang="text"><code>tenant_schema_versions
+  client_id
+  database_name
+  current_schema_version
+  target_schema_version
+  last_migration_id
+  migration_status
+  last_success_at
+  last_failure_at
+  failure_message</code></pre><p>Migration runner flow:</p><pre data-lang="text"><code>New migration merged
+  -&gt; CI validates migration
+  -&gt; staging client DB upgraded
+  -&gt; smoke tests pass
+  -&gt; production rollout begins
+  -&gt; apply migration client by client
+  -&gt; record result
+  -&gt; stop or quarantine on failure</code></pre><h3>8.4 Blob Storage</h3><p>Each client receives dedicated Blob Storage.</p><p>Containers:</p><pre data-lang="text"><code>invoices
+receipts
+vendor-documents
+exports
+reports
+attachments</code></pre><p>Blob rules:</p><ul><li>Private by default.</li><li>No public container access.</li><li>Short-lived SAS upload/download URLs.</li><li>Blob metadata includes client_id, organization_id, document_type.</li><li>Encryption at rest.</li><li>Optional customer-managed key.</li><li>Lifecycle rules for archive/purge.</li><li>Container/storage metrics recorded daily.</li></ul><hr><h2>9. Security Architecture</h2><h3>9.1 Identity</h3><p>Target identity service:</p><ul><li>Microsoft Entra External ID.</li><li>MFA and conditional access where appropriate.</li><li>JWT claims include role and tenant context.</li><li>Optional enterprise SSO.</li></ul><h3>9.2 API Security</h3><p>API Management enforces:</p><ul><li>JWT validation.</li><li>Rate limits.</li><li>Client/tenant claims required.</li><li>CORS policy.</li><li>Request size limits.</li><li>API versioning.</li><li>Request correlation ID.</li></ul><h3>9.3 Data Security</h3><ul><li>Dedicated PostgreSQL per client.</li><li>Dedicated Blob Storage per client.</li><li>Private endpoints where feasible.</li><li>Managed Identity for service-to-service access.</li><li>Key Vault for secrets.</li><li>No service credentials in frontend.</li><li>Audit log for sensitive actions.</li></ul><h3>9.4 Authorization</h3><p>Authorization remains layered:</p><pre data-lang="text"><code>Frontend role visibility
+  + API authorization
+  + tenant registry routing
+  + PostgreSQL RLS / scoped queries</code></pre><hr><h2>10. Usage Metering and Cost Tracking</h2><h3>10.1 Why Usage Metering Matters</h3><p>The business requirement is clear: clients may upload huge invoice volumes. The platform must know which clients are driving storage, database, event, and AI cost.</p><h3>10.2 Daily Usage Table</h3><p>Recommended table:</p><pre data-lang="text"><code>tenant_usage_daily
+  client_id
+  organization_id
+  usage_date
+  invoice_count
+  invoice_line_item_count
+  blob_bytes
+  blob_object_count
+  postgres_allocated_bytes
+  postgres_used_bytes
+  event_count
+  ai_extraction_count
+  email_count
+  sms_count
+  estimated_storage_cost
+  estimated_database_cost
+  estimated_event_cost
+  estimated_ai_cost
+  total_estimated_cost
+  created_at</code></pre><h3>10.3 Metrics Sources</h3><table><thead><tr><th>Metric</th><th>Source</th></tr></thead><tbody><tr><td>Blob size</td><td>Azure Storage metrics / inventory</td></tr><tr><td>Blob object count</td><td>Storage inventory</td></tr><tr><td>DB size</td><td>PostgreSQL metrics / SQL queries</td></tr><tr><td>Invoice count</td><td>Client PostgreSQL</td></tr><tr><td>Event count</td><td>Service Bus metrics</td></tr><tr><td>Email/SMS count</td><td>Worker logs / provider response</td></tr><tr><td>AI extraction count</td><td>Worker logs / invoice processing records</td></tr><tr><td>Cost</td><td>Azure Cost Management + internal allocation</td></tr></tbody></table><hr><h2>11. Observability and Operations</h2><h3>11.1 Required Observability</h3><p>Use:</p><ul><li>Application Insights.</li><li>Log Analytics.</li><li>Azure Monitor alerts.</li><li>Azure Cost Management.</li><li>Service Bus metrics.</li><li>PostgreSQL metrics.</li><li>Storage metrics.</li></ul><h3>11.2 Key Alerts</h3><ul><li>Invoice extraction failure rate above threshold.</li><li>Payment webhook failures.</li><li>Service Bus DLQ message count greater than zero.</li><li>Service Bus queue depth above threshold.</li><li>Client DB storage above threshold.</li><li>Client Blob Storage above threshold.</li><li>API 5xx rate above threshold.</li><li>API latency above SLO.</li><li>Client budget threshold exceeded.</li><li>Database CPU/memory/storage pressure.</li></ul><h3>11.3 Correlation ID</h3><p>Every request and event must carry:</p><pre data-lang="text"><code>correlation_id
+client_id
+organization_id
+user_id
+event_id</code></pre><p>This allows tracing from:</p><pre data-lang="text"><code>frontend click
+  -&gt; API request
+  -&gt; Service Bus event
+  -&gt; worker execution
+  -&gt; PostgreSQL write
+  -&gt; notification</code></pre><hr><h2>12. Migration Plan</h2><h3>Phase 0: Architecture and Governance Baseline</h3><p><strong>Objective:</strong> finalize architecture, naming, tagging, Terraform structure, and security model.</p><p>Deliverables:</p><ul><li>Azure landing zone decisions.</li><li>Resource naming standard.</li><li>Tagging standard.</li><li>Terraform module design.</li><li>Tenant registry schema.</li><li>Event envelope standard.</li><li>Security and networking baseline.</li><li>CI/CD approval model.</li></ul><p>Exit criteria:</p><ul><li>CEO/CTO approval.</li><li>Terraform repo initialized.</li><li>Shared architecture diagram approved.</li></ul><h3>Phase 1: Shared Platform Foundation</h3><p><strong>Objective:</strong> create shared Azure foundation.</p><p>Build:</p><ul><li>Azure Front Door + WAF.</li><li>Azure Static Web Apps.</li><li>API Management.</li><li>Container Apps environment.</li><li>Azure Functions environment.</li><li>Service Bus namespace.</li><li>Key Vault.</li><li>Application Insights.</li><li>Log Analytics.</li><li>Control Plane DB.</li></ul><p>Exit criteria:</p><ul><li>React app deployed to Azure Static Web Apps.</li><li>API Management can route to a test API.</li><li>Service Bus test event processed.</li><li>Logs visible in Application Insights.</li></ul><h3>Phase 2: Control Plane and Tenant Registry</h3><p><strong>Objective:</strong> build tenant routing and provisioning foundation.</p><p>Build:</p><ul><li>Tenant registry.</li><li>Provisioning job table.</li><li>Usage summary tables.</li><li>Client provisioning workflow.</li><li>Terraform output ingestion.</li><li>Admin UI/API for provisioning status.</li></ul><p>Exit criteria:</p><ul><li>New client request creates pending provisioning job.</li><li>Terraform output updates tenant registry.</li><li>API can resolve client data plane endpoint.</li></ul><h3>Phase 3: Standard Client Data Plane Module</h3><p><strong>Objective:</strong> create repeatable client resource group template.</p><p>Build Terraform module for:</p><ul><li>Client resource group.</li><li>Client Blob Storage.</li><li>Client PostgreSQL Flexible Server.</li><li>Client database.</li><li>Client private endpoints.</li><li>Client diagnostic settings.</li><li>Client budget alert.</li><li>Client Key Vault references.</li></ul><p>Exit criteria:</p><ul><li>One test client environment provisioned.</li><li>Migrations applied successfully.</li><li>Blob upload/download works through API.</li><li>DB connection resolved through tenant registry.</li></ul><h3>Phase 4: API Migration</h3><p><strong>Objective:</strong> move data access from direct Supabase client pattern to API-managed access.</p><p>Migrate:</p><ul><li>Products.</li><li>Invoices.</li><li>Payments.</li><li>Inventory.</li><li>Vendors.</li><li>Recipes.</li><li>Dashboard queries.</li></ul><p>Exit criteria:</p><ul><li>Core modules run through Container Apps API.</li><li>Tenant routing works.</li><li>API authorization works.</li><li>Existing role behavior preserved.</li></ul><h3>Phase 5: File and Invoice Workflow Migration</h3><p><strong>Objective:</strong> move document-heavy workflows to client Blob Storage and Azure workers.</p><p>Migrate:</p><ul><li>Invoice upload.</li><li>Email invoice import.</li><li>Blob-created event.</li><li>Invoice extraction worker.</li><li>AI extraction status updates.</li><li>Invoice review workflow.</li></ul><p>Target flow:</p><pre data-lang="text"><code>Upload invoice
+  -&gt; client Blob Storage
+  -&gt; Event Grid
+  -&gt; Service Bus
+  -&gt; invoice-processing worker
+  -&gt; client PostgreSQL
+  -&gt; notification event</code></pre><p>Exit criteria:</p><ul><li>Invoice upload works end to end.</li><li>AI extraction writes to client DB.</li><li>Failure writes DLQ and visible status.</li><li>Large file upload tested.</li></ul><h3>Phase 6: Payment, POS, and Notification Events</h3><p><strong>Objective:</strong> migrate external events to Azure Functions and Service Bus.</p><p>Migrate:</p><ul><li>Stripe webhook.</li><li>Dwolla webhook.</li><li>Checkbook webhook.</li><li>POS webhook.</li><li>Notification events.</li><li>Email/SMS/WhatsApp worker.</li></ul><p>Exit criteria:</p><ul><li>Webhook signatures validated.</li><li>Idempotency enforced.</li><li>DLQ tested.</li><li>Payment status update tested.</li><li>Notification delivered from event.</li></ul><h3>Phase 7: Reporting, AI, and Scheduled Jobs</h3><p><strong>Objective:</strong> move scheduled and AI workloads.</p><p>Migrate:</p><ul><li>SmartPrep cron.</li><li>AI insights.</li><li>Labor forecast.</li><li>Vendor bid evaluation.</li><li>Dashboard reports.</li><li>Scheduled reports.</li><li>Accounting sync.</li></ul><p>Exit criteria:</p><ul><li>Timer Functions running.</li><li>AI calls tracked by client.</li><li>Reports generated and stored in client Blob Storage.</li><li>Usage metering captures AI/report cost drivers.</li></ul><h3>Phase 8: Observability, Cost, and Production Readiness</h3><p><strong>Objective:</strong> make the platform production-operable.</p><p>Build:</p><ul><li>Dashboards.</li><li>SLOs.</li><li>Alerts.</li><li>Cost reporting.</li><li>Usage metering jobs.</li><li>Backup validation.</li><li>Restore runbook.</li><li>Incident response runbook.</li></ul><p>Exit criteria:</p><ul><li>Per-client usage dashboard available.</li><li>Cost alerts working.</li><li>Backup/restore tested.</li><li>Incident runbook approved.</li></ul><h3>Phase 9: Pilot and Cutover</h3><p><strong>Objective:</strong> migrate first live tenant safely.</p><p>Steps:</p><ul><li>Select pilot client.</li><li>Provision client Azure data plane.</li><li>Backfill data.</li><li>Validate counts.</li><li>Run parallel read mode.</li><li>Run workflow smoke tests.</li><li>Freeze writes briefly if required.</li><li>Cut over routing.</li><li>Monitor for 7 days.</li></ul><p>Exit criteria:</p><ul><li>Pilot client stable.</li><li>No data reconciliation gaps.</li><li>Performance acceptable.</li><li>Support runbook validated.</li></ul><h3>Phase 10: Rollout to All Clients</h3><p><strong>Objective:</strong> repeat migration using standard playbook.</p><p>Steps:</p><ul><li>Prioritize clients by risk and volume.</li><li>Provision data planes.</li><li>Migrate and validate data.</li><li>Cut over client by client.</li><li>Monitor cost and performance.</li><li>Decommission old paths after stabilization.</li></ul><p>Exit criteria:</p><ul><li>All active clients on Azure target architecture.</li><li>Supabase runtime dependencies removed or explicitly retained by decision.</li><li>Azure operating dashboards become source of truth.</li></ul><hr><h2>13. Data Migration Approach</h2><h3>13.1 Migration Method</h3><p>For each client:</p><pre data-lang="text"><code>Extract source data
+  -&gt; transform to target schema if required
+  -&gt; load client PostgreSQL
+  -&gt; copy files to client Blob Storage
+  -&gt; validate counts and checksums
+  -&gt; run application smoke tests
+  -&gt; cut over routing</code></pre><h3>13.2 Validation</h3><p>Validate:</p><ul><li>invoice count</li><li>invoice line item count</li><li>payment count</li><li>vendor count</li><li>product count</li><li>inventory count</li><li>audit log count</li><li>blob object count</li><li>blob byte count</li><li>sample file retrieval</li><li>dashboard totals</li><li>AP totals</li></ul><h3>13.3 Rollback</h3><p>Rollback strategy:</p><ul><li>Preserve source environment until post-cutover window closes.</li><li>Keep migration snapshots.</li><li>Routing can point client back to old environment if cutover fails.</li><li>Do not delete old data until reconciliation and retention approval.</li></ul><hr><h2>14. Risks and Mitigations</h2><table><thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead><tbody><tr><td>Higher per-client infrastructure cost</td><td>Lower margin for small clients</td><td>Price plans accordingly; automate cost tracking; enforce budgets.</td></tr><tr><td>Many PostgreSQL servers to manage</td><td>Operational complexity</td><td>Terraform, migration runner, monitoring templates.</td></tr><tr><td>Schema upgrades across all clients</td><td>Migration risk</td><td>Tenant schema version table and phased rollout.</td></tr><tr><td>Event duplication</td><td>Duplicate emails/payments</td><td>Idempotency keys and unique constraints.</td></tr><tr><td>Queue backlog</td><td>Delayed workflows</td><td>Queue depth alerts and autoscaling workers.</td></tr><tr><td>Large invoice uploads</td><td>Storage cost and processing lag</td><td>Dedicated Blob Storage, lifecycle policies, async processing.</td></tr><tr><td>Secrets sprawl</td><td>Security exposure</td><td>Key Vault and Managed Identity.</td></tr><tr><td>Routing bugs</td><td>Client data access failure</td><td>Tenant registry validation and automated smoke tests.</td></tr><tr><td>Cutover data mismatch</td><td>Business disruption</td><td>Reconciliation reports and rollback window.</td></tr></tbody></table><hr><h2>15. Governance Model</h2><h3>15.1 Architecture Review Board</h3><p>Approves:</p><ul><li>Terraform module changes.</li><li>Shared platform changes.</li><li>Security baseline changes.</li><li>Database migration policy.</li><li>Client data plane template changes.</li></ul><h3>15.2 Change Management</h3><p>Production change requirements:</p><ul><li>Pull request.</li><li>Terraform plan.</li><li>Security scan.</li><li>Architecture approval for infrastructure changes.</li><li>Deployment approval.</li><li>Post-deployment smoke test.</li></ul><h3>15.3 Standards</h3><p>Required standards:</p><ul><li>All resources tagged.</li><li>All events include client_id and correlation_id.</li><li>All secrets in Key Vault.</li><li>No public database access.</li><li>Blob Storage private by default.</li><li>Per-client budget alert.</li><li>Diagnostic settings enabled.</li><li>Terraform manages infrastructure.</li></ul><hr><h2>16. Success Metrics</h2><table><thead><tr><th>Metric</th><th>Target</th></tr></thead><tbody><tr><td>Client provisioning time</td><td>Under 30 minutes after approval</td></tr><tr><td>Invoice upload reliability</td><td>99.9% successful accepted uploads</td></tr><tr><td>Invoice extraction workflow</td><td>Retryable with DLQ for failures</td></tr><tr><td>Webhook processing</td><td>Idempotent, observable, retryable</td></tr><tr><td>Per-client cost visibility</td><td>Daily client-level cost estimate</td></tr><tr><td>Per-client usage visibility</td><td>Daily DB/storage/event usage</td></tr><tr><td>Restore readiness</td><td>Client restore runbook tested</td></tr><tr><td>Deployment repeatability</td><td>All client data planes from same Terraform module</td></tr><tr><td>Security posture</td><td>No public DB, no browser secrets, Key Vault-backed secrets</td></tr></tbody></table><hr><h2>17. Recommended Executive Decision</h2><p>Enterprise Architecture recommends approving the Azure migration using the following target model:</p><p>1. Shared application and control plane.</p><p>2. Standard isolated client data plane for every client.</p><p>3. Dedicated Blob Storage and PostgreSQL Flexible Server per client.</p><p>4. Azure Service Bus as the event backbone.</p><p>5. Terraform as the provisioning and governance standard.</p><p>6. Tenant registry as the core routing and operations source of truth.</p><p>7. Phased migration beginning with shared platform foundation and one pilot tenant.</p><p>This design is more expensive than a shared-database SaaS model, but it best matches the stated business goals: strong client isolation, invoice-heavy workload support, per-client database/storage tracking, enterprise readiness, and a repeatable standard architecture.</p><hr><h2>18. Appendix A: Current to Azure Service Replacement</h2><table><thead><tr><th>Current</th><th>Azure Target</th></tr></thead><tbody><tr><td>React/Vite SPA</td><td>Azure Static Web Apps</td></tr><tr><td>Supabase Auth</td><td>Microsoft Entra External ID</td></tr><tr><td>Supabase PostgreSQL</td><td>Azure PostgreSQL Flexible Server per client</td></tr><tr><td>Supabase Storage</td><td>Azure Blob Storage per client</td></tr><tr><td>Supabase Edge Functions</td><td>Azure Functions and Container Apps workers</td></tr><tr><td>pg_net</td><td>Service Bus and Event Grid</td></tr><tr><td>pg_cron</td><td>Timer Functions</td></tr><tr><td>Supabase Realtime</td><td>Azure Web PubSub / SignalR</td></tr><tr><td>Supabase environment secrets</td><td>Azure Key Vault</td></tr><tr><td>Supabase logs</td><td>Application Insights + Log Analytics</td></tr><tr><td>Supabase backups</td><td>PostgreSQL PITR and backup policies</td></tr></tbody></table><hr><h2>19. Appendix B: CEO-Level Message</h2><p>RestOps will move from a platform that is functionally strong but Supabase-centric to an Azure-native SaaS operating model. The migration gives the company a stronger enterprise story:</p><ul><li>Every client is isolated by design.</li><li>Heavy invoice and payment workloads are separated per client.</li><li>Client usage and cost become measurable.</li><li>Shared automation keeps operations efficient.</li><li>Terraform guarantees every client is provisioned consistently.</li><li>Service Bus makes workflows reliable and auditable.</li><li>Azure governance, monitoring, identity, and security controls prepare the platform for enterprise customers.</li></ul><p>This is the right foundation for scaling RestOps from product build-out into enterprise SaaS operations.</p>
+</body>
+</html>

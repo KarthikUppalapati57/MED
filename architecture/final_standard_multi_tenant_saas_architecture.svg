@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs>
+    <style>
+      .bg{fill:#f7f9fc}
+      .title{font:800 34px Arial, Helvetica, sans-serif;fill:#122033}
+      .subtitle{font:500 17px Arial, Helvetica, sans-serif;fill:#607086}
+      .section{font:800 18px Arial, Helvetica, sans-serif;fill:#122033}
+      .label{font:700 15px Arial, Helvetica, sans-serif;fill:#122033}
+      .small{font:500 13px Arial, Helvetica, sans-serif;fill:#526174}
+      .tiny{font:500 11px Arial, Helvetica, sans-serif;fill:#526174}
+      .mono{font:600 12px Consolas, Menlo, monospace;fill:#334155}
+      .box{fill:#fff;stroke:#d8e1ee;stroke-width:2;rx:14;filter:url(#shadow)}
+      .blue{fill:#eff6ff;stroke:#2563eb}
+      .green{fill:#ecfdf5;stroke:#16a34a}
+      .amber{fill:#fffbeb;stroke:#d97706}
+      .purple{fill:#f5f3ff;stroke:#7c3aed}
+      .red{fill:#fef2f2;stroke:#dc2626}
+      .cyan{fill:#ecfeff;stroke:#0891b2}
+      .slate{fill:#f8fafc;stroke:#64748b}
+      .line{stroke:#6b7c93;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+      .dash{stroke:#6b7c93;stroke-width:2.2;fill:none;stroke-dasharray:7 6;marker-end:url(#arrow)}
+      .thick{stroke-width:3.2}
+      .badge{font:800 11px Arial, Helvetica, sans-serif}
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity=".10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="10" refX="11" refY="5" orient="auto">
+      <path d="M0,0 L12,5 L0,10 Z" fill="#6b7c93"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1800" height="1200"/>
+
+  <text x="70" y="70" class="title">Final Standard Multi-Tenant SaaS Architecture</text>
+  <text x="70" y="100" class="subtitle">One standard design for every client: shared platform control plane + identical isolated client data plane resource group</text>
+
+  <!-- Users and ingress -->
+  <rect x="70" y="145" width="250" height="145" class="box blue"/>
+  <text x="95" y="180" class="section">Users &amp; Sources</text>
+  <text x="95" y="212" class="small">Web App · Mobile App</text>
+  <text x="95" y="237" class="small">POS · Payment Webhooks</text>
+  <text x="95" y="262" class="small">Invoice Uploads · Email Intake</text>
+
+  <rect x="390" y="130" width="345" height="175" class="box purple"/>
+  <text x="420" y="165" class="section">Global Ingress</text>
+  <text x="420" y="198" class="label">Azure Front Door + WAF</text>
+  <text x="420" y="223" class="small">TLS · DDoS posture · global routing</text>
+  <text x="420" y="252" class="label">Azure API Management</text>
+  <text x="420" y="277" class="small">JWT validation · throttling · API policies</text>
+
+  <path d="M320 218 L390 218" class="line thick"/>
+
+  <!-- Shared platform -->
+  <rect x="800" y="115" width="900" height="260" class="box"/>
+  <text x="830" y="152" class="section">Shared Platform / Control Plane Resource Groups</text>
+  <text x="830" y="179" class="small">Shared by all clients. No client invoice/payment data is stored here except routing, identity, billing and audit metadata.</text>
+
+  <rect x="830" y="205" width="190" height="120" class="box blue"/>
+  <text x="850" y="235" class="label">Azure Static</text>
+  <text x="850" y="255" class="label">Web Apps</text>
+  <text x="850" y="282" class="small">React SPA</text>
+  <text x="850" y="304" class="small">CDN + TLS</text>
+
+  <rect x="1045" y="205" width="205" height="120" class="box amber"/>
+  <text x="1065" y="235" class="label">Container Apps</text>
+  <text x="1065" y="255" class="small">restops-core-api</text>
+  <text x="1065" y="280" class="small">Tenant resolver</text>
+  <text x="1065" y="303" class="small">Domain services</text>
+
+  <rect x="1275" y="205" width="185" height="120" class="box cyan"/>
+  <text x="1295" y="235" class="label">Azure Functions</text>
+  <text x="1295" y="260" class="small">Webhooks</text>
+  <text x="1295" y="282" class="small">Workers</text>
+  <text x="1295" y="304" class="small">Schedulers</text>
+
+  <rect x="1485" y="205" width="185" height="120" class="box green"/>
+  <text x="1505" y="235" class="label">Control DB</text>
+  <text x="1505" y="260" class="small">Tenant registry</text>
+  <text x="1505" y="282" class="small">Plans · usage</text>
+  <text x="1505" y="304" class="small">Routing map</text>
+
+  <path d="M735 218 L800 218" class="line thick"/>
+
+  <!-- Event backbone -->
+  <rect x="390" y="405" width="1310" height="175" class="box cyan"/>
+  <text x="420" y="442" class="section">Shared Event Backbone</text>
+  <text x="420" y="469" class="small">Standard for all clients. All event-driven workflows carry tenant_id, org_id, correlation_id and idempotency_key.</text>
+
+  <rect x="425" y="495" width="250" height="55" class="box cyan"/>
+  <text x="445" y="528" class="label">Azure Service Bus Topics</text>
+
+  <rect x="715" y="495" width="255" height="55" class="box cyan"/>
+  <text x="735" y="528" class="label">Subscriptions + DLQ</text>
+
+  <rect x="1010" y="495" width="250" height="55" class="box amber"/>
+  <text x="1030" y="528" class="label">Notification Workers</text>
+
+  <rect x="1300" y="495" width="330" height="55" class="box purple"/>
+  <text x="1320" y="528" class="label">SendGrid · Twilio · WhatsApp · Push</text>
+
+  <path d="M675 522 L715 522" class="line"/>
+  <path d="M970 522 L1010 522" class="line"/>
+  <path d="M1260 522 L1300 522" class="line"/>
+  <path d="M1368 325 L1368 405" class="line"/>
+  <path d="M1150 325 L1150 405" class="line"/>
+
+  <!-- Standard tenant template -->
+  <rect x="70" y="635" width="1630" height="415" class="box green"/>
+  <text x="105" y="675" class="section">Standard Client Isolation Template - Deployed Identically For Every Client</text>
+  <text x="105" y="704" class="small">Each client receives the same resource group pattern. This is one architecture, repeated consistently per tenant for isolation and usage tracking.</text>
+
+  <rect x="105" y="735" width="245" height="250" class="box green"/>
+  <text x="130" y="770" class="label">Client Resource Group</text>
+  <text x="130" y="797" class="mono">rg-restops-client-{id}</text>
+  <text x="130" y="832" class="small">Tags:</text>
+  <text x="150" y="858" class="small">tenant_id</text>
+  <text x="150" y="883" class="small">plan</text>
+  <text x="150" y="908" class="small">environment</text>
+  <text x="150" y="933" class="small">cost_center</text>
+  <text x="130" y="965" class="small">Budget alerts per client</text>
+
+  <rect x="400" y="735" width="280" height="250" class="box blue"/>
+  <text x="430" y="770" class="label">Dedicated Blob Storage</text>
+  <text x="430" y="800" class="small">Private containers:</text>
+  <text x="450" y="826" class="small">invoices</text>
+  <text x="450" y="851" class="small">receipts</text>
+  <text x="450" y="876" class="small">exports</text>
+  <text x="430" y="908" class="small">Encryption at rest</text>
+  <text x="430" y="933" class="small">Lifecycle policies</text>
+  <text x="430" y="958" class="small">Usage metrics by tenant</text>
+
+  <rect x="730" y="735" width="300" height="250" class="box amber"/>
+  <text x="760" y="770" class="label">Dedicated PostgreSQL</text>
+  <text x="760" y="794" class="label">Flexible Server</text>
+  <text x="760" y="826" class="small">Invoices · payments · products</text>
+  <text x="760" y="851" class="small">inventory · audit · ledgers</text>
+  <text x="760" y="883" class="small">RLS still enabled</text>
+  <text x="760" y="908" class="small">PITR backups</text>
+  <text x="760" y="933" class="small">Client DB usage tracking</text>
+  <text x="760" y="958" class="small">Independent scaling</text>
+
+  <rect x="1080" y="735" width="270" height="250" class="box purple"/>
+  <text x="1110" y="770" class="label">Client Security</text>
+  <text x="1110" y="800" class="small">Key Vault key / CMK</text>
+  <text x="1110" y="826" class="small">Private endpoints</text>
+  <text x="1110" y="851" class="small">Managed identities</text>
+  <text x="1110" y="883" class="small">No public DB access</text>
+  <text x="1110" y="908" class="small">Per-client diagnostics</text>
+  <text x="1110" y="933" class="small">Defender policies</text>
+
+  <rect x="1400" y="735" width="260" height="250" class="box slate"/>
+  <text x="1430" y="770" class="label">Client Observability</text>
+  <text x="1430" y="800" class="small">Log Analytics</text>
+  <text x="1430" y="826" class="small">Storage metrics</text>
+  <text x="1430" y="851" class="small">DB metrics</text>
+  <text x="1430" y="883" class="small">Usage metering jobs</text>
+  <text x="1430" y="908" class="small">Cost dashboards</text>
+  <text x="1430" y="933" class="small">Alert rules</text>
+
+  <path d="M350 860 L400 860" class="line"/>
+  <path d="M680 860 L730 860" class="line"/>
+  <path d="M1030 860 L1080 860" class="line"/>
+  <path d="M1350 860 L1400 860" class="line"/>
+
+  <!-- Routing from control plane to tenant plane -->
+  <path d="M1578 325 C1578 505 880 520 880 735" class="dash"/>
+  <text x="970" y="610" class="small">Tenant registry resolves client_id to DB/storage endpoints</text>
+
+  <path d="M1150 325 C1140 470 540 560 540 735" class="dash"/>
+  <text x="550" y="600" class="small">API writes files to that client's Blob Storage</text>
+
+  <path d="M1150 325 C1170 520 885 575 885 735" class="dash"/>
+  <text x="900" y="632" class="small">API queries that client's PostgreSQL server</text>
+
+  <!-- Bottom principles -->
+  <rect x="70" y="1085" width="1630" height="70" class="box red"/>
+  <text x="105" y="1122" class="label">Non-negotiable standards:</text>
+  <text x="310" y="1122" class="small">same template for every client · dedicated client data plane · shared app/control plane · Service Bus for events · private storage/DB · per-client usage and cost metering · tenant_id on every event/log</text>
+</svg>
