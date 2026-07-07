@@ -14,6 +14,25 @@ const AuthContext = createContext(null);
 // Cache the user profile in sessionStorage so that on page reload
 // the role is available IMMEDIATELY (no flash of 'ground_staff').
 const PROFILE_CACHE_KEY = 'restops_profile_cache';
+const PENDING_INVITE_TOKEN_KEY = 'restops_pending_invite_token';
+
+function normalizeInviteToken(token) {
+  return String(token || '').replace(/[\n\r.,!?>\]]+$/, '').trim();
+}
+
+function setPendingInviteToken(token) {
+  const cleaned = normalizeInviteToken(token);
+  if (!cleaned) return;
+  try { localStorage.setItem(PENDING_INVITE_TOKEN_KEY, cleaned); } catch {}
+}
+
+function getPendingInviteToken() {
+  try { return normalizeInviteToken(localStorage.getItem(PENDING_INVITE_TOKEN_KEY)); } catch { return ''; }
+}
+
+function clearPendingInviteToken() {
+  try { localStorage.removeItem(PENDING_INVITE_TOKEN_KEY); } catch {}
+}
 
 function getCachedProfile() {
   try {
@@ -136,9 +155,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const processPendingInvitation = useCallback(async (email, userId) => {
-    if (!email || !userId || inviteLock.current) return;
+    if (!email || !userId || inviteLock.current) return false;
     inviteLock.current = true;
+    const pendingInviteToken = getPendingInviteToken();
     try {
+      if (pendingInviteToken) {
+        const { error } = await supabase.rpc('accept_invitation', { p_token: pendingInviteToken });
+        if (error) throw error;
+        clearPendingInviteToken();
+        return true;
+      }
+
       const { data: invite } = await supabase
         .from('invitations')
         .select('*')
@@ -155,6 +182,8 @@ export const AuthProvider = ({ children }) => {
         return true;
       }
     } catch (err) {
+      if (pendingInviteToken) clearPendingInviteToken();
+      setAuthError(err);
       console.warn('Error processing invitation:', err);
     } finally {
       inviteLock.current = false;
@@ -618,22 +647,26 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const loginWithSSO = useCallback(async (provider) => {
+  const loginWithSSO = useCallback(async (provider, options = {}) => {
     setAuthError(null);
+    const { inviteToken = null, redirectTo = `${APP_URL}/` } = options;
+    if (inviteToken) setPendingInviteToken(inviteToken);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${APP_URL}/`,
+          redirectTo,
         },
       });
       if (error) {
+        if (inviteToken) clearPendingInviteToken();
         setAuthError(error);
         return { data: null, error };
       }
-      posthog.capture('user_logged_in', { method: `sso_${provider}` });
+      posthog.capture('user_logged_in', { method: `sso_${provider}`, invite_flow: !!inviteToken });
       return { data, error: null };
     } catch (err) {
+      if (inviteToken) clearPendingInviteToken();
       setAuthError(err);
       return { data: null, error: err };
     }

@@ -95,11 +95,12 @@ const LayoutWrapper = ({ children, currentPageName }) => {
 function SignupPage() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { signUp, user } = useAuth();
+  const { signUp, user, loginWithSSO } = useAuth();
   const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [ssoProvider, setSsoProvider] = useState(null);
   const [success, setSuccess] = useState(false);
 
   // Fetch invitation details
@@ -171,6 +172,26 @@ function SignupPage() {
     }
   };
 
+
+  const handleSSOSignup = async (provider) => {
+    setError('');
+    if (!inviteInfo) {
+      setError('Please wait for invitation details to load.');
+      return;
+    }
+
+    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+    setSsoProvider(provider);
+    const { error: ssoError } = await loginWithSSO(provider, {
+      inviteToken: cleanToken,
+      redirectTo: `${window.location.origin}/`,
+    });
+
+    if (ssoError) {
+      setError(ssoError.message);
+      setSsoProvider(null);
+    }
+  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-background animated-mesh p-4">
       <Card className="w-full max-w-md glass-card rounded-xl shadow-2xl p-8 space-y-6 border border-border/50 relative z-10 animate-fade-in-scale">
@@ -264,6 +285,35 @@ function SignupPage() {
                 </>
               ) : 'Create Account'}
             </button>
+
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/40" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground font-semibold">Or sign up with</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleSSOSignup('google')}
+                disabled={!inviteInfo || loading || !!ssoProvider}
+                className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
+              >
+                {ssoProvider === 'google' ? 'Redirecting...' : 'Google'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSSOSignup('azure')}
+                disabled={!inviteInfo || loading || !!ssoProvider}
+                className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
+              >
+                {ssoProvider === 'azure' ? 'Redirecting...' : 'Microsoft'}
+              </button>
+            </div>
 
             <div className="text-center pt-2 border-t border-border/40">
               <p className="text-sm text-muted-foreground">
