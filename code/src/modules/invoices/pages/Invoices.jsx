@@ -661,7 +661,13 @@ export default function Invoices() {
   };
 
   const finalizeApprovedInvoiceWorkflow = async (invoice) => {
-    await api.client.rpc('sync_invoice_products', { p_invoice_id: invoice.id });
+    const { error: productSyncError } = await api.client.rpc('sync_invoice_products', {
+      p_invoice_id: invoice.id,
+      p_user_id: userProfile?.id || null,
+    });
+    if (productSyncError) throw productSyncError;
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    queryClient.invalidateQueries({ queryKey: ['price_variances'] });
     const { ensureLedgerBill, recordPaymentLedger } = await import('@/lib/workflowService');
     const apRoutingDestination = await resolveInvoiceApRouting(invoice);
     const routingUpdate = {
@@ -802,7 +808,7 @@ export default function Invoices() {
         toast.success(
           approvalResult.redirectedToPayments
             ? 'Paid invoice approved and recorded in Payment History'
-            : 'Invoice approved & products/inventory updated'
+            : 'Invoice approved. Product catalog was updated.'
         );
       } else if (finalStatus === 'pending_approval') {
         posthog.capture('invoice_pending_approval', { invoiceId: savedInvoice.id });
@@ -852,7 +858,7 @@ export default function Invoices() {
       toast.success(
         approvalResult.redirectedToPayments
           ? 'Paid invoice approved and recorded in Payment History'
-          : 'Invoice approved & products/inventory updated'
+          : 'Invoice approved. Product catalog was updated.'
       );
     } catch (err) {
       console.error('Approve failed:', err);
@@ -946,7 +952,7 @@ export default function Invoices() {
       toast.success(
         approvalResult.redirectedToPayments
           ? 'Paid invoice approved and recorded in Payment History'
-          : 'Invoice approved - items staged for 24h review before finalizing in inventory'
+          : 'Invoice approved. Product catalog was updated.'
       );
 
       // Email the original uploader that their invoice was approved

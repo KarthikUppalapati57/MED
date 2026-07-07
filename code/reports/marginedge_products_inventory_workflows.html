@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarginEdge Products and Inventory Workflow</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #607089;
+      --line: #dfe5ef;
+      --nav: #111827;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --cyan: #0891b2;
+      --amber: #b45309;
+      --purple: #7c3aed;
+      --red: #b91c1c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px 18px;
+      background: var(--nav);
+      color: #f9fafb;
+      overflow-y: auto;
+    }
+
+    .brand {
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255,255,255,.14);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .brand p {
+      margin: 8px 0 0;
+      color: #aeb8c8;
+      font-size: 12px;
+    }
+
+    .nav-group {
+      margin: 20px 0 8px;
+      color: #8ea0b8;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .nav-button {
+      display: block;
+      width: 100%;
+      margin: 4px 0;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #d9e1ec;
+      text-align: left;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav-button:hover,
+    .nav-button.active {
+      background: rgba(255,255,255,.1);
+      color: #ffffff;
+    }
+
+    main {
+      padding: 32px;
+      max-width: 1280px;
+      width: 100%;
+    }
+
+    section.view { display: none; }
+    section.view.active { display: block; }
+
+    .hero,
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    .hero {
+      margin-bottom: 18px;
+      padding: 24px;
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 980px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      grid-column: span 12;
+      padding: 18px;
+    }
+
+    .half { grid-column: span 6; }
+
+    h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    h4 {
+      margin: 16px 0 8px;
+      color: #334155;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 6px 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 0;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      color: #0f172a;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    a { color: #1d4ed8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #eef6f5;
+      color: #0f766e;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .badge.blue { background: #eff6ff; color: var(--blue); }
+    .badge.warn { background: #fffbeb; color: var(--amber); }
+    .badge.bad { background: #fef2f2; color: var(--red); }
+
+    .note {
+      padding: 12px;
+      border-left: 4px solid var(--amber);
+      background: #fff7ed;
+      color: #7c2d12;
+      border-radius: 6px;
+    }
+
+    .pdf-map-wrap {
+      overflow-x: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .pdf-map {
+      width: 760px;
+      margin: 0 auto;
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .pill {
+      display: inline-block;
+      min-width: 150px;
+      padding: 9px 18px;
+      border: 2px solid #22c55e;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 800;
+    }
+
+    .phase {
+      position: relative;
+      width: 330px;
+      margin: 22px auto;
+      padding: 18px 14px 14px;
+      border: 2px solid #6b7280;
+      background: #f8fafc;
+    }
+
+    .phase.wide { width: 460px; }
+
+    .phase-title {
+      position: absolute;
+      top: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0 8px;
+      background: #f8fafc;
+      color: #374151;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      white-space: nowrap;
+    }
+
+    .flowbox {
+      width: 230px;
+      margin: 10px auto;
+      padding: 10px;
+      border: 2px solid #3b82f6;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .flowbox.data { border-color: #06b6d4; background: #ecfeff; color: #155e75; }
+    .flowbox.db { border-color: #22c55e; background: #f0fdf4; color: #166534; }
+    .flowbox.warn { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+    .flowbox.bad { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+    .flowbox.small { width: 180px; font-size: 11px; }
+
+    .decision {
+      width: 122px;
+      height: 122px;
+      margin: 18px auto;
+      border: 2px solid #a855f7;
+      background: #faf5ff;
+      color: #6b21a8;
+      transform: rotate(45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .decision span {
+      display: block;
+      width: 92px;
+      transform: rotate(-45deg);
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .arrow-down {
+      width: 2px;
+      height: 22px;
+      margin: 0 auto;
+      background: #111827;
+      position: relative;
+    }
+
+    .arrow-down::after {
+      content: "";
+      position: absolute;
+      left: -4px;
+      bottom: -1px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid #111827;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+      margin: 10px auto;
+      width: 520px;
+    }
+
+    .branch-note {
+      color: #475569;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .map-caption {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: left;
+    }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      aside { position: relative; height: auto; }
+      main { padding: 18px; }
+      .half { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <h1>MarginEdge Workflow</h1>
+        <p>Products and Inventory process maps based on public MarginEdge documentation.</p>
+      </div>
+
+      <div class="nav-group">Modules</div>
+      <button class="nav-button active" data-target="products">Products Module</button>
+      <button class="nav-button" data-target="inventory">Inventory Module</button>
+
+      <div class="nav-group">Reference</div>
+      <button class="nav-button" data-target="evidence">Evidence and Notes</button>
+    </aside>
+
+    <main>
+      <section id="products" class="view active">
+        <div class="hero">
+          <h2>MarginEdge Products Module</h2>
+          <p>This workflow describes how MarginEdge publicly documents Products: products are generic items used for reporting, inventory, recipes, and vendor-item matching. MarginEdge says invoice processing can match vendor items to existing products or create new products, and one product can have multiple vendor items associated with it.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Products Workflow - PDF Style Process Map</h3>
+            <div class="pdf-map-wrap">
+              <div class="pdf-map">
+                <div class="pill">START<br>Product Database</div>
+                <div class="arrow-down"></div>
+
+                <div class="phase">
+                  <div class="phase-title">PRODUCT CREATION SOURCES</div>
+                  <div class="flowbox">1. Product source begins<br>Processed invoice vendor item<br>or Restaurant Admin adds product manually</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Existing Product match?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">Associate vendor item<br>to existing product</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox db small">Create new Product<br>using standard suggestion<br>or custom name</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">PRODUCT SETUP</div>
+                  <div class="flowbox">2. Admin reviews product<br>Products > View All Products<br>Search, filter, sort, export</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">3. Product fields shown<br>Name, Category<br>Accounting Code<br>Item Count<br>On Inventory<br>Tax Exempt<br>Report by Unit<br>Latest Price</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">4. Admin edits product<br>Name, category<br>tax exempt flag<br>should be inventoried<br>count sheets<br>report/count unit</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Should be inventoried?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">Assign to one or more<br>inventory count sheets</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox small">Product remains for<br>purchase/reporting use</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">VENDOR ITEM AND PRICE LOGIC</div>
+                  <div class="flowbox db">5. Vendor items attach<br>Many vendor items can map<br>to one generic product</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Vendor item wrong product?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Wrong</div>
+                      <div class="flowbox warn small">Use Reassign<br>choose existing/new product<br>enter package conversion</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Correct</div>
+                      <div class="flowbox small">Keep association<br>for future matching</div>
+                    </div>
+                  </div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">6. Invoice processing updates<br>latest purchase price<br>Manual starting price allowed<br>until invoice item is associated</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">7. Price Details records<br>price change history<br>History records product edits</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase">
+                  <div class="phase-title">DOWNSTREAM USE</div>
+                  <div class="flowbox">8. Product feeds inventory<br>count sheets and count-by units</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">9. Product feeds recipes<br>ingredient conversions<br>allergen tagging<br>recipe costing</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">10. Product feeds reports<br>purchase report<br>category/accounting reports<br>theoretical usage</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="pill">END<br>Product ready for reporting, inventory, and costing</div>
+              </div>
+              <p class="map-caption">Internal MarginEdge database columns, triggers, and edge functions are not public. This map uses the public workflow and visible data fields described in MarginEdge documentation.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Product Workflow Details</h3>
+            <ol>
+              <li>Processed invoices are a primary product source: MarginEdge documents that each food or beverage vendor item is matched to an existing product or a new product is created if no appropriate product exists.</li>
+              <li>Manual product creation is available to Restaurant Admin or MarginEdge Admin roles from <code>Products > View All Products > Add Product</code>.</li>
+              <li>When adding a product, users enter/select product name, category, inventory/report flags, count-by unit, starting price, and allergens where applicable.</li>
+              <li>Product review columns include name, category, accounting code, item count, inventory flag, tax exempt flag, report by unit, and latest price.</li>
+              <li>Latest price is location-specific when product databases are shared; invoice-associated vendor items update the product price automatically.</li>
+              <li>Vendor items can be reassigned from a product to an existing or new product, with conversion between vendor packaging and product count-by unit.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>Publicly Visible Product Data Objects</h3>
+            <table>
+              <thead><tr><th>Object</th><th>Publicly described fields / behavior</th></tr></thead>
+              <tbody>
+                <tr><td>Product</td><td>Name, category, accounting code, inventory flag, tax exempt flag, report/count unit, latest price, price details, history, allergens, count sheets.</td></tr>
+                <tr><td>Vendor Item</td><td>Can be associated with a product; multiple vendor items can belong to one product; wrong associations can be reassigned.</td></tr>
+                <tr><td>Category</td><td>Used for reporting and accounting; product can be split across multiple categories by percentage during setup.</td></tr>
+                <tr><td>Count-by Unit</td><td>Defines how product is counted on inventory and reports; conversions are needed when purchase unit differs from count unit.</td></tr>
+                <tr><td>Price Details</td><td>Shows price-change history; starting price can be manually entered until invoice data updates it.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="inventory" class="view">
+        <div class="hero">
+          <h2>MarginEdge Inventory Module</h2>
+          <p>This workflow describes how MarginEdge publicly documents Inventory: admins decide which products and recipes are inventoried, organize them into count sheets, enter dated inventory counts, save or close inventories, and use closed inventories for food usage, waste, theoretical usage, internal transfers, and reporting.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory Workflow - PDF Style Process Map</h3>
+            <div class="pdf-map-wrap">
+              <div class="pdf-map">
+                <div class="pill">START<br>Inventory Setup</div>
+                <div class="arrow-down"></div>
+
+                <div class="phase">
+                  <div class="phase-title">PREPARE COUNT SHEETS</div>
+                  <div class="flowbox">1. Admin decides what to inventory<br>Products and/or recipes<br>choose how each is counted</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">2. Create count sheets<br>Default examples:<br>Food Inventory<br>Bar Inventory<br>Custom sheets allowed</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Organization method?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Auto by Category</div>
+                      <div class="flowbox db small">Products auto-section<br>by category<br>alphabetical sort</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Sheet to Shelf</div>
+                      <div class="flowbox db small">Custom sections<br>physical layout<br>same product may appear<br>in multiple sections</div>
+                    </div>
+                  </div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">3. Add products/recipes<br>one by one<br>or all products in category<br>set auto-add rules for new products</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">TAKE INVENTORY</div>
+                  <div class="flowbox">4. User opens<br>Inventory > Inventory Counts<br>clicks Enter a Count</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">5. Select count sheet<br>Only one person should edit<br>one count sheet at a time</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">6. Select inventory date<br>Date represents last business day<br>included in the inventory</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">7. Enter counts<br>type full count<br>or use plus sign<br>to add to existing count</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">8. System calculates<br>line value automatically<br>using inventory price/conversions</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">SAVE OR CLOSE</div>
+                  <div class="flowbox">9. User clicks Save<br>or Save Exit</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Close inventory?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox warn small">Inventory status = Saved<br>User can resume/edit later<br>Usage reports not ready</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">Inventory status = Closed<br>Final counts available<br>Export PDF or CSV</div>
+                    </div>
+                  </div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">10. Same-day count sheets<br>roll up into one<br>inventory total</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">REPORTING AND COSTING</div>
+                  <div class="flowbox db">11. Closed inventories feed<br>food usage reports<br>previous vs current values<br>inventory totals</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">12. Inventory prices<br>automatically use<br>last purchase price<br>manual price allowed<br>before purchase history exists</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">13. Waste log entries<br>pull into theoretical reports<br>for more accurate food costs</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Two closed inventories?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">Theoretical usage can compare<br>purchases + sales + inventory<br>actual vs theoretical variance</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox warn small">Close another inventory<br>for accurate usage reporting</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase">
+                  <div class="phase-title">ADVANCED FLOWS</div>
+                  <div class="flowbox">14. Ordering view can show<br>pars, on hand, and last count<br>beside order guides</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">15. Internal transfers<br>move products/recipes<br>between locations<br>books adjust both sides</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">16. Central kitchen flow<br>commissary treated like vendor<br>journal entries document transactions</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="pill">END<br>Inventory closed and usable for food-cost reporting</div>
+              </div>
+              <p class="map-caption">This map follows the one-page reference PDF style, but represents MarginEdge's documented public inventory workflow rather than this repository's internal implementation.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Inventory Workflow Details</h3>
+            <ol>
+              <li>Users first decide which products and/or recipes to inventory and how to count them.</li>
+              <li>Count sheets are reusable templates. Inventory counts are the dated results of counting those sheets.</li>
+              <li>Multiple count sheets can exist for one restaurant, and count sheets from the same date roll into one inventory total.</li>
+              <li>Products can be organized by Auto by Category or Sheet to Shelf. Sheet to Shelf supports custom sections matching physical storage areas.</li>
+              <li>Inventory count entry uses a selected count sheet and inventory date; users enter counts directly or add to existing counts.</li>
+              <li>Inventories remain Saved until closed. MarginEdge says all inventories need to be closed to see usage report details.</li>
+              <li>Accurate theoretical usage reporting generally requires two closed inventories plus PMIX mapping and POS connection.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>Publicly Visible Inventory Data Objects</h3>
+            <table>
+              <thead><tr><th>Object</th><th>Publicly described fields / behavior</th></tr></thead>
+              <tbody>
+                <tr><td>Count Sheet</td><td>Template list of products and/or recipes; can be Food, Bar, daily hot-list, weekly protein list, or custom sheet.</td></tr>
+                <tr><td>Inventory Count</td><td>Dated result of entered counts; has Saved or Closed status; closed inventories are used for final reporting.</td></tr>
+                <tr><td>Inventory Date</td><td>Represents the last day of business included in the inventory.</td></tr>
+                <tr><td>Count Unit / Conversion</td><td>Used when product is counted differently than purchased; MarginEdge handles obvious conversions or asks for help.</td></tr>
+                <tr><td>Waste Log</td><td>Waste entries can pull into theoretical reports for more accurate food costs.</td></tr>
+                <tr><td>PMIX Mapping</td><td>Associates POS buttons with products or recipes for theoretical usage reporting.</td></tr>
+                <tr><td>Internal Transfer</td><td>Moves products and recipes between locations and reflects changes in platform/accounting records.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="evidence" class="view">
+        <div class="hero">
+          <h2>Evidence and Notes</h2>
+          <p>This artifact uses public MarginEdge pages and help-center articles. It does not claim access to MarginEdge internal code, database schema, triggers, queues, or private APIs.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Source Evidence Used</h3>
+            <table>
+              <thead><tr><th>Topic</th><th>Evidence</th><th>URL</th></tr></thead>
+              <tbody>
+                <tr><td>Products page behavior</td><td>Invoices create/match products; product list/search/filter/export; columns; product edit fields; vendor item reassignment; price details/history.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/360047714754-Finding-and-Editing-Your-Products-in-MarginEdge">Finding and Editing Your Products</a></td></tr>
+                <tr><td>Add product flow</td><td>Restaurant Admin/MarginEdge Admin adds product, chooses name suggestion or new product, category, inventory/report settings, count unit, price, allergens, save.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/360023013273-How-to-Add-Products-in-MarginEdge">How to Add Products</a></td></tr>
+                <tr><td>Vendor item reassignment</td><td>Wrong vendor item can be reassigned from product edit page to existing or new product with conversion.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/360052028733-How-to-Fix-a-Vendor-Item-Associated-with-the-Wrong-Product">Fix Vendor Item Association</a></td></tr>
+                <tr><td>Inventory overview</td><td>Decide products/recipes to inventory; create/organize count sheets; enter counts from computer/phone/tablet; count sheets vs inventory counts; automatic inventory prices; close inventories; one editor per sheet.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/218822407-Getting-Started-with-Inventory">Getting Started with Inventory</a></td></tr>
+                <tr><td>Count sheet setup</td><td>Add/edit/remove sheets; Food/Bar default sheets; Auto by Category; Sheet to Shelf; auto-add new products; add products/recipes; remove/reorder products.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/115002912588-How-do-I-Set-Up-my-Inventory-Count-Sheets">Set Up Count Sheets</a></td></tr>
+                <tr><td>Taking inventory</td><td>Inventory Counts, Enter a Count, choose count sheet, choose date, enter counts, line value auto-calculated, Save/Saved status, edit/resume, Close, Closed status.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/360055247493-Setup-Complete-Steps-for-Taking-Inventory">Steps for Taking Inventory</a></td></tr>
+                <tr><td>Theoretical usage</td><td>Compares what should be on hand from purchases/sales to actual inventory; requires POS connection, PMIX mapping, and at least two inventories for the main report.</td><td><a href="https://help.marginedge.com/hc/en-us/articles/360015329433-Getting-Started-with-Theoretical-Usage-Reporting">Theoretical Usage Reporting</a></td></tr>
+                <tr><td>Inventory and ordering product page</td><td>Products/prices auto-update on sheets as ordering occurs; count multiple packaging units with conversion math; reports update when inventories close; waste log feeds theoreticals; internal transfers and commissary flows.</td><td><a href="https://www.marginedge.com/inventory-management">Inventory and Ordering Management</a></td></tr>
+                <tr><td>Recipes and menu analysis</td><td>Ingredient prices auto-update as invoices process; conversions are central; recipe ingredients are not tied to vendors; menu analysis uses real-time ingredient prices and PMIX data.</td><td><a href="https://www.marginedge.com/menu-analysis">Recipes and Menu Analysis</a></td></tr>
+                <tr><td>Invoice processing</td><td>Invoices can be sent by scan/upload/email/photo/EDI; line-item data can go to accounting; product prices update as invoices come in; vendor items connect to products.</td><td><a href="https://www.marginedge.com/automated-invoice">Automated Invoice Processing</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <h3>Boundary Notes</h3>
+            <div class="note">
+              MarginEdge internal DB columns, table names, triggers, queues, background workers, and edge functions are not public in the reviewed sources. The process maps therefore use public nouns and behavior: Product, Vendor Item, Category, Count Sheet, Inventory Count, Inventory Date, Waste Log, PMIX Mapping, Recipe, POS, Order Guide, Internal Transfer, and Commissary.
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll(".nav-button"));
+    const views = Array.from(document.querySelectorAll(".view"));
+
+    function activate(target) {
+      buttons.forEach((button) => button.classList.toggle("active", button.dataset.target === target));
+      views.forEach((view) => view.classList.toggle("active", view.id === target));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => activate(button.dataset.target));
+    });
+  </script>
+</body>
+</html>

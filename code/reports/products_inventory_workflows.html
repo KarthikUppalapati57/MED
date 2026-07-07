@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Products and Inventory Workflow Artifact</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #607089;
+      --line: #dfe5ef;
+      --accent: #0f766e;
+      --accent-2: #2563eb;
+      --warn: #b45309;
+      --bad: #b91c1c;
+      --soft: #eef6f5;
+      --code: #0f172a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px 18px;
+      background: #111827;
+      color: #f9fafb;
+      overflow-y: auto;
+    }
+
+    .brand {
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255,255,255,.14);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .brand p {
+      margin: 8px 0 0;
+      color: #aeb8c8;
+      font-size: 12px;
+    }
+
+    .nav-group {
+      margin: 20px 0 8px;
+      color: #8ea0b8;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .nav-button {
+      display: block;
+      width: 100%;
+      margin: 4px 0;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #d9e1ec;
+      text-align: left;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav-button:hover,
+    .nav-button.active {
+      background: rgba(255,255,255,.1);
+      color: #ffffff;
+    }
+
+    main {
+      padding: 32px;
+      max-width: 1280px;
+      width: 100%;
+    }
+
+    section.view { display: none; }
+    section.view.active { display: block; }
+
+    .hero {
+      margin-bottom: 24px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 920px;
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      grid-column: span 12;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+
+    .half { grid-column: span 6; }
+    .third { grid-column: span 4; }
+
+    h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    h4 {
+      margin: 16px 0 8px;
+      font-size: 14px;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    p { margin: 8px 0; }
+    ul, ol { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 6px 0; }
+
+    .badge {
+      display: inline-block;
+      margin: 2px 4px 2px 0;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .badge.blue { background: #eff6ff; color: var(--accent-2); }
+    .badge.warn { background: #fffbeb; color: var(--warn); }
+    .badge.bad { background: #fef2f2; color: var(--bad); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 0;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef2f7;
+      color: var(--code);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+    }
+
+    .flow {
+      counter-reset: step;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .flow li {
+      position: relative;
+      margin: 0 0 12px;
+      padding: 12px 12px 12px 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+    }
+
+    .flow li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      text-align: center;
+      font-size: 12px;
+      line-height: 22px;
+      font-weight: 800;
+    }
+
+    .note {
+      padding: 12px;
+      border-left: 4px solid var(--warn);
+      background: #fff7ed;
+      color: #7c2d12;
+      border-radius: 6px;
+    }
+
+    .ok {
+      padding: 12px;
+      border-left: 4px solid var(--accent);
+      background: #ecfdf5;
+      color: #064e3b;
+      border-radius: 6px;
+    }
+
+    .chart {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .chart-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .chart-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .chart-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .node {
+      position: relative;
+      min-height: 84px;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .node::after {
+      content: "";
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      width: 10px;
+      height: 2px;
+      background: #94a3b8;
+    }
+
+    .node:last-child::after,
+    .chart-row .node.no-arrow::after {
+      display: none;
+    }
+
+    .node-title {
+      display: block;
+      margin-bottom: 6px;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .node small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .node.ui { border-color: #93c5fd; background: #eff6ff; }
+    .node.api { border-color: #99f6e4; background: #ecfdf5; }
+    .node.db { border-color: #c4b5fd; background: #f5f3ff; }
+    .node.logic { border-color: #fde68a; background: #fffbeb; }
+    .node.trigger { border-color: #fecaca; background: #fef2f2; }
+
+    .branch-label {
+      margin: 12px 0 4px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend i {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .pdf-map-wrap {
+      overflow-x: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .pdf-map {
+      width: 760px;
+      margin: 0 auto;
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .pill {
+      display: inline-block;
+      min-width: 130px;
+      padding: 9px 18px;
+      border: 2px solid #22c55e;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 800;
+    }
+
+    .phase {
+      position: relative;
+      width: 300px;
+      margin: 22px auto;
+      padding: 18px 14px 14px;
+      border: 2px solid #6b7280;
+      background: #f8fafc;
+    }
+
+    .phase.wide {
+      width: 420px;
+    }
+
+    .phase-title {
+      position: absolute;
+      top: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0 8px;
+      background: #f8fafc;
+      color: #374151;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      white-space: nowrap;
+    }
+
+    .flowbox {
+      width: 210px;
+      margin: 10px auto;
+      padding: 10px;
+      border: 2px solid #3b82f6;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .flowbox.data {
+      border-color: #06b6d4;
+      background: #ecfeff;
+      color: #155e75;
+    }
+
+    .flowbox.db {
+      border-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+
+    .flowbox.warn {
+      border-color: #f59e0b;
+      background: #fffbeb;
+      color: #92400e;
+    }
+
+    .flowbox.bad {
+      border-color: #ef4444;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    .flowbox.small {
+      width: 170px;
+      font-size: 11px;
+    }
+
+    .decision {
+      width: 120px;
+      height: 120px;
+      margin: 18px auto;
+      border: 2px solid #a855f7;
+      background: #faf5ff;
+      color: #6b21a8;
+      transform: rotate(45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .decision span {
+      display: block;
+      width: 92px;
+      transform: rotate(-45deg);
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .arrow-down {
+      width: 2px;
+      height: 22px;
+      margin: 0 auto;
+      background: #111827;
+      position: relative;
+    }
+
+    .arrow-down::after {
+      content: "";
+      position: absolute;
+      left: -4px;
+      bottom: -1px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid #111827;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+      margin: 10px auto;
+      width: 500px;
+    }
+
+    .branch-note {
+      color: #475569;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .map-caption {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: left;
+    }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      aside {
+        position: relative;
+        height: auto;
+      }
+      main { padding: 18px; }
+      .half, .third { grid-column: span 12; }
+      .chart-row,
+      .chart-row.three,
+      .chart-row.two {
+        grid-template-columns: 1fr;
+      }
+      .node::after {
+        left: 22px;
+        right: auto;
+        top: auto;
+        bottom: -10px;
+        width: 2px;
+        height: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <h1>Products and Inventory Workflows</h1>
+        <p>Separate module audit with DB columns, triggers, RPCs, edge functions, and live artifacts.</p>
+      </div>
+
+      <div class="nav-group">Modules</div>
+      <button class="nav-button active" data-target="products">Products Module</button>
+      <button class="nav-button" data-target="inventory">Inventory Module</button>
+
+      <div class="nav-group">Artifacts</div>
+      <button class="nav-button" data-target="live">Live Artifacts</button>
+      <button class="nav-button" data-target="risks">Gaps and Risks</button>
+    </aside>
+
+    <main>
+      <section id="products" class="view active">
+        <div class="hero">
+          <h2>Products Module</h2>
+          <p>The Products module manages the tenant product catalog, COGS/category mapping, product costs, trusted global item suggestions, and price variance resolution. The active UI is in <code>src/modules/products/pages/Products.jsx</code> with realtime margin widgets in <code>ProductsLiveDashboard.jsx</code>.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Products Workflow - PDF Style Process Map</h3>
+            <div class="pdf-map-wrap">
+              <div class="pdf-map">
+                <div class="pill">START<br>Products Catalog</div>
+                <div class="arrow-down"></div>
+
+                <div class="phase">
+                  <div class="phase-title">OPEN MODULE</div>
+                  <div class="flowbox">1. Manager opens<br><code>Products.jsx</code><br>Route chooses active tab</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">2. System loads<br><code>products</code><br>WHERE active org/brand/location<br>Search + sort + page 50</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">3. UI calculates<br>Total products<br>Inventoried count<br>Tax exempt count<br>Category count</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">CATALOG ACTION</div>
+                  <div class="flowbox">4. User selects action<br>Add product<br>Edit product<br>Delete product<br>Bulk export/delete</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Valid required fields?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Invalid</div>
+                      <div class="flowbox warn small">Show validation error<br>Block save</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Valid</div>
+                      <div class="flowbox db small">5. Write product row<br>INSERT / UPDATE<br>or soft delete</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">DATABASE UPDATES</div>
+                  <div class="flowbox db">6. <code>products</code> updated<br>name, product_id, category<br>accounting_category, units<br>latest_price, flags, scope</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">7. <code>set_updated_at</code><br>updates timestamp</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">8. <code>trg_sync_dim_product</code><br>syncs product warehouse dimension</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>latest_price changed?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">9. Recipe trigger<br>recalculates recipe costs<br>may insert margin alert</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox small">No recipe recalculation</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">AI AND PRICE FLOWS</div>
+                  <div class="flowbox data">10. AI Verification tab<br>calls trusted global vendor item RPC<br>mapping_count >= 50<br>confidence >= 90</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">11. Frontend token match<br>compares product name<br>against global item name</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">12. Price Action Center<br>loads flagged vendor items<br>User dismisses or accepts</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">13. <code>resolve_price_variance</code><br>clears vendor flag<br>optionally updates product cost</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase">
+                  <div class="phase-title">REFRESH AND AUDIT</div>
+                  <div class="flowbox">14. React Query invalidates<br><code>products</code> and<br><code>price_variances</code></div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">15. Supabase realtime<br><code>products-realtime</code><br>refreshes other sessions</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">16. Export CSV option<br>Product ID, Name, Category<br>Inventoried, Unit, Price</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="pill">END<br>Product catalog updated</div>
+              </div>
+              <p class="map-caption">This mirrors the reference PDF format: stage containers, numbered boxes, validation diamonds, branch outputs, database updates, trigger side effects, and final refresh/export steps.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Products Logic Flow Chart</h3>
+            <div class="chart">
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">User Opens Products</span>
+                  <small><code>/Products/:tab</code> chooses Master Catalog, AI Verification, Price Action Center, or Purchase Report.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">React Query Loads Data</span>
+                  <small><code>useAuthInfiniteQuery</code> calls <code>api.entities.Product.list()</code> with page, search, sort, and selected columns.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Products Table</span>
+                  <small><code>apiClient</code> reads <code>products</code> and applies active organization, brand, and location scope where present.</small>
+                </div>
+                <div class="node logic">
+                  <span class="node-title">UI Processing</span>
+                  <small>Debounced search, category filter, stats, CSV export rows, and table rendering are calculated from returned rows.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Create / Update / Soft Delete</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">Add/Edit Dialog</span>
+                  <small>User submits product fields: name, product ID, category, account code, units, flags, latest price.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Entity API Mutation</span>
+                  <small><code>Product.create</code>, <code>Product.update</code>, or soft-delete <code>Product.delete</code> writes through Supabase.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">DB Row Changes</span>
+                  <small><code>products</code> row is inserted, updated, or receives <code>deleted_at</code>.</small>
+                </div>
+                <div class="node trigger">
+                  <span class="node-title">Realtime Refresh</span>
+                  <small><code>products-realtime</code> sees public <code>products</code> changes and invalidates the product cache.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Trusted Global Mapping</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">AI Verification Tab</span>
+                  <small>Enabled only when that tab is active and organization context exists.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Trusted Suggestions RPC</span>
+                  <small><code>get_trusted_global_vendor_item_suggestions</code> returns only high-confidence, high-count global items.</small>
+                </div>
+                <div class="node logic">
+                  <span class="node-title">Token Match Logic</span>
+                  <small>Frontend compares product and global item tokens, requiring shared token coverage before suggesting a category.</small>
+                </div>
+                <div class="node ui">
+                  <span class="node-title">User Reviews Mapping</span>
+                  <small>Suggestion prefills the edit dialog; save becomes a normal <code>products.accounting_category</code> update.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Price Variance to Recipe Margin</div>
+              <div class="chart-row">
+                <div class="node api">
+                  <span class="node-title">Flagged Vendor Items</span>
+                  <small><code>get_flagged_vendor_items</code> joins vendor item, vendor, invoice, mapping, and product data.</small>
+                </div>
+                <div class="node ui">
+                  <span class="node-title">Accept or Dismiss</span>
+                  <small>Price Action Center sends <code>vendorItemId</code> and <code>updateProduct</code> choice.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Resolve Price RPC</span>
+                  <small><code>resolve_price_variance</code> clears the flag and can update <code>products.latest_price</code>.</small>
+                </div>
+                <div class="node trigger">
+                  <span class="node-title">Recipe Cost Trigger</span>
+                  <small>Latest price update fires recipe recalculation and can insert <code>ai_insights</code> margin alerts.</small>
+                </div>
+              </div>
+            </div>
+            <div class="legend">
+              <span><i style="background:#eff6ff"></i> UI</span>
+              <span><i style="background:#ecfdf5"></i> API/RPC</span>
+              <span><i style="background:#f5f3ff"></i> DB table</span>
+              <span><i style="background:#fffbeb"></i> Processing logic</span>
+              <span><i style="background:#fef2f2"></i> Trigger/realtime</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Where Data Comes From</h3>
+            <span class="badge">Supabase table: products</span>
+            <span class="badge blue">RPC: get_trusted_global_vendor_item_suggestions</span>
+            <span class="badge blue">RPC: get_flagged_vendor_items</span>
+            <span class="badge blue">RPC: resolve_price_variance</span>
+            <span class="badge">Realtime: products</span>
+            <p>Main product rows are read through <code>api.entities.Product.list()</code>, which wraps <code>supabase.from('products')</code> and auto-applies active organization, brand, and location scope where available.</p>
+            <p>The AI Verification Queue reads trusted network suggestions using <code>supabase.rpc('get_trusted_global_vendor_item_suggestions')</code>. The Price Action Center reads vendor item price spike rows through <code>api.vendors.getFlaggedVendorItems(organization.id)</code>.</p>
+          </div>
+
+          <div class="card half">
+            <h3>Frontend Processing</h3>
+            <ol class="flow">
+              <li>Route tab is derived from <code>/Products/:subPath</code>, defaulting to <code>all-products</code>.</li>
+              <li>Search is debounced for 500 ms, then Product list is paged in blocks of 50 rows.</li>
+              <li>Category filtering happens client-side against <code>accounting_category</code>.</li>
+              <li>Trusted global matching tokenizes the tenant product name and global item name, requires high token overlap, mapping count >= 50, and confidence >= 90.</li>
+              <li>Create, update, delete, and bulk delete all invalidate the <code>products</code> query cache and rely on soft delete behavior in <code>api.entities.Product</code>.</li>
+              <li>Realtime subscription on public <code>products</code> invalidates the product cache whenever any product row changes.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Product DB Columns Used by UI and Workflows</h3>
+            <table>
+              <thead><tr><th>Table</th><th>Columns called or depended on</th><th>Used for</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code>products</code></td>
+                  <td><code>id</code>, <code>product_id</code>, <code>name</code>, <code>description</code>, <code>category</code>, <code>accounting_category</code>, <code>is_inventoried</code>, <code>is_tax_exempt</code>, <code>report_by_unit</code>, <code>base_unit</code>, <code>latest_price</code>, <code>location_specific</code>, <code>organization_id</code>, <code>brand_id</code>, <code>location_id</code>, <code>created_at</code>, <code>deleted_at</code></td>
+                  <td>Catalog grid, dialog form, stats, CSV export, AI queue, realtime costing, soft delete filtering.</td>
+                </tr>
+                <tr>
+                  <td><code>global_vendor_items</code></td>
+                  <td><code>id</code>, <code>item_name</code>, <code>mapping_count</code>, <code>most_common_category</code>, <code>confidence_score</code></td>
+                  <td>Trusted network category suggestions after normalization and confidence filters.</td>
+                </tr>
+                <tr>
+                  <td><code>vendor_items</code></td>
+                  <td><code>id</code>, <code>vendor_item_name</code>, <code>previous_price</code>, <code>last_price</code>, <code>last_price_change_percent</code>, <code>price_variance_flag</code>, <code>last_invoice_id</code>, <code>vendor_id</code></td>
+                  <td>Price Action Center rows and variance resolution.</td>
+                </tr>
+                <tr>
+                  <td><code>vendor_item_mappings</code>, <code>vendors</code>, <code>invoices</code></td>
+                  <td><code>internal_product_id</code>, <code>vendor_item_id</code>, vendor <code>name</code>, invoice <code>invoice_date</code></td>
+                  <td>Shows linked product, vendor name, and invoice date for price variance decisions.</td>
+                </tr>
+                <tr>
+                  <td><code>recipes</code>, <code>ai_insights</code></td>
+                  <td>Recipe cost fields, <code>ingredients</code>, <code>selling_price</code>, <code>target_margin_percent</code>, <code>margin_alert_enabled</code>, insight metadata fields.</td>
+                  <td>Product price changes trigger recipe cost recalculation and optional margin alerts.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Create / Edit / Delete Workflow</h3>
+            <ol class="flow">
+              <li>User opens Add/Edit Product. Ground staff are hidden from management buttons by UI permissions.</li>
+              <li>Form writes <code>name</code>, <code>product_id</code>, <code>description</code>, <code>category</code>, <code>accounting_category</code>, inventoried/tax flags, units, price, and location-specific flag.</li>
+              <li>Create uses <code>api.entities.Product.create()</code>. If <code>product_id</code> is blank, UI generates <code>PRD-&lt;timestamp&gt;</code>.</li>
+              <li>Update uses <code>api.entities.Product.update(id, formData)</code>.</li>
+              <li>Delete and bulk delete use soft delete because the Product entity is configured with <code>useSoftDelete = true</code>; the API sets <code>deleted_at</code>.</li>
+              <li>On success, React Query invalidates <code>products</code>; Supabase realtime also refreshes the product list when the row changes.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>AI Verification and Global Mapping Workflow</h3>
+            <ol class="flow">
+              <li>UI loads product rows and, only on the AI Verification tab, calls <code>get_trusted_global_vendor_item_suggestions</code>.</li>
+              <li>SQL returns only global rows with <code>mapping_count >= 50</code>, <code>confidence_score >= 90</code>, and a normalized COGS category.</li>
+              <li>Frontend token-matches product names to global item names and requires at least 80% coverage.</li>
+              <li>When a trusted suggestion is accepted for review, the product dialog is prefilled with the normalized accounting category.</li>
+              <li>Save is still a normal product update; the global suggestion is not auto-written without user confirmation.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Price Variance Workflow</h3>
+            <ol class="flow">
+              <li>Frontend calls <code>get_flagged_vendor_items(p_organization_id)</code>.</li>
+              <li>RPC joins <code>vendor_items</code> to <code>vendors</code>, optional <code>vendor_item_mappings</code>, <code>products</code>, and <code>invoices</code>.</li>
+              <li>User can dismiss or accept the vendor price change.</li>
+              <li><code>resolve_price_variance(p_vendor_item_id, p_update_product)</code> clears <code>vendor_items.price_variance_flag</code>.</li>
+              <li>If accepted and mapped, the RPC updates <code>products.latest_price</code> to <code>vendor_items.last_price</code>.</li>
+              <li>Updating <code>products.latest_price</code> fires the recipe margin trigger described below.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>Product Triggers and Functions</h3>
+            <table>
+              <thead><tr><th>Name</th><th>Trigger/Event</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code>set_updated_at</code></td>
+                  <td>Before update on <code>products</code></td>
+                  <td>Sets <code>updated_at = now()</code>.</td>
+                </tr>
+                <tr>
+                  <td><code>trg_sync_dim_product</code></td>
+                  <td>After insert/update on <code>products</code></td>
+                  <td>Syncs product records into the warehouse dimension <code>dim_product</code>.</td>
+                </tr>
+                <tr>
+                  <td><code>trigger_recalculate_recipes_on_price_change</code></td>
+                  <td>After update of <code>latest_price</code> on <code>products</code></td>
+                  <td>Finds recipes whose JSON ingredients contain the product, recalculates recipe costs, and inserts <code>ai_insights</code> margin alerts when target margin is breached.</td>
+                </tr>
+                <tr>
+                  <td><code>trigger_cascade_invoice_prices</code></td>
+                  <td>After invoice status changes to validated/approved</td>
+                  <td>Loops invoice line items, updates product <code>latest_price</code>, updates inventory <code>unit_cost</code> and <code>current_value</code>, then indirectly invokes recipe recalculation.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Products Edge Functions</h3>
+            <p>No Products page action directly invokes a Supabase edge function. Product-related intelligence is handled by Postgres RPCs and triggers. Indirectly related edge functions include:</p>
+            <table>
+              <thead><tr><th>Function</th><th>Relationship</th><th>Tables touched</th></tr></thead>
+              <tbody>
+                <tr><td><code>ai-insights-chat</code></td><td>Reads products, inventory, invoices, POS data, and AI insights to summarize business context.</td><td><code>products</code>, <code>inventory</code>, <code>invoices</code>, <code>pos_sales_data</code>, <code>ai_insights</code></td></tr>
+                <tr><td><code>invoice-processing</code></td><td>Invoice extraction can feed invoice line items, which later cascade into product and inventory prices when invoices are validated.</td><td><code>invoices</code>, invoice-derived data</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="inventory" class="view">
+        <div class="hero">
+          <h2>Inventory Module</h2>
+          <p>The Inventory module manages live stock levels, wastage, count sheets and sessions, receiving, transfers, POS depletion, scanning UI, and AvT views. The active UI is in <code>src/modules/inventory/pages/Inventory.jsx</code> with related components under <code>src/modules/inventory/components/</code>.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory Workflow - PDF Style Process Map</h3>
+            <div class="pdf-map-wrap">
+              <div class="pdf-map">
+                <div class="pill">START<br>Inventory Operations</div>
+                <div class="arrow-down"></div>
+
+                <div class="phase">
+                  <div class="phase-title">OPEN MODULE</div>
+                  <div class="flowbox">1. Staff/Manager opens<br><code>Inventory.jsx</code><br>Route chooses workflow tab</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox data">2. System conditionally fetches<br><code>inventory</code>, <code>wastage_logs</code><br><code>count_sheets</code>, <code>count_sessions</code><br><code>recipes</code></div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">3. Scope and filters applied<br>organization, brand, location<br>search, category, sort</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">SELECT WORKFLOW</div>
+                  <div class="flowbox">4. User chooses action<br>Inventory CRUD<br>Wastage<br>Count Session<br>Receiving<br>Transfer<br>POS Depletion</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Which action?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Manual Stock</div>
+                      <div class="flowbox small">Edit/Add/Delete<br>or log wastage</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Automated Flow</div>
+                      <div class="flowbox small">Count, receiving,<br>transfer, or POS</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">COUNT SESSION PATH</div>
+                  <div class="flowbox">5. Create count sheet<br>items from inventory:<br>inventory_id, product_name<br>expected_quantity, unit</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">6. Staff physically counts<br>enters counted quantity<br>system shows variance</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>All quantities valid?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Invalid</div>
+                      <div class="flowbox warn small">Show errors<br>Block submit</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">Valid</div>
+                      <div class="flowbox db small">7. Call<br><code>complete_count_session</code></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">DATABASE UPDATES - COUNT</div>
+                  <div class="flowbox db">8. For each counted item<br>lock inventory row<br>actual vs expected</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">9. <code>inventory</code> UPDATE<br>current_quantity = counted<br>current_value = counted x unit_cost<br>previous_quantity/value saved</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">10. <code>count_sessions</code> INSERT<br>status = completed<br>counted_data + variance_data<br>completed_at, counted_by</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">11. <code>inventory_movements</code> INSERT<br>movement for changed items<br>source = count_session</div>
+                  <div class="arrow-down"></div>
+                  <div class="decision"><span>Total variance nonzero?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Yes</div>
+                      <div class="flowbox db small">12. GL variance entry<br>Inventory Asset<br>COGS variance</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">No</div>
+                      <div class="flowbox small">No GL entry needed</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase wide">
+                  <div class="phase-title">RECEIVING / TRANSFER / POS PATHS</div>
+                  <div class="flowbox db">13. Receiving path<br><code>receive_purchase_order</code><br>creates receiving row<br>updates order status<br>increments inventory</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">14. Transfer path<br><code>execute_internal_transfer</code><br>deducts source<br>creates/updates destination<br>writes movement rows</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox db">15. POS depletion path<br>calculate theoretical usage<br>manager approves<br>deduct inventory quantities</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="phase">
+                  <div class="phase-title">LOW STOCK AND REFRESH</div>
+                  <div class="decision"><span>current_quantity <= reorder/par?</span></div>
+                  <div class="split">
+                    <div>
+                      <div class="branch-note">Below level</div>
+                      <div class="flowbox db small">16. Notification / action<br>low inventory<br>Create order</div>
+                    </div>
+                    <div>
+                      <div class="branch-note">OK</div>
+                      <div class="flowbox small">No alert needed</div>
+                    </div>
+                  </div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">17. Realtime channel refresh<br>inventory, wastage<br>count sheets, count sessions</div>
+                  <div class="arrow-down"></div>
+                  <div class="flowbox">18. Export CSV option<br>Product, quantity, unit<br>value, variance, status</div>
+                </div>
+
+                <div class="arrow-down"></div>
+                <div class="pill">END<br>Inventory updated</div>
+              </div>
+              <p class="map-caption">This follows the supplied inventory PDF style while using this codebase's actual entities and RPCs: <code>complete_count_session</code>, <code>receive_purchase_order</code>, <code>execute_internal_transfer</code>, and POS depletion RPCs.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory Logic Flow Charts</h3>
+            <div class="chart">
+              <div class="branch-label">Main Inventory List and CRUD</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">User Opens Inventory Tab</span>
+                  <small><code>/Inventory/:subPath</code> maps to inventory list, wastage, counts, receiving, POS sync, transfers, or AvT.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Conditional Data Load</span>
+                  <small><code>needsInventory</code>, <code>needsWastage</code>, <code>needsCountSheets</code>, and related flags decide which queries run.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Scoped DB Reads</span>
+                  <small><code>inventory</code>, <code>wastage_logs</code>, <code>count_sheets</code>, <code>count_sessions</code>, and <code>recipes</code> are read through <code>apiClient</code>.</small>
+                </div>
+                <div class="node logic">
+                  <span class="node-title">Context + Table Logic</span>
+                  <small><code>filterByContext</code>, debounced search, category filters, metrics, and virtualized visible rows shape the UI.</small>
+                </div>
+              </div>
+
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">Add/Edit/Delete Item</span>
+                  <small>User changes product name, account category, quantity, unit, unit cost, location, par, or reorder point.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Inventory Entity Mutation</span>
+                  <small><code>Inventory.create</code>, <code>Inventory.update</code>, or soft-delete <code>Inventory.delete</code>.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Inventory Row Changes</span>
+                  <small><code>inventory</code> stores current quantity/value, previous quantity/value, costing, and count metadata.</small>
+                </div>
+                <div class="node trigger">
+                  <span class="node-title">Realtime + Fact Sync</span>
+                  <small>Realtime invalidates UI queries; DB triggers update timestamps and reporting fact rows.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Inventory Count Session</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">Create Count Sheet</span>
+                  <small>Current inventory list becomes <code>count_sheets.items</code> with inventory ID, product name, expected quantity, and unit.</small>
+                </div>
+                <div class="node ui">
+                  <span class="node-title">Active Count Wizard</span>
+                  <small>User enters counted quantities, then submits counts JSON.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Complete Count RPC</span>
+                  <small><code>complete_count_session</code> locks count sheet and inventory rows, then calculates quantity and dollar variance.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Atomic DB Writes</span>
+                  <small>Updates <code>inventory</code>, inserts <code>count_sessions</code>, writes <code>general_ledger_entries</code>, and logs <code>inventory_movements</code>.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Loading Dock Receiving</div>
+              <div class="chart-row">
+                <div class="node api">
+                  <span class="node-title">Pending Orders Query</span>
+                  <small><code>AutoOrder.list</code> loads sent, ordered, partially received, and pending orders.</small>
+                </div>
+                <div class="node ui">
+                  <span class="node-title">User Enters Received Qty</span>
+                  <small>Short shipments are flagged in the UI before submission.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Receiving RPC</span>
+                  <small><code>receive_purchase_order</code> compares expected vs received and creates a receiving record.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Inventory Updated</span>
+                  <small>Existing inventory is incremented or a new row is created; movement rows document the receiving source.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Internal Transfer</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">Select Destination + Items</span>
+                  <small>User picks a location and in-stock source inventory items with transfer quantities.</small>
+                </div>
+                <div class="node logic">
+                  <span class="node-title">Quantity Validation</span>
+                  <small>UI prevents quantities below zero or above available stock.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Transfer RPC</span>
+                  <small><code>execute_internal_transfer</code> creates a completed transfer and moves stock in one server call.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Two-Sided Stock Movement</span>
+                  <small>Source inventory is deducted, destination inventory is created/updated, and movement rows are inserted.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">POS Depletion</div>
+              <div class="chart-row">
+                <div class="node ui">
+                  <span class="node-title">CSV PMIX Upload or Daily POS Review</span>
+                  <small>Manual path parses CSV sales; daily path reads POS ledgers for a date.</small>
+                </div>
+                <div class="node api">
+                  <span class="node-title">Calculate Theoretical Usage</span>
+                  <small><code>calculate_theoretical_depletion</code> or <code>generate_daily_theoretical_usage</code> joins sales to recipes and ingredients.</small>
+                </div>
+                <div class="node ui">
+                  <span class="node-title">Manager Approval</span>
+                  <small>User reviews ingredient usage and approves depletion.</small>
+                </div>
+                <div class="node db">
+                  <span class="node-title">Deduct Inventory</span>
+                  <small><code>execute_inventory_depletion</code> or <code>approve_daily_pos_usage</code> subtracts quantities and records movement/audit data.</small>
+                </div>
+              </div>
+
+              <div class="branch-label">Realtime Refresh</div>
+              <div class="chart-row three">
+                <div class="node trigger">
+                  <span class="node-title">Supabase Channel</span>
+                  <small><code>inventory-realtime-{organization.id}</code> listens for changes to inventory, wastage, count sheets, and count sessions.</small>
+                </div>
+                <div class="node logic">
+                  <span class="node-title">Debounced Invalidation</span>
+                  <small>Each table group waits 1500 ms before invalidating its React Query cache.</small>
+                </div>
+                <div class="node ui no-arrow">
+                  <span class="node-title">UI Refreshes</span>
+                  <small>Lists, metric cards, count views, and active workflow panels re-render from fresh data.</small>
+                </div>
+              </div>
+            </div>
+            <div class="legend">
+              <span><i style="background:#eff6ff"></i> UI</span>
+              <span><i style="background:#ecfdf5"></i> API/RPC</span>
+              <span><i style="background:#f5f3ff"></i> DB table</span>
+              <span><i style="background:#fffbeb"></i> Processing logic</span>
+              <span><i style="background:#fef2f2"></i> Trigger/realtime</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Where Data Comes From</h3>
+            <span class="badge">Supabase table: inventory</span>
+            <span class="badge">wastage_logs</span>
+            <span class="badge">count_sheets</span>
+            <span class="badge">count_sessions</span>
+            <span class="badge">recipes</span>
+            <span class="badge">auto_orders</span>
+            <span class="badge blue">RPC inventory metrics</span>
+            <span class="badge blue">RPC count/session/receiving/transfer/POS</span>
+            <p>Inventory rows are read through <code>api.entities.Inventory.filter()</code>, scoped by organization, brand, and location. The page conditionally loads data only for tabs that need it.</p>
+            <p>Metrics come from <code>get_inventory_totals</code>. Count completion, receiving, transfer, and POS depletion workflows are server-side Postgres RPCs.</p>
+          </div>
+
+          <div class="card half">
+            <h3>Frontend Processing</h3>
+            <ol class="flow">
+              <li>Route subpath maps to active tabs such as inventory list, wastage, receiving, counts, POS sync, transfers, and AvT.</li>
+              <li>Search is debounced for 500 ms; list pages are fetched in pages of 50 rows.</li>
+              <li><code>filterByContext</code> narrows returned data to the current organization, brand, and location context.</li>
+              <li>Realtime invalidation is debounced for inventory, wastage, count sheets, and count sessions.</li>
+              <li>Inventory table virtualization calculates visible rows from scroll position to keep large lists responsive.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory DB Columns Used by UI and Workflows</h3>
+            <table>
+              <thead><tr><th>Table</th><th>Columns called or depended on</th><th>Used for</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code>inventory</code></td>
+                  <td><code>id</code>, <code>organization_id</code>, <code>brand_id</code>, <code>location_id</code>, <code>product_id</code>, <code>internal_product_id</code>, <code>product_name</code>, <code>category</code>, <code>accounting_category</code>, <code>location</code>, <code>current_quantity</code>, <code>current_unit</code>, <code>current_value</code>, <code>previous_quantity</code>, <code>previous_value</code>, <code>unit_cost</code>, <code>par_level</code>, <code>reorder_point</code>, <code>conversion_rates</code>, <code>last_counted_date</code>, <code>last_counted_by</code>, <code>pending_source_invoice</code>, <code>pending_until</code>, <code>deleted_at</code>, <code>updated_at</code></td>
+                  <td>Main stock list, edit/add dialogs, metrics, counts, receiving, POS depletion, transfers, scan simulation, CSV export.</td>
+                </tr>
+                <tr>
+                  <td><code>inventory_movements</code></td>
+                  <td><code>organization_id</code>, <code>location_id</code>, <code>inventory_id</code>, <code>movement_type</code>, <code>quantity</code>, <code>source_type</code>, <code>source_id</code>, <code>previous_quantity</code>, <code>new_quantity</code>, <code>created_by</code>, <code>created_at</code></td>
+                  <td>Audit trail for purchases, recipe consumption, manual adjustments, transfers, stock counts, and receiving.</td>
+                </tr>
+                <tr>
+                  <td><code>wastage_logs</code></td>
+                  <td><code>organization_id</code>, <code>brand_id</code>, <code>location_id</code>, <code>product_id</code>, <code>product_name</code>, <code>quantity</code>, <code>unit</code>, <code>value</code>, <code>reason</code>, <code>notes</code>, <code>logged_by</code>, <code>created_at</code></td>
+                  <td>Wastage log, wastage summary, monthly wastage value in inventory metrics.</td>
+                </tr>
+                <tr>
+                  <td><code>count_sheets</code></td>
+                  <td><code>id</code>, <code>organization_id</code>, <code>location_id</code>, <code>name</code>, <code>description</code>, <code>items</code>, <code>created_by</code>, <code>created_at</code>, <code>updated_at</code></td>
+                  <td>Reusable count templates built from current inventory.</td>
+                </tr>
+                <tr>
+                  <td><code>count_sessions</code></td>
+                  <td><code>id</code>, <code>organization_id</code>, <code>count_sheet_id</code>, <code>status</code>, <code>counted_data</code>, <code>variance_data</code>, <code>started_at</code>, <code>completed_at</code>, <code>counted_by</code></td>
+                  <td>Completed physical counts and variance records.</td>
+                </tr>
+                <tr>
+                  <td><code>auto_orders</code>, <code>receivings</code></td>
+                  <td>Order status, items JSON, vendor, location, receiving items/status/date/user.</td>
+                  <td>Loading dock receiving and inventory increment workflow.</td>
+                </tr>
+                <tr>
+                  <td><code>recipes</code>, <code>recipe_ingredients</code>, <code>pos_sales_data</code>, <code>pos_menu_mapping</code></td>
+                  <td>Recipe IDs/names, ingredient quantities/units, POS item sales quantities, mapped recipe IDs.</td>
+                  <td>POS theoretical depletion and daily usage review.</td>
+                </tr>
+                <tr>
+                  <td><code>transfers</code>, <code>locations</code></td>
+                  <td>Transfer locations, items JSON, status, completion metadata, location names.</td>
+                  <td>Internal transfer workflow and destination selection.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card third">
+            <h3>Inventory List CRUD</h3>
+            <ol class="flow">
+              <li>List loads from <code>api.entities.Inventory.filter()</code> with category, search, sort, and paging.</li>
+              <li>Edit writes product name, account category, quantity, unit, unit cost, storage location, par level, and reorder point.</li>
+              <li>Add writes a new inventory row with the same fields and current context scope.</li>
+              <li>Delete and bulk delete soft-delete rows by writing <code>deleted_at</code>.</li>
+              <li>Save and delete invalidate inventory queries. Realtime changes also invalidate after a debounce.</li>
+            </ol>
+          </div>
+
+          <div class="card third">
+            <h3>Wastage Workflow</h3>
+            <ol class="flow">
+              <li>User chooses an inventory item and opens Log Wastage.</li>
+              <li>UI captures quantity, unit, reason, and notes.</li>
+              <li>Creates a <code>wastage_logs</code> row through <code>api.entities.WastageLog.create()</code>.</li>
+              <li>Then updates inventory quantity and value by subtracting the wasted amount.</li>
+              <li>Wastage query and inventory query are invalidated; realtime handles other clients.</li>
+            </ol>
+          </div>
+
+          <div class="card third">
+            <h3>Count Sheet and Count Session</h3>
+            <ol class="flow">
+              <li>Create Template builds <code>count_sheets.items</code> from current inventory rows with expected quantity and unit.</li>
+              <li>Active count session collects counted quantities in the wizard.</li>
+              <li>Completion calls <code>complete_count_session</code> RPC with organization, location, sheet, counts JSON, and user.</li>
+              <li>RPC locks rows, calculates variances, updates inventory, creates GL variance entry, creates completed count session, and inserts inventory movements.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Receiving Workflow</h3>
+            <ol class="flow">
+              <li>Loading Dock loads <code>auto_orders</code> and filters pending/sent/ordered/partially received orders.</li>
+              <li>User enters actual received quantities. Short quantities are detected client-side for warning text.</li>
+              <li><code>receiveOrderWorkflow</code> calls <code>receive_purchase_order</code>.</li>
+              <li>RPC creates a <code>receivings</code> row, updates <code>auto_orders.status</code> and <code>last_workflow_step</code>.</li>
+              <li>For each received item, RPC finds inventory by inventory ID, product ID, or product name. It updates existing inventory or creates a new row.</li>
+              <li>RPC inserts <code>inventory_movements</code> rows with <code>movement_type = purchase_order</code> and <code>source_type = receiving</code>.</li>
+              <li>Workflow service also creates a notification and emits a frontend workflow event.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>Transfer Workflow</h3>
+            <ol class="flow">
+              <li>Inventory Transfers loads destination locations from <code>api.entities.Location.list()</code>.</li>
+              <li>User selects in-stock inventory items and quantities.</li>
+              <li>Current component calls <code>execute_internal_transfer</code> directly, creating and completing the transfer in one RPC.</li>
+              <li>RPC creates a <code>transfers</code> row, deducts source inventory, creates/updates destination inventory, and writes movement rows for transfer out/in.</li>
+              <li>A separate workflow helper also exists for two-step transfer creation and completion through <code>createTransferWorkflow</code> and <code>completeTransferWorkflow</code>.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>POS Sync and Depletion Workflow</h3>
+            <ol class="flow">
+              <li>Manual POS Sync uploads a CSV PMIX file and parses menu item names and quantities with Papa Parse.</li>
+              <li>Frontend calls <code>calculate_theoretical_depletion(p_org_id, p_sales_json)</code>.</li>
+              <li>RPC matches sales item names to recipe names, joins recipe ingredients and products, and returns total ingredient usage.</li>
+              <li>User approves processing; frontend calls <code>execute_inventory_depletion(p_org_id, p_depletion_json)</code>.</li>
+              <li>RPC deducts inventory quantity by product ID and stores previous quantity.</li>
+              <li>Daily review can call <code>generate_daily_theoretical_usage</code> from <code>pos_sales_data</code>, then <code>approve_daily_pos_usage</code> to deduct and record movements.</li>
+              <li>Separately, trigger <code>trigger_pos_sales_to_inventory</code> can automatically deplete inventory after insert into <code>pos_sales_data</code>.</li>
+            </ol>
+          </div>
+
+          <div class="card half">
+            <h3>Metrics and AvT</h3>
+            <ol class="flow">
+              <li><code>get_inventory_totals</code> computes <code>totalItems</code>, <code>totalValue</code>, <code>lowStock</code>, and month-to-date wastage value.</li>
+              <li>It reads filtered <code>inventory</code> and <code>wastage_logs</code>, enforcing organization/location filters.</li>
+              <li><code>get_avt_variance_report</code> exists server-side and aggregates movement rows into theoretical vs actual usage.</li>
+              <li>The current <code>AvTDashboard.jsx</code> UI uses inventory rows plus generated/mock historical math for display, so it is not yet fully wired to the AvT RPC.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory Triggers and Functions</h3>
+            <table>
+              <thead><tr><th>Name</th><th>Trigger/Event</th><th>What it processes</th></tr></thead>
+              <tbody>
+                <tr><td><code>set_updated_at</code></td><td>Before update on <code>inventory</code></td><td>Sets <code>updated_at</code>.</td></tr>
+                <tr><td><code>trg_sync_fact_inventory</code></td><td>After insert/update on <code>inventory</code></td><td>Syncs <code>fact_inventory</code> snapshot rows for reporting.</td></tr>
+                <tr><td><code>audit_trigger</code></td><td>After insert/update/delete on <code>inventory</code></td><td>Writes audit log records through <code>process_audit_log</code>.</td></tr>
+                <tr><td><code>trigger_pos_sales_to_inventory</code></td><td>After insert on <code>pos_sales_data</code></td><td>Finds mapped recipe ingredients, subtracts theoretical usage from inventory, and writes <code>inventory_movements</code>.</td></tr>
+                <tr><td><code>trigger_cascade_invoice_prices</code></td><td>After invoice validation/approval</td><td>Updates inventory unit cost and current value from invoice line item unit prices.</td></tr>
+                <tr><td><code>sync_recipe_ingredients_from_jsonb</code></td><td>Recipe ingredient JSON sync trigger</td><td>Keeps normalized recipe ingredients aligned with recipe JSON ingredients.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Inventory Edge Functions</h3>
+            <table>
+              <thead><tr><th>Edge function</th><th>Current behavior</th><th>Tables touched</th><th>Workflow relationship</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><code>pos-sync</code></td>
+                  <td>Receives external POS webhook, checks provider/location config, standardizes Toast/Square payload into a sales ticket, updates config sync timestamp.</td>
+                  <td><code>pos_configurations</code>, <code>sales_tickets</code></td>
+                  <td>Integration-side POS ingestion. The Inventory UI currently uses DB RPCs and CSV upload rather than this edge function directly.</td>
+                </tr>
+                <tr>
+                  <td><code>pos-webhook</code></td>
+                  <td>Ingests POS order payloads and writes POS order headers/items.</td>
+                  <td><code>pos_orders</code>, <code>pos_order_items</code>, <code>webhook_events</code></td>
+                  <td>Feeds POS ledgers that can support daily theoretical usage workflows.</td>
+                </tr>
+                <tr>
+                  <td><code>calculate-depletion</code></td>
+                  <td>Accepts organization and sales data, currently returns a success placeholder rather than applying depletion.</td>
+                  <td>None in current implementation.</td>
+                  <td>Named for inventory depletion, but real app processing is currently the Postgres RPC path.</td>
+                </tr>
+                <tr>
+                  <td><code>iot-ingest</code> / <code>iot-webhook</code></td>
+                  <td>Receives sensor temperature/humidity readings and writes temperature logs.</td>
+                  <td><code>iot_sensors</code>, <code>temperature_logs</code></td>
+                  <td>Food safety/cold storage context; not direct product quantity processing.</td>
+                </tr>
+                <tr>
+                  <td><code>generate-prep-sheet</code></td>
+                  <td>References subtracting <code>inventory.current_quantity</code> for prep planning.</td>
+                  <td>Inventory and prep planning related tables.</td>
+                  <td>Downstream planning artifact that uses stock availability.</td>
+                </tr>
+                <tr>
+                  <td><code>ai-insights-chat</code></td>
+                  <td>Reads inventory, products, invoices, POS sales, and AI insights for assistant context.</td>
+                  <td><code>inventory</code>, <code>products</code>, <code>invoices</code>, <code>pos_sales_data</code>, <code>ai_insights</code></td>
+                  <td>Read-only operational intelligence over inventory and products.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="live" class="view">
+        <div class="hero">
+          <h2>Live Artifacts and Source Evidence</h2>
+          <p>This section lists the live schema artifacts and source files used to produce this report. The live schema snapshots were already present in the repository and generated on 2026-06-16.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card half">
+            <h3>Live Table Counts From <code>live_workflow_schema_audit.json</code></h3>
+            <table>
+              <thead><tr><th>Table</th><th>Live count</th><th>Meaning</th></tr></thead>
+              <tbody>
+                <tr><td><code>products</code></td><td>8</td><td>Rows available to product catalog workflows.</td></tr>
+                <tr><td><code>inventory</code></td><td>8</td><td>Rows available to live inventory workflows.</td></tr>
+                <tr><td><code>inventory_movements</code></td><td>3</td><td>Existing movement/audit rows.</td></tr>
+                <tr><td><code>global_vendor_items</code></td><td>4</td><td>Network suggestion rows.</td></tr>
+                <tr><td><code>recipe_ingredients</code></td><td>3</td><td>Recipe ingredient rows for POS/recipe costing.</td></tr>
+                <tr><td><code>recipes</code></td><td>4</td><td>Recipe rows for cost and depletion logic.</td></tr>
+                <tr><td><code>count_sheets</code></td><td>0</td><td>No live count templates in the snapshot.</td></tr>
+                <tr><td><code>count_sessions</code></td><td>0</td><td>No live count sessions in the snapshot.</td></tr>
+                <tr><td><code>wastage_logs</code></td><td>0</td><td>No live wastage rows in the snapshot.</td></tr>
+                <tr><td><code>purchase_orders</code> / <code>purchase_order_items</code></td><td>0 / 0</td><td>No purchase-order rows in this snapshot.</td></tr>
+                <tr><td><code>auto_orders</code></td><td>1</td><td>One order row available to loading dock workflows.</td></tr>
+                <tr><td><code>transfers</code></td><td>1</td><td>One transfer row available in snapshot.</td></tr>
+                <tr><td><code>pos_sales_data</code>, <code>pos_items</code>, <code>pos_menu_mapping</code></td><td>0 each</td><td>No live POS data in this snapshot.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card half">
+            <h3>Source Files Reviewed</h3>
+            <ul>
+              <li><code>src/modules/products/pages/Products.jsx</code></li>
+              <li><code>src/modules/products/components/ProductsLiveDashboard.jsx</code></li>
+              <li><code>src/modules/inventory/pages/Inventory.jsx</code></li>
+              <li><code>src/modules/inventory/components/LoadingDockReceiving.jsx</code></li>
+              <li><code>src/modules/inventory/components/InventoryTransfers.jsx</code></li>
+              <li><code>src/modules/inventory/components/POSSyncEngine.jsx</code></li>
+              <li><code>src/modules/inventory/components/DailyPOSSyncReview.jsx</code></li>
+              <li><code>src/modules/inventory/components/AvTDashboard.jsx</code></li>
+              <li><code>src/lib/apiClient.js</code></li>
+              <li><code>src/lib/workflowService.js</code></li>
+              <li><code>live_supabase_post_118_columns.json</code></li>
+              <li><code>live_workflow_schema_audit.json</code></li>
+              <li>Relevant migrations under <code>supabase/migrations/</code></li>
+              <li>Relevant functions under <code>supabase/functions/</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Important DB/RPC Artifacts</h3>
+            <table>
+              <thead><tr><th>Artifact</th><th>Defined in</th><th>Used by</th></tr></thead>
+              <tbody>
+                <tr><td><code>get_trusted_global_vendor_item_suggestions</code></td><td><code>20260625000028_global_vendor_item_trust_hardening.sql</code></td><td>Products AI Verification Queue</td></tr>
+                <tr><td><code>get_flagged_vendor_items</code>, <code>resolve_price_variance</code></td><td><code>20260622210002_price_variance_tracking.sql</code></td><td>Products Price Action Center</td></tr>
+                <tr><td><code>recalculate_recipe_costs_on_price_change</code></td><td><code>044_recipe_margin_protection.sql</code></td><td>Product latest price trigger</td></tr>
+                <tr><td><code>cascade_invoice_prices</code></td><td><code>055_dynamic_recipe_costing.sql</code></td><td>Invoice validation to products/inventory pricing</td></tr>
+                <tr><td><code>get_inventory_totals</code></td><td><code>110_server_side_metrics_and_sync.sql</code></td><td>Inventory KPI cards</td></tr>
+                <tr><td><code>complete_count_session</code></td><td><code>20260622210003_inventory_count_optimization.sql</code></td><td>Inventory count wizard completion</td></tr>
+                <tr><td><code>receive_purchase_order</code></td><td><code>20260624000019_remote_lint_followup.sql</code></td><td>Loading Dock receiving</td></tr>
+                <tr><td><code>execute_internal_transfer</code>, <code>complete_inventory_transfer</code></td><td><code>20260624000018_remote_lint_repair.sql</code></td><td>Inventory transfers</td></tr>
+                <tr><td><code>calculate_theoretical_depletion</code>, <code>execute_inventory_depletion</code></td><td><code>118_live_schema_repair_and_security.sql</code> and <code>110_server_side_metrics_and_sync.sql</code></td><td>Manual POS Sync</td></tr>
+                <tr><td><code>generate_daily_theoretical_usage</code>, <code>approve_daily_pos_usage</code></td><td><code>20260624000018_remote_lint_repair.sql</code></td><td>Daily POS Sync Review</td></tr>
+                <tr><td><code>process_pos_sales_to_inventory</code></td><td><code>045_pos_avt_costing.sql</code></td><td>Automatic POS sales depletion trigger</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="risks" class="view">
+        <div class="hero">
+          <h2>Gaps and Risks</h2>
+          <p>These are not blockers to reading the workflow artifact, but they matter before calling the modules production-complete.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Workflow Risks Found</h3>
+            <div class="note">
+              <strong>Inventory movement type mismatch:</strong> the earlier <code>inventory_movements</code> check constraint lists <code>stock_count</code>, <code>transfer</code>, and other values, but later RPCs insert values such as <code>count_variance</code>, <code>transfer_in</code>, and likely transfer-out values. If the live constraint was not widened in another migration, count or transfer RPCs can fail at insert time.
+            </div>
+            <ul>
+              <li><strong>AvT dashboard is not fully live-RPC-backed:</strong> <code>AvTDashboard.jsx</code> currently generates mock opening/purchase/theoretical values from inventory rows. The server RPC <code>get_avt_variance_report</code> exists but is not used in this component.</li>
+              <li><strong>Product Live Dashboard contains seeded/mock events:</strong> <code>ProductsLiveDashboard.jsx</code> starts with sample price increase/decrease events, then listens to product updates for simulated realtime costing events.</li>
+              <li><strong>POS sync has multiple paths:</strong> CSV upload uses <code>calculate_theoretical_depletion</code> and <code>execute_inventory_depletion</code>; daily review uses <code>generate_daily_theoretical_usage</code> and <code>approve_daily_pos_usage</code>; edge functions write POS orders/tickets; the <code>pos_sales_data</code> trigger can also deplete inventory. These need one canonical operating path to avoid duplicate depletion.</li>
+              <li><strong><code>calculate-depletion</code> edge function is placeholder-like:</strong> it returns success and processed item count but does not currently fetch inventory/recipes or apply depletion.</li>
+              <li><strong>Products/inventory access is partly UI-gated:</strong> ground staff buttons are hidden, but final authority comes from RLS/RPC checks. Review final RLS policies before relying on UI role checks.</li>
+              <li><strong>Soft deletes are frontend API behavior:</strong> Products and Inventory use soft delete through <code>apiClient</code>, so direct table deletes or other clients may bypass that unless DB rules enforce the same policy.</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <h3>Recommended Follow-Up Checks</h3>
+            <ol class="flow">
+              <li>Confirm live <code>inventory_movements.movement_type</code> constraint includes all inserted values from count and transfer RPCs.</li>
+              <li>Pick one POS depletion source of truth and disable or document the others to prevent double deductions.</li>
+              <li>Wire <code>AvTDashboard.jsx</code> to <code>get_avt_variance_report</code> if actual reporting is expected.</li>
+              <li>Replace seeded/mock product live events with real vendor item, invoice, or product price change events.</li>
+              <li>Add smoke tests for product price variance resolution, count session completion, receiving, and transfer completion.</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const buttons = Array.from(document.querySelectorAll(".nav-button"));
+    const views = Array.from(document.querySelectorAll(".view"));
+
+    function activate(target) {
+      buttons.forEach((button) => button.classList.toggle("active", button.dataset.target === target));
+      views.forEach((view) => view.classList.toggle("active", view.id === target));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => activate(button.dataset.target));
+    });
+  </script>
+</body>
+</html>
