@@ -95,6 +95,9 @@ export default function PlatformAdmin() {
   });
   const [isInviteLinkDialogOpen, setIsInviteLinkDialogOpen] = useState(false);
   const [generatedInviteLink, setGeneratedInviteLink] = useState("");
+  const [demoInviteDraft, setDemoInviteDraft] = useState(null);
+  const [demoInviteEmail, setDemoInviteEmail] = useState("");
+  const [confirmDemoInvite, setConfirmDemoInvite] = useState(false);
 
 
 
@@ -368,8 +371,25 @@ export default function PlatformAdmin() {
     setInviting(false);
   };
 
-  const handleAcceptDemo = async (request) => {
-    const toastId = toast.loading(`Accepting request from ${request.full_name} and generating onboarding link...`);
+  const openDemoInviteDialog = (request) => {
+    setDemoInviteDraft(request);
+    setDemoInviteEmail((request.email || "").trim().toLowerCase());
+    setConfirmDemoInvite(false);
+  };
+
+  const handleAcceptDemo = async (request, onboardingEmailOverride = null) => {
+    const onboardingEmail = (onboardingEmailOverride || request.email || "").trim().toLowerCase();
+    if (!onboardingEmail || !onboardingEmail.includes("@")) {
+      toast.error("Enter a valid onboarding email before sending the invite.");
+      return;
+    }
+    const duplicatePendingInvite = pendingClientInvites.find((invite) => invite.email?.toLowerCase() === onboardingEmail);
+    if (duplicatePendingInvite) {
+      toast.error(`An active onboarding invitation already exists for ${onboardingEmail}. Revoke it before sending another.`);
+      return;
+    }
+
+    const toastId = toast.loading(`Accepting request from ${request.full_name} and generating onboarding link for ${onboardingEmail}...`);
     setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
     
     try {
@@ -381,7 +401,7 @@ export default function PlatformAdmin() {
       const { data: newInvite, error: inviteErr } = await supabase
         .from("invitations")
         .insert([{
-          email: request.email,
+          email: onboardingEmail,
           token,
           role: "owner",
           invited_by: user?.id,
@@ -392,7 +412,9 @@ export default function PlatformAdmin() {
           metadata: { 
             modules: ALL_MODULE_KEYS.filter(k => k !== 'platform'),
             access: { read: true, write: true, update: true },
-            demo_request_id: request.id
+            demo_request_id: request.id,
+            demo_request_email: request.email,
+            onboarding_email: onboardingEmail
           }
         }]).select().single();
 
@@ -420,7 +442,7 @@ export default function PlatformAdmin() {
 
       // 3. Send email via EmailJS
       const emailResult = await sendEmail({
-        to_email: request.email,
+        to_email: onboardingEmail,
         to_name: request.full_name,
         subject: "Your Restops Demo Request has been Approved!",
         message: `
@@ -429,6 +451,8 @@ Hi ${request.full_name},
 We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
 We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+
+This invite is assigned to ${onboardingEmail}. Please use that email address when creating your account or signing in with Google/Microsoft.
 
 Click the link below to create your account and access your environment:
 <${signupLink}>
@@ -449,7 +473,7 @@ The Restops Platform Team
         toast.success("Demo request accepted! Onboarding link sent to client.", { id: toastId });
       }
 
-      posthog.capture('demo_request_approved', { email: request.email });
+      posthog.capture('demo_request_approved', { email: request.email, onboarding_email: onboardingEmail });
 
       // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['demo-requests'] });
@@ -458,6 +482,9 @@ The Restops Platform Team
       // Open the link dialog for the admin to see/copy too!
       setGeneratedInviteLink(signupLink);
       setIsInviteLinkDialogOpen(true);
+      setDemoInviteDraft(null);
+      setDemoInviteEmail("");
+      setConfirmDemoInvite(false);
 
     } catch (err) {
       console.error("Failed to accept demo request:", err);
@@ -586,21 +613,35 @@ The Restops Platform Team
 
     try {
       if (request.status === 'accepted') {
-        // Find the invitation that was created for this demo request
-        const { data: invite } = await supabase
+        // Find the invitation that was created for this demo request.
+        // The onboarding/auth email can differ from the original demo contact email.
+        let { data: invite } = await supabase
           .from('invitations')
-          .select('token')
-          .eq('email', request.email)
+          .select('token, email, metadata')
+          .contains('metadata', { demo_request_id: request.id })
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        if (!invite) {
+          const fallback = await supabase
+            .from('invitations')
+            .select('token, email, metadata')
+            .eq('email', request.email)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          invite = fallback.data;
+        }
 
         const signupLink = invite?.token
           ? `${window.location.origin}/signup/${invite.token}`
           : `${window.location.origin}`;
 
+        const onboardingEmail = invite?.email || request.email;
+
         const emailResult = await sendEmail({
-          to_email: request.email,
+          to_email: onboardingEmail,
           to_name: request.full_name,
           subject: "Your Restops Demo Request has been Approved!",
           message: `
@@ -609,6 +650,8 @@ Hi ${request.full_name},
 We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
 We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+
+This invite is assigned to ${onboardingEmail}. Please use that email address when creating your account or signing in with Google/Microsoft.
 
 Click the link below to create your account and access your environment:
 ${signupLink}
@@ -1294,7 +1337,7 @@ The Restops Platform Team
                                   variant="outline" 
                                   className="h-8 px-3 text-xs bg-resend-green/5 hover:bg-resend-green/10 text-resend-green border-resend-green/20 font-bold rounded-xl flex items-center"
                                   disabled={processingRequests.has(r.id)}
-                                  onClick={() => handleAcceptDemo(r)}
+                                  onClick={() => openDemoInviteDialog(r)}
                                 >
                                   {processingRequests.has(r.id) ? (
                                     <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
@@ -1526,6 +1569,73 @@ The Restops Platform Team
               toast.success("Modules updated");
               setEditingOrgModules(null);
             }}>Save Configuration</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!demoInviteDraft} onOpenChange={(open) => { if (!open) { setDemoInviteDraft(null); setDemoInviteEmail(""); } }}>
+        <DialogContent className="max-w-lg rounded-3xl border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">Approve Demo Request</DialogTitle>
+            <DialogDescription>
+              Confirm the email that should own the tenant onboarding account before sending the secure invite.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 py-4">
+            <div className="rounded-2xl border bg-secondary/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Demo request contact</p>
+              <p className="mt-2 text-sm font-bold text-foreground">{demoInviteDraft?.full_name || "Unknown"}</p>
+              <p className="text-xs text-muted-foreground">{demoInviteDraft?.email}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{demoInviteDraft?.company_name}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="demo-onboarding-email">Onboarding account email</Label>
+              <Input
+                id="demo-onboarding-email"
+                type="email"
+                value={demoInviteEmail}
+                onChange={(event) => setDemoInviteEmail(event.target.value)}
+                placeholder="owner@company.com"
+                className="h-11 rounded-xl"
+              />
+              <p className="text-xs text-muted-foreground">The tenant must sign up or use Google/Microsoft SSO with this email. The original demo email remains saved for sales history.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setDemoInviteDraft(null); setDemoInviteEmail(""); setConfirmDemoInvite(false); }}>Cancel</Button>
+            <Button
+              className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6"
+              disabled={!demoInviteEmail.trim() || processingRequests.has(demoInviteDraft?.id)}
+              onClick={() => setConfirmDemoInvite(true)}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmDemoInvite} onOpenChange={setConfirmDemoInvite}>
+        <DialogContent className="max-w-md rounded-3xl border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">Are you sure you want to proceed?</DialogTitle>
+            <DialogDescription>
+              This will generate a secure onboarding link, bind it to the selected onboarding email, and send the invite.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-2xl border bg-secondary/40 p-4 my-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Onboarding email</p>
+            <p className="mt-2 text-sm font-bold text-foreground">{demoInviteEmail}</p>
+            <p className="mt-2 text-xs text-muted-foreground">Original demo contact: {demoInviteDraft?.email}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDemoInvite(false)}>No, go back</Button>
+            <Button
+              className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-6"
+              disabled={processingRequests.has(demoInviteDraft?.id)}
+              onClick={() => handleAcceptDemo(demoInviteDraft, demoInviteEmail)}
+            >
+              {processingRequests.has(demoInviteDraft?.id) ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : <><Send className="mr-2 h-4 w-4" /> Yes, Send Invite</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
