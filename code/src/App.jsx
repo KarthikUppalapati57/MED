@@ -99,26 +99,37 @@ function SignupPage() {
   const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState(null);
+  const [inviteLoading, setInviteLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [ssoProvider, setSsoProvider] = useState(null);
   const [success, setSuccess] = useState(false);
 
   // Fetch invitation details
   React.useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setInviteLoading(false);
+      setError('Invalid or expired invitation link.');
+      return;
+    }
     const fetchInvite = async () => {
+      setInviteLoading(true);
+      setError('');
       const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
-      const { data } = await supabase
+      const { data, error: inviteError } = await supabase
         .rpc('get_invite_details', { invite_token: cleanToken });
-      if (data) {
-        setInviteInfo(data);
-        setForm(f => ({ ...f, email: data.email || '' }));
+      const invite = Array.isArray(data) ? data[0] : data;
+      if (!inviteError && invite?.id && invite?.email) {
+        setInviteInfo(invite);
+        setForm(f => ({ ...f, email: invite.email || '' }));
         // Emit Real-Time Domain Event
         supabase.rpc('log_invitation_opened', { p_token: cleanToken })
           .catch(err => console.warn('Failed to log invite open:', err));
       } else {
+        setInviteInfo(null);
+        setForm(f => ({ ...f, email: '' }));
         setError('Invalid or expired invitation link.');
       }
+      setInviteLoading(false);
     };
     fetchInvite();
   }, [token]);
@@ -139,7 +150,7 @@ function SignupPage() {
       setError(passwordPolicy.message);
       return;
     }
-    if (!inviteInfo) {
+    if (inviteLoading || !inviteInfo) {
       setError('Please wait for invitation details to load.');
       return;
     }
@@ -175,7 +186,7 @@ function SignupPage() {
 
   const handleSSOSignup = async (provider) => {
     setError('');
-    if (!inviteInfo) {
+    if (inviteLoading || !inviteInfo) {
       setError('Please wait for invitation details to load.');
       return;
     }
@@ -201,14 +212,16 @@ function SignupPage() {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {inviteInfo
+            {inviteLoading
+              ? 'Validating invitation...'
+              : inviteInfo
               ? `You've been invited as ${
                   inviteInfo.role === 'owner' || inviteInfo.role === 'org_owner' ? 'organization owner' :
                   inviteInfo.role === 'admin' || inviteInfo.role === 'platform_admin' ? 'platform admin' :
                   inviteInfo.role === 'manager' || inviteInfo.role === 'branch_manager' ? 'branch manager' :
                   inviteInfo.role?.replace('_', ' ')
                 }`
-              : 'Join the team'}
+              : 'Invitation unavailable'}
           </p>
         </div>
 
@@ -226,6 +239,11 @@ function SignupPage() {
           </div>
         ) : (
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {!inviteLoading && !inviteInfo && (
+              <div className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">
+                Invalid or expired invitation link. Please contact the Restops Platform team for a new onboarding invite.
+              </div>
+            )}
             <div className="space-y-1">
               <label className="block text-sm font-medium text-foreground">Full Name</label>
               <input
@@ -234,6 +252,7 @@ function SignupPage() {
                 onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
+                disabled={inviteLoading || !inviteInfo}
               />
             </div>
             <div className="space-y-1">
@@ -245,7 +264,10 @@ function SignupPage() {
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 readOnly={!!inviteInfo?.email}
+                disabled={inviteLoading || !inviteInfo}
               />
+              {inviteLoading && <p className="text-xs text-muted-foreground">Checking invitation...</p>}
+              {!!inviteInfo?.email && <p className="text-xs text-muted-foreground">This invite is assigned to {inviteInfo.email}.</p>}
             </div>
             <div className="space-y-1">
               <label className="block text-sm font-medium text-foreground">Password</label>
@@ -256,6 +278,7 @@ function SignupPage() {
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
+                disabled={inviteLoading || !inviteInfo}
               />
               <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
             </div>
@@ -268,14 +291,15 @@ function SignupPage() {
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
+                disabled={inviteLoading || !inviteInfo}
               />
             </div>
-            {error && (
+            {error && (inviteInfo || inviteLoading) && (
               <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">{error}</p>
             )}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || inviteLoading || !inviteInfo}
               className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-primary-foreground hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shimmer-sweep"
             >
               {loading ? (
@@ -283,7 +307,7 @@ function SignupPage() {
                   <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin mr-2" />
                   Creating account...
                 </>
-              ) : 'Create Account'}
+              ) : inviteLoading ? 'Validating invite...' : 'Create Account'}
             </button>
 
 
@@ -300,7 +324,7 @@ function SignupPage() {
               <button
                 type="button"
                 onClick={() => handleSSOSignup('google')}
-                disabled={!inviteInfo || loading || !!ssoProvider}
+                disabled={inviteLoading || !inviteInfo || loading || !!ssoProvider}
                 className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
               >
                 {ssoProvider === 'google' ? 'Redirecting...' : 'Google'}
@@ -308,7 +332,7 @@ function SignupPage() {
               <button
                 type="button"
                 onClick={() => handleSSOSignup('azure')}
-                disabled={!inviteInfo || loading || !!ssoProvider}
+                disabled={inviteLoading || !inviteInfo || loading || !!ssoProvider}
                 className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
               >
                 {ssoProvider === 'azure' ? 'Redirecting...' : 'Microsoft'}
