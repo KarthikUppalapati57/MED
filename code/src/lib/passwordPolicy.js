@@ -31,11 +31,11 @@ const SEQUENTIAL_PATTERNS = [
   'mnbvcxz',
 ];
 
-export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MIN_LENGTH = 15;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export const PASSWORD_POLICY_DESCRIPTION =
-  'Use 12-128 characters with uppercase, lowercase, number, special character, no spaces, no common words, no sequences, and no personal information.';
+  'Use 15-128 characters with uppercase, lowercase, number, special character, no spaces, no common words, no sequences, and no personal information.';
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
