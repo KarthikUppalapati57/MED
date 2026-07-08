@@ -32,6 +32,16 @@ const CookiePolicy = React.lazy(() => import('./modules/public/pages/CookiePolic
 const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
+const INVITE_VALIDATION_TIMEOUT_MS = 15000;
+
+const withTimeout = (promise, timeoutMs, message) => {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+};
+
 const notify = async (type, message, options) => {
   const { toast } = await import('sonner');
   toast[type](message, options);
@@ -106,32 +116,77 @@ function SignupPage() {
 
   // Fetch invitation details
   React.useEffect(() => {
+    let cancelled = false;
+    let safetyTimer;
+
     if (!token) {
       setInviteLoading(false);
       setError('Invalid or expired invitation link.');
-      return;
+      return () => { cancelled = true; };
     }
+
+    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+
+    const finishLoading = () => {
+      window.clearTimeout(safetyTimer);
+      if (!cancelled) setInviteLoading(false);
+    };
+
+    safetyTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setInviteLoading(false);
+      setError((current) => current || 'Invitation validation is taking too long. Refresh the page or ask the Platform Admin to reissue the invite.');
+    }, INVITE_VALIDATION_TIMEOUT_MS + 1000);
+
     const fetchInvite = async () => {
       setInviteLoading(true);
+      setInviteInfo(null);
       setError('');
-      const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
-      const { data, error: inviteError } = await supabase
-        .rpc('get_invite_details', { invite_token: cleanToken });
-      const invite = Array.isArray(data) ? data[0] : data;
-      if (!inviteError && invite?.id && invite?.email) {
-        setInviteInfo(invite);
-        setForm(f => ({ ...f, email: invite.email || '' }));
-        // Emit Real-Time Domain Event
-        supabase.rpc('log_invitation_opened', { p_token: cleanToken })
-          .catch(err => console.warn('Failed to log invite open:', err));
-      } else {
+
+      try {
+        const { data, error: inviteError } = await withTimeout(
+          supabase.rpc('get_invite_details', { invite_token: cleanToken }),
+          INVITE_VALIDATION_TIMEOUT_MS,
+          'Invitation validation timed out.'
+        );
+
+        if (cancelled) return;
+
+        const invite = Array.isArray(data) ? data[0] : data;
+        if (!inviteError && invite?.id && invite?.email) {
+          setInviteInfo(invite);
+          setForm(f => ({ ...f, email: invite.email || '' }));
+          setError('');
+          finishLoading();
+
+          // Emit Real-Time Domain Event after the UI is unlocked. This should never block signup.
+          supabase.rpc('log_invitation_opened', { p_token: cleanToken })
+            .catch(err => console.warn('Failed to log invite open:', err));
+          return;
+        }
+
         setInviteInfo(null);
         setForm(f => ({ ...f, email: '' }));
-        setError('Invalid or expired invitation link.');
+        setError(inviteError?.message || 'Invalid or expired invitation link.');
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('Invitation validation failed:', err);
+        setInviteInfo(null);
+        setForm(f => ({ ...f, email: '' }));
+        setError(err.message === 'Invitation validation timed out.'
+          ? 'Invitation validation timed out. Refresh the page or ask the Platform Admin to reissue the invite.'
+          : 'Invalid or expired invitation link.');
+      } finally {
+        finishLoading();
       }
-      setInviteLoading(false);
     };
+
     fetchInvite();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safetyTimer);
+    };
   }, [token]);
 
   const handleSubmit = async (e) => {
@@ -1048,3 +1103,5 @@ function App() {
 }
 
 export default App
+
+
