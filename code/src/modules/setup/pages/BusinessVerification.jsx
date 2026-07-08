@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +27,13 @@ function identifierTypeForBusinessType(businessType) {
 }
 const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'];
 
+const BUSINESS_STEPS = [
+  { key: 'business_information', label: 'Business' },
+  { key: 'contact_verification', label: 'Contact' },
+  { key: 'address_verification', label: 'Addresses' },
+  { key: 'business_review', label: 'Review' },
+];
+
 function normalizeEmail(value) {
   return value.trim().toLowerCase();
 }
@@ -54,8 +61,8 @@ function maskIdentifier(identifier) {
   return digits.slice(-4);
 }
 
-function scoreBusiness({ identifierType, website, phone, email, businessAddress, serviceAddress }) {
-  let score = identifierType === 'ein' ? 50 : 45;
+function scoreBusiness({ identifierType, website, phone, email, businessAddress, serviceAddress, taxVerificationEnabled = true }) {
+  let score = taxVerificationEnabled ? (identifierType === 'ein' ? 50 : 45) : 60;
   if (email.includes('@')) score += 10;
   if (phone.replace(/\D/g, '').length >= 10) score += 10;
   if (website.trim()) score += 10;
@@ -74,7 +81,11 @@ export default function BusinessVerification() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [loadingDraft, setLoadingDraft] = useState(true);
+  const [stepKey, setStepKey] = useState('business_information');
   const [sameMailing, setSameMailing] = useState(true);
+  const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
   const [contactOtp, setContactOtp] = useState({
     email: {
       otpId: null,
@@ -108,6 +119,7 @@ export default function BusinessVerification() {
   });
 
   const requiredIdentifierType = identifierTypeForBusinessType(form.businessType);
+  const isTaxVerificationEnabled = requiredIdentifierType === 'ein' ? verificationSettings.ein_verification_enabled : verificationSettings.ssn_verification_enabled;
   const isIndividualOwner = requiredIdentifierType === 'ssn';
   const contactEmailLabel = isIndividualOwner ? 'Contact Email' : 'Business Email';
   const emailVerified = contactOtp.email.verifiedTarget === normalizeEmail(form.email);
@@ -120,7 +132,122 @@ export default function BusinessVerification() {
     email: form.email,
     businessAddress: form.businessAddress,
     serviceAddress: form.serviceAddress,
-  }), [form, requiredIdentifierType]);
+    taxVerificationEnabled: isTaxVerificationEnabled,
+  }), [form, requiredIdentifierType, isTaxVerificationEnabled]);
+  const currentStepIndex = Math.max(0, BUSINESS_STEPS.findIndex((step) => step.key === stepKey));
+  const isFirstStep = currentStepIndex === 0;
+  const isLastStep = currentStepIndex === BUSINESS_STEPS.length - 1;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDraft = async () => {
+      try {
+        const [draftState, settings] = await Promise.all([
+          api.onboarding.getBusinessVerificationDraft().catch(() => null),
+          api.onboarding.getVerificationSettings().catch(() => ({ ein_verification_enabled: true, ssn_verification_enabled: true })),
+        ]);
+        if (cancelled) return;
+        setVerificationSettings({
+          ein_verification_enabled: settings?.ein_verification_enabled !== false,
+          ssn_verification_enabled: settings?.ssn_verification_enabled !== false,
+        });
+        const draft = draftState?.draft || {};
+        if (draft.form) {
+          setForm((prev) => ({ ...prev, ...draft.form }));
+          if (typeof draft.sameMailing === 'boolean') setSameMailing(draft.sameMailing);
+        }
+        if (draftState?.current_step && BUSINESS_STEPS.some((step) => step.key === draftState.current_step)) {
+          setStepKey(draftState.current_step);
+        }
+      } finally {
+        if (!cancelled) setLoadingDraft(false);
+      }
+    };
+    loadDraft();
+    return () => { cancelled = true; };
+  }, []);
+
+  const buildDraftPayload = () => ({ form: { ...form, identifierType: requiredIdentifierType }, sameMailing });
+
+  const saveDraft = async (targetStep = stepKey, options = {}) => {
+    if (!user?.id) return false;
+    setSavingDraft(true);
+    try {
+      await api.onboarding.saveBusinessVerificationDraft({ payload: buildDraftPayload(), step: targetStep });
+      await refreshProfile();
+      if (!options.silent) toast.success('Draft saved.');
+      return true;
+    } catch (err) {
+      console.error('Failed to save onboarding draft:', err);
+      toast.error(err.message || 'Failed to save draft.');
+      return false;
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const validateBusinessInfo = () => {
+    if (!form.legalName.trim()) return 'Legal business name is required.';
+    if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
+    if (isTaxVerificationEnabled && !form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
+    return null;
+  };
+
+  const validateContact = () => {
+    const businessInfoMessage = validateBusinessInfo();
+    if (businessInfoMessage) return businessInfoMessage;
+    if (!form.email.includes('@')) return 'A valid business email is required.';
+    if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
+    if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
+    if (!phoneVerified) return 'Verify the business phone with OTP before continuing.';
+    return null;
+  };
+
+  const validateAddresses = () => {
+    for (const [label, address] of [['Business address', form.businessAddress], ['Service address', form.serviceAddress]]) {
+      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
+        return `${label} must include street, city, state, and ZIP.`;
+      }
+    }
+    if (!sameMailing) {
+      const address = form.mailingAddress;
+      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
+        return 'Mailing address must include street, city, state, and ZIP.';
+      }
+    }
+    return null;
+  };
+
+  const validateCurrentStep = () => {
+    if (stepKey === 'business_information') return validateBusinessInfo();
+    if (stepKey === 'contact_verification') return validateContact();
+    if (stepKey === 'address_verification') return validateAddresses();
+    return validate();
+  };
+
+  const goToStep = async (nextKey) => {
+    const nextIndex = BUSINESS_STEPS.findIndex((step) => step.key === nextKey);
+    if (nextIndex > currentStepIndex) {
+      const validationMessage = validateCurrentStep();
+      if (validationMessage) {
+        toast.error(validationMessage);
+        return;
+      }
+    }
+    const saved = await saveDraft(nextKey, { silent: true });
+    if (saved) setStepKey(nextKey);
+  };
+
+  const goNext = () => {
+    const next = BUSINESS_STEPS[currentStepIndex + 1];
+    if (next) goToStep(next.key);
+  };
+
+  const goBack = () => {
+    const prev = BUSINESS_STEPS[currentStepIndex - 1];
+    if (prev) goToStep(prev.key);
+  };
+
   if (userProfile?.organization_id) {
     return <Navigate to="/" replace />;
   }
@@ -142,7 +269,7 @@ export default function BusinessVerification() {
   const validate = () => {
     if (!form.legalName.trim()) return 'Legal business name is required.';
     if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
-    if (!form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
+    if (isTaxVerificationEnabled && !form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
     if (!form.email.includes('@')) return 'A valid business email is required.';
     if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
     if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
@@ -256,10 +383,15 @@ export default function BusinessVerification() {
       const result = await api.onboarding.submitBusinessVerification({
         ...form,
         identifierType: requiredIdentifierType,
+        taxIdentifier: isTaxVerificationEnabled ? form.taxIdentifier : '',
         sameMailing,
       });
 
       await refreshProfile();
+
+      if (result?.tax_identifier_required === false) {
+        toast.info('Tax ID verification is currently disabled by Platform Admin; continuing with contact and address verification.');
+      }
 
       if (result?.status === 'verified') {
         toast.success('Business verified. Continue to payment setup.');
@@ -330,132 +462,188 @@ export default function BusinessVerification() {
             <CardDescription>We support EIN businesses and SSN-based sole proprietors. Only masked identifiers are stored.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1 md:col-span-2">
-                <Label>Legal Business Name</Label>
-                <Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} placeholder="Acme Hospitality LLC" />
+            {loadingDraft ? (
+              <div className="flex items-center justify-center rounded-xl border bg-secondary/30 p-10 text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading saved onboarding progress...
               </div>
-              <div className="space-y-1">
-                <Label>Business Type</Label>
-                <Select value={form.businessType} onValueChange={(value) => setForm({ ...form, businessType: value, identifierType: identifierTypeForBusinessType(value), taxIdentifier: '' })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{BUSINESS_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>Tax Identifier Type</Label>
-                <div className="flex h-10 items-center rounded-md border bg-secondary/50 px-3 text-sm font-medium text-foreground">
-                  {requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}
+            ) : (
+              <>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {BUSINESS_STEPS.map((step, index) => (
+                    <button
+                      key={step.key}
+                      type="button"
+                      onClick={() => goToStep(step.key)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${stepKey === step.key ? 'border-primary bg-primary text-primary-foreground' : index < currentStepIndex ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-border bg-secondary/40 text-muted-foreground'}`}
+                    >
+                      {index + 1}. {step.label}
+                    </button>
+                  ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{isIndividualOwner ? 'Individual owner tenants verify SSN.' : 'Business entity tenants verify EIN.'}</p>
-              </div>
-              <div className="space-y-1">
-                <Label>{requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}</Label>
-                <Input value={form.taxIdentifier} onChange={(e) => setForm({ ...form, taxIdentifier: e.target.value, identifierType: requiredIdentifierType })} placeholder={requiredIdentifierType === 'ein' ? '12-3456789' : '123-45-6789'} />
-              </div>
-              <div className="space-y-2">
-                <Label>{contactEmailLabel}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={form.email}
-                    onChange={(e) => {
-                      setForm({ ...form, email: e.target.value });
-                      setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '' } }));
-                    }}
-                    placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
-                  />
-                  <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending || emailVerified} className="shrink-0">
-                    {contactOtp.email.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : emailVerified ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {!emailVerified && contactOtp.email.otpId && (
-                  <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
-                    <div className="flex gap-2">
-                      <Input value={contactOtp.email.code} onChange={(e) => updateOtpCode('email', e.target.value)} placeholder="Email OTP" inputMode="numeric" />
-                      <Button type="button" onClick={() => verifyOtp('email')} disabled={contactOtp.email.verifying} className="shrink-0">
-                        {contactOtp.email.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-                      </Button>
+
+                {stepKey === 'business_information' && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-1 md:col-span-2">
+                      <Label>Legal Business Name</Label>
+                      <Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} placeholder="Acme Hospitality LLC" />
                     </div>
-                    {contactOtp.email.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.email.devCode}</p>}
+                    <div className="space-y-1">
+                      <Label>Business Type</Label>
+                      <Select value={form.businessType} onValueChange={(value) => setForm({ ...form, businessType: value, identifierType: identifierTypeForBusinessType(value), taxIdentifier: '' })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{BUSINESS_TYPES.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tax Identifier Type</Label>
+                      <div className="flex h-10 items-center rounded-md border bg-secondary/50 px-3 text-sm font-medium text-foreground">
+                        {requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{isIndividualOwner ? 'Individual owner tenants use SSN when verification is enabled.' : 'Business entity tenants use EIN when verification is enabled.'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}</Label>
+                      <Input value={form.taxIdentifier} onChange={(e) => setForm({ ...form, taxIdentifier: e.target.value, identifierType: requiredIdentifierType })} disabled={!isTaxVerificationEnabled} placeholder={isTaxVerificationEnabled ? (requiredIdentifierType === 'ein' ? '12-3456789' : '123-45-6789') : 'Verification disabled by Platform Admin'} />
+                      {!isTaxVerificationEnabled && <p className="text-xs text-amber-600">This verification type is disabled. No EIN/SSN is required for this onboarding.</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Website</Label>
+                      <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://restaurant.com" />
+                    </div>
                   </div>
                 )}
-                {emailVerified && <p className="text-xs font-medium text-resend-green">Email verified.</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={form.phone}
-                    onChange={(e) => {
-                      setForm({ ...form, phone: e.target.value });
-                      setContactOtp((prev) => ({ ...prev, phone: { ...prev.phone, verifiedTarget: '' } }));
-                    }}
-                    placeholder="(865) 555-0142"
-                  />
-                  <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending || phoneVerified} className="shrink-0">
-                    {contactOtp.phone.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneVerified ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {!phoneVerified && contactOtp.phone.otpId && (
-                  <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
-                    <div className="flex gap-2">
-                      <Input value={contactOtp.phone.code} onChange={(e) => updateOtpCode('phone', e.target.value)} placeholder="Phone OTP" inputMode="numeric" />
-                      <Button type="button" onClick={() => verifyOtp('phone')} disabled={contactOtp.phone.verifying} className="shrink-0">
-                        {contactOtp.phone.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-                      </Button>
+
+                {stepKey === 'contact_verification' && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>{contactEmailLabel}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={form.email}
+                          onChange={(e) => {
+                            setForm({ ...form, email: e.target.value });
+                            setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '' } }));
+                          }}
+                          placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
+                        />
+                        <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending || emailVerified} className="shrink-0">
+                          {contactOtp.email.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : emailVerified ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {!emailVerified && contactOtp.email.otpId && (
+                        <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
+                          <div className="flex gap-2">
+                            <Input value={contactOtp.email.code} onChange={(e) => updateOtpCode('email', e.target.value)} placeholder="Email OTP" inputMode="numeric" />
+                            <Button type="button" onClick={() => verifyOtp('email')} disabled={contactOtp.email.verifying} className="shrink-0">
+                              {contactOtp.email.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                            </Button>
+                          </div>
+                          {contactOtp.email.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.email.devCode}</p>}
+                        </div>
+                      )}
+                      {emailVerified && <p className="text-xs font-medium text-resend-green">Email verified.</p>}
                     </div>
-                    {contactOtp.phone.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.phone.devCode}</p>}
+                    <div className="space-y-2">
+                      <Label>Phone</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={form.phone}
+                          onChange={(e) => {
+                            setForm({ ...form, phone: e.target.value });
+                            setContactOtp((prev) => ({ ...prev, phone: { ...prev.phone, verifiedTarget: '' } }));
+                          }}
+                          placeholder="(865) 555-0142"
+                        />
+                        <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending || phoneVerified} className="shrink-0">
+                          {contactOtp.phone.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneVerified ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {!phoneVerified && contactOtp.phone.otpId && (
+                        <div className="space-y-2 rounded-lg border bg-secondary/40 p-3">
+                          <div className="flex gap-2">
+                            <Input value={contactOtp.phone.code} onChange={(e) => updateOtpCode('phone', e.target.value)} placeholder="Phone OTP" inputMode="numeric" />
+                            <Button type="button" onClick={() => verifyOtp('phone')} disabled={contactOtp.phone.verifying} className="shrink-0">
+                              {contactOtp.phone.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                            </Button>
+                          </div>
+                          {contactOtp.phone.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.phone.devCode}</p>}
+                        </div>
+                      )}
+                      {phoneVerified && <p className="text-xs font-medium text-resend-green">Phone verified.</p>}
+                    </div>
                   </div>
                 )}
-                {phoneVerified && <p className="text-xs font-medium text-resend-green">Phone verified.</p>}
-              </div>
-              <div className="space-y-1">
-                <Label>Website</Label>
-                <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://restaurant.com" />
-              </div>
-            </div>
 
-            <AddressFields title="Business Address" addressKey="businessAddress" icon={MapPin} />
+                {stepKey === 'address_verification' && (
+                  <div className="space-y-6">
+                    <AddressFields title="Business Address" addressKey="businessAddress" icon={MapPin} />
+                    <div className="flex items-center justify-between rounded-lg border bg-card p-4">
+                      <div>
+                        <p className="font-semibold text-foreground">Mailing address same as business address</p>
+                        <p className="text-sm text-muted-foreground">Turn this off if billing or mail should go somewhere else.</p>
+                      </div>
+                      <Button type="button" variant={sameMailing ? 'default' : 'outline'} onClick={() => setSameMailing((value) => !value)}>
+                        {sameMailing ? 'Same' : 'Different'}
+                      </Button>
+                    </div>
+                    {!sameMailing && <AddressFields title="Mailing Address" addressKey="mailingAddress" icon={MapPin} />}
+                    <div className="space-y-3 rounded-lg border bg-secondary/30 p-4">
+                      <div className="flex items-center gap-2 font-semibold text-foreground">
+                        <MapPin className="h-4 w-4 text-primary" />
+                        Service Address
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Location Name</Label>
+                        <Input value={form.serviceLocationName} onChange={(e) => setForm({ ...form, serviceLocationName: e.target.value })} placeholder="Downtown Restaurant" />
+                      </div>
+                      <AddressFields title="Restaurant Location" addressKey="serviceAddress" icon={MapPin} />
+                    </div>
+                  </div>
+                )}
 
-            <div className="flex items-center justify-between rounded-lg border bg-card p-4">
-              <div>
-                <p className="font-semibold text-foreground">Mailing address same as business address</p>
-                <p className="text-sm text-muted-foreground">Turn this off if billing or mail should go somewhere else.</p>
-              </div>
-              <Button type="button" variant={sameMailing ? 'default' : 'outline'} onClick={() => setSameMailing((value) => !value)}>
-                {sameMailing ? 'Same' : 'Different'}
-              </Button>
-            </div>
-
-            {!sameMailing && <AddressFields title="Mailing Address" addressKey="mailingAddress" icon={MapPin} />}
-
-            <div className="space-y-3 rounded-lg border bg-secondary/30 p-4">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <MapPin className="h-4 w-4 text-primary" />
-                Service Address
-              </div>
-              <div className="space-y-1">
-                <Label>Location Name</Label>
-                <Input value={form.serviceLocationName} onChange={(e) => setForm({ ...form, serviceLocationName: e.target.value })} placeholder="Downtown Restaurant" />
-              </div>
-              <AddressFields title="Restaurant Location" addressKey="serviceAddress" icon={MapPin} />
-            </div>
-
-            <div className="rounded-lg border bg-primary/5 p-4">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <FileCheck2 className="h-4 w-4 text-primary" />
-                Estimated Trust Score: {trustScore}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">Provider calls are represented by a local simulation in this first implementation slice. The persistence contract is ready for USPS, KYB, and SSN provider integration.</p>
-            </div>
+                {stepKey === 'business_review' && (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border bg-primary/5 p-4">
+                      <div className="flex items-center gap-2 font-semibold text-foreground">
+                        <FileCheck2 className="h-4 w-4 text-primary" />
+                        Estimated Trust Score: {trustScore}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{isTaxVerificationEnabled ? 'Provider calls are represented by a local simulation until EIN/SSN API keys are configured.' : 'Tax ID verification is disabled for this identifier type. Contact and address verification still apply.'}</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business:</b> {form.legalName || 'Not entered'}<br /><span className="text-muted-foreground">{form.businessType} / {requiredIdentifierType.toUpperCase()}</span></div>
+                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Contact:</b> {form.email || 'No email'}<br /><span className="text-muted-foreground">{form.phone || 'No phone'}</span></div>
+                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business address:</b><br /><span className="text-muted-foreground">{[form.businessAddress.line1, form.businessAddress.city, form.businessAddress.state, form.businessAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
+                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Service address:</b><br /><span className="text-muted-foreground">{[form.serviceAddress.line1, form.serviceAddress.city, form.serviceAddress.state, form.serviceAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
-          <CardFooter className="flex justify-end border-t bg-secondary/40 p-6">
-            <Button onClick={saveVerification} disabled={loading} className="min-w-[180px]">
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> Verify & Continue</>}
+          <CardFooter className="flex flex-col gap-3 border-t bg-secondary/40 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" variant="outline" onClick={() => saveDraft()} disabled={savingDraft || loading || loadingDraft}>
+              {savingDraft ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Draft'}
             </Button>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <Button type="button" variant="ghost" onClick={goBack} disabled={isFirstStep || savingDraft || loading || loadingDraft} className="flex-1 sm:flex-none">
+                Back
+              </Button>
+              {!isLastStep ? (
+                <Button type="button" onClick={goNext} disabled={savingDraft || loading || loadingDraft} className="flex-1 sm:flex-none">
+                  Next
+                </Button>
+              ) : (
+                <Button onClick={saveVerification} disabled={loading || savingDraft || loadingDraft} className="min-w-[180px] flex-1 sm:flex-none">
+                  {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> Verify & Continue</>}
+                </Button>
+              )}
+            </div>
           </CardFooter>
         </Card>
       </div>
     </div>
   );
 }
+
+

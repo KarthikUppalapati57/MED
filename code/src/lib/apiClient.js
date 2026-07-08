@@ -438,6 +438,32 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    getVerificationSettings: async () => {
+      const { data, error } = await supabase.rpc('get_onboarding_verification_settings');
+      if (error) throw error;
+      return data || { ein_verification_enabled: true, ssn_verification_enabled: true };
+    },
+    updateVerificationSettings: async ({ einEnabled, ssnEnabled }) => {
+      const { data, error } = await supabase.rpc('update_onboarding_verification_settings', {
+        p_ein_enabled: einEnabled,
+        p_ssn_enabled: ssnEnabled,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getBusinessVerificationDraft: async () => {
+      const { data, error } = await supabase.rpc('get_my_business_verification_draft');
+      if (error) throw error;
+      return data || { draft: {}, current_step: 'business_information' };
+    },
+    saveBusinessVerificationDraft: async ({ payload, step }) => {
+      const { data, error } = await supabase.rpc('save_business_verification_draft', {
+        p_payload: payload,
+        p_step: step,
+      });
+      if (error) throw error;
+      return data;
+    },
     requestContactOtp: async ({ channel, target }) => {
       const { data, error } = await supabase.rpc('request_onboarding_contact_otp', {
         p_channel: channel,
@@ -453,7 +479,8 @@ export const api = {
       });
       if (error) throw error;
       return data;
-    },    submitBusinessVerification: async (payload) => {
+    },
+    submitBusinessVerification: async (payload) => {
       const { data, error } = await supabase.rpc('submit_business_verification', {
         p_payload: payload,
       });
@@ -782,6 +809,8 @@ export const api = {
     }
   }
 };
+
+
 
 
 

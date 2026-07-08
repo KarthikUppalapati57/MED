@@ -20,7 +20,7 @@ import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalida
 import { toast } from "sonner";
 import Papa from 'papaparse';
 import posthog from '@/lib/posthog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function PlatformOrganizations() {
@@ -43,6 +43,10 @@ export default function PlatformOrganizations() {
   const [csvFile, setCsvFile] = useState(null);
   const [csvData, setCsvData] = useState([]);
   const [isModifyingHierarchy, setIsModifyingHierarchy] = useState(false);
+  const [reviewActionDialog, setReviewActionDialog] = useState(null);
+  const [reviewActionReason, setReviewActionReason] = useState('');
+  const [verificationSettingsForm, setVerificationSettingsForm] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
+  const [isSavingVerificationSettings, setIsSavingVerificationSettings] = useState(false);
   const [manualEntry, setManualEntry] = useState({
     type: 'brand', // 'brand' or 'location'
     brandName: '',
@@ -148,6 +152,35 @@ export default function PlatformOrganizations() {
       });
     }
   });
+  const { data: verificationSettings } = useAuthQuery({
+    queryKey: ['platform_onboarding_verification_settings'],
+    queryFn: () => api.onboarding.getVerificationSettings(),
+  });
+
+  React.useEffect(() => {
+    if (verificationSettings) {
+      setVerificationSettingsForm({
+        ein_verification_enabled: verificationSettings.ein_verification_enabled !== false,
+        ssn_verification_enabled: verificationSettings.ssn_verification_enabled !== false,
+      });
+    }
+  }, [verificationSettings]);
+
+  const handleSaveVerificationSettings = async () => {
+    setIsSavingVerificationSettings(true);
+    try {
+      await api.onboarding.updateVerificationSettings({
+        einEnabled: verificationSettingsForm.ein_verification_enabled,
+        ssnEnabled: verificationSettingsForm.ssn_verification_enabled,
+      });
+      queryClient.invalidateQueries({ queryKey: ['platform_onboarding_verification_settings'] });
+      toast.success('Business verification settings updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update verification settings');
+    } finally {
+      setIsSavingVerificationSettings(false);
+    }
+  };
   const { data: plans = [] } = useAuthQuery({
     queryKey: ['platform_plans'],
     queryFn: async () => {
@@ -444,23 +477,37 @@ export default function PlatformOrganizations() {
     queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
   };
 
-  const handleOnboardingAction = async (item, action) => {
+  const openReviewActionDialog = (item, action) => {
+    setReviewActionDialog({ item, action });
+    setReviewActionReason('');
+  };
+
+  const closeReviewActionDialog = () => {
+    setReviewActionDialog(null);
+    setReviewActionReason('');
+  };
+
+  const handleOnboardingAction = async () => {
+    if (!reviewActionDialog) return;
+    const { item, action } = reviewActionDialog;
+    const reason = reviewActionReason.trim();
+    if ((action === 'reject' || action === 'more_info') && !reason) {
+      toast.error(action === 'reject' ? 'A rejection reason is required.' : 'Tell the tenant what information is needed.');
+      return;
+    }
+
     try {
       if (action === 'approve') {
-        const note = window.prompt('Approval note, optional') || null;
-        await api.onboarding.approveBusinessVerification({ userId: item.verification.user_id, note });
+        await api.onboarding.approveBusinessVerification({ userId: item.verification.user_id, note: reason || null });
         toast.success('Business verification approved');
       } else if (action === 'reject') {
-        const reason = window.prompt('Reason sent to the tenant') || '';
-        if (!reason.trim()) return;
         await api.onboarding.rejectBusinessVerification({ userId: item.verification.user_id, reason });
         toast.success('Business verification rejected');
       } else if (action === 'more_info') {
-        const reason = window.prompt('What information should the tenant provide?') || '';
-        if (!reason.trim()) return;
         await api.onboarding.requestMoreInfo({ userId: item.verification.user_id, reason });
         toast.success('More information requested');
       }
+      closeReviewActionDialog();
       refreshOnboardingReview();
     } catch (err) {
       toast.error(err.message || 'Could not update onboarding review');
@@ -853,7 +900,7 @@ export default function PlatformOrganizations() {
                                 {item.addresses.length === 0 ? <p>No addresses linked yet.</p> : item.addresses.map((address) => (
                                   <div key={address.id} className="rounded-lg border border-border bg-secondary/20 p-2">
                                     <p className="font-bold text-foreground">{address.address_type}</p>
-                                    <p>{[address.line1, address.line2, address.city, address.state, address.postal_code].filter(Boolean).join(', ')}</p>
+                                    <p>{[address.address_line_1, address.address_line_2, address.city, address.state, address.zip_code].filter(Boolean).join(', ')}</p>
                                   </div>
                                 ))}
                               </div>
@@ -883,9 +930,9 @@ export default function PlatformOrganizations() {
                           </div>
 
                           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                            <Button size="sm" variant="outline" onClick={() => handleOnboardingAction(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleOnboardingAction(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
-                            <Button size="sm" onClick={() => handleOnboardingAction(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
+                            <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
+                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                            <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -987,6 +1034,30 @@ export default function PlatformOrganizations() {
                                <span>Created:</span> 
                                <span className="font-mono bg-card px-2 py-1 rounded-md border border-border/50">{new Date(selectedOrg.created_at).toLocaleDateString()}</span>
                              </p>
+                          </div>
+                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit xl:col-span-1 space-y-4">
+                             <div>
+                               <p className="text-sm font-bold text-foreground mb-1">Business Verification</p>
+                               <p className="text-xs text-muted-foreground">Enable or disable EIN/SSN verification requirements during tenant onboarding.</p>
+                             </div>
+                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+                               <Checkbox checked={verificationSettingsForm.ein_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ein_verification_enabled: Boolean(checked) }))} />
+                               <span>
+                                 <span className="block text-xs font-bold text-foreground">Require EIN verification</span>
+                                 <span className="block text-[11px] text-muted-foreground">Applies to LLC, corporation, partnership, and other business entities.</span>
+                               </span>
+                             </label>
+                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+                               <Checkbox checked={verificationSettingsForm.ssn_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ssn_verification_enabled: Boolean(checked) }))} />
+                               <span>
+                                 <span className="block text-xs font-bold text-foreground">Require SSN verification</span>
+                                 <span className="block text-[11px] text-muted-foreground">Applies to sole proprietor and independent contractor onboarding.</span>
+                               </span>
+                             </label>
+                             <Button size="sm" className="w-full" onClick={handleSaveVerificationSettings} disabled={isSavingVerificationSettings}>
+                               {isSavingVerificationSettings && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                               Save Verification Settings
+                             </Button>
                           </div>
                         </div>
                         <div className="pt-4 border-t border-border flex justify-end">
@@ -1136,6 +1207,46 @@ export default function PlatformOrganizations() {
         )}
       </div>
 
+      <Dialog open={!!reviewActionDialog} onOpenChange={(open) => { if (!open) closeReviewActionDialog(); }}>
+        <DialogContent className="max-w-lg bg-card border-border shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {reviewActionDialog?.action === 'approve' ? 'Approve Business Verification?' : reviewActionDialog?.action === 'reject' ? 'Reject Business Verification?' : 'Request More Information?'}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewActionDialog?.action === 'approve'
+                ? 'This will unlock the tenant to continue to payment setup.'
+                : reviewActionDialog?.action === 'reject'
+                ? 'This will block onboarding and notify the tenant with the reason.'
+                : 'This will keep the tenant in pending review and notify them what to provide.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="rounded-xl border bg-secondary/40 p-3 text-sm">
+              <p className="font-bold text-foreground">{reviewActionDialog?.item?.profile?.email || reviewActionDialog?.item?.verification?.legal_business_name || 'Tenant'}</p>
+              <p className="text-xs text-muted-foreground">Current status: {reviewActionDialog?.item?.verification?.verification_status || 'pending_review'}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{reviewActionDialog?.action === 'approve' ? 'Approval note (optional)' : 'Message to tenant'}</Label>
+              <textarea
+                value={reviewActionReason}
+                onChange={(event) => setReviewActionReason(event.target.value)}
+                className="min-h-24 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
+                placeholder={reviewActionDialog?.action === 'approve' ? 'Optional internal/admin note' : 'Explain what happened or what information is needed'}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeReviewActionDialog}>Cancel</Button>
+            <Button
+              variant={reviewActionDialog?.action === 'reject' ? 'destructive' : 'default'}
+              onClick={handleOnboardingAction}
+            >
+              {reviewActionDialog?.action === 'approve' ? 'Yes, Approve' : reviewActionDialog?.action === 'reject' ? 'Yes, Reject' : 'Send Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isHierarchyModalOpen} onOpenChange={setIsHierarchyModalOpen}>
         <DialogContent className="max-w-2xl bg-card border-border shadow-2xl">
           <DialogHeader>
@@ -1282,6 +1393,9 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
+
+
 
 
 
