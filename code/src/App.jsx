@@ -266,7 +266,7 @@ function SignupPage() {
 
     // Map deprecated role names to new role names to satisfy database constraints
     const roleMapping = {
-      owner: 'org_owner',
+      owner: 'org_manager',
       admin: 'platform_admin',
       manager: 'branch_manager',
     };
@@ -324,8 +324,8 @@ function SignupPage() {
               ? 'Validating invitation...'
               : inviteInfo
               ? `You've been invited as ${
-                  inviteInfo.role === 'owner' || inviteInfo.role === 'org_owner' ? 'organization owner' :
-                  inviteInfo.role === 'admin' || inviteInfo.role === 'platform_admin' ? 'platform admin' :
+                  ['owner', 'org_owner', 'org_manager'].includes(inviteInfo.role) ? 'organization manager' :
+                  inviteInfo.role === 'tenant_super_admin' ? 'tenant super admin' : inviteInfo.role === 'admin' || inviteInfo.role === 'platform_admin' ? 'platform admin' :
                   inviteInfo.role === 'manager' || inviteInfo.role === 'branch_manager' ? 'branch manager' :
                   inviteInfo.role?.replace('_', ' ')
                 }`
@@ -906,8 +906,8 @@ const AuthenticatedApp = () => {
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
   const isEnrolled = verifiedFactors.length > 0;
   
-  const highPrivilegeRoles = ['platform_admin', 'org_owner', 'branch_manager'];
-  // Platform admins, org owners, and branch managers MUST set up MFA
+  const highPrivilegeRoles = ['platform_admin', 'tenant_super_admin', 'org_manager', 'branch_manager'];
+  // Platform admins, tenant super admins, org managers, and branch managers MUST set up MFA
   const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled;
   
   // Challenge if they are enrolled (regardless of role) but haven't verified this session
@@ -936,7 +936,7 @@ const AuthenticatedApp = () => {
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const isTenantOwner = role === 'org_owner';
+  const isTenantOwner = role === 'tenant_super_admin' || role === 'org_manager' || role === 'org_owner';
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
   
   const isUnassignedUser = !userProfile?.organization_id;
@@ -1156,8 +1156,3 @@ function App() {
 }
 
 export default App
-
-
-
-
-

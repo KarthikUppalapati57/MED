@@ -191,7 +191,7 @@ export default function Invoices() {
   const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const isHigherRole = ['org_owner', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+  const isHigherRole = ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
 
   // Resizing state
   const [sheetWidth, setSheetWidth] = useState(() => {
@@ -1794,5 +1794,3 @@ export default function Invoices() {
     </div>
   );
 }
-
-

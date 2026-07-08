@@ -3,77 +3,81 @@ import React, { useMemo } from 'react';
 
 /**
  * Custom hook for role-based capability checks.
- * 
+ *
  * Roles hierarchy:
- *   ground_staff < location_manager < branch_manager < org_owner < platform_admin
- * 
- * Capabilities:
- *   ground_staff:     View data, upload invoices
- *   location_manager: Edit, approve invoices/payments, manage local inventory
- *   branch_manager:   Manage multiple locations, access reports, manage staff
- *   org_owner:        Full org access, user management, org settings, accounting
- *   platform_admin:   Platform-wide management, all orgs, subscription/pricing
+ *   ground_staff < location_manager < branch_manager < org_manager < tenant_super_admin < platform_admin
  */
 
 const ROLE_LEVEL = {
-  ground_staff:     0,
-  location_manager: 1,
-  manager:          2, // alias
-  branch_manager:   2,
-  org_owner:        3,
-  owner:            3, // alias
-  platform_admin:   4,
-  admin:            4, // alias
+  ground_staff:        0,
+  location_manager:    1,
+  manager:             2, // legacy alias
+  branch_manager:      2,
+  owner:               3, // legacy alias
+  org_owner:           3, // legacy alias
+  org_manager:         3,
+  tenant_super_admin:  4,
+  admin:               5, // legacy alias
+  platform_admin:      5,
 };
+
+function normalizeRole(role) {
+  if (role === 'owner' || role === 'org_owner') return 'org_manager';
+  if (role === 'manager') return 'branch_manager';
+  if (role === 'admin') return 'platform_admin';
+  return role || 'ground_staff';
+}
 
 export function usePermissions() {
   const { role, userProfile } = useAuth();
-
-  const currentLevel = ROLE_LEVEL[role] ?? 0;
+  const normalizedRole = normalizeRole(role);
+  const currentLevel = ROLE_LEVEL[normalizedRole] ?? 0;
 
   return useMemo(() => ({
-    role,
+    role: normalizedRole,
+    rawRole: role,
     userProfile,
     roleLevel: ROLE_LEVEL,
 
-    // Basic capabilities
-    canView: true, 
-    canUpload: true, 
-    canCreate: currentLevel >= 1,            // location_manager+
-    canEdit: currentLevel >= 1,              // location_manager+
-    canApprove: currentLevel >= 1,           // location_manager+
-    canDelete: currentLevel >= 2,            // branch_manager+
-    canSuperDelete: currentLevel >= 3,       // org_owner+
-    canManageUsers: currentLevel >= 3,       // org_owner+
-    canInviteUsers: currentLevel >= 2,       // branch_manager+
-    canManageHierarchy: currentLevel >= 4,   // platform_admin only
-    canManageSubscriptions: currentLevel >= 4, // platform_admin only
-    canManageAccounting: currentLevel >= 3,  // org_owner+
+    canView: true,
+    canUpload: true,
+    canCreate: currentLevel >= 1,
+    canEdit: currentLevel >= 1,
+    canApprove: currentLevel >= 1,
+    canDelete: currentLevel >= 2,
+    canSuperDelete: currentLevel >= 3,
+    canManageUsers: currentLevel >= 3,
+    canInviteUsers: currentLevel >= 2,
+    canManageHierarchy: currentLevel >= 4,
+    canManageSubscriptions: currentLevel >= 4,
+    canManageAccounting: currentLevel >= 3,
 
-    // Module-specific capabilities
-    canEditInventory: currentLevel >= 1,     // location_manager+
-    canManageRecipes: currentLevel >= 1,     // location_manager+
-    canManageOrders: currentLevel >= 1,      // location_manager+
-    canProcessPayments: currentLevel >= 2,   // branch_manager+
-    canManageVendors: currentLevel >= 2,     // branch_manager+
-    canViewReports: currentLevel >= 2,       // branch_manager+
-    canManageLocations: currentLevel >= 2,   // branch_manager+
-    canManageBrands: currentLevel >= 3,      // org_owner+
+    canEditInventory: currentLevel >= 1,
+    canManageRecipes: currentLevel >= 1,
+    canManageOrders: currentLevel >= 1,
+    canProcessPayments: currentLevel >= 2,
+    canManageVendors: currentLevel >= 2,
+    canViewReports: currentLevel >= 2,
+    canManageLocations: currentLevel >= 2,
+    canManageBrands: currentLevel >= 3,
 
-    // Role identity checks (new roles)
-    isGroundStaff: role === 'ground_staff',
-    isLocationManager: role === 'location_manager' || role === 'manager',
-    isBranchManager: role === 'branch_manager' || role === 'manager',
-    isOrgOwner: role === 'org_owner' || role === 'owner',
-    isPlatformAdmin: role === 'platform_admin' || role === 'admin',
+    isGroundStaff: normalizedRole === 'ground_staff',
+    isLocationManager: normalizedRole === 'location_manager',
+    isBranchManager: normalizedRole === 'branch_manager',
+    isOrgManager: normalizedRole === 'org_manager',
+    isOrgOwner: normalizedRole === 'org_manager',
+    isTenantSuperAdmin: normalizedRole === 'tenant_super_admin',
+    isPlatformAdmin: normalizedRole === 'platform_admin',
 
-    // Level-based checks
     isLocationManagerOrAbove: currentLevel >= 1,
     isBranchManagerOrAbove: currentLevel >= 2,
+    isOrgManagerOrAbove: currentLevel >= 3,
     isOrgOwnerOrAbove: currentLevel >= 3,
-    isPlatformAdminOrAbove: currentLevel >= 4,
+    isTenantSuperAdminOrAbove: currentLevel >= 4,
+    isPlatformAdminOrAbove: currentLevel >= 5,
 
-    // Check against a specific minimum role
-    hasMinRole: (minRole) => currentLevel >= (ROLE_LEVEL[minRole] ?? 0),
-  }), [role, userProfile, currentLevel]);
+    hasMinRole: (minRole) => currentLevel >= (ROLE_LEVEL[normalizeRole(minRole)] ?? 0),
+  }), [role, userProfile, normalizedRole, currentLevel]);
 }
+
+export { normalizeRole, ROLE_LEVEL };

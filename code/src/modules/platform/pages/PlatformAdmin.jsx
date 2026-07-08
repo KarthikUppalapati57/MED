@@ -337,7 +337,7 @@ export default function PlatformAdmin() {
       const emailResult = await sendInvitationEmail({
         to_email: inviteEmail,
         to_name: inviteEmail.split('@')[0],
-        role: "Organization Owner",
+        role: "Tenant Super Admin",
         org_name: "Restops Platform",
         invite_link: link
       });
@@ -450,7 +450,7 @@ Hi ${request.full_name},
 
 We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
-We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+We have generated a secure, personalized onboarding link so you can set up your tenant super admin account and explore the platform's advanced multi-tenant ecosystem.
 
 This invite is assigned to ${onboardingEmail}. Please use that email address when creating your account or signing in with Google/Microsoft.
 
@@ -649,7 +649,7 @@ Hi ${request.full_name},
 
 We are thrilled to inform you that your request for a Restops system walkthrough and demo has been approved! 
 
-We have generated a secure, personalized onboarding link so you can set up your organization owner account and explore the platform's advanced multi-tenant ecosystem.
+We have generated a secure, personalized onboarding link so you can set up your tenant super admin account and explore the platform's advanced multi-tenant ecosystem.
 
 This invite is assigned to ${onboardingEmail}. Please use that email address when creating your account or signing in with Google/Microsoft.
 
@@ -943,7 +943,7 @@ The Restops Platform Team
               </div>
               <div>
                 <h2 className="text-2xl font-bold">Invite New Client</h2>
-                <p className="text-muted-foreground text-sm">Generate secure onboarding links for Organization Owners</p>
+                <p className="text-muted-foreground text-sm">Generate secure onboarding links for Tenant Super Admins</p>
               </div>
             </div>
           </div>
@@ -1121,7 +1121,7 @@ The Restops Platform Team
                           const emailResult = await sendInvitationEmail({
                             to_email: invite.email,
                             to_name: invite.email.split('@')[0],
-                            role: "Organization Owner",
+                            role: "Tenant Super Admin",
                             org_name: "Restops Platform",
                             invite_link: link
                           });
@@ -1688,4 +1688,3 @@ The Restops Platform Team
     </div>
   );
 }
-

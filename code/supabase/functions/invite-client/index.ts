@@ -24,7 +24,7 @@ serve(async (req) => {
       .from('invitations')
       .insert({
         email,
-        role: 'org_owner',
+        role: 'tenant_super_admin',
         onboarding_type: 'client_invite',
         status: 'pending'
       })

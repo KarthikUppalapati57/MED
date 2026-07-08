@@ -21,17 +21,18 @@ import { cn } from '@/lib/utils';
  *
  * Behavior per role:
  *   Platform Admin -> Dropdown of ALL organizations -> brands -> locations
- *   Org Owner      -> Dropdown of their org's brands -> locations
+ *   Tenant Super Admin -> Dropdown of tenant organizations -> brands -> locations
+ *   Org Manager    -> Dropdown of their org's brands -> locations
  *   Branch Manager -> Dropdown of their assigned branches -> locations
  *   Ground Level   -> Static text showing assigned location (no dropdown)
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
-  const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
+  const { isPlatformAdmin, isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
 
-  // Platform Admin: fetch ALL orgs
+  // Platform Admin: fetch all orgs; Tenant Super Admin: fetch tenant-visible orgs
   const { data: adminAllOrgs = [] } = useAuthQuery({
-    queryKey: ['ctx-all-orgs'],
+    queryKey: ['ctx-all-orgs', isPlatformAdmin ? 'platform' : 'tenant'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
@@ -40,11 +41,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: isPlatformAdmin,
+    enabled: isPlatformAdmin || isTenantSuperAdmin,
   });
 
-  const availableOrgs = isPlatformAdmin 
-    ? adminAllOrgs 
+  const availableOrgs = (isPlatformAdmin || isTenantSuperAdmin)
+    ? adminAllOrgs
     : (accessTree || []).map(node => node.organization).filter(Boolean);
 
   // Brands: fetch for the active org
@@ -60,7 +61,7 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!activeOrgId,
+    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeOrgId,
   });
 
   // Locations: fetch only after a brand is selected.
@@ -78,11 +79,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isOrgOwner || isBranchManager || isLocationManager) && !!activeBrandId,
+    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeBrandId,
   });
 
   // Ground staff: no switcher, just show assigned location name
-  if (!isPlatformAdmin && !isOrgOwner && !isBranchManager && !isLocationManager) {
+  if (!isPlatformAdmin && !isTenantSuperAdmin && !isOrgManager && !isBranchManager && !isLocationManager) {
     if (location?.name) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -97,7 +98,7 @@ export default function ContextSwitcher() {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {/* Organization Selector */}
-      {(isPlatformAdmin || availableOrgs.length > 0) && (
+      {(isPlatformAdmin || isTenantSuperAdmin || availableOrgs.length > 0) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[200px]">

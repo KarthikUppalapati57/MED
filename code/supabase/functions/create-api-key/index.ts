@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -7,10 +7,12 @@ const ROLE_LEVEL: Record<string, number> = {
   location_manager: 1,
   manager: 2,
   branch_manager: 2,
-  org_owner: 3,
+  org_manager: 3,
+  tenant_super_admin: 4,
   owner: 3,
-  platform_admin: 4,
-  admin: 4,
+  org_owner: 3,
+  platform_admin: 5,
+  admin: 5,
 };
 
 function json(body: unknown, status = 200) {
@@ -104,4 +106,3 @@ serve(async (req) => {
     return json({ error: error instanceof Error ? error.message : "Internal Server Error" }, 500);
   }
 });
-

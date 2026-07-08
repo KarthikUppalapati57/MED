@@ -324,7 +324,7 @@ export default function OrgManagement() {
     setSaving(false);
   };
 
-  const canManage = ['org_owner', 'platform_admin'].includes(userProfile?.role);
+  const canManage = ['org_manager', 'tenant_super_admin', 'platform_admin'].includes(userProfile?.role);
 
   // Precomputed Brand/Location/Staff lookup Maps for O(1) retrieval during hierarchy rendering
   const orgBrandsMap = React.useMemo(() => {
@@ -841,4 +841,3 @@ export default function OrgManagement() {
     </div>
   );
 }
-

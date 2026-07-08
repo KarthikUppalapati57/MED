@@ -27,7 +27,7 @@ export const MODULE_DEFINITIONS = {
   executive_bi: {
     label: "Executive BI",
     pages: ["ExecutiveBI"],
-    minRole: "org_owner",
+    minRole: "org_manager",
     icon: "Activity",
   },
   custom_reports: {
@@ -51,7 +51,7 @@ export const MODULE_DEFINITIONS = {
   billing: {
     label: "Platform Subscription",
     pages: ["Billing"],
-    minRole: "org_owner",
+    minRole: "org_manager",
     icon: "CreditCard",
   },
   products: {
@@ -105,13 +105,13 @@ export const MODULE_DEFINITIONS = {
   accounting: {
     label: "Accounting",
     pages: ["Accounting"],
-    minRole: "org_owner",
+    minRole: "org_manager",
     icon: "DollarSign",
   },
   admin: {
     label: "Organization Admin",
     pages: ["UserManagement", "OrgManagement", "AuditLogs", "FranchisorConsole"],
-    minRole: "org_owner",
+    minRole: "org_manager",
     icon: "Users",
   },
   setup: {
@@ -135,7 +135,7 @@ export const MODULE_DEFINITIONS = {
   integrations: {
     label: "Integrations",
     pages: ["Integrations", "DeveloperPortal"],
-    minRole: "org_owner",
+    minRole: "org_manager",
     icon: "Settings",
   },
   crm_marketing: {
@@ -211,14 +211,14 @@ export function getEnabledPages(enabledModules) {
  * FAIL-CLOSED (secure-by-default):
  * - Only explicitly ungated setup pages are allowed outside module mapping
  * - Core modules are always allowed
- * - Org owners bypass subscription module restrictions
+ * - Org managers bypass subscription module restrictions
  * - Operational modules require explicit inclusion
  */
 export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);
   if (!moduleInfo) return isUngatedAuthPage(pageName);
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
-  if (userRole === "org_owner") return true;
+  if (["org_manager", "tenant_super_admin"].includes(userRole)) return true;
   const modulesList = enabledModules || [];
   const normalizedList = modulesList.map(m => String(m).toLowerCase());
   return normalizedList.includes(moduleInfo.key.toLowerCase());

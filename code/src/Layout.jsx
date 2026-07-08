@@ -65,7 +65,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
-  { name: 'Executive BI', href: 'ExecutiveBI', icon: Activity, minRole: 'org_owner' },
+  { name: 'Executive BI', href: 'ExecutiveBI', icon: Activity, minRole: 'org_manager' },
   { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
@@ -205,19 +205,19 @@ const navigation = [
   { 
     name: 'Organization Settings', 
     icon: Building2, 
-    minRole: 'org_owner',
+    minRole: 'org_manager',
     subItems: [
       { name: 'Hierarchy', href: 'OrgManagement/hierarchy', icon: Building2 },
       { name: 'Franchisor Console', href: 'FranchisorConsole', icon: Building2 },
       { name: 'Security & MFA', href: 'OrgManagement/security', icon: ShieldCheck }
     ]
   },
-  { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_owner' },
-  { name: 'Billing & Plans', href: 'Billing', icon: CreditCard, minRole: 'org_owner' },
+  { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_manager' },
+  { name: 'Billing & Plans', href: 'Billing', icon: CreditCard, minRole: 'org_manager' },
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
-  { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_owner' },
-  { name: 'Organization Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_owner' },
-  { name: 'Developer Portal', href: 'DeveloperPortal', icon: Code, minRole: 'org_owner' },
+  { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_manager' },
+  { name: 'Organization Audit Logs', href: 'AuditLogs', icon: FileText, minRole: 'org_manager' },
+  { name: 'Developer Portal', href: 'DeveloperPortal', icon: Code, minRole: 'org_manager' },
   { 
     name: 'Hardware & Displays', 
     icon: Smartphone, 
@@ -235,7 +235,7 @@ const roleBadgeColors = {
   location_manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
   manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
   branch_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
-  org_owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
+  org_manager: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
   owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
   admin: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
   platform_admin: 'bg-indigo-500/10 text-indigo-500 dark:bg-indigo-500/20 dark:text-indigo-300',

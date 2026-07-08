@@ -144,7 +144,7 @@ export default function ApprovalPolicySettings() {
                     <SelectItem value="location_manager">Location Manager</SelectItem>
                     <SelectItem value="manager">General Manager</SelectItem>
                     <SelectItem value="org_admin">Org Admin</SelectItem>
-                    <SelectItem value="org_owner">Org Owner</SelectItem>
+                    <SelectItem value="org_manager">Org Manager</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

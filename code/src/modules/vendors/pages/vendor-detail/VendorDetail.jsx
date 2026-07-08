@@ -71,7 +71,7 @@ export default function VendorDetail() {
   const [activeTab, setActiveTab] = useState('overview');
 
   // Role based access control (UI locks)
-  const isElevatedUser = isPlatformAdmin || role === 'org_owner' || role === 'admin';
+  const isElevatedUser = isPlatformAdmin || role === 'tenant_super_admin' || role === 'org_manager' || role === 'admin';
 
   const { data: vendor, isLoading } = useAuthQuery({
     queryKey: ['vendor', id],

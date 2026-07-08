@@ -87,7 +87,7 @@ serve(async (req) => {
        return new Response(JSON.stringify({ error: 'Vendor must complete Dwolla onboarding first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    // 1. Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Owner).
+    // 1. Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Manager).
     const { data: releaseData, error: releaseError } = await supabase.rpc('release_invoice_funds', {
       p_invoice_id: invoice_id,
       p_payment_account_id: payment_account_id || null

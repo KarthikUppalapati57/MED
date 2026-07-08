@@ -342,7 +342,7 @@ export const AuthProvider = ({ children }) => {
       } else {
         // If profile is missing but user is authenticated, create a skeleton profile
         // This prevents the application from getting stuck in an inconsistent state
-        const role = sessionUser.app_metadata?.role || 'org_owner';
+        const role = sessionUser.app_metadata?.role || 'tenant_super_admin';
         
         // Create a skeleton profile
         const { data: newProfile, error } = await supabase
@@ -752,7 +752,8 @@ export const AuthProvider = ({ children }) => {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
       branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
-      org_owner:        ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
+      org_manager:      ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
+      tenant_super_admin: ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_tenant', 'manage_accounting'],
       platform_admin:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_platform', 'manage_subscriptions', 'manage_accounting'],
     };
     return (roleActionMap[role] || []).includes(action);

@@ -130,7 +130,7 @@ export default function PlatformOrganizations() {
         supabase.from('onboarding_bank_accounts').select('id, user_id, organization_id, bank_name, account_type, account_number_last4, routing_number_last4, is_default, status, payment_account_id, created_at').order('created_at', { ascending: false }).limit(200),
         supabase.from('tenant_payment_authorizations').select('id, user_id, organization_id, onboarding_bank_account_id, payment_account_id, signer_full_name, signer_title, consent_version, signed_at, status').order('signed_at', { ascending: false }).limit(200),
         supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, event_data, created_at').order('created_at', { ascending: false }).limit(200),
-        supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_owner']).order('created_at', { ascending: false }).limit(100),
+        supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_owner', 'org_manager', 'tenant_super_admin']).order('created_at', { ascending: false }).limit(100),
       ]);
 
       const results = [verificationsResult, profilesResult, addressesResult, bankAccountsResult, signaturesResult, eventsResult, invitesResult];
@@ -239,8 +239,8 @@ export default function PlatformOrganizations() {
       posthog.capture('workspace_updated');
       toast.success("Billing & configuration updated");
 
-      // Notify Org Owner
-      const orgOwner = users.find(u => u.organization_id === selectedOrgId && u.role === 'org_owner');
+      // Notify Org Manager
+      const orgOwner = users.find(u => u.organization_id === selectedOrgId && u.role === 'org_manager');
       if (orgOwner) {
         await supabase.from('notifications').insert({
           organization_id: selectedOrgId,
@@ -1393,9 +1393,3 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
-
-
-
-
-
-

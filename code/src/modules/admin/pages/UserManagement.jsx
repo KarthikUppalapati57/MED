@@ -26,7 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Restops Roles 
 const Restops_ROLES = {
-  org_owner:        { label: "Organization Owner", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
+  tenant_super_admin: { label: "Tenant Super Admin", color: "indigo", description: "Full access across all tenant organizations", icon: ShieldCheck },
+  org_manager:        { label: "Organization Manager", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
   branch_manager:   { label: "Branch Manager",     color: "purple", description: "Manages multiple locations and local team members", icon: Building2 },
   location_manager: { label: "Location Manager",   color: "blue",   description: "Manages daily operations, inventory, and approvals", icon: UserCheck },
   ground_staff:     { label: "Ground Staff",       color: "teal",   description: "Can upload invoices and perform inventory counts",     icon: Users },
@@ -39,6 +40,7 @@ const ROLE_COLOR_CLASSES = {
   blue:   { badge: "bg-resend-blue/10 text-resend-blue border-resend-blue/20",       dot: "bg-resend-blue/50" },
   teal:   { badge: "bg-primary/10 text-primary border-primary/20",       dot: "bg-primary" },
   amber:  { badge: "bg-resend-yellow/10 text-resend-yellow border-resend-yellow/20",   dot: "bg-resend-yellow/50" },
+  indigo: { badge: "bg-indigo-500/10 text-indigo-500 border-indigo-200", dot: "bg-indigo-500" },
   slate:  { badge: "bg-secondary text-muted-foreground border-border",    dot: "bg-slate-400" },
 };
 
@@ -809,7 +811,7 @@ export default function UserManagement() {
   // Client-side filtering for scope if needed (since memberships query might not filter by brand_id/location_id at DB level if they reside in profiles)
   const scopedMembers = useMemo(() => {
     return members.filter(m => {
-      if (isPlatformAdmin || !userRole || userRole === 'org_owner') return true;
+      if (isPlatformAdmin || !userRole || ['org_manager', 'tenant_super_admin'].includes(userRole)) return true;
       if (isBranchManager) return m.brand_id === activeBrandId || m.profiles?.brand_id === activeBrandId;
       if (isLocationManager) return m.location_id === activeLocationId || m.profiles?.location_id === activeLocationId;
       return false; // Ground staff shouldn't be here, but just in case
@@ -833,7 +835,7 @@ export default function UserManagement() {
     const total = scopedMembers.length;
     const active = scopedMembers.filter(m => m.status === 'active').length;
     const invited = scopedMembers.filter(m => m.status === 'invited').length;
-    const admins = scopedMembers.filter(m => ['org_owner', 'platform_admin'].includes(m.role || m.capabilities?.role)).length;
+    const admins = scopedMembers.filter(m => ['org_manager', 'tenant_super_admin', 'platform_admin'].includes(m.role || m.capabilities?.role)).length;
     return { total, active, invited, admins };
   }, [scopedMembers]);
 
@@ -843,7 +845,7 @@ export default function UserManagement() {
     const myLevel = roleLevel?.[userRole] ?? 0;
     const targetLevel = roleLevel?.[targetRole] ?? 0;
     
-    // Org Owner can edit anyone in their org except Platform Admin
+    // Org Manager can edit anyone in their org except Platform Admin
     if (myLevel >= 3 && targetLevel < 4) return true;
     
     // Branch Manager can edit Location Managers and Ground Staff (in their branch)
@@ -909,7 +911,7 @@ export default function UserManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-card shadow-sm rounded-xl p-1 border border-border">
           <TabsTrigger value="members" className="rounded-lg px-6 font-bold">Team Members</TabsTrigger>
-          {(userRole === 'org_owner' || isPlatformAdmin) && (
+          {(['org_manager', 'tenant_super_admin'].includes(userRole) || isPlatformAdmin) && (
             <TabsTrigger value="roles" className="rounded-lg px-6 font-bold">Role Builder</TabsTrigger>
           )}
         </TabsList>

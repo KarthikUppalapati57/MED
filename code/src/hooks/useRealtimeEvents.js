@@ -63,7 +63,7 @@ export function useRealtimeEvents() {
 
     // Track C: Listen to partitioned logs for admins
     let logsChannel = null;
-    if (role === 'platform_admin' || role === 'org_owner') {
+    if (role === 'platform_admin' || role === 'tenant_super_admin' || role === 'org_manager') {
       logsChannel = supabase
         .channel('admin-logs-channel')
         .on(

@@ -11,10 +11,12 @@ const ROLE_RANK = {
   manager: 1,
   branch_manager: 2,
   brand_manager: 2,
-  org_owner: 3,
+  org_manager: 3,
+  tenant_super_admin: 4,
   owner: 3,
-  admin: 3,
-  platform_admin: 4,
+  org_owner: 3,
+  admin: 5,
+  platform_admin: 5,
 };
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>

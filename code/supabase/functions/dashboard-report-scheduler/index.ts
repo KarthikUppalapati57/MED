@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
@@ -75,11 +75,11 @@ function filterRecipients({ profiles, preference }: {
     .filter((profile) => roles.includes(profile.role))
     .filter((profile) => {
       if (preference.scope === 'brand') {
-        if (profile.role === 'org_owner') return true;
+        if (profile.role === 'org_manager' || profile.role === 'tenant_super_admin') return true;
         return !profile.brand_id || !preference.brand_id || profile.brand_id === preference.brand_id;
       }
       if (preference.scope === 'location') {
-        if (profile.role === 'org_owner') return true;
+        if (profile.role === 'org_manager' || profile.role === 'tenant_super_admin') return true;
         if (profile.role === 'brand_manager' || profile.role === 'branch_manager') return !profile.brand_id || !preference.brand_id || profile.brand_id === preference.brand_id;
         if (profile.role === 'location_manager') return !profile.location_id || !preference.location_id || profile.location_id === preference.location_id;
         return false;
@@ -257,4 +257,3 @@ serve(async (req) => {
     });
   }
 });
-

@@ -1,10 +1,10 @@
-﻿import React from 'react';
+import React from 'react';
 import { ShieldX, Lock, ArrowUpCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 /**
- * AccessDenied — Premium denial page shown when a user lacks permission.
+ * AccessDenied � Premium denial page shown when a user lacks permission.
  * 
  * Two modes:
  *   reason="role"   -> User's role is too low for this page
@@ -43,7 +43,7 @@ export default function AccessDenied({ reason = 'role', requiredRole, moduleName
             <>
               The <span className="font-semibold text-foreground">{moduleName}</span> module 
               is not included in your organization's current plan. 
-              Contact your organization owner to upgrade your subscription.
+              Contact your organization manager to upgrade your subscription.
             </>
           ) : (
             <>
@@ -89,4 +89,3 @@ export default function AccessDenied({ reason = 'role', requiredRole, moduleName
     </div>
   );
 }
-

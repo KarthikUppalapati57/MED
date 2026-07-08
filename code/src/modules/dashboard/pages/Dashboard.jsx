@@ -76,7 +76,7 @@ const DEFAULT_REPORT_PREFERENCES = {
   weeklyExecutive: true,
   includeForecasts: true,
   includeEscalations: true,
-  recipientRoles: ['org_owner', 'brand_manager', 'branch_manager', 'location_manager'],
+  recipientRoles: ['tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager', 'location_manager'],
 };
 
 function currency(value) {
@@ -129,9 +129,9 @@ function createCanAccessPage({ organization, userProfile, hasMinRole, isPlatform
 function canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }) {
   if (isPlatformAdmin) return true;
   const role = userProfile?.role;
-  if (scope === 'org') return role === 'org_owner';
-  if (scope === 'brand') return ['org_owner', 'brand_manager', 'branch_manager'].includes(role);
-  if (scope === 'location') return ['org_owner', 'brand_manager', 'branch_manager', 'location_manager'].includes(role);
+  if (scope === 'org') return ['org_manager', 'tenant_super_admin'].includes(role);
+  if (scope === 'brand') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager'].includes(role);
+  if (scope === 'location') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager'].includes(role);
   return false;
 }
 
@@ -2515,7 +2515,7 @@ function EscalationPanel({ escalations, organization, scope, userProfile }) {
 function createHandoffText({ metrics, scope, actions, statusMap, dataHealthScore, note }) {
   const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
   const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
-  const scopeName = scope === 'brand' ? 'Brand Manager' : scope === 'location' ? 'Location Manager' : 'Org Owner';
+  const scopeName = scope === 'brand' ? 'Brand Manager' : scope === 'location' ? 'Location Manager' : 'Org Manager';
 
   return [
     `${scopeName} Daily Handoff`,
@@ -3123,16 +3123,16 @@ function PlatformDashboard() {
 
 export default function Dashboard() {
   const { organization, brand, location } = useAuth();
-  const { isPlatformAdmin, isOrgOwner, isBranchManager, isLocationManager } = usePermissions();
+  const { isPlatformAdmin, isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
 
   if (isPlatformAdmin) return <PlatformDashboard />;
-  if (isOrgOwner) {
+  if (isTenantSuperAdmin || isOrgManager) {
     return (
       <OrgOperatorDashboard
         scope="org"
         title={`${organization?.name || 'Organization'} Dashboard`}
         subtitle="Organization control center with daily restaurant performance and platform workflows."
-        scopeLabel="Org Owner"
+        scopeLabel="Org Manager"
       />
     );
   }

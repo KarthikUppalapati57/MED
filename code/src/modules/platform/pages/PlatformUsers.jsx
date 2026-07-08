@@ -229,7 +229,7 @@ export default function PlatformUsers() {
                     <Badge variant="outline" className={cn(
                       "text-[10px] capitalize font-bold",
                       u.role === 'platform_admin' ? "bg-purple-500/10 text-purple-500 border-purple-200" :
-                      u.role === 'org_owner' ? "bg-rose-500/10 text-rose-500 border-rose-200" : "bg-card text-muted-foreground"
+                      u.role === 'org_manager' ? "bg-rose-500/10 text-rose-500 border-rose-200" : "bg-card text-muted-foreground"
                     )}>
                       {u.role?.replace('_', ' ') || 'User'}
                     </Badge>
