@@ -42,6 +42,53 @@ const withTimeout = (promise, timeoutMs, message) => {
   return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
 };
 
+const normalizeInviteToken = (value) => String(value || '').replace(/[\n\r.,!?>\]]+$/, '').trim();
+
+const isExpiredInvite = (invite) => {
+  if (!invite?.expires_at) return false;
+  const expiresAt = new Date(invite.expires_at).getTime();
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+};
+
+const getInviteDetailsWithFallback = async (cleanToken) => {
+  let rpcError = null;
+
+  try {
+    const { data, error } = await supabase.rpc('get_invite_details', { invite_token: cleanToken });
+    if (error) {
+      rpcError = error;
+    } else {
+      const invite = Array.isArray(data) ? data[0] : data;
+      if (invite?.id && invite?.email) {
+        if (isExpiredInvite(invite)) throw new Error('This invitation link has expired.');
+        return invite;
+      }
+    }
+  } catch (err) {
+    rpcError = err;
+  }
+
+  const { data: fallbackInvite, error: fallbackError } = await supabase
+    .from('invitations')
+    .select('id,email,role,organization_id,invited_by,expires_at,accepted_at')
+    .eq('token', cleanToken)
+    .is('accepted_at', null)
+    .maybeSingle();
+
+  if (fallbackError) {
+    const details = rpcError?.message || fallbackError.message;
+    throw new Error(details ? `Invite lookup failed: ${details}` : 'Invite lookup failed.');
+  }
+
+  if (!fallbackInvite?.id || !fallbackInvite?.email) {
+    if (rpcError?.message) console.warn('Invite RPC failed before fallback returned empty:', rpcError);
+    return null;
+  }
+
+  if (isExpiredInvite(fallbackInvite)) throw new Error('This invitation link has expired.');
+
+  return fallbackInvite;
+};
 const notify = async (type, message, options) => {
   const { toast } = await import('sonner');
   toast[type](message, options);
@@ -103,8 +150,12 @@ const LayoutWrapper = ({ children, currentPageName }) => {
 
 // Signup Page for Invited Users 
 function SignupPage() {
-  const { token } = useParams();
+  const { token: routeToken } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const token = normalizeInviteToken(routeToken || queryParams.get('token') || hashParams.get('token'));
   const { signUp, user, loginWithSSO } = useAuth();
   const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
@@ -121,11 +172,11 @@ function SignupPage() {
 
     if (!token) {
       setInviteLoading(false);
-      setError('Invalid or expired invitation link.');
+      setError('Invalid invitation link. The invite token is missing.');
       return () => { cancelled = true; };
     }
 
-    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+    const cleanToken = token;
 
     const finishLoading = () => {
       window.clearTimeout(safetyTimer);
@@ -144,16 +195,15 @@ function SignupPage() {
       setError('');
 
       try {
-        const { data, error: inviteError } = await withTimeout(
-          supabase.rpc('get_invite_details', { invite_token: cleanToken }),
+        const invite = await withTimeout(
+          getInviteDetailsWithFallback(cleanToken),
           INVITE_VALIDATION_TIMEOUT_MS,
           'Invitation validation timed out.'
         );
 
         if (cancelled) return;
 
-        const invite = Array.isArray(data) ? data[0] : data;
-        if (!inviteError && invite?.id && invite?.email) {
+        if (invite?.id && invite?.email) {
           setInviteInfo(invite);
           setForm(f => ({ ...f, email: invite.email || '' }));
           setError('');
@@ -167,7 +217,7 @@ function SignupPage() {
 
         setInviteInfo(null);
         setForm(f => ({ ...f, email: '' }));
-        setError(inviteError?.message || 'Invalid or expired invitation link.');
+        setError('Invalid or expired invitation link. Please ask the Platform Admin to reissue the invite.');
       } catch (err) {
         if (cancelled) return;
         console.warn('Invitation validation failed:', err);
@@ -219,7 +269,7 @@ function SignupPage() {
     };
     const mappedRole = roleMapping[inviteInfo.role] || inviteInfo.role;
 
-    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+    const cleanToken = token;
 
     const { data, error: signUpError } = await signUp(form.email, form.password, {
       full_name: form.full_name,
@@ -246,7 +296,7 @@ function SignupPage() {
       return;
     }
 
-    const cleanToken = token.replace(/[\n\r.,!?>\]]+$/, '').trim();
+    const cleanToken = token;
     setSsoProvider(provider);
     const { error: ssoError } = await loginWithSSO(provider, {
       inviteToken: cleanToken,
@@ -296,7 +346,7 @@ function SignupPage() {
           <form className="space-y-4" onSubmit={handleSubmit}>
             {!inviteLoading && !inviteInfo && (
               <div className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">
-                Invalid or expired invitation link. Please contact the Restops Platform team for a new onboarding invite.
+                {error || 'Invalid or expired invitation link. Please contact the Restops Platform team for a new onboarding invite.'}
               </div>
             )}
             <div className="space-y-1">
@@ -1103,5 +1153,8 @@ function App() {
 }
 
 export default App
+
+
+
 
 
