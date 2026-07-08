@@ -22,6 +22,25 @@ const PLATFORM_AUDIT_ROW_HEIGHT = 72;
 const PLATFORM_AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
 const PLATFORM_AUDIT_ROW_OVERSCAN = 8;
 
+const PLATFORM_AUDIT_TABLES = [
+  'organizations',
+  'profiles',
+  'plans',
+  'webhook_events',
+  'invitations',
+  'brands',
+  'locations',
+  'business_verifications',
+  'organization_addresses',
+  'onboarding_workflow_runs',
+  'onboarding_step_events',
+  'onboarding_payment_methods',
+  'onboarding_contact_otps',
+  'onboarding_bank_accounts',
+  'tenant_payment_authorizations',
+  'onboarding_admin_actions',
+  'platform_onboarding_settings',
+];
 export default function PlatformAuditLogs() {
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
@@ -59,8 +78,6 @@ export default function PlatformAuditLogs() {
         
       if (logModuleFilter !== 'All') {
         q = q.eq('table_name', logModuleFilter.toLowerCase());
-      } else {
-        q = q.in('table_name', ['organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations']);
       }
       
       if (debouncedSearchQuery) {
@@ -144,7 +161,7 @@ export default function PlatformAuditLogs() {
     }
   };
 
-  const moduleFilters = ['All', 'organizations', 'profiles', 'plans', 'webhook_events', 'invitations', 'brands', 'locations'];
+  const moduleFilters = ['All', ...PLATFORM_AUDIT_TABLES];
 
  // Guards 
   if (!authChecked) {
@@ -441,4 +458,6 @@ export default function PlatformAuditLogs() {
     </div>
   );
 }
+
+
 
