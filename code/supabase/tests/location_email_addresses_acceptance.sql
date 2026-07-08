@@ -73,7 +73,7 @@ BEGIN
     id, email, full_name, role, organization_id, brand_id, location_id,
     access_level, invoice_approval_limit
   ) VALUES
-    (v_owner, 'location-email-owner@example.test', 'Location Email Owner', 'org_owner', v_org, NULL, NULL, 'organization', 10000),
+    (v_owner, 'location-email-owner@example.test', 'Location Email Owner', 'org_manager', v_org, NULL, NULL, 'organization', 10000),
     (v_branch, 'location-email-branch@example.test', 'Location Email Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand', 1000),
     (v_choto_manager, 'location-email-choto@example.test', 'Choto Manager', 'location_manager', v_org, v_brand1, v_choto, 'location', 500),
     (v_seymore_manager, 'location-email-seymore@example.test', 'Seymore Manager', 'location_manager', v_org, v_brand1, v_seymore, 'location', 500),
@@ -90,7 +90,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_choto_manager, 'location_manager'),
     (v_org, v_seymore_manager, 'location_manager'),
@@ -145,7 +145,7 @@ VALUES
   ('owner-brand2@example.test', (SELECT value FROM location_email_ids WHERE key='other_org'), (SELECT value FROM location_email_ids WHERE key='brand1'), (SELECT value FROM location_email_ids WHERE key='brand2_location'), 'owner brand2');
 
 INSERT INTO location_email_results
-SELECT 'org_owner_can_add_any_location',
+SELECT 'org_manager_can_add_any_location',
        EXISTS (SELECT 1 FROM public.location_email_addresses WHERE email = 'owner-seymore@example.test')
        AND EXISTS (SELECT 1 FROM public.location_email_addresses WHERE email = 'owner-brand2@example.test'),
        'owner inserted brand1 and brand2 locations';

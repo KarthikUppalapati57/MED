@@ -48,7 +48,7 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner, 'batch3c1-owner@example.test', 'Batch 3c1 Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'batch3c1-owner@example.test', 'Batch 3c1 Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'batch3c1-branch@example.test', 'Batch 3c1 Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
     (v_location, 'batch3c1-location@example.test', 'Batch 3c1 Location', 'location_manager', v_org, v_brand1, v_loc1, 'location'),
     (v_ground, 'batch3c1-ground@example.test', 'Batch 3c1 Ground', 'ground_staff', v_org, v_brand1, v_loc1, 'location')
@@ -63,7 +63,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_location, 'location_manager'),
     (v_org, v_ground, 'ground_staff');

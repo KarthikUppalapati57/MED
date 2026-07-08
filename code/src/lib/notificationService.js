@@ -62,7 +62,7 @@ export async function notifyManagers({ organization_id, title, message, type = '
       .from('profiles')
       .select('id, email, full_name, role')
       .eq('organization_id', organization_id)
-      .in('role', ['location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin'])
+      .in('role', ['location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin'])
       .neq('status', 'inactive');
 
     if (error) {

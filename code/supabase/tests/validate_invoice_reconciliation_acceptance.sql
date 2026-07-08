@@ -40,13 +40,13 @@ BEGIN
 
   UPDATE public.profiles
      SET organization_id = v_org,
-         role = 'org_owner',
+         role = 'org_manager',
          email = 'val1-step1-' || substr(v_user::text, 1, 8) || '@example.test',
          full_name = 'VAL1 Reconciliation Owner'
    WHERE id = v_user;
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
-  VALUES (v_org, v_user, 'org_owner');
+  VALUES (v_org, v_user, 'org_manager');
 
   PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);

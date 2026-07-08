@@ -12,9 +12,9 @@ const ROLE_LEVEL = {
   ground_staff:        0,
   location_manager:    1,
   manager:             2, // legacy alias
+  brand_manager:       2,
   branch_manager:      2,
   owner:               3, // legacy alias
-  org_owner:           3, // legacy alias
   org_manager:         3,
   tenant_super_admin:  4,
   admin:               5, // legacy alias
@@ -22,7 +22,7 @@ const ROLE_LEVEL = {
 };
 
 function normalizeRole(role) {
-  if (role === 'owner' || role === 'org_owner') return 'org_manager';
+  if (role === 'owner') return 'org_manager';
   if (role === 'manager') return 'branch_manager';
   if (role === 'admin') return 'platform_admin';
   return role || 'ground_staff';
@@ -63,16 +63,16 @@ export function usePermissions() {
 
     isGroundStaff: normalizedRole === 'ground_staff',
     isLocationManager: normalizedRole === 'location_manager',
+    isBrandManager: normalizedRole === 'brand_manager',
     isBranchManager: normalizedRole === 'branch_manager',
     isOrgManager: normalizedRole === 'org_manager',
-    isOrgOwner: normalizedRole === 'org_manager',
     isTenantSuperAdmin: normalizedRole === 'tenant_super_admin',
     isPlatformAdmin: normalizedRole === 'platform_admin',
 
     isLocationManagerOrAbove: currentLevel >= 1,
+    isBrandManagerOrAbove: currentLevel >= 2,
     isBranchManagerOrAbove: currentLevel >= 2,
     isOrgManagerOrAbove: currentLevel >= 3,
-    isOrgOwnerOrAbove: currentLevel >= 3,
     isTenantSuperAdminOrAbove: currentLevel >= 4,
     isPlatformAdminOrAbove: currentLevel >= 5,
 

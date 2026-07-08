@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const ALLOWED_ROLES = ["org_manager", "branch_manager", "location_manager", "tenant_super_admin", "platform_admin"];
+    const ALLOWED_ROLES = ["org_manager", "brand_manager", "branch_manager", "location_manager", "tenant_super_admin", "platform_admin"];
     if (!ALLOWED_ROLES.includes(callerProfile.role)) {
       console.warn(`[invite-user] Role ${callerProfile.role} not in allowed list`);
       return new Response(JSON.stringify({ error: "Forbidden: insufficient role" }), {

@@ -69,8 +69,8 @@ SELECT set_config(
   jsonb_build_object(
     'sub', '00000000-0000-4000-8000-000000332001',
     'role', 'authenticated',
-    'app_metadata', jsonb_build_object('role', 'org_owner'),
-    'user_metadata', jsonb_build_object('role', 'org_owner')
+    'app_metadata', jsonb_build_object('role', 'org_manager'),
+    'user_metadata', jsonb_build_object('role', 'org_manager')
   )::text,
   true
 );
@@ -85,7 +85,7 @@ BEGIN
     RAISE EXCEPTION 'get_auth_role expected profile role location_manager, got %', resolved_role;
   END IF;
 
-  IF resolved_role = 'org_owner' THEN
+  IF resolved_role = 'org_manager' THEN
     RAISE EXCEPTION 'get_auth_role still trusts JWT app_metadata.role';
   END IF;
 

@@ -6,11 +6,11 @@ const ROLE_LEVEL: Record<string, number> = {
   ground_staff: 0,
   location_manager: 1,
   manager: 2,
+  brand_manager: 2,
   branch_manager: 2,
   org_manager: 3,
   tenant_super_admin: 4,
   owner: 3,
-  org_owner: 3,
   platform_admin: 5,
   admin: 5,
 };

@@ -56,7 +56,7 @@ BEGIN
   INSERT INTO public.profiles (
     id, email, full_name, role, organization_id, brand_id, location_id, access_level
   ) VALUES
-    (v_owner, 'vendor-transition-owner@example.test', 'Vendor Transition Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'vendor-transition-owner@example.test', 'Vendor Transition Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'vendor-transition-branch@example.test', 'Vendor Transition Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
     (v_location_manager, 'vendor-transition-location@example.test', 'Vendor Transition Location', 'location_manager', v_org, v_brand1, v_location1, 'location')
   ON CONFLICT (id) DO UPDATE
@@ -72,7 +72,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_location_manager, 'location_manager');
 

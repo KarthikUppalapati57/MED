@@ -39,7 +39,7 @@ BEGIN
     'ground_staff',
     'location_manager',
     'branch_manager',
-    'org_owner',
+    'org_manager',
     'platform_admin'
   ]
   LOOP
@@ -50,10 +50,10 @@ BEGIN
     v_expected_manager := v_role IN (
       'location_manager',
       'branch_manager',
-      'org_owner',
+      'org_manager',
       'platform_admin'
     );
-    v_expected_admin := v_role IN ('org_owner', 'platform_admin');
+    v_expected_admin := v_role IN ('org_manager', 'platform_admin');
 
     SELECT public.is_manager_or_above(),
            public.is_admin(),
@@ -92,7 +92,7 @@ ORDER BY CASE role_name
   WHEN 'ground_staff' THEN 1
   WHEN 'location_manager' THEN 2
   WHEN 'branch_manager' THEN 3
-  WHEN 'org_owner' THEN 4
+  WHEN 'org_manager' THEN 4
   WHEN 'platform_admin' THEN 5
 END;
 

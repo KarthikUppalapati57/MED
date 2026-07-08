@@ -44,7 +44,7 @@ BEGIN
      SET organization_id = v_org,
          brand_id = v_brand1,
          location_id = NULL,
-         role = 'org_owner',
+         role = 'org_manager',
          access_level = 'organization',
          updated_at = now()
    WHERE id = v_admin;
@@ -78,7 +78,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_admin, 'org_owner'),
+    (v_org, v_admin, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_location, 'location_manager'),
     (v_org, v_ground, 'ground_staff');

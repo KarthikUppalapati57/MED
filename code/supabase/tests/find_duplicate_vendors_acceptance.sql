@@ -53,7 +53,7 @@ BEGIN
   INSERT INTO public.profiles (
     id, email, full_name, role, organization_id, brand_id, location_id, access_level
   ) VALUES
-    (v_owner, 'vendor-duplicate-owner@example.test', 'Vendor Duplicate Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'vendor-duplicate-owner@example.test', 'Vendor Duplicate Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_location_manager, 'vendor-duplicate-location@example.test', 'Vendor Duplicate Location', 'location_manager', v_org, v_brand1, v_location1, 'location')
   ON CONFLICT (id) DO UPDATE
      SET email = EXCLUDED.email,
@@ -68,7 +68,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_location_manager, 'location_manager');
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, email, status, approval_status, created_by)

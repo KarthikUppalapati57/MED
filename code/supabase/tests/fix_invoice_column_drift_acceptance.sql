@@ -31,13 +31,13 @@ BEGIN
 
   UPDATE public.profiles
      SET organization_id = v_org,
-         role = 'org_owner',
+         role = 'org_manager',
          email = 'phase32-column-drift-' || substr(v_user::text, 1, 8) || '@example.test',
          full_name = 'Phase 3.2 Column Drift'
    WHERE id = v_user;
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
-  VALUES (v_org, v_user, 'org_owner');
+  VALUES (v_org, v_user, 'org_manager');
 
   PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
@@ -108,7 +108,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.approval_policies (organization_id, min_amount, max_amount, required_role)
-  VALUES (v_org, 0, NULL, 'org_owner');
+  VALUES (v_org, 0, NULL, 'org_manager');
 
   SELECT public.evaluate_invoice_approval_policy(v_invoice_id) INTO v_eval_result;
 

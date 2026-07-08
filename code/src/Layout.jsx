@@ -234,6 +234,7 @@ const roleBadgeColors = {
   ground_staff: 'bg-secondary text-muted-foreground',
   location_manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
   manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
+  brand_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
   branch_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
   org_manager: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
   owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',

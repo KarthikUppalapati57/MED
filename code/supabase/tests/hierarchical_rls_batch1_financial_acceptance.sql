@@ -81,7 +81,7 @@ BEGIN
     access_level, invoice_approval_limit
   ) VALUES
     (v_platform, 'batch1-platform@example.test', 'Batch 1 Platform', 'platform_admin', NULL, NULL, NULL, 'platform', 10000),
-    (v_owner, 'batch1-owner@example.test', 'Batch 1 Owner', 'org_owner', v_org, NULL, NULL, 'organization', 10000),
+    (v_owner, 'batch1-owner@example.test', 'Batch 1 Owner', 'org_manager', v_org, NULL, NULL, 'organization', 10000),
     (v_branch, 'batch1-branch@example.test', 'Batch 1 Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand', 1000),
     (v_location, 'batch1-location@example.test', 'Batch 1 Location', 'location_manager', v_org, v_brand1, v_loc1, 'location', 500),
     (v_ground, 'batch1-ground@example.test', 'Batch 1 Ground', 'ground_staff', v_org, v_brand1, v_loc1, 'location', 0)
@@ -99,7 +99,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_location, 'location_manager'),
     (v_org, v_ground, 'ground_staff');

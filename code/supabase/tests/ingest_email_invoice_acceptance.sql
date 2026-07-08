@@ -65,7 +65,7 @@ BEGIN
     id, email, full_name, role, organization_id, brand_id, location_id,
     access_level, invoice_approval_limit
   ) VALUES
-    (v_owner, 'ingest-owner@example.test', 'Ingest Owner', 'org_owner', v_org, NULL, NULL, 'organization', 10000),
+    (v_owner, 'ingest-owner@example.test', 'Ingest Owner', 'org_manager', v_org, NULL, NULL, 'organization', 10000),
     (v_choto_manager, 'ingest-choto@example.test', 'Choto Manager', 'location_manager', v_org, v_brand1, v_choto, 'location', 500),
     (v_seymore_manager, 'ingest-seymore@example.test', 'Seymore Manager', 'location_manager', v_org, v_brand1, v_seymore, 'location', 500)
   ON CONFLICT (id) DO UPDATE
@@ -80,7 +80,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_choto_manager, 'location_manager'),
     (v_org, v_seymore_manager, 'location_manager');
 
@@ -266,7 +266,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM ingest_email_ids WHERE key='owner'), true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 INSERT INTO ingest_email_results
-SELECT 'unmatched_visible_to_org_owner',
+SELECT 'unmatched_visible_to_org_manager',
        EXISTS (
          SELECT 1 FROM public.invoices
          WHERE id = (SELECT value FROM ingest_email_ids WHERE key='unmatched_invoice')

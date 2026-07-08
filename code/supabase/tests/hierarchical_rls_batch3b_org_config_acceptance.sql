@@ -47,7 +47,7 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level, invoice_approval_limit)
   VALUES
-    (v_owner, 'batch3b-owner@example.test', 'Batch 3b Owner', 'org_owner', v_org, NULL, NULL, 'organization', 10000),
+    (v_owner, 'batch3b-owner@example.test', 'Batch 3b Owner', 'org_manager', v_org, NULL, NULL, 'organization', 10000),
     (v_branch, 'batch3b-branch@example.test', 'Batch 3b Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand', 1000),
     (v_loc_mgr1, 'batch3b-loc1@example.test', 'Batch 3b Loc1', 'location_manager', v_org, v_brand1, v_loc1, 'location', 500),
     (v_loc_mgr2, 'batch3b-loc2@example.test', 'Batch 3b Loc2', 'location_manager', v_org, v_brand1, v_loc2, 'location', 500),
@@ -59,7 +59,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'), (v_org, v_branch, 'branch_manager'),
+    (v_org, v_owner, 'org_manager'), (v_org, v_branch, 'branch_manager'),
     (v_org, v_loc_mgr1, 'location_manager'), (v_org, v_loc_mgr2, 'location_manager'),
     (v_org, v_ground, 'ground_staff'), (v_org, v_other_user, 'ground_staff');
 
@@ -142,7 +142,7 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 
 INSERT INTO public.accounting_export_queue (organization_id, entity_type, entity_id)
 VALUES ((SELECT value FROM batch3b_ids WHERE key='org'), 'invoice', gen_random_uuid());
-INSERT INTO batch3b_results VALUES ('org_owner_can_insert_admin_only_table', true, 'accounting export insert succeeded');
+INSERT INTO batch3b_results VALUES ('org_manager_can_insert_admin_only_table', true, 'accounting export insert succeeded');
 
 RESET ROLE;
 

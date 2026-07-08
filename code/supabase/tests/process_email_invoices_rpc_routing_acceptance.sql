@@ -40,13 +40,13 @@ BEGIN
 
   INSERT INTO public.profiles(id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner, 'process-email-owner@example.test', 'Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'process-email-owner@example.test', 'Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_choto_manager, 'process-email-choto@example.test', 'Choto Manager', 'location_manager', v_org, v_brand, v_choto, 'location'),
     (v_seymore_manager, 'process-email-seymore@example.test', 'Seymore Manager', 'location_manager', v_org, v_brand, v_seymore, 'location')
   ON CONFLICT (id) DO UPDATE SET role=EXCLUDED.role, organization_id=EXCLUDED.organization_id, brand_id=EXCLUDED.brand_id, location_id=EXCLUDED.location_id, deleted_at=NULL;
 
   INSERT INTO public.organization_members(organization_id, user_id, role)
-  VALUES (v_org, v_owner, 'org_owner'), (v_org, v_choto_manager, 'location_manager'), (v_org, v_seymore_manager, 'location_manager');
+  VALUES (v_org, v_owner, 'org_manager'), (v_org, v_choto_manager, 'location_manager'), (v_org, v_seymore_manager, 'location_manager');
 
   INSERT INTO public.location_email_addresses(email, organization_id, brand_id, location_id, label)
   VALUES ('choto-invoices@example.test', v_org, v_brand, v_choto, 'Choto invoices');

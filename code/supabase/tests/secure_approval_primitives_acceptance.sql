@@ -57,7 +57,7 @@ BEGIN
     id, email, full_name, role, organization_id, brand_id, location_id,
     access_level, invoice_approval_limit
   ) VALUES
-    (v_owner, 'step2-owner@example.test', 'Step 2 Owner', 'org_owner', v_org, NULL, NULL, 'organization', 1000),
+    (v_owner, 'step2-owner@example.test', 'Step 2 Owner', 'org_manager', v_org, NULL, NULL, 'organization', 1000),
     (v_branch1, 'step2-branch1@example.test', 'Step 2 Branch 1', 'branch_manager', v_org, v_brand1, NULL, 'brand', 500),
     (v_branch2, 'step2-branch2@example.test', 'Step 2 Branch 2', 'branch_manager', v_org, v_brand2, NULL, 'brand', 500),
     (v_loc_mgr1, 'step2-loc1@example.test', 'Step 2 Loc 1', 'location_manager', v_org, v_brand1, v_loc1, 'location', 100),
@@ -76,7 +76,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch1, 'branch_manager'),
     (v_org, v_branch2, 'branch_manager'),
     (v_org, v_loc_mgr1, 'location_manager'),

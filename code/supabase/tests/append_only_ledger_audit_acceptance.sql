@@ -49,8 +49,8 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner_a, 'batch3c2-owner-a@example.test', 'Batch 3c2 Owner A', 'org_owner', v_org_a, NULL, NULL, 'organization'),
-    (v_owner_b, 'batch3c2-owner-b@example.test', 'Batch 3c2 Owner B', 'org_owner', v_org_b, NULL, NULL, 'organization'),
+    (v_owner_a, 'batch3c2-owner-a@example.test', 'Batch 3c2 Owner A', 'org_manager', v_org_a, NULL, NULL, 'organization'),
+    (v_owner_b, 'batch3c2-owner-b@example.test', 'Batch 3c2 Owner B', 'org_manager', v_org_b, NULL, NULL, 'organization'),
     (v_branch, 'batch3c2-branch@example.test', 'Batch 3c2 Branch', 'branch_manager', v_org_a, v_brand1, NULL, 'brand'),
     (v_location, 'batch3c2-location@example.test', 'Batch 3c2 Location', 'location_manager', v_org_a, v_brand1, v_loc1, 'location'),
     (v_ground, 'batch3c2-ground@example.test', 'Batch 3c2 Ground', 'ground_staff', v_org_a, v_brand1, v_loc1, 'location')
@@ -65,8 +65,8 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org_a, v_owner_a, 'org_owner'),
-    (v_org_b, v_owner_b, 'org_owner'),
+    (v_org_a, v_owner_a, 'org_manager'),
+    (v_org_b, v_owner_b, 'org_manager'),
     (v_org_a, v_branch, 'branch_manager'),
     (v_org_a, v_location, 'location_manager'),
     (v_org_a, v_ground, 'ground_staff');
@@ -87,13 +87,13 @@ SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM batch3c2_ids
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 
 INSERT INTO batch3c2_results
-SELECT 'org_owner_can_select_own_org_gl_and_audit',
+SELECT 'org_manager_can_select_own_org_gl_and_audit',
        (SELECT count(*) FROM public.general_ledger_entries) = 1
        AND (SELECT count(*) FROM public.audit_logs) = 1,
        'gl=' || (SELECT count(*) FROM public.general_ledger_entries) || ', audit=' || (SELECT count(*) FROM public.audit_logs);
 
 INSERT INTO batch3c2_results
-SELECT 'org_owner_cannot_read_cross_org_gl_and_audit',
+SELECT 'org_manager_cannot_read_cross_org_gl_and_audit',
        NOT EXISTS (SELECT 1 FROM public.general_ledger_entries WHERE id = (SELECT value FROM batch3c2_ids WHERE key='gl_b'))
        AND NOT EXISTS (SELECT 1 FROM public.audit_logs WHERE id = (SELECT value FROM batch3c2_ids WHERE key='audit_b')),
        'org B rows hidden from org A admin';
@@ -102,30 +102,30 @@ DO $$
 BEGIN
   BEGIN
     UPDATE public.general_ledger_entries SET amount = 999 WHERE id = (SELECT value FROM batch3c2_ids WHERE key='gl_a');
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_update_gl', false, 'UPDATE unexpectedly succeeded');
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_update_gl', false, 'UPDATE unexpectedly succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_update_gl', true, SQLERRM);
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_update_gl', true, SQLERRM);
   END;
 
   BEGIN
     DELETE FROM public.general_ledger_entries WHERE id = (SELECT value FROM batch3c2_ids WHERE key='gl_a');
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_delete_gl', false, 'DELETE unexpectedly succeeded');
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_delete_gl', false, 'DELETE unexpectedly succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_delete_gl', true, SQLERRM);
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_delete_gl', true, SQLERRM);
   END;
 
   BEGIN
     UPDATE public.audit_logs SET action = 'forged' WHERE id = (SELECT value FROM batch3c2_ids WHERE key='audit_a');
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_update_audit', false, 'UPDATE unexpectedly succeeded');
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_update_audit', false, 'UPDATE unexpectedly succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_update_audit', true, SQLERRM);
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_update_audit', true, SQLERRM);
   END;
 
   BEGIN
     DELETE FROM public.audit_logs WHERE id = (SELECT value FROM batch3c2_ids WHERE key='audit_a');
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_delete_audit', false, 'DELETE unexpectedly succeeded');
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_delete_audit', false, 'DELETE unexpectedly succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c2_results VALUES ('org_owner_cannot_delete_audit', true, SQLERRM);
+    INSERT INTO batch3c2_results VALUES ('org_manager_cannot_delete_audit', true, SQLERRM);
   END;
 
   BEGIN

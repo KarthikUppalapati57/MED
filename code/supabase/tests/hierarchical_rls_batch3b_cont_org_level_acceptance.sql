@@ -44,7 +44,7 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level, invoice_approval_limit)
   VALUES
-    (v_owner, 'batch3bc-owner@example.test', 'Batch 3bC Owner', 'org_owner', v_org, NULL, NULL, 'organization', 10000),
+    (v_owner, 'batch3bc-owner@example.test', 'Batch 3bC Owner', 'org_manager', v_org, NULL, NULL, 'organization', 10000),
     (v_branch, 'batch3bc-branch@example.test', 'Batch 3bC Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand', 1000),
     (v_loc_mgr1, 'batch3bc-loc1@example.test', 'Batch 3bC Loc1', 'location_manager', v_org, v_brand1, v_loc1, 'location', 500),
     (v_loc_mgr2, 'batch3bc-loc2@example.test', 'Batch 3bC Loc2', 'location_manager', v_org, v_brand1, v_loc2, 'location', 500),
@@ -55,7 +55,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'), (v_org, v_branch, 'branch_manager'),
+    (v_org, v_owner, 'org_manager'), (v_org, v_branch, 'branch_manager'),
     (v_org, v_loc_mgr1, 'location_manager'), (v_org, v_loc_mgr2, 'location_manager'), (v_org, v_ground, 'ground_staff');
 
   INSERT INTO public.customers (id, organization_id, first_name, last_name, email)

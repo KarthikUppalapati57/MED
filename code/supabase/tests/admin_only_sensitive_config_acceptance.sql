@@ -73,9 +73,9 @@ BEGIN
     business_email, business_email_verified_at, business_phone, business_phone_verified_at
   )
   VALUES
-    (v_owner_a, 'batch3c4-owner-a@example.test', 'Batch 3c4 Owner A', 'org_owner', v_org_a, NULL, NULL, 'organization', 'owner-a-biz@example.test', now(), '+15550000001', now()),
-    (v_owner_b, 'batch3c4-owner-b@example.test', 'Batch 3c4 Owner B', 'org_owner', v_org_b, NULL, NULL, 'organization', 'owner-b-biz@example.test', now(), '+15550000002', now()),
-    (v_owner_c, 'batch3c4-owner-c@example.test', 'Batch 3c4 Owner C', 'org_owner', v_org_c, NULL, NULL, 'organization', 'owner-c-biz@example.test', now(), '+15550000003', now()),
+    (v_owner_a, 'batch3c4-owner-a@example.test', 'Batch 3c4 Owner A', 'org_manager', v_org_a, NULL, NULL, 'organization', 'owner-a-biz@example.test', now(), '+15550000001', now()),
+    (v_owner_b, 'batch3c4-owner-b@example.test', 'Batch 3c4 Owner B', 'org_manager', v_org_b, NULL, NULL, 'organization', 'owner-b-biz@example.test', now(), '+15550000002', now()),
+    (v_owner_c, 'batch3c4-owner-c@example.test', 'Batch 3c4 Owner C', 'org_manager', v_org_c, NULL, NULL, 'organization', 'owner-c-biz@example.test', now(), '+15550000003', now()),
     (v_branch, 'batch3c4-branch@example.test', 'Batch 3c4 Branch', 'branch_manager', v_org_a, v_brand1, NULL, 'brand', 'branch-biz@example.test', now(), '+15550000004', now()),
     (v_location, 'batch3c4-location@example.test', 'Batch 3c4 Location', 'location_manager', v_org_a, v_brand1, v_loc1, 'location', 'location-biz@example.test', now(), '+15550000005', now()),
     (v_ground, 'batch3c4-ground@example.test', 'Batch 3c4 Ground', 'ground_staff', v_org_a, v_brand1, v_loc1, 'location', 'ground-biz@example.test', now(), '+15550000006', now())
@@ -94,9 +94,9 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org_a, v_owner_a, 'org_owner'),
-    (v_org_b, v_owner_b, 'org_owner'),
-    (v_org_c, v_owner_c, 'org_owner'),
+    (v_org_a, v_owner_a, 'org_manager'),
+    (v_org_b, v_owner_b, 'org_manager'),
+    (v_org_c, v_owner_c, 'org_manager'),
     (v_org_a, v_branch, 'branch_manager'),
     (v_org_a, v_location, 'location_manager'),
     (v_org_a, v_ground, 'ground_staff');
@@ -163,7 +163,7 @@ SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM batch3c4_ids
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 
 INSERT INTO batch3c4_results
-SELECT 'org_owner_can_read_own_org_sensitive_tables',
+SELECT 'org_manager_can_read_own_org_sensitive_tables',
        (SELECT count(*) FROM public.archived_brands) = 1
        AND (SELECT count(*) FROM public.archived_locations) = 1
        AND (SELECT count(*) FROM public.archived_profiles) = 1
@@ -196,14 +196,14 @@ BEGIN
     UPDATE public.ai_insights
     SET resolved = true
     WHERE id = (SELECT value FROM batch3c4_ids WHERE key='insight_a');
-    INSERT INTO batch3c4_results VALUES ('org_owner_can_write_admin_only_tables', true, 'admin inserts/updates succeeded');
+    INSERT INTO batch3c4_results VALUES ('org_manager_can_write_admin_only_tables', true, 'admin inserts/updates succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c4_results VALUES ('org_owner_can_write_admin_only_tables', false, SQLERRM);
+    INSERT INTO batch3c4_results VALUES ('org_manager_can_write_admin_only_tables', false, SQLERRM);
   END;
 END $$;
 
 INSERT INTO batch3c4_results
-SELECT 'org_owner_cross_org_isolation',
+SELECT 'org_manager_cross_org_isolation',
        NOT EXISTS (SELECT 1 FROM public.archived_brands WHERE organization_id = (SELECT value FROM batch3c4_ids WHERE key='org_b'))
        AND NOT EXISTS (SELECT 1 FROM public.business_verifications WHERE organization_id = (SELECT value FROM batch3c4_ids WHERE key='org_b'))
        AND NOT EXISTS (SELECT 1 FROM public.subscriptions WHERE organization_id = (SELECT value FROM batch3c4_ids WHERE key='org_b'))

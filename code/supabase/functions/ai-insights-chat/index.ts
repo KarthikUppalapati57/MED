@@ -14,7 +14,6 @@ const ROLE_RANK = {
   org_manager: 3,
   tenant_super_admin: 4,
   owner: 3,
-  org_owner: 3,
   admin: 5,
   platform_admin: 5,
 };

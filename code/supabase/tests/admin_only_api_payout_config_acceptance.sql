@@ -51,8 +51,8 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner_a, 'batch3c3-owner-a@example.test', 'Batch 3c3 Owner A', 'org_owner', v_org_a, NULL, NULL, 'organization'),
-    (v_owner_b, 'batch3c3-owner-b@example.test', 'Batch 3c3 Owner B', 'org_owner', v_org_b, NULL, NULL, 'organization'),
+    (v_owner_a, 'batch3c3-owner-a@example.test', 'Batch 3c3 Owner A', 'org_manager', v_org_a, NULL, NULL, 'organization'),
+    (v_owner_b, 'batch3c3-owner-b@example.test', 'Batch 3c3 Owner B', 'org_manager', v_org_b, NULL, NULL, 'organization'),
     (v_branch, 'batch3c3-branch@example.test', 'Batch 3c3 Branch', 'branch_manager', v_org_a, v_brand1, NULL, 'brand'),
     (v_location, 'batch3c3-location@example.test', 'Batch 3c3 Location', 'location_manager', v_org_a, v_brand1, v_loc1, 'location'),
     (v_ground, 'batch3c3-ground@example.test', 'Batch 3c3 Ground', 'ground_staff', v_org_a, v_brand1, v_loc1, 'location')
@@ -67,8 +67,8 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org_a, v_owner_a, 'org_owner'),
-    (v_org_b, v_owner_b, 'org_owner'),
+    (v_org_a, v_owner_a, 'org_manager'),
+    (v_org_b, v_owner_b, 'org_manager'),
     (v_org_a, v_branch, 'branch_manager'),
     (v_org_a, v_location, 'location_manager'),
     (v_org_a, v_ground, 'ground_staff');
@@ -94,7 +94,7 @@ SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM batch3c3_ids
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 
 INSERT INTO batch3c3_results
-SELECT 'org_owner_can_select_own_org_rows',
+SELECT 'org_manager_can_select_own_org_rows',
        (SELECT count(*) FROM public.payment_accounts) = 1
        AND (SELECT count(*) FROM public.api_keys) = 1
        AND (SELECT count(*) FROM public.developer_api_keys) = 1,
@@ -112,14 +112,14 @@ BEGIN
     UPDATE public.payment_accounts SET name = 'Owner Updated Account' WHERE id = (SELECT value FROM batch3c3_ids WHERE key='payment_a');
     UPDATE public.api_keys SET name = 'Owner Updated API' WHERE id = (SELECT value FROM batch3c3_ids WHERE key='api_a');
     UPDATE public.developer_api_keys SET name = 'Owner Updated Dev' WHERE id = (SELECT value FROM batch3c3_ids WHERE key='dev_a');
-    INSERT INTO batch3c3_results VALUES ('org_owner_can_insert_update_all_three', true, 'admin insert/update succeeded');
+    INSERT INTO batch3c3_results VALUES ('org_manager_can_insert_update_all_three', true, 'admin insert/update succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO batch3c3_results VALUES ('org_owner_can_insert_update_all_three', false, SQLERRM);
+    INSERT INTO batch3c3_results VALUES ('org_manager_can_insert_update_all_three', false, SQLERRM);
   END;
 END $$;
 
 INSERT INTO batch3c3_results
-SELECT 'org_owner_cannot_read_cross_org_rows',
+SELECT 'org_manager_cannot_read_cross_org_rows',
        NOT EXISTS (SELECT 1 FROM public.payment_accounts WHERE id = (SELECT value FROM batch3c3_ids WHERE key='payment_b'))
        AND NOT EXISTS (SELECT 1 FROM public.api_keys WHERE id = (SELECT value FROM batch3c3_ids WHERE key='api_b'))
        AND NOT EXISTS (SELECT 1 FROM public.developer_api_keys WHERE id = (SELECT value FROM batch3c3_ids WHERE key='dev_b')),

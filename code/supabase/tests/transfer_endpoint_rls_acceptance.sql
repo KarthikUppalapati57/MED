@@ -58,7 +58,7 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner, 'transfer-owner@example.test', 'Transfer Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'transfer-owner@example.test', 'Transfer Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'transfer-branch@example.test', 'Transfer Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
     (v_choto_manager, 'transfer-choto@example.test', 'Choto Manager', 'location_manager', v_org, v_brand1, v_choto, 'location'),
     (v_seymore_manager, 'transfer-seymore@example.test', 'Seymore Manager', 'location_manager', v_org, v_brand1, v_seymore, 'location'),
@@ -75,7 +75,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_choto_manager, 'location_manager'),
     (v_org, v_seymore_manager, 'location_manager'),
@@ -183,11 +183,11 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM transfer_rule_ids WHERE key='owner'), true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 INSERT INTO transfer_rule_results
-SELECT 'org_owner_sees_transfer_tables',
+SELECT 'org_manager_sees_transfer_tables',
        EXISTS (SELECT 1 FROM public.transfers WHERE id = (SELECT value FROM transfer_rule_ids WHERE key='transfer'))
        AND EXISTS (SELECT 1 FROM public.intercompany_transfers WHERE id = (SELECT value FROM transfer_rule_ids WHERE key='intercompany'))
        AND EXISTS (SELECT 1 FROM public.commissary_routes WHERE id = (SELECT value FROM transfer_rule_ids WHERE key='route')),
-       'org owner sees all org transfer rows';
+       'org manager sees all org transfer rows';
 RESET ROLE;
 
 SET LOCAL ROLE authenticated;

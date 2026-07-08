@@ -1,6 +1,6 @@
 -- Tenant Super Admin + Org Manager role model.
 -- Adds a business tenant layer above organizations and migrates the
--- customer-facing org_owner role to org_manager.
+-- legacy customer-facing owner role to org_manager.
 
 BEGIN;
 
@@ -169,6 +169,14 @@ UPDATE public.organization_members SET role = public.normalize_app_role(role) WH
 UPDATE public.brand_members SET role = public.normalize_app_role(role) WHERE role IN ('owner', 'org_owner', 'manager', 'admin');
 UPDATE public.location_members SET role = public.normalize_app_role(role) WHERE role IN ('owner', 'org_owner', 'manager', 'admin');
 
+UPDATE auth.users
+SET raw_app_meta_data = jsonb_set(COALESCE(raw_app_meta_data, '{}'::jsonb), '{role}', '"org_manager"'::jsonb, true)
+WHERE raw_app_meta_data ->> 'role' = 'org_owner';
+
+UPDATE auth.users
+SET raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'::jsonb), '{role}', '"org_manager"'::jsonb, true)
+WHERE raw_user_meta_data ->> 'role' = 'org_owner';
+
 INSERT INTO public.tenant_members (tenant_id, user_id, role)
 SELECT DISTINCT o.tenant_id, o.owner_id, 'tenant_super_admin'
 FROM public.organizations o
@@ -193,11 +201,11 @@ WHERE tm.user_id = p.id
 
 
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check CHECK (
-  role IN ('ground_staff', 'location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin')
+  role IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin')
 );
 
 ALTER TABLE public.invitations ADD CONSTRAINT invitations_role_check CHECK (
-  role IN ('ground_staff', 'location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin')
+  role IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin')
 );
 
 ALTER TABLE public.tenant_members ADD CONSTRAINT tenant_members_role_check CHECK (
@@ -212,6 +220,7 @@ VALUES
   ('ground_staff', true),
   ('location_manager', true),
   ('branch_manager', true),
+  ('brand_manager', true),
   ('org_manager', true),
   ('tenant_super_admin', true),
   ('platform_admin', true)
@@ -219,15 +228,15 @@ ON CONFLICT (name) DO UPDATE SET is_system = true;
 
 DO $$
 DECLARE
-  v_org_owner_role_id uuid;
+  v_legacy_owner_role_id uuid;
   v_org_manager_role_id uuid;
 BEGIN
-  SELECT id INTO v_org_owner_role_id FROM public.roles WHERE name = 'org_owner' LIMIT 1;
+  SELECT id INTO v_legacy_owner_role_id FROM public.roles WHERE name = 'org_owner' LIMIT 1;
   SELECT id INTO v_org_manager_role_id FROM public.roles WHERE name = 'org_manager' LIMIT 1;
 
-  IF v_org_owner_role_id IS NOT NULL AND v_org_manager_role_id IS NOT NULL THEN
+  IF v_legacy_owner_role_id IS NOT NULL AND v_org_manager_role_id IS NOT NULL THEN
     DELETE FROM public.user_roles legacy_ur
-    WHERE legacy_ur.role_id = v_org_owner_role_id
+    WHERE legacy_ur.role_id = v_legacy_owner_role_id
       AND EXISTS (
         SELECT 1
         FROM public.user_roles manager_ur
@@ -237,15 +246,28 @@ BEGIN
 
     UPDATE public.user_roles
     SET role_id = v_org_manager_role_id
-    WHERE role_id = v_org_owner_role_id;
+    WHERE role_id = v_legacy_owner_role_id;
 
     DELETE FROM public.role_permissions
-    WHERE role_id = v_org_owner_role_id;
+    WHERE role_id = v_legacy_owner_role_id;
 
     DELETE FROM public.roles
-    WHERE id = v_org_owner_role_id;
+    WHERE id = v_legacy_owner_role_id;
   END IF;
 END $$;
+CREATE OR REPLACE FUNCTION public.normalize_app_role(p_role text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT CASE lower(NULLIF(trim(p_role), ''))
+    WHEN 'owner' THEN 'org_manager'
+    WHEN 'manager' THEN 'branch_manager'
+    WHEN 'admin' THEN 'platform_admin'
+    ELSE lower(NULLIF(trim(p_role), ''))
+  END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.get_auth_role()
 RETURNS text
@@ -301,6 +323,7 @@ AS $$
   SELECT public.get_auth_role() IN (
     'location_manager',
     'branch_manager',
+    'brand_manager',
     'org_manager',
     'tenant_super_admin',
     'platform_admin'
@@ -337,6 +360,7 @@ AS $$
     WHEN 'ground_staff' THEN 10
     WHEN 'location_manager' THEN 20
     WHEN 'branch_manager' THEN 30
+    WHEN 'brand_manager' THEN 30
     WHEN 'org_manager' THEN 40
     WHEN 'tenant_super_admin' THEN 50
     WHEN 'platform_admin' THEN 60
@@ -356,18 +380,18 @@ DECLARE
   normalized_target text := public.normalize_app_role(target_role);
 BEGIN
   IF caller_role = 'platform_admin' THEN
-    RETURN normalized_target IN ('ground_staff', 'location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin');
+    RETURN normalized_target IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin');
   END IF;
 
   IF caller_role = 'tenant_super_admin' THEN
-    RETURN normalized_target IN ('ground_staff', 'location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin');
+    RETURN normalized_target IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin');
   END IF;
 
   IF caller_role = 'org_manager' THEN
-    RETURN normalized_target IN ('ground_staff', 'location_manager', 'branch_manager');
+    RETURN normalized_target IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager');
   END IF;
 
-  IF caller_role = 'branch_manager' THEN
+  IF caller_role IN ('brand_manager', 'branch_manager') THEN
     RETURN normalized_target IN ('ground_staff', 'location_manager');
   END IF;
 
@@ -396,7 +420,7 @@ AS $$
        AND b.organization_id = public.get_auth_org()
      )
      OR (
-       public.get_auth_role() = 'branch_manager'
+       public.get_auth_role() IN ('brand_manager', 'branch_manager')
        AND b.brand_id = (SELECT p.brand_id FROM public.profiles p WHERE p.id = auth.uid())
      );
 $$;
@@ -422,7 +446,7 @@ AS $$
        AND l.organization_id = public.get_auth_org()
      )
      OR (
-       public.get_auth_role() = 'branch_manager'
+       public.get_auth_role() IN ('brand_manager', 'branch_manager')
        AND l.brand_id = (SELECT p.brand_id FROM public.profiles p WHERE p.id = auth.uid())
      )
      OR (
@@ -511,7 +535,7 @@ BEGIN
     RETURN true;
   END IF;
 
-  IF v_role = 'branch_manager' THEN
+  IF v_role IN ('brand_manager', 'branch_manager') THEN
     RETURN v_brand IS NOT NULL AND v_target_brand = v_brand;
   END IF;
 
@@ -607,10 +631,10 @@ BEGIN
   END IF;
 
   IF v_role = 'org_manager' THEN
-    RETURN v_granted_role IN ('ground_staff', 'location_manager', 'branch_manager');
+    RETURN v_granted_role IN ('ground_staff', 'location_manager', 'brand_manager', 'branch_manager');
   END IF;
 
-  IF v_role = 'branch_manager' THEN
+  IF v_role IN ('brand_manager', 'branch_manager') THEN
     RETURN v_grant_rank <= public.access_role_rank('location_manager')
        AND v_brand IS NOT NULL
        AND v_target_brand = v_brand;

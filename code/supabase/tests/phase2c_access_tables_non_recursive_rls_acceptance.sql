@@ -51,7 +51,7 @@ BEGIN
 
   INSERT INTO public.profiles (id, email, full_name, role, organization_id, brand_id, location_id, access_level)
   VALUES
-    (v_owner, 'phase2c-owner@example.test', 'Phase 2c Owner', 'org_owner', v_org, NULL, NULL, 'organization'),
+    (v_owner, 'phase2c-owner@example.test', 'Phase 2c Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'phase2c-branch@example.test', 'Phase 2c Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
     (v_loc_mgr, 'phase2c-locmgr@example.test', 'Phase 2c Location Manager', 'location_manager', v_org, v_brand1, v_loc1, 'location'),
     (v_ground, 'phase2c-ground@example.test', 'Phase 2c Ground', 'ground_staff', v_org, v_brand1, v_loc1, 'location'),
@@ -76,7 +76,7 @@ BEGIN
   UPDATE phase2c_ids SET value = (SELECT id FROM public.roles WHERE name = 'ground_staff' AND is_system IS TRUE LIMIT 1) WHERE key = 'role_ground';
   UPDATE phase2c_ids SET value = (SELECT id FROM public.roles WHERE name = 'location_manager' AND is_system IS TRUE LIMIT 1) WHERE key = 'role_location';
   UPDATE phase2c_ids SET value = (SELECT id FROM public.roles WHERE name = 'branch_manager' AND is_system IS TRUE LIMIT 1) WHERE key = 'role_branch';
-  UPDATE phase2c_ids SET value = (SELECT id FROM public.roles WHERE name = 'org_owner' AND is_system IS TRUE LIMIT 1) WHERE key = 'role_owner';
+  UPDATE phase2c_ids SET value = (SELECT id FROM public.roles WHERE name = 'org_manager' AND is_system IS TRUE LIMIT 1) WHERE key = 'role_owner';
 
   SELECT value INTO v_role_ground FROM phase2c_ids WHERE key = 'role_ground';
   SELECT value INTO v_role_location FROM phase2c_ids WHERE key = 'role_location';
@@ -85,7 +85,7 @@ BEGIN
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES
-    (v_org, v_owner, 'org_owner'),
+    (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
     (v_org, v_loc_mgr, 'location_manager'),
     (v_org, v_ground, 'ground_staff'),
@@ -139,7 +139,7 @@ DO $$
 BEGIN
   BEGIN
     UPDATE public.profiles
-       SET role = 'org_owner'
+       SET role = 'org_manager'
      WHERE id = (SELECT value FROM phase2c_ids WHERE key='loc_mgr');
     INSERT INTO phase2c_results VALUES ('location_manager_direct_profile_self_promotion_rejected', false, 'profile role update unexpectedly succeeded');
   EXCEPTION WHEN others THEN
@@ -201,7 +201,7 @@ DO $$
 BEGIN
   BEGIN
     UPDATE public.profiles
-       SET role = 'org_owner'
+       SET role = 'org_manager'
      WHERE id = (SELECT value FROM phase2c_ids WHERE key='branch');
     INSERT INTO phase2c_results VALUES ('branch_manager_direct_profile_self_promotion_rejected', false, 'profile role update unexpectedly succeeded');
   EXCEPTION WHEN others THEN
@@ -214,11 +214,11 @@ BEGIN
       (SELECT value FROM phase2c_ids WHERE key='org'),
       (SELECT value FROM phase2c_ids WHERE key='brand1'),
       (SELECT value FROM phase2c_ids WHERE key='target_ground'),
-      'org_owner'
+      'org_manager'
     );
-    INSERT INTO phase2c_results VALUES ('branch_manager_cannot_grant_org_owner', false, 'grant org_owner unexpectedly succeeded');
+    INSERT INTO phase2c_results VALUES ('branch_manager_cannot_grant_org_manager', false, 'grant org_manager unexpectedly succeeded');
   EXCEPTION WHEN others THEN
-    INSERT INTO phase2c_results VALUES ('branch_manager_cannot_grant_org_owner', true, SQLERRM);
+    INSERT INTO phase2c_results VALUES ('branch_manager_cannot_grant_org_manager', true, SQLERRM);
   END;
 
   BEGIN
