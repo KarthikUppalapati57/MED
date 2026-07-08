@@ -213,7 +213,7 @@ function SignupPage() {
           finishLoading();
 
           // Emit Real-Time Domain Event after the UI is unlocked. This should never block signup.
-          supabase.rpc('log_invitation_opened', { p_token: cleanToken })
+          Promise.resolve(supabase.rpc('log_invitation_opened', { p_token: cleanToken }))
             .catch(err => console.warn('Failed to log invite open:', err));
           return;
         }
