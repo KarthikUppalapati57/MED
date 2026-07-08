@@ -60,6 +60,9 @@ const getInviteDetailsWithFallback = async (cleanToken) => {
     } else {
       const invite = Array.isArray(data) ? data[0] : data;
       if (invite?.id && invite?.email) {
+        if (invite.status && invite.status !== 'active') {
+          throw new Error(invite.status_message || 'This invitation is no longer available.');
+        }
         if (isExpiredInvite(invite)) throw new Error('This invitation link has expired.');
         return invite;
       }
@@ -225,7 +228,7 @@ function SignupPage() {
         setForm(f => ({ ...f, email: '' }));
         setError(err.message === 'Invitation validation timed out.'
           ? 'Invitation validation timed out. Refresh the page or ask the Platform Admin to reissue the invite.'
-          : 'Invalid or expired invitation link.');
+          : err.message || 'Invalid or expired invitation link.');
       } finally {
         finishLoading();
       }
