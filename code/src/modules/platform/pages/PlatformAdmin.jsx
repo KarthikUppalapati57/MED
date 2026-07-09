@@ -40,6 +40,12 @@ const TABS = [
   { id: 'ocr', label: 'OCR Review Queue', icon: FileText }
 ];
 
+const createTenantCouponCode = (email) => {
+  const prefix = String(email || 'tenant').split('@')[0].replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase() || 'TENANT';
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `RESTOPS-${prefix}-${suffix}`;
+};
+
 const ACCESS_LEVELS = [
   { id: 'read', label: 'Read', color: 'sky' },
   { id: 'write', label: 'Write', color: 'emerald' },
@@ -89,6 +95,9 @@ export default function PlatformAdmin() {
   const [inviting, setInviting] = useState(false);
   const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS].filter(k => k !== 'platform'));
   const [inviteRequiresBusinessVerification, setInviteRequiresBusinessVerification] = useState(true);
+  const [inviteIncludesCoupon, setInviteIncludesCoupon] = useState(false);
+  const [inviteCouponMonths, setInviteCouponMonths] = useState(1);
+  const [inviteCouponCode, setInviteCouponCode] = useState("");
   const [inviteAccessLevels, setInviteAccessLevels] = useState({
     read: true,
     write: false,
@@ -302,14 +311,50 @@ export default function PlatformAdmin() {
     const toastId = toast.loading("Generating secure onboarding link & sending email...");
     setInviting(true);
     try {
+      const normalizedInviteEmail = inviteEmail.trim().toLowerCase();
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
+      let couponMetadata = null;
+      if (inviteIncludesCoupon) {
+        const trialMonths = Math.max(1, Math.min(24, Number(inviteCouponMonths) || 1));
+        const couponCode = (inviteCouponCode.trim() || createTenantCouponCode(normalizedInviteEmail)).toUpperCase();
+        const { data: coupon, error: couponErr } = await supabase
+          .from('onboarding_coupons')
+          .insert({
+            code: couponCode,
+            description: `${trialMonths} month tenant onboarding trial for ${normalizedInviteEmail}`,
+            discount_type: 'trial_days',
+            discount_value: 0,
+            trial_days: trialMonths * 30,
+            max_redemptions: 1,
+            active: true,
+            starts_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString(),
+            metadata: {
+              source: 'platform_invite',
+              invited_email: normalizedInviteEmail,
+              trial_months: trialMonths,
+              generated_by: user?.id || null,
+            },
+          })
+          .select('id, code, trial_days, expires_at')
+          .single();
+        if (couponErr) throw couponErr;
+        couponMetadata = {
+          id: coupon.id,
+          code: coupon.code,
+          trial_months: trialMonths,
+          trial_days: coupon.trial_days,
+          expires_at: coupon.expires_at,
+        };
+      }
+
       const { data: newInvite, error: insertErr } = await supabase
         .from("invitations")
         .insert([{
-          email: inviteEmail,
+          email: normalizedInviteEmail,
           token,
           role: "tenant_super_admin",
           invited_by: user?.id,
@@ -320,7 +365,10 @@ export default function PlatformAdmin() {
           metadata: { 
             modules: inviteSelectedModules,
             access: inviteAccessLevels,
-            business_verification_required: inviteRequiresBusinessVerification
+            business_verification_required: inviteRequiresBusinessVerification,
+            coupon: couponMetadata,
+            coupon_code: couponMetadata?.code || null,
+            coupon_trial_months: couponMetadata?.trial_months || null
           }
         }]).select().single();
 
@@ -337,11 +385,13 @@ export default function PlatformAdmin() {
 
       // Send invitation email via EmailJS
       const emailResult = await sendInvitationEmail({
-        to_email: inviteEmail,
-        to_name: inviteEmail.split('@')[0],
+        to_email: normalizedInviteEmail,
+        to_name: normalizedInviteEmail.split('@')[0],
         role: "Tenant Super Admin",
         org_name: "Restops Platform",
-        invite_link: link
+        invite_link: link,
+        coupon_code: couponMetadata?.code || null,
+        coupon_trial_months: couponMetadata?.trial_months || null
       });
 
       setGeneratedInviteLink(link);
@@ -352,11 +402,12 @@ export default function PlatformAdmin() {
         p_event_name: 'user.invitation.sent',
         p_entity_type: 'invitation',
         p_entity_id: null,
-        p_payload: { email: inviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification }
+        p_payload: { email: normalizedInviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification, coupon_code: couponMetadata?.code || null, coupon_trial_months: couponMetadata?.trial_months || null }
       });
       if (eventErr) console.warn('Failed to emit domain event:', eventErr);
 
       setInviteEmail("");
+      setInviteCouponCode("");
       queryClient.invalidateQueries({ queryKey: ['client-invites'] });
 
       if (!emailResult.success) {
@@ -365,7 +416,7 @@ export default function PlatformAdmin() {
       } else {
         toast.success("Onboarding link generated and invitation email sent!", { id: toastId });
       }
-      posthog.capture('client_invited', { email: inviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification });
+      posthog.capture('client_invited', { email: normalizedInviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification, coupon_code: couponMetadata?.code || null, coupon_trial_months: couponMetadata?.trial_months || null });
     } catch (e) {
       console.error('Invite generation failed:', e);
       toast.error(e.message || "Failed to generate invitation", { id: toastId });
@@ -968,33 +1019,117 @@ The Restops Platform Team
                   />
                 </div>
               </div>
-              <div className="rounded-2xl border border-border bg-secondary/30 p-4">
-                <div className="flex items-start justify-between gap-4">
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 shadow-sm">
+                <div className="flex flex-col gap-4">
                   <div>
-                    <Label className="text-sm font-bold text-foreground">Business Verification</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">Require EIN/SSN, contact, and address verification before hierarchy setup.</p>
+                    <Label className="text-sm font-bold text-foreground">Require Business Verification?</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Choose whether this tenant must complete EIN/SSN verification before hierarchy setup.
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={inviteRequiresBusinessVerification}
-                    onClick={() => setInviteRequiresBusinessVerification((current) => !current)}
-                    className={cn(
-                      "relative h-7 w-12 shrink-0 rounded-full transition-colors",
-                      inviteRequiresBusinessVerification ? "bg-slate-900" : "bg-muted"
-                    )}
-                  >
-                    <span className={cn(
-                      "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                      inviteRequiresBusinessVerification ? "translate-x-6" : "translate-x-1"
-                    )} />
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={inviteRequiresBusinessVerification}
+                      onClick={() => setInviteRequiresBusinessVerification(true)}
+                      className={cn(
+                        "h-11 rounded-xl border text-sm font-bold transition-all",
+                        inviteRequiresBusinessVerification
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/50"
+                      )}
+                    >
+                      Yes, Verify
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!inviteRequiresBusinessVerification}
+                      onClick={() => setInviteRequiresBusinessVerification(false)}
+                      className={cn(
+                        "h-11 rounded-xl border text-sm font-bold transition-all",
+                        !inviteRequiresBusinessVerification
+                          ? "border-amber-500 bg-amber-500 text-white shadow-sm"
+                          : "border-border bg-card text-muted-foreground hover:border-amber-400"
+                      )}
+                    >
+                      No, Skip
+                    </button>
+                  </div>
                 </div>
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {inviteRequiresBusinessVerification ? 'Business verification required' : 'Business verification skipped'}
+                  {inviteRequiresBusinessVerification
+                    ? 'Tenant will see business verification during onboarding'
+                    : 'Tenant will skip business verification and continue to hierarchy setup'}
                 </p>
               </div>
 
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 shadow-sm">
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <Label className="text-sm font-bold text-foreground">Include Coupon / Trial?</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Send a one-use trial coupon with the onboarding link. It can only be redeemed by this invited email.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      aria-pressed={!inviteIncludesCoupon}
+                      onClick={() => setInviteIncludesCoupon(false)}
+                      className={cn(
+                        "h-11 rounded-xl border text-sm font-bold transition-all",
+                        !inviteIncludesCoupon
+                          ? "border-border bg-slate-900 text-white shadow-sm"
+                          : "border-border bg-card text-muted-foreground hover:border-slate-400"
+                      )}
+                    >
+                      No Coupon
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={inviteIncludesCoupon}
+                      onClick={() => setInviteIncludesCoupon(true)}
+                      className={cn(
+                        "h-11 rounded-xl border text-sm font-bold transition-all",
+                        inviteIncludesCoupon
+                          ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                          : "border-border bg-card text-muted-foreground hover:border-emerald-400"
+                      )}
+                    >
+                      Yes, Add Coupon
+                    </button>
+                  </div>
+                </div>
+                {inviteIncludesCoupon && (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[140px_1fr]">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-foreground">Trial Months</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={inviteCouponMonths}
+                        onChange={(event) => setInviteCouponMonths(event.target.value)}
+                        className="h-10 rounded-xl bg-card"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-foreground">Coupon Code</Label>
+                      <Input
+                        value={inviteCouponCode}
+                        onChange={(event) => setInviteCouponCode(event.target.value.toUpperCase())}
+                        placeholder="Auto-generate if blank"
+                        className="h-10 rounded-xl bg-card uppercase"
+                      />
+                    </div>
+                  </div>
+                )}
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  {inviteIncludesCoupon
+                    ? `${Math.max(1, Math.min(24, Number(inviteCouponMonths) || 1))} month coupon will be sent with the invite email`
+                    : 'Tenant will choose plan and pay normally'}
+                </p>
+              </div>
               <div className="space-y-3">
                 <Label className="text-sm font-bold text-foreground">Granular Access Permissions</Label>
                 <div className="grid grid-cols-3 gap-3">

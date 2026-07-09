@@ -129,6 +129,11 @@ export default function OnboardingPage() {
       if (data) setPlans(data);
     });
   }, []);
+  useEffect(() => {
+    const inviteCoupon = userProfile?.coupon_code || userProfile?.metadata?.coupon_code || userProfile?.metadata?.coupon?.code;
+    if (inviteCoupon && !couponCode.trim()) setCouponCode(inviteCoupon);
+  }, [userProfile?.coupon_code, userProfile?.metadata, couponCode]);
+
 
   useEffect(() => {
     if (completed && userProfile?.organization_id) navigate('/', { replace: true });

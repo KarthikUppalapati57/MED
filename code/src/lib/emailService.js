@@ -57,7 +57,7 @@ export async function sendEmail({ to_email, to_name, subject, message, from_name
 /**
  * Send an invitation email to a new team member.
  */
-export async function sendInvitationEmail({ to_email, to_name, role, org_name, invite_link }) {
+export async function sendInvitationEmail({ to_email, to_name, role, org_name, invite_link, coupon_code = null, coupon_trial_months = null }) {
   return sendEmail({
     to_email,
     to_name,
@@ -67,7 +67,13 @@ Hi ${to_name || 'there'},
 
 You've been invited to join ${org_name || 'the organization'} on the Restops platform as a ${role || 'team member'}.
 
-${invite_link ? `Click the link below to accept your invitation and set up your account:\n<${invite_link}>` : 'Please log in to accept your invitation.'}
+${invite_link ? `Click the link below to accept your invitation and set up your account:
+<${invite_link}>` : 'Please log in to accept your invitation.'}
+
+${coupon_code ? `Your onboarding coupon is included with this invite:
+Code: ${coupon_code}
+Trial: ${coupon_trial_months || 1} month${Number(coupon_trial_months || 1) === 1 ? '' : 's'}
+Use this code on the Plan & Payment step. It is locked to this email address.` : ''}
 
 This invitation will expire in 7 days.
 
