@@ -952,14 +952,15 @@ const AuthenticatedApp = () => {
  // Already-assigned users (existing accounts) skip this gate they already have MFA set up.
   const mfaStatusKnown = isMfaReady || !isUnassignedUser;
   
-  // Setup is required for any non-platform-admin without an organization
-  const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && isUnassignedUser && mfaStatusKnown;
-  
-  // Within the setup flow, we distinguish between business verification, payment, organization creation, and pending assignment
   const businessVerificationStatus = userProfile?.business_verification_status || 'not_started';
-  const needsBusinessVerification = needsSetupFlow && isTenantOwner && businessVerificationStatus !== 'verified';
-  const needsPaymentVerification = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified' && !userProfile?.payment_verified;
-  const needsOnboarding = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified' && userProfile?.payment_verified;
+  const needsTenantOnboardingPayment = isTenantOwner && businessVerificationStatus === 'verified' && !userProfile?.payment_verified;
+  
+  // Setup covers unassigned users plus tenant owners who created hierarchy but still need plan/payment.
+  const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && mfaStatusKnown && (isUnassignedUser || needsTenantOnboardingPayment);
+  
+  const needsBusinessVerification = needsSetupFlow && isTenantOwner && isUnassignedUser && businessVerificationStatus !== 'verified';
+  const needsPaymentVerification = false;
+  const needsOnboarding = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified';
   const needsAssignment = needsSetupFlow && !isTenantOwner;
 
   if (isLoadingAuth) {
@@ -1157,3 +1158,4 @@ function App() {
 }
 
 export default App
+

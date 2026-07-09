@@ -253,7 +253,7 @@ export default function BusinessVerification() {
   }
 
   if (userProfile?.business_verification_status === 'verified') {
-    return <Navigate to="/verify-payment" replace />;
+    return <Navigate to="/onboarding" replace />;
   }
 
   const updateAddress = (key, field, value) => {
@@ -394,8 +394,8 @@ export default function BusinessVerification() {
       }
 
       if (result?.status === 'verified') {
-        toast.success('Business verified. Continue to payment setup.');
-        navigate('/verify-payment', { replace: true });
+        toast.success('Business verified. Continue to onboarding.');
+        navigate('/onboarding', { replace: true });
       } else if (result?.status === 'pending_review') {
         toast.info('Business submitted for manual review. We will unlock payment setup after approval.');
       } else {
@@ -645,5 +645,4 @@ export default function BusinessVerification() {
     </div>
   );
 }
-
 

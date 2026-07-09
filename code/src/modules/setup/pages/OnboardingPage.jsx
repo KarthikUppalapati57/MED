@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -8,125 +8,52 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Building2, Store, MapPin, CheckCircle2, ArrowRight, Loader2, Upload, FileSpreadsheet, Plus, Trash2, Sparkles, Check, Search } from 'lucide-react';
-import Papa from 'papaparse';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 
-function AddressAutocompleteInput({ id, value, onChange, placeholder }) {
-  const [open, setOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState('');
-  const abortRef = useRef(null);
-  const trimmedValue = value.trim();
+const DRAFT_KEY = 'restops:onboarding:draft:v2';
+const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
+const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalCode: '', country: 'United States' });
+const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
+const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
+const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
+const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
+const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, address: emptyAddress(), brands: [createBrand()] });
 
-  useEffect(() => {
-    if (trimmedValue.length < 3) {
-      setSuggestions([]);
-      setIsSearching(false);
-      setError('');
-      abortRef.current?.abort();
-      return;
-    }
+function FieldLabel({ htmlFor, children, required = false }) {
+  return <Label htmlFor={htmlFor} className="text-sm font-medium text-foreground">{children}{required && <span className="text-destructive"> *</span>}</Label>;
+}
 
-    const timer = window.setTimeout(async () => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsSearching(true);
-      setError('');
-
-      try {
-        const params = new URLSearchParams({
-          format: 'jsonv2',
-          q: trimmedValue,
-          addressdetails: '1',
-          limit: '5',
-        });
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) throw new Error('Address lookup failed');
-        const results = await response.json();
-        setSuggestions(Array.isArray(results) ? results : []);
-        setOpen(true);
-      } catch (lookupError) {
-        if (lookupError.name !== 'AbortError') {
-          setSuggestions([]);
-          setError('Address suggestions unavailable. You can still type it manually.');
-          setOpen(true);
-        }
-      } finally {
-        if (!controller.signal.aborted) setIsSearching(false);
-      }
-    }, 350);
-
-    return () => {
-      window.clearTimeout(timer);
-      abortRef.current?.abort();
-    };
-  }, [trimmedValue]);
-
-  const selectAddress = (address) => {
-    onChange(address);
-    setOpen(false);
-    setSuggestions([]);
-    setError('');
-  };
-
+function AddressFields({ idPrefix, value, onChange, required = false, compact = false }) {
+  const update = (field, nextValue) => onChange({ ...value, [field]: nextValue });
   return (
-    <div className="relative">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          id={id}
-          placeholder={placeholder}
-          value={value}
-          autoComplete="street-address"
-          onChange={(e) => {
-            onChange(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => {
-            if (suggestions.length > 0 || error || isSearching) setOpen(true);
-          }}
-          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-          className="h-9 bg-card pl-9 text-sm text-muted-foreground"
-        />
-      </div>
-
-      {open && (suggestions.length > 0 || isSearching || error) && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-card shadow-lg">
-          {isSearching && (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Searching addresses...
-            </div>
-          )}
-
-          {!isSearching && error && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              {error}
-            </div>
-          )}
-
-          {!isSearching && !error && suggestions.map((item) => (
-            <button
-              key={`${item.place_id}-${item.osm_id}`}
-              type="button"
-              onMouseDown={(event) => {
-                event.preventDefault();
-                selectAddress(item.display_name);
-              }}
-              className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-secondary focus:bg-secondary focus:outline-none"
-            >
-              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              <span className="line-clamp-2 text-foreground">{item.display_name}</span>
-            </button>
-          ))}
+    <div className={compact ? 'space-y-3' : 'rounded-md border bg-muted/20 p-4 space-y-3'}>
+      <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-1.5">
+          <FieldLabel htmlFor={`${idPrefix}-line1`} required={required}>Business/Service Address</FieldLabel>
+          <Input id={`${idPrefix}-line1`} value={value.line1} onChange={(event) => update('line1', event.target.value)} className="h-10 bg-card" />
         </div>
-      )}
+        <div className="space-y-1.5">
+          <FieldLabel htmlFor={`${idPrefix}-line2`}>Suite / Unit</FieldLabel>
+          <Input id={`${idPrefix}-line2`} value={value.line2} onChange={(event) => update('line2', event.target.value)} className="h-10 bg-card" />
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-4">
+        {[
+          ['city', 'City'],
+          ['state', 'State/Region'],
+          ['postalCode', 'Postal Code'],
+          ['country', 'Country'],
+        ].map(([field, label]) => (
+          <div key={field} className="space-y-1.5">
+            <FieldLabel htmlFor={`${idPrefix}-${field}`} required={required}>{label}</FieldLabel>
+            <Input id={`${idPrefix}-${field}`} value={value[field]} onChange={(event) => update(field, event.target.value)} className="h-10 bg-card" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -134,95 +61,196 @@ function AddressAutocompleteInput({ id, value, onChange, placeholder }) {
 export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
-
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [onboardingMode, setOnboardingMode] = useState(null); // 'manual' or 'csv'
-  const [csvFile, setCsvFile] = useState(null);
-  const [csvData, setCsvData] = useState([]);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [businessIdentity, setBusinessIdentity] = useState({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
+  const [organizations, setOrganizations] = useState([createOrganization()]);
 
   useEffect(() => {
-    const fetchPlans = async () => {
-      const { data } = await supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true });
-      if (data) setPlans(data);
-    };
-    fetchPlans();
+    const saved = window.localStorage.getItem(DRAFT_KEY);
+    if (!saved) return;
+    try {
+      const draft = JSON.parse(saved);
+      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, ...draft.businessIdentity }));
+      if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations);
+      if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
+      if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
+      if (draft.couponCode) setCouponCode(draft.couponCode);
+    } catch (error) {
+      console.warn('Failed to restore onboarding draft:', error);
+    }
   }, []);
 
-  // Hierarchical state for multiple organizations
-  const [organizations, setOrganizations] = useState([
-    { 
-      name: '', slug: '', slugManual: false, 
-      brands: [{ name: '', locations: [{ name: '', address: '' }] }] 
-    }
-  ]);
-
-  const retryCountRef = useRef(0);
+  useEffect(() => {
+    supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true }).then(({ data }) => {
+      if (data) setPlans(data);
+    });
+  }, []);
 
   useEffect(() => {
-    if (!completed) return;
-    let cancelled = false;
-
-    const pollUntilReady = async () => {
-      const MAX_RETRIES = 12; 
-      let success = false;
-
-      for (let i = 0; i < MAX_RETRIES; i++) {
-        if (cancelled) return;
-        
-        try {
-          const freshProfile = await refreshProfile();
-          if (freshProfile?.organization_id) {
-            success = true;
-            break;
-          }
-        } catch (e) {
-          console.warn('Profile refresh attempt failed:', e);
-        }
-        
-        await new Promise(r => setTimeout(r, 800 + (i * 100)));
-      }
-
-      if (!cancelled && !success) {
-        navigate('/', { replace: true });
-      }
-    };
-
-    pollUntilReady();
-    return () => { cancelled = true; };
-  }, [completed, refreshProfile, navigate]);
-
-  useEffect(() => {
-    if (completed && userProfile?.organization_id) {
-      navigate('/', { replace: true });
-    }
+    if (completed && userProfile?.organization_id) navigate('/', { replace: true });
   }, [completed, userProfile?.organization_id, navigate]);
 
-  if (userProfile?.organization_id && !completed) {
-    return <Navigate to="/" replace />;
-  }
+  const totals = useMemo(() => {
+    const brandCount = organizations.reduce((sum, org) => sum + org.brands.length, 0);
+    const locationCount = organizations.reduce((sum, org) => sum + org.brands.reduce((brandSum, brand) => brandSum + brand.locations.length, 0), 0);
+    return { brandCount, locationCount };
+  }, [organizations]);
 
-  if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) {
-    return <Navigate to="/business-verification" replace />;
-  }
-  if (userProfile && !userProfile.payment_verified && !completed) {
-    return <Navigate to="/verify-payment" replace />;
-  }
+  const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
+  const updateOrganization = (orgIdx, updater) => setOrganizations((prev) => prev.map((org, index) => (index === orgIdx ? updater(org) : org)));
+  const updateBrand = (orgIdx, brandIdx, updater) => updateOrganization(orgIdx, (org) => ({ ...org, brands: org.brands.map((brand, index) => (index === brandIdx ? updater(brand) : brand)) }));
+  const updateLocation = (orgIdx, brandIdx, locIdx, updater) => updateBrand(orgIdx, brandIdx, (brand) => ({ ...brand, locations: brand.locations.map((location, index) => (index === locIdx ? updater(location) : location)) }));
+  const handleOrgNameChange = (orgIdx, value) => updateOrganization(orgIdx, (org) => ({ ...org, name: value, slug: org.slugManual ? org.slug : slugify(value) }));
+  const addOrganization = () => setOrganizations((prev) => [...prev, createOrganization()]);
+  const addBrand = (orgIdx) => updateOrganization(orgIdx, (org) => ({ ...org, brands: [...org.brands, createBrand()] }));
+  const addLocation = (orgIdx, brandIdx) => updateBrand(orgIdx, brandIdx, (brand) => ({ ...brand, locations: [...brand.locations, createLocation()] }));
+  const removeOrganization = (orgIdx) => organizations.length > 1 && setOrganizations((prev) => prev.filter((_, index) => index !== orgIdx));
+  const removeBrand = (orgIdx, brandIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx && org.brands.length > 1 ? { ...org, brands: org.brands.filter((_, nextIndex) => nextIndex !== brandIdx) } : org));
+  const removeLocation = (orgIdx, brandIdx, locIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx ? { ...org, brands: org.brands.map((brand, nextBrandIdx) => nextBrandIdx === brandIdx && brand.locations.length > 1 ? { ...brand, locations: brand.locations.filter((_, nextLocIdx) => nextLocIdx !== locIdx) } : brand) } : org));
+
+  const saveDraft = () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, businessIdentity, organizations, selectedPlan, couponCode, updatedAt: new Date().toISOString() }));
+    toast.success('Onboarding draft saved.');
+  };
+
+  const validateBusinessIdentity = () => {
+    if (!businessIdentity.companyName.trim()) return 'Company name is required.';
+    if (!businessIdentity.ownershipModel) return 'Ownership model is required.';
+    if (!addressComplete(businessIdentity.businessAddress)) return 'Business/service address is required.';
+    if (!businessIdentity.mailingSameAsBusiness && !addressComplete(businessIdentity.mailingAddress)) return 'Mailing address is required when it is different from business address.';
+    return null;
+  };
+
+  const validateHierarchy = () => {
+    if (!organizations.length) return 'Add at least one organization.';
+    for (const [orgIdx, org] of organizations.entries()) {
+      if (!org.name.trim()) return `Organization ${orgIdx + 1} name is required.`;
+      if (!org.slug.trim()) return `Organization ${orgIdx + 1} slug is required.`;
+      if (org.addressEnabled && !addressComplete(org.address)) return `${org.name || `Organization ${orgIdx + 1}`} address is incomplete.`;
+      for (const [brandIdx, brand] of org.brands.entries()) {
+        if (!brand.name.trim()) return `Brand ${brandIdx + 1} is required in ${org.name || `Organization ${orgIdx + 1}`}.`;
+        if (brand.addressEnabled && !addressComplete(brand.address)) return `${brand.name || `Brand ${brandIdx + 1}`} address is incomplete.`;
+        for (const [locIdx, location] of brand.locations.entries()) {
+          if (!location.name.trim()) return `Location ${locIdx + 1} is required in ${brand.name || `Brand ${brandIdx + 1}`}.`;
+          if (!addressComplete(location.businessAddress)) return `${location.name || `Location ${locIdx + 1}`} business/service address is required.`;
+          if (!location.mailingSameAsBusiness && !addressComplete(location.mailingAddress)) return `${location.name || `Location ${locIdx + 1}`} mailing address is incomplete.`;
+        }
+      }
+    }
+    return null;
+  };
+
+  const buildHierarchyPayload = () => organizations.map((org) => ({
+    name: org.name.trim(),
+    slug: org.slug.trim(),
+    metadata: { tenant_business_identity: businessIdentity, organization_address: org.addressEnabled ? org.address : null },
+    brands: org.brands.map((brand) => ({
+      name: brand.name.trim(),
+      metadata: { brand_address: brand.addressEnabled ? brand.address : null },
+      locations: brand.locations.map((location) => ({
+        name: location.name.trim(),
+        address: formatAddress(location.businessAddress),
+        business_address: location.businessAddress,
+        mailing_address: location.mailingSameAsBusiness ? location.businessAddress : location.mailingAddress,
+      })),
+    })),
+  }));
+
+  const performOnboarding = async () => {
+    if (!user) {
+      toast.error('You must be logged in to complete onboarding.');
+      return false;
+    }
+    const hierarchyError = validateHierarchy();
+    if (hierarchyError) {
+      toast.error(hierarchyError);
+      return false;
+    }
+    setLoading(true);
+    try {
+      const hierarchy = buildHierarchyPayload();
+      const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
+      hierarchy.forEach((org) => posthog.capture('workspace_created', { orgName: org.name }));
+      await supabase.auth.refreshSession();
+      toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s).`);
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 3, businessIdentity, organizations, selectedPlan, couponCode }));
+      await refreshProfile();
+      return true;
+    } catch (error) {
+      console.error('Onboarding failed:', error);
+      toast.error(error.message?.includes('organizations_slug_key') ? 'One of your organization slugs is already taken. Please try a different one.' : (error.message || 'Failed to complete onboarding.'), { duration: 5000 });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return toast.error('Enter a coupon or trial code first.');
+    setCouponLoading(true);
+    try {
+      const result = await api.onboarding.applyCoupon({ code: couponCode.trim(), planId: selectedPlan?.id || null });
+      setCouponResult(result?.coupon || null);
+      toast.success(`Applied ${result?.coupon?.code || couponCode.trim()}`);
+      await refreshProfile();
+    } catch (error) {
+      setCouponResult(null);
+      toast.error(error.message || 'Coupon could not be applied.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    if (!selectedPlan) return toast.error('Please select a plan to continue.');
+    if (!selectedPlan.stripe_price_id) {
+      window.localStorage.removeItem(DRAFT_KEY);
+      setCompleted(true);
+      return toast.success('Free plan selected.');
+    }
+    setCheckoutLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', { body: { priceId: selectedPlan.stripe_price_id, successUrl: `${window.location.origin}/`, cancelUrl: `${window.location.origin}/onboarding` } });
+      if (error) throw error;
+      if (!data?.url) throw new Error('No checkout URL returned');
+      window.localStorage.removeItem(DRAFT_KEY);
+      window.location.href = data.url;
+    } catch (error) {
+      toast.error(error.message || 'Failed to start checkout process.');
+      setCheckoutLoading(false);
+    }
+  };
+
+  const goNext = async () => {
+    if (step === 1) {
+      const error = validateBusinessIdentity();
+      if (error) return toast.error(error);
+      saveDraft();
+      return setStep(2);
+    }
+    if (step === 2) {
+      if (await performOnboarding()) setStep(3);
+      return;
+    }
+    await handleSubscribe();
+  };
+
+  if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) return <Navigate to="/business-verification" replace />;
+  if (userProfile?.organization_id && userProfile?.payment_verified && !completed) return <Navigate to="/" replace />;
 
   if (completed) {
     return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
-            <CheckCircle2 className="w-8 h-8 text-primary" />
-          </div>
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse"><CheckCircle2 className="w-8 h-8 text-primary" /></div>
           <h2 className="text-2xl font-bold text-foreground">Onboarding Complete!</h2>
           <p className="text-muted-foreground">Setting up your workspace. Redirecting shortly...</p>
           <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
@@ -231,839 +259,189 @@ export default function OnboardingPage() {
     );
   }
 
-  // Organization helpers
-  const handleOrgNameChange = (orgIdx, value) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        name: value,
-        slug: org.slugManual ? org.slug : value.toLowerCase().replace(/[^a-z0-9]/g, '-')
-      };
-    }));
-  };
-
-  const handleOrgSlugChange = (orgIdx, value) => {
-    setOrganizations(prev => prev.map((org, i) => i === orgIdx ? { ...org, slug: value, slugManual: true } : org));
-  };
-
-  const addOrganization = () => {
-    setOrganizations(prev => [...prev, { name: '', slug: '', slugManual: false, brands: [{ name: '', locations: [{ name: '', address: '' }] }] }]);
-  };
-
-  const removeOrganization = (idx) => {
-    if (organizations.length <= 1) return;
-    setOrganizations(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // Brand helpers
-  const addBrand = (orgIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return { ...org, brands: [...org.brands, { name: '', locations: [{ name: '', address: '' }] }] };
-    }));
-  };
-
-  const removeBrand = (orgIdx, brandIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      if (org.brands.length <= 1) return org;
-      return { ...org, brands: org.brands.filter((_, bi) => bi !== brandIdx) };
-    }));
-  };
-
-  const updateBrandName = (orgIdx, brandIdx, name) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => bi === brandIdx ? { ...b, name } : b)
-      };
-    }));
-  };
-
-  // Location helpers
-  const addLocation = (orgIdx, brandIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => bi === brandIdx ? { ...b, locations: [...b.locations, { name: '', address: '' }] } : b)
-      };
-    }));
-  };
-
-  const removeLocation = (orgIdx, brandIdx, locIdx) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => {
-          if (bi !== brandIdx) return b;
-          if (b.locations.length <= 1) return b;
-          return { ...b, locations: b.locations.filter((_, li) => li !== locIdx) };
-        })
-      };
-    }));
-  };
-
-  const updateLocation = (orgIdx, brandIdx, locIdx, field, value) => {
-    setOrganizations(prev => prev.map((org, i) => {
-      if (i !== orgIdx) return org;
-      return {
-        ...org,
-        brands: org.brands.map((b, bi) => {
-          if (bi !== brandIdx) return b;
-          return {
-            ...b,
-            locations: b.locations.map((loc, li) => li === locIdx ? { ...loc, [field]: value } : loc)
-          };
-        })
-      };
-    }));
-  };
-
-  const nextStep = () => setStep((s) => s + 1);
-  const prevStep = () => setStep((s) => s - 1);
-
-  // Validation helpers
-  const hasValidOrgs = organizations.length > 0 && organizations.every(o => o.name.trim() !== '' && o.slug.trim() !== '');
-  const hasValidBrands = organizations.every(o => o.brands.length > 0 && o.brands.every(b => b.name.trim() !== ''));
-  const hasValidLocations = organizations.every(o => o.brands.every(b => b.locations.length > 0 && b.locations.every(l => l.name.trim() !== '')));
-
-  const handleCsvUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setCsvFile(file);
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data && results.data.length > 0) {
-            setCsvData(results.data);
-            toast.success(`Found ${results.data.length} records in CSV`);
-          } else {
-            toast.error('The CSV file appears to be empty or formatting is invalid.');
-            setCsvFile(null);
-          }
-        },
-        error: (err) => {
-          console.error(err);
-          toast.error('Failed to parse CSV file.');
-          setCsvFile(null);
-        }
-      });
-    }
-  };
-
-  const downloadTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8,Organization Name,Brand Name,Location Name,Location Address\nAcme Corp,Acme Burgers,Downtown Branch,123 Main St NY\nAcme Corp,Acme Pizza,Uptown Branch,456 High St NY\nGlobal Eats,Sushi World,Tokyo Spot,789 Broad St";
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "restops_onboarding_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const performOnboarding = async (finalOrganizations) => {
-    if (!user) {
-      toast.error('You must be logged in to complete onboarding');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (!Array.isArray(finalOrganizations) || finalOrganizations.length === 0) {
-        throw new Error('No valid organizations to create');
-      }
-
-      const hierarchy = finalOrganizations.map((org) => {
-        const brands = (org.brands || []).map((brand) => {
-          const locations = (brand.locations || [])
-            .filter((loc) => loc.name?.trim())
-            .map((loc) => ({
-              name: loc.name.trim(),
-              address: loc.address?.trim() || 'Address pending',
-            }));
-
-          return {
-            name: brand.name?.trim() || '',
-            locations,
-          };
-        }).filter((brand) => brand.name && brand.locations.length > 0);
-
-        return {
-          name: org.name?.trim() || '',
-          slug: org.slug?.trim() || '',
-          brands,
-        };
-      });
-
-      if (hierarchy.some((org) => !org.name || !org.slug || org.brands.length === 0)) {
-        throw new Error('Please fill in all required fields for each organization');
-      }
-
-      const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
-      const primaryOrgId = result.primary_org_id || result.primaryOrganization?.id;
-
-      hierarchy.forEach((org) => {
-        posthog.capture('workspace_created', { orgName: org.name });
-      });
-
-      await supabase.auth.refreshSession();
-
-      try {
-        const { data: invs } = await supabase
-          .from('invitations')
-          .select('metadata')
-          .eq('email', user.email)
-          .not('accepted_at', 'is', null)
-          .order('accepted_at', { ascending: false })
-          .limit(1);
-
-        if (invs && invs[0] && primaryOrgId) {
-          const meta = invs[0].metadata || {};
-          
-          if (meta.modules) {
-            await supabase
-              .from('organizations')
-              .update({ enabled_modules: meta.modules })
-              .eq('id', primaryOrgId);
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to apply invitation metadata:', err);
-      }
-
-      toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s). Proceed to select a plan.`);
-      await refreshProfile();
-      setStep(4);
-    } catch (error) {
-      console.error('Onboarding failed:', error);
-      const message = error.message?.includes('organizations_slug_key')
-        ? 'One of your organization slugs is already taken. Please try a different one.'
-        : (error.message || 'Failed to complete onboarding');
-      toast.error(message, { duration: 5000 });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualSubmit = async () => {
-    if (!hasValidOrgs || !hasValidBrands || !hasValidLocations) {
-      toast.error('Please fill in all required fields for each organization');
-      return;
-    }
-    await performOnboarding(organizations);
-  };
-
-  const handleCsvSubmit = async () => {
-    if (!csvData || csvData.length === 0) {
-      toast.error('Please upload a valid CSV file first');
-      return;
-    }
-
-    let currentOrg = '';
-    let currentBrand = '';
-    const processedRows = [];
-
-    for (const row of csvData) {
-      let oName = (row['Organization Name'] || row['organization_name'] || row['orgName'] || row['Org Name'] || row['org'] || '').trim();
-      let bName = (row['Brand Name'] || row['brand_name'] || row['brandName'] || row['Brand'] || row['brand'] || '').trim();
-      let lName = (row['Location Name'] || row['location_name'] || row['locationName'] || row['Location'] || row['location'] || '').trim();
-      let lAddr = (row['Location Address'] || row['address'] || row['locationAddress'] || row['Address'] || '').trim();
-
-      if (oName) currentOrg = oName;
-      if (bName) currentBrand = bName;
-
-      if (!oName) oName = currentOrg;
-      if (!bName) bName = currentBrand;
-
-      if (oName && bName && lName) {
-        processedRows.push({
-          oName,
-          bName,
-          lName,
-          lAddr: lAddr || 'Address pending'
-        });
-      }
-    }
-
-    if (processedRows.length === 0) {
-      toast.error('No valid rows found. Please ensure your CSV has Organization Name, Brand Name, and Location Name columns.');
-      return;
-    }
-
-    const orgsMap = {};
-    processedRows.forEach(row => {
-      const oKey = row.oName.toLowerCase();
-      if (!orgsMap[oKey]) {
-        orgsMap[oKey] = {
-           name: row.oName,
-           slug: row.oName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000),
-           brandsMap: {}
-        };
-      }
-      
-      const bKey = row.bName.toLowerCase();
-      if (!orgsMap[oKey].brandsMap[bKey]) {
-         orgsMap[oKey].brandsMap[bKey] = { name: row.bName, locations: [] };
-      }
-      
-      const existingLoc = orgsMap[oKey].brandsMap[bKey].locations.find(
-        l => l.name.toLowerCase() === row.lName.toLowerCase()
-      );
-      if (!existingLoc) {
-        orgsMap[oKey].brandsMap[bKey].locations.push({ name: row.lName, address: row.lAddr });
-      }
-    });
-
-    const parsedOrganizations = Object.values(orgsMap).map(o => ({
-       name: o.name,
-       slug: o.slug,
-       slugManual: true,
-       brands: Object.values(o.brandsMap)
-    }));
-
-    if (parsedOrganizations.length === 0) {
-      toast.error('Could not parse any organizations from the CSV.');
-      return;
-    }
-
-    const totalBrands = parsedOrganizations.reduce((s, o) => s + o.brands.length, 0);
-    const totalLocations = parsedOrganizations.reduce((s, o) => s + o.brands.reduce((bs, b) => bs + b.locations.length, 0), 0);
-    
-    toast.info(`Importing ${parsedOrganizations.length} organization(s) with ${totalBrands} brand(s) and ${totalLocations} location(s)`);
-    await performOnboarding(parsedOrganizations);
-  };
-
-  const handleApplyCoupon = async () => {
-    const trimmedCode = couponCode.trim();
-    if (!trimmedCode) {
-      toast.error('Enter a coupon or trial code first.');
-      return;
-    }
-
-    setCouponLoading(true);
-    try {
-      const result = await api.onboarding.applyCoupon({
-        code: trimmedCode,
-        planId: selectedPlan?.id || null,
-      });
-      setCouponResult(result?.coupon || null);
-      toast.success(`Applied ${result?.coupon?.code || trimmedCode}`);
-      await refreshProfile();
-    } catch (err) {
-      console.error('Coupon apply failed:', err);
-      setCouponResult(null);
-      toast.error(err.message || 'Coupon could not be applied.');
-    } finally {
-      setCouponLoading(false);
-    }
-  };
-  const handleSubscribe = async () => {
-    if (!selectedPlan) {
-      toast.error('Please select a plan to continue');
-      return;
-    }
-    
-    if (!selectedPlan.stripe_price_id) {
-      toast.success('Free plan selected!');
-      setCompleted(true);
-      return;
-    }
-
-    setCheckoutLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { 
-          priceId: selectedPlan.stripe_price_id,
-          successUrl: `${window.location.origin}/`,
-          cancelUrl: `${window.location.origin}/onboarding`
-        }
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (err) {
-      console.error('Checkout error:', err);
-      toast.error(err.message || 'Failed to start checkout process');
-      setCheckoutLoading(false);
-    }
-  };
-
-  if (!onboardingMode) {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
-        <div className="w-full max-w-2xl">
-          <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
-            <CardHeader className="text-center pb-8 border-b">
-              <CardTitle className="text-3xl font-bold text-foreground">Welcome to Restops</CardTitle>
-              <CardDescription className="text-muted-foreground text-lg mt-2">
-                How would you like to set up your organizations?
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
-              <div 
-                onClick={() => setOnboardingMode('manual')}
-                className="group cursor-pointer rounded-xl border-2 border-border p-6 hover:border-primary hover:bg-primary/5/50 transition-all text-center flex flex-col items-center gap-4"
-              >
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Building2 className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-foreground mb-1">Manual Setup</h3>
-                  <p className="text-sm text-muted-foreground">I want to type in my organization, brand, and location details directly.</p>
-                </div>
-              </div>
-              
-              <div 
-                onClick={() => setOnboardingMode('csv')}
-                className="group cursor-pointer rounded-xl border-2 border-border p-6 hover:border-primary hover:bg-primary/5/50 transition-all text-center flex flex-col items-center gap-4"
-              >
-                <div className="w-16 h-16 rounded-full bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <FileSpreadsheet className="w-8 h-8 text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-foreground mb-1">Bulk Import</h3>
-                  <p className="text-sm text-muted-foreground">I have a CSV/Excel file with my organization data ready to upload.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <p className="text-center mt-8 text-muted-foreground text-sm">
-            Logged in as <span className="text-primary font-medium">{user?.email}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (onboardingMode === 'csv') {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
-        <div className="w-full max-w-2xl">
-          <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
-            <CardHeader className="space-y-1 pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                  <FileSpreadsheet className="w-6 h-6 text-indigo-400" /> Bulk Import
-                </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)}>Change Method</Button>
-              </div>
-              <CardDescription className="text-muted-foreground text-base">
-                Upload a CSV file containing your organization details.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-4">
-              <div className="p-4 bg-indigo-50 text-indigo-400 text-sm rounded-lg border border-indigo-100">
-                <p className="font-semibold mb-1">Required CSV Columns:</p>
-                <code className="bg-card px-2 py-1 object-cover rounded text-xs select-all text-muted-foreground">Organization Name, Brand Name, Location Name, Location Address</code>
-              </div>
-              
-              <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 hover:border-indigo-500 hover:bg-secondary transition-colors">
-                <input 
-                  type="file" 
-                  id="csv-upload" 
-                  accept=".csv" 
-                  className="hidden" 
-                  onChange={handleCsvUpload} 
-                />
-                <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 bg-card shadow-sm rounded-full flex items-center justify-center text-indigo-400">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <div className="text-center">
-                    <span className="text-indigo-400 font-semibold hover:underline">Click to browse</span> or drag and drop
-                    <p className="text-xs text-muted-foreground mt-1">.CSV files only</p>
-                  </div>
-                </label>
-              </div>
-
-              {csvFile && (
-                <div className="p-3 bg-card border rounded-lg flex items-center justify-between shadow-sm">
-                  <span className="text-sm font-medium text-foreground truncate">{csvFile.name}</span>
-                  <span className="text-xs font-bold text-resend-green bg-resend-green/5 px-2 py-1 rounded-full">{csvData.length} Valid Rows</span>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between pt-6 border-t border-border">
-              <Button variant="outline" onClick={downloadTemplate}>
-                Download Template
-              </Button>
-              <Button 
-                onClick={handleCsvSubmit} 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[140px]"
-                disabled={loading || !csvFile || csvData.length === 0}
-              >
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
-                ) : (
-                  <>Import & Complete <CheckCircle2 className="w-4 h-4 ml-2" /> </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
-          <p className="text-center mt-8 text-muted-foreground text-sm">
-            Logged in as <span className="text-indigo-400 font-medium">{user?.email}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
-      <div className="w-full max-w-2xl">
-        <div className="flex justify-between mb-2">
-          <Button variant="ghost" size="sm" onClick={() => setOnboardingMode(null)} className="text-muted-foreground hover:text-foreground">
-            &larr; Back to options
-          </Button>
+    <div className="min-h-screen bg-secondary p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-primary">RestOps onboarding</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Set up your tenant workspace</h1>
+          </div>
+          <div className="text-sm text-muted-foreground">Logged in as <span className="font-medium text-foreground">{user?.email}</span></div>
         </div>
-        <div className="flex items-center justify-between mb-8 px-2">
-          {[1, 2, 3, 4].map((i) => (
-            <React.Fragment key={i}>
-              <div className="flex flex-col items-center gap-2">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  step >= i ? 'bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/10' : 'bg-card border-border text-muted-foreground'
-                }`}>
-                  {step > i ? <CheckCircle2 className="w-6 h-6" /> : i}
+
+        <div className="mb-6 grid gap-2 sm:grid-cols-3">
+          {['Business Identity', 'Hierarchy', 'Plan & Payment'].map((label, index) => {
+            const itemStep = index + 1;
+            const active = step === itemStep;
+            const done = step > itemStep;
+            return (
+              <div key={label} className={`rounded-md border px-4 py-3 text-sm ${active ? 'border-primary bg-primary/5 text-primary' : done ? 'border-primary/30 bg-primary/5 text-foreground' : 'bg-card text-muted-foreground'}`}>
+                <div className="flex items-center gap-2 font-medium"><span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${active || done ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{done ? <CheckCircle2 className="h-3.5 w-3.5" /> : itemStep}</span>{label}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <Card className="border-border bg-card shadow-sm">
+          {step === 1 && (
+            <>
+              <CardHeader>
+                <CardTitle>Business Identity</CardTitle>
+                <CardDescription>These details identify the tenant business before hierarchy setup.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <FieldLabel htmlFor="company-name" required>Company Name</FieldLabel>
+                    <Input id="company-name" value={businessIdentity.companyName} onChange={(event) => updateBusinessIdentity('companyName', event.target.value)} className="h-11 bg-card" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <FieldLabel htmlFor="ownership-model" required>Ownership Model</FieldLabel>
+                    <Select value={businessIdentity.ownershipModel} onValueChange={(value) => updateBusinessIdentity('ownershipModel', value)}>
+                      <SelectTrigger id="ownership-model" className="h-11 bg-card"><SelectValue placeholder="Select ownership model" /></SelectTrigger>
+                      <SelectContent>{ownershipModels.map((model) => <SelectItem key={model} value={model}>{model.replace('_', ' ').replace(/^./, (char) => char.toUpperCase())}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <FieldLabel htmlFor="website">Website</FieldLabel>
+                    <Input id="website" value={businessIdentity.website} onChange={(event) => updateBusinessIdentity('website', event.target.value)} className="h-11 bg-card" placeholder="https://" />
+                  </div>
                 </div>
-                <span className={`text-xs font-medium ${step >= i ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {i === 1 ? 'Organizations' : i === 2 ? 'Brands' : i === 3 ? 'Locations' : 'Plan'}
-                </span>
-              </div>
-              {i < 4 && (
-                <div className={`flex-1 h-0.5 mx-4 transition-all duration-500 ${step > i ? 'bg-primary' : 'bg-secondary'}`} />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
+                <AddressFields idPrefix="business-address" value={businessIdentity.businessAddress} onChange={(value) => updateBusinessIdentity('businessAddress', value)} required />
+                <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                  <div><p className="text-sm font-medium text-foreground">Mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go to a different address.</p></div>
+                  <Switch checked={businessIdentity.mailingSameAsBusiness} onCheckedChange={(checked) => updateBusinessIdentity('mailingSameAsBusiness', checked)} />
+                </div>
+                {!businessIdentity.mailingSameAsBusiness && <AddressFields idPrefix="business-mailing" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentity('mailingAddress', value)} required />}
+              </CardContent>
+            </>
+          )}
 
-        <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-              {step === 1 && <><Building2 className="w-6 h-6 text-primary" /> Let's start with your company</>}
-              {step === 2 && <><Store className="w-6 h-6 text-primary" /> Define your brands</>}
-              {step === 3 && <><MapPin className="w-6 h-6 text-primary" /> Add locations</>}
-              {step === 4 && <><Sparkles className="w-6 h-6 text-primary" /> Select a Plan</>}
-            </CardTitle>
-            <CardDescription className="text-muted-foreground text-base">
-              {step === 1 && "What are the names of your overall business entities?"}
-              {step === 2 && "Add all your restaurant brands for each organization."}
-              {step === 3 && "Add locations for each brand."}
-              {step === 4 && "Choose the subscription tier that best fits your needs."}
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            {/* Step 1: Organizations */}
-            {step === 1 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {organizations.map((org, idx) => (
-                  <div key={idx} className="space-y-4 p-5 border rounded-xl bg-card/50 relative group shadow-sm transition-all hover:border-primary/50">
-                    <div className="flex justify-between items-center border-b pb-3">
-                       <Label className="text-foreground font-bold flex items-center gap-2">
-                         <span className="bg-primary/10 text-primary w-6 h-6 flex items-center justify-center rounded-full text-xs">{idx + 1}</span> 
-                         Organization Details
-                       </Label>
-                       {organizations.length > 1 && (
-                         <Button variant="ghost" size="icon" onClick={() => removeOrganization(idx)} className="h-8 w-8 text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 transition-colors">
-                           <Trash2 className="w-4 h-4" />
-                         </Button>
-                       )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`orgName-${idx}`}>Organization Name</Label>
-                      <Input 
-                        id={`orgName-${idx}`}
-                        placeholder="e.g. Acme Hospitality Group" 
-                        value={org.name} 
-                        onChange={(e) => handleOrgNameChange(idx, e.target.value)}
-                        className="h-12 text-lg bg-card"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`orgSlug-${idx}`}>Slug (URL identifier)</Label>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-sm">restops.io/</span>
-                        <Input 
-                          id={`orgSlug-${idx}`}
-                          placeholder="acme-hospitality" 
-                          value={org.slug} 
-                          onChange={(e) => handleOrgSlugChange(idx, e.target.value)}
-                          className="h-10 text-sm italic text-primary font-medium bg-card"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button 
-                  variant="outline" 
-                  onClick={addOrganization}
-                  className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-teal-400 transition-colors h-14"
-                >
-                  <Plus className="w-5 h-5 mr-2" /> Add Another Organization
-                </Button>
-              </div>
-            )}
-
-            {/* Step 2: Brands */}
-            {step === 2 && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          {step === 2 && (
+            <>
+              <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div><CardTitle>Organization Hierarchy</CardTitle><CardDescription>Define your Tenant -&gt; Organization -&gt; Brand -&gt; Location structure.</CardDescription></div>
+                <Button type="button" variant="outline" onClick={addOrganization} className="shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Organization</Button>
+              </CardHeader>
+              <CardContent className="space-y-5">
                 {organizations.map((org, orgIdx) => (
-                  <div key={orgIdx} className="space-y-4">
-                    <h3 className="text-lg font-bold text-foreground border-b pb-2 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                      {org.name || `Organization ${orgIdx + 1}`}
-                    </h3>
-                    <div className="pl-2 border-l-2 border-primary/20 space-y-4">
-                      {org.brands.map((brand, brandIdx) => (
-                        <div key={brandIdx} className="flex items-center gap-3 group">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                                Brand {brandIdx + 1}
-                              </span>
-                            </div>
-                            <Input 
-                              placeholder={brandIdx === 0 ? "e.g. Acme Burgers" : "e.g. Acme Pizza"} 
-                              value={brand.name} 
-                              onChange={(e) => updateBrandName(orgIdx, brandIdx, e.target.value)}
-                              className="h-12 text-lg bg-card"
-                            />
-                          </div>
-                          {org.brands.length > 1 && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 mt-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => removeBrand(orgIdx, brandIdx)}
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </Button>
-                          )}
+                  <div key={`org-${orgIdx}`} className="rounded-md border p-4 sm:p-5">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="grid flex-1 gap-3 md:grid-cols-[1fr_280px]">
+                        <div className="space-y-1.5">
+                          <FieldLabel htmlFor={`org-${orgIdx}-name`} required>Organization Name</FieldLabel>
+                          <Input id={`org-${orgIdx}-name`} value={org.name} onChange={(event) => handleOrgNameChange(orgIdx, event.target.value)} className="h-11 bg-card" />
                         </div>
-                      ))}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => addBrand(orgIdx)}
-                        className="w-full border-dashed border-2 border-primary/20 text-primary hover:bg-primary/5 transition-colors"
-                      >
-                        <Plus className="w-4 h-4 mr-2" /> Add Another Brand to {org.name || `Org ${orgIdx + 1}`}
-                      </Button>
+                        <div className="space-y-1.5">
+                          <FieldLabel htmlFor={`org-${orgIdx}-slug`} required>Slug</FieldLabel>
+                          <Input id={`org-${orgIdx}-slug`} value={org.slug} onChange={(event) => updateOrganization(orgIdx, (current) => ({ ...current, slug: slugify(event.target.value), slugManual: true }))} className="h-11 bg-card" />
+                        </div>
+                      </div>
+                      {organizations.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeOrganization(orgIdx)}><Trash2 className="h-4 w-4" /></Button>}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            {/* Step 3: Locations */}
-            {step === 3 && (
-              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                {organizations.map((org, orgIdx) => (
-                  <div key={orgIdx} className="space-y-6">
-                    <h3 className="text-lg font-bold text-foreground border-b pb-2 flex items-center gap-2">
-                      <Building2 className="w-5 h-5 text-muted-foreground" />
-                      {org.name || `Organization ${orgIdx + 1}`}
-                    </h3>
-                    
-                    <div className="space-y-6 pl-2">
-                      {org.brands.filter(b => b.name.trim()).map((brand, brandIdx) => (
-                        <div key={brandIdx} className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Store className="w-4 h-4 text-primary" />
-                            <h4 className="text-sm font-bold text-foreground">{brand.name}</h4>
-                            <span className="text-xs text-muted-foreground">({brand.locations.length} location{brand.locations.length !== 1 ? 's' : ''})</span>
+                    <div className="mb-5 flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                      <div><p className="text-sm font-medium text-foreground">Add organization address</p><p className="text-xs text-muted-foreground">Optional for organizations; locations still require addresses.</p></div>
+                      <Switch checked={org.addressEnabled} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, addressEnabled: checked }))} />
+                    </div>
+                    {org.addressEnabled && <div className="mb-5"><AddressFields idPrefix={`org-${orgIdx}-address`} value={org.address} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, address: value }))} required /></div>}
+
+                    <div className="space-y-4 border-l pl-4 sm:ml-4 sm:pl-5">
+                      {org.brands.map((brand, brandIdx) => (
+                        <div key={`org-${orgIdx}-brand-${brandIdx}`} className="rounded-md bg-muted/30 p-4">
+                          <div className="mb-4 flex items-start justify-between gap-3">
+                            <div className="flex-1 space-y-1.5">
+                              <FieldLabel htmlFor={`brand-${orgIdx}-${brandIdx}`} required>Brand</FieldLabel>
+                              <Input id={`brand-${orgIdx}-${brandIdx}`} value={brand.name} onChange={(event) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, name: event.target.value }))} className="h-11 bg-card" />
+                            </div>
+                            {org.brands.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeBrand(orgIdx, brandIdx)}><Trash2 className="h-4 w-4" /></Button>}
                           </div>
 
-                          <div className="pl-4 border-l-2 border-teal-100 space-y-3">
-                            {brand.locations.map((loc, locIdx) => (
-                              <div key={locIdx} className="group bg-secondary/50 rounded-lg p-3 border border-border hover:border-primary/30 transition-colors">
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-1 space-y-2">
-                                    <Input 
-                                      placeholder={locIdx === 0 ? "e.g. Downtown Branch" : "e.g. Airport Location"} 
-                                      value={loc.name} 
-                                      onChange={(e) => updateLocation(orgIdx, brandIdx, locIdx, 'name', e.target.value)}
-                                      className="h-10 bg-card"
-                                    />
-                                    <AddressAutocompleteInput
-                                      id={`location-address-${orgIdx}-${brandIdx}-${locIdx}`}
-                                      placeholder="123 Street, City, State, ZIP"
-                                      value={loc.address}
-                                      onChange={(address) => updateLocation(orgIdx, brandIdx, locIdx, 'address', address)}
-                                    />
+                          <div className="mb-4 flex items-center justify-between rounded-md border bg-card px-4 py-3">
+                            <div><p className="text-sm font-medium text-foreground">Add brand address</p><p className="text-xs text-muted-foreground">Optional unless enabled.</p></div>
+                            <Switch checked={brand.addressEnabled} onCheckedChange={(checked) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, addressEnabled: checked }))} />
+                          </div>
+                          {brand.addressEnabled && <div className="mb-4"><AddressFields idPrefix={`brand-${orgIdx}-${brandIdx}-address`} value={brand.address} onChange={(value) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, address: value }))} required /></div>}
+
+                          <div className="space-y-3 sm:ml-4">
+                            {brand.locations.map((location, locIdx) => (
+                              <div key={`org-${orgIdx}-brand-${brandIdx}-loc-${locIdx}`} className="rounded-md bg-card p-3 shadow-sm ring-1 ring-border">
+                                <div className="mb-3 grid gap-3 md:grid-cols-[1.3fr_1fr_1fr_auto]">
+                                  <div className="space-y-1.5">
+                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}`} required>Location Name</FieldLabel>
+                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}`} value={location.name} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, name: event.target.value }))} className="h-10 bg-card" />
                                   </div>
-                                  {brand.locations.length > 1 && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="text-muted-foreground hover:text-resend-red hover:bg-resend-red/10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  )}
+                                  <div className="space-y-1.5">
+                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}-city`} required>City</FieldLabel>
+                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}-city`} value={location.businessAddress.city} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: { ...current.businessAddress, city: event.target.value } }))} className="h-10 bg-card" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}-state`} required>State/Region</FieldLabel>
+                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}-state`} value={location.businessAddress.state} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: { ...current.businessAddress, state: event.target.value } }))} className="h-10 bg-card" />
+                                  </div>
+                                  {brand.locations.length > 1 && <Button type="button" variant="ghost" size="icon" className="self-end" onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}><Trash2 className="h-4 w-4" /></Button>}
                                 </div>
+                                <AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-business`} value={location.businessAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: value }))} required compact />
+                                <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"><p className="text-sm font-medium text-foreground">Mailing same as business/service</p><Switch checked={location.mailingSameAsBusiness} onCheckedChange={(checked) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} /></div>
+                                {!location.mailingSameAsBusiness && <div className="mt-3"><AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-mailing`} value={location.mailingAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingAddress: value }))} required compact /></div>}
                               </div>
                             ))}
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => addLocation(orgIdx, brandIdx)}
-                              className="text-primary hover:text-primary hover:bg-primary/5 text-xs w-full border border-dashed border-primary/20"
-                            >
-                              <Plus className="w-3.5 h-3.5 mr-1" /> Add Location to {brand.name}
-                            </Button>
+                            <Button type="button" variant="ghost" onClick={() => addLocation(orgIdx, brandIdx)}><Plus className="mr-2 h-4 w-4" /> Add Location</Button>
                           </div>
                         </div>
                       ))}
+                      <Button type="button" variant="ghost" onClick={() => addBrand(orgIdx)}><Plus className="mr-2 h-4 w-4" /> Add Brand</Button>
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>Total organizations: <span className="font-semibold text-foreground">{organizations.length}</span></span><span>Total brands: <span className="font-semibold text-foreground">{totals.brandCount}</span></span><span>Total locations: <span className="font-semibold text-foreground">{totals.locationCount}</span></span></div>
+              </CardContent>
+            </>
+          )}
 
-            {/* Step 4: Plans */}
-            {step === 4 && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {plans.length === 0 ? (
-                    <div className="col-span-2 text-center py-8 text-muted-foreground">
-                      Loading plans...
-                    </div>
-                  ) : (
-                    plans.map((plan) => (
-                      <div 
-                        key={plan.id}
-                        onClick={() => setSelectedPlan(plan)}
-                        className={`cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
-                          selectedPlan?.id === plan.id 
-                            ? 'border-primary bg-primary/5/30 shadow-md ring-1 ring-ring' 
-                            : 'border-border hover:border-teal-300 bg-card hover:shadow-sm'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="font-bold text-lg text-foreground">{plan.name}</h3>
-                            <p className="text-sm text-muted-foreground line-clamp-2">{plan.description}</p>
-                          </div>
-                          {selectedPlan?.id === plan.id && (
-                            <div className="bg-primary text-primary-foreground p-1 rounded-full shrink-0 animate-in zoom-in-50">
-                              <Check className="w-3 h-3" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="mb-4">
-                          <span className="text-3xl font-extrabold text-foreground">${plan.price_monthly}</span>
-                          <span className="text-sm font-medium text-muted-foreground">/mo</span>
-                        </div>
-                        <ul className="space-y-2 text-sm text-muted-foreground">
-                          {(Array.isArray(plan.features) ? plan.features : Object.entries(plan.features || {}).map(([key, value]) => value === true ? key : key + ': ' + value)).slice(0, 4).map((feat, idx) => (
-                            <li key={idx} className="flex items-center gap-2">
-                              <Check className="w-4 h-4 text-primary shrink-0" />
-                              <span className="truncate">{feat}</span>
-                            </li>
-                          ))}
-                        </ul>
+          {step === 3 && (
+            <>
+              <CardHeader>
+                <CardTitle>Plan & Payment</CardTitle>
+                <CardDescription>Select the plan for this tenant workspace.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  {plans.map((plan) => (
+                    <button key={plan.id} type="button" onClick={() => setSelectedPlan(plan)} className={`rounded-md border p-4 text-left transition hover:border-primary ${selectedPlan?.id === plan.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <div><h3 className="font-semibold text-foreground">{plan.name}</h3><p className="text-sm text-muted-foreground">{plan.description}</p></div>
+                        {selectedPlan?.id === plan.id && <CheckCircle2 className="h-5 w-5 text-primary" />}
                       </div>
-                    ))
-                  )}
+                      <div className="text-2xl font-bold text-foreground">${Number(plan.price_monthly || 0).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      {Array.isArray(plan.features) && plan.features.length > 0 && <ul className="mt-3 space-y-1 text-sm text-muted-foreground">{plan.features.slice(0, 4).map((feature) => <li key={feature}>- {feature}</li>)}</ul>}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="rounded-xl border bg-secondary/40 p-4">
+                <div className="rounded-md border bg-muted/20 p-4">
                   <Label htmlFor="coupon-code">Coupon or Trial Code</Label>
-                  <div className="mt-2 flex flex-col gap-3 sm:flex-row">
-                    <Input
-                      id="coupon-code"
-                      value={couponCode}
-                      onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
-                      placeholder="RESTOPS30"
-                      className="h-11 bg-card"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleApplyCoupon}
-                      disabled={couponLoading || !couponCode.trim()}
-                      className="h-11 sm:min-w-[120px]"
-                    >
-                      {couponLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying</> : 'Apply'}
-                    </Button>
+                  <div className="mt-2 flex gap-2">
+                    <Input id="coupon-code" value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="Enter code" className="h-11 bg-card" />
+                    <Button type="button" variant="outline" onClick={handleApplyCoupon} disabled={couponLoading || !couponCode.trim()} className="h-11 min-w-[112px]">{couponLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying</> : 'Apply'}</Button>
                   </div>
-                  {couponResult && (
-                    <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground">
-                      <span className="font-semibold">{couponResult.code}</span>
-                      <span className="text-muted-foreground"> applied</span>
-                      {couponResult.trial_days > 0 && <span className="text-muted-foreground"> for {couponResult.trial_days} trial days</span>}
-                      {couponResult.discount_type === 'percent' && <span className="text-muted-foreground"> for {couponResult.discount_value}% off</span>}
-                    </div>
-                  )}
+                  {couponResult && <div className="mt-3 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-foreground"><span className="font-semibold">{couponResult.code}</span><span className="text-muted-foreground"> applied</span>{couponResult.trial_days > 0 && <span className="text-muted-foreground"> for {couponResult.trial_days} trial days</span>}{couponResult.discount_type === 'percent' && <span className="text-muted-foreground"> for {couponResult.discount_value}% off</span>}</div>}
                 </div>
-              </div>
-            )}
-          </CardContent>
+              </CardContent>
+            </>
+          )}
 
-          <CardFooter className="flex justify-between pt-6 border-t border-border">
-            {step > 1 && step < 4 ? (
-              <Button variant="ghost" onClick={prevStep} disabled={loading}>
-                Back
-              </Button>
-            ) : (
-              <div />
-            )}
-            
-            {step < 3 ? (
-              <Button 
-                onClick={nextStep} 
-                className="bg-primary hover:bg-primary text-primary-foreground min-w-[120px]"
-                disabled={
-                  (step === 1 && !hasValidOrgs) || 
-                  (step === 2 && !hasValidBrands)
-                }
-              >
-                Next <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            ) : step === 3 ? (
-              <Button 
-                onClick={handleManualSubmit} 
-                className="bg-primary hover:bg-primary text-primary-foreground min-w-[140px]"
-                disabled={loading || !hasValidLocations}
-              >
-                {loading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
-                ) : (
-                  <>Next Step <ArrowRight className="w-4 h-4 ml-2" /> </>
-                )}
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleSubscribe} 
-                className="bg-primary hover:bg-primary text-primary-foreground min-w-[140px]"
-                disabled={checkoutLoading || !selectedPlan}
-              >
-                {checkoutLoading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Preparing Checkout...</>
-                ) : (
-                  <>Complete & Subscribe <CheckCircle2 className="w-4 h-4 ml-2" /> </>
-                )}
-              </Button>
-            )}
+          <CardFooter className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" variant="outline" onClick={saveDraft} disabled={loading || checkoutLoading} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
+            <div className="flex w-full gap-3 sm:w-auto">
+              <Button type="button" variant="ghost" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading || checkoutLoading} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{step === 3 ? 'Complete' : 'Next'} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
+            </div>
           </CardFooter>
         </Card>
-
-        <p className="text-center mt-8 text-muted-foreground text-sm">
-          Logged in as <span className="text-primary font-medium">{user?.email}</span>
-        </p>
       </div>
     </div>
   );
 }
+
