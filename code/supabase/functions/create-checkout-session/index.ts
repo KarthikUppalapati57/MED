@@ -62,11 +62,12 @@ serve(async (req) => {
 
     const { data: plan, error: planError } = await adminClient
       .from('plans')
-      .select('id, name, price_monthly, stripe_price_id')
+      .select('id, name, price_monthly, stripe_price_id, is_active')
       .eq('id', selectedPlanId)
       .single()
 
     if (planError || !plan) throw new Error('Invalid plan ID')
+    if (plan.is_active !== true) throw new Error('Selected plan is not active')
 
     const resolvedPriceId = priceId || plan.stripe_price_id
     if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
@@ -90,7 +91,18 @@ serve(async (req) => {
 
       await adminClient
         .from('profiles')
-        .update({ payment_verified: true, payment_method_type: 'free_plan', updated_at: new Date().toISOString() })
+        .update({
+          payment_verified: true,
+          payment_method_type: 'free_plan',
+          pending_onboarding_plan_id: plan.id,
+          pending_payment_metadata: {
+            provider: 'free_plan',
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            completed_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', authData.user.id)
 
       return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=free', freePlan: true }), {
@@ -102,7 +114,19 @@ serve(async (req) => {
     if (!stripe) {
       await adminClient
         .from('profiles')
-        .update({ payment_verified: true, payment_method_type: 'mock_subscription', updated_at: new Date().toISOString() })
+        .update({
+          payment_verified: true,
+          payment_method_type: 'mock_subscription',
+          pending_onboarding_plan_id: plan.id,
+          pending_payment_metadata: {
+            provider: 'mock_subscription',
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            completed_at: new Date().toISOString(),
+            reason: 'stripe_secret_missing',
+          },
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', authData.user.id)
 
       const baseUrl = successUrl || '/onboarding'
@@ -143,6 +167,22 @@ serve(async (req) => {
       }
     }
 
+    await adminClient
+      .from('profiles')
+      .update({
+        pending_onboarding_plan_id: plan.id,
+        pending_stripe_customer_id: customerId,
+        payment_method_type: 'stripe_subscription',
+        pending_payment_metadata: {
+          provider: 'stripe',
+          plan_id: plan.id,
+          coupon_code: coupon || '',
+          checkout_status: 'created',
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', authData.user.id)
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
@@ -167,6 +207,22 @@ serve(async (req) => {
       },
       allow_promotion_codes: true,
     })
+
+    await adminClient
+      .from('profiles')
+      .update({
+        pending_checkout_session_id: session.id,
+        pending_payment_metadata: {
+          provider: 'stripe',
+          plan_id: plan.id,
+          coupon_code: coupon || '',
+          checkout_status: 'session_created',
+          checkout_session_id: session.id,
+          stripe_customer_id: customerId,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', authData.user.id)
 
     return new Response(JSON.stringify({ success: true, url: session.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

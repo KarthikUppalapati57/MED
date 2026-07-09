@@ -26,6 +26,18 @@ serve(async (req) => {
           .update({
             payment_verified: true,
             payment_method_type: metadata.payment_method_type || 'stripe_subscription',
+            pending_onboarding_plan_id: planId || null,
+            pending_stripe_customer_id: session.customer || null,
+            pending_stripe_subscription_id: session.subscription || null,
+            pending_checkout_session_id: session.id || null,
+            pending_payment_metadata: {
+              provider: 'stripe',
+              plan_id: planId || '',
+              checkout_session_id: session.id || '',
+              stripe_customer_id: session.customer || '',
+              stripe_subscription_id: session.subscription || '',
+              completed_at: new Date().toISOString(),
+            },
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId)

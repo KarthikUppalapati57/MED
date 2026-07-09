@@ -22,6 +22,34 @@ const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?
 const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
 const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, address: emptyAddress(), brands: [createBrand()] });
+const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
+const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
+const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
+const normalizeOrganization = (org = {}) => ({ ...createOrganization(), ...org, address: normalizeAddress(org.address), brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()] });
+const normalizeKey = (value) => String(value || '').trim().toLowerCase();
+const isValidPostalCode = (address) => {
+  const country = normalizeKey(address?.country);
+  const postalCode = String(address?.postalCode || '').trim();
+  if (!postalCode) return false;
+  if (['us', 'usa', 'united states', 'united states of america'].includes(country)) return /^\d{5}(-?\d{4})?$/.test(postalCode);
+  return /^[a-z0-9][a-z0-9\s-]{2,12}$/i.test(postalCode);
+};
+const addressError = (address, label) => {
+  if (!addressComplete(address)) return `${label} is required.`;
+  if (!isValidPostalCode(address)) return `${label} postal code is invalid.`;
+  return null;
+};
+const websiteError = (value) => {
+  const website = String(value || '').trim();
+  if (!website || website === 'https://' || website === 'http://') return null;
+  try {
+    const parsed = new URL(website);
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname.includes('.')) return 'Website must be a valid URL.';
+    return null;
+  } catch {
+    return 'Website must be a valid URL.';
+  }
+};
 
 function FieldLabel({ htmlFor, children, required = false }) {
   return <Label htmlFor={htmlFor} className="text-sm font-medium text-foreground">{children}{required && <span className="text-destructive"> *</span>}</Label>;
@@ -69,6 +97,7 @@ export default function OnboardingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [finalizingOnboarding, setFinalizingOnboarding] = useState(false);
   const autoFinalizeRef = useRef(false);
+  const [draftReady, setDraftReady] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -77,16 +106,21 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(DRAFT_KEY);
-    if (!saved) return;
+    if (!saved) {
+      setDraftReady(true);
+      return;
+    }
     try {
       const draft = JSON.parse(saved);
-      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, ...draft.businessIdentity }));
-      if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations);
+      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, ...draft.businessIdentity, businessAddress: normalizeAddress(draft.businessIdentity.businessAddress), mailingAddress: normalizeAddress(draft.businessIdentity.mailingAddress), mailingSameAsBusiness: draft.businessIdentity.mailingSameAsBusiness !== false }));
+      if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
       if (draft.couponCode) setCouponCode(draft.couponCode);
     } catch (error) {
       console.warn('Failed to restore onboarding draft:', error);
+    } finally {
+      setDraftReady(true);
     }
   }, []);
 
@@ -99,6 +133,20 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (completed && userProfile?.organization_id) navigate('/', { replace: true });
   }, [completed, userProfile?.organization_id, navigate]);
+
+  useEffect(() => {
+    const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
+    if (!checkoutStatus || !['success', 'free', 'mock'].includes(checkoutStatus)) return;
+    if (!draftReady || !user || completed || finalizingOnboarding || autoFinalizeRef.current) return;
+
+    autoFinalizeRef.current = true;
+    setFinalizingOnboarding(true);
+    setStep(3);
+
+    refreshProfile()
+      .then(() => performOnboarding())
+      .finally(() => setFinalizingOnboarding(false));
+  }, [draftReady, user, completed, finalizingOnboarding]);
 
   const totals = useMemo(() => {
     const brandCount = organizations.reduce((sum, org) => sum + org.brands.length, 0);
@@ -126,24 +174,59 @@ export default function OnboardingPage() {
   const validateBusinessIdentity = () => {
     if (!businessIdentity.companyName.trim()) return 'Company name is required.';
     if (!businessIdentity.ownershipModel) return 'Ownership model is required.';
-    if (!addressComplete(businessIdentity.businessAddress)) return 'Business/service address is required.';
-    if (!businessIdentity.mailingSameAsBusiness && !addressComplete(businessIdentity.mailingAddress)) return 'Mailing address is required when it is different from business address.';
+    const websiteValidation = websiteError(businessIdentity.website);
+    if (websiteValidation) return websiteValidation;
+    const businessAddressError = addressError(businessIdentity.businessAddress, 'Business/service address');
+    if (businessAddressError) return businessAddressError;
+    if (!businessIdentity.mailingSameAsBusiness) {
+      const mailingAddressError = addressError(businessIdentity.mailingAddress, 'Mailing address');
+      if (mailingAddressError) return mailingAddressError;
+    }
     return null;
   };
 
   const validateHierarchy = () => {
     if (!organizations.length) return 'Add at least one organization.';
+    const orgSlugs = new Set();
+    const orgNames = new Set();
     for (const [orgIdx, org] of organizations.entries()) {
       if (!org.name.trim()) return `Organization ${orgIdx + 1} name is required.`;
       if (!org.slug.trim()) return `Organization ${orgIdx + 1} slug is required.`;
-      if (org.addressEnabled && !addressComplete(org.address)) return `${org.name || `Organization ${orgIdx + 1}`} address is incomplete.`;
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(org.slug.trim())) return `${org.name || `Organization ${orgIdx + 1}`} slug can use lowercase letters, numbers, and hyphens only.`;
+      const orgSlug = normalizeKey(org.slug);
+      if (orgSlugs.has(orgSlug)) return `Organization slug ${org.slug} is duplicated.`;
+      orgSlugs.add(orgSlug);
+      const orgName = normalizeKey(org.name);
+      if (orgNames.has(orgName)) return `Organization name ${org.name} is duplicated.`;
+      orgNames.add(orgName);
+      if (!Array.isArray(org.brands) || org.brands.length === 0) return `${org.name || `Organization ${orgIdx + 1}`} requires at least one brand.`;
+      if (org.addressEnabled) {
+        const orgAddressError = addressError(org.address, `${org.name || `Organization ${orgIdx + 1}`} address`);
+        if (orgAddressError) return orgAddressError;
+      }
+      const brandNames = new Set();
       for (const [brandIdx, brand] of org.brands.entries()) {
         if (!brand.name.trim()) return `Brand ${brandIdx + 1} is required in ${org.name || `Organization ${orgIdx + 1}`}.`;
-        if (brand.addressEnabled && !addressComplete(brand.address)) return `${brand.name || `Brand ${brandIdx + 1}`} address is incomplete.`;
+        const brandName = normalizeKey(brand.name);
+        if (brandNames.has(brandName)) return `Brand name ${brand.name} is duplicated in ${org.name || `Organization ${orgIdx + 1}`}.`;
+        brandNames.add(brandName);
+        if (!Array.isArray(brand.locations) || brand.locations.length === 0) return `${brand.name || `Brand ${brandIdx + 1}`} requires at least one location.`;
+        if (brand.addressEnabled) {
+          const brandAddressError = addressError(brand.address, `${brand.name || `Brand ${brandIdx + 1}`} address`);
+          if (brandAddressError) return brandAddressError;
+        }
+        const locationNames = new Set();
         for (const [locIdx, location] of brand.locations.entries()) {
           if (!location.name.trim()) return `Location ${locIdx + 1} is required in ${brand.name || `Brand ${brandIdx + 1}`}.`;
-          if (!addressComplete(location.businessAddress)) return `${location.name || `Location ${locIdx + 1}`} business/service address is required.`;
-          if (!location.mailingSameAsBusiness && !addressComplete(location.mailingAddress)) return `${location.name || `Location ${locIdx + 1}`} mailing address is incomplete.`;
+          const locationName = normalizeKey(location.name);
+          if (locationNames.has(locationName)) return `Location name ${location.name} is duplicated in ${brand.name || `Brand ${brandIdx + 1}`}.`;
+          locationNames.add(locationName);
+          const locationAddressError = addressError(location.businessAddress, `${location.name || `Location ${locIdx + 1}`} business/service address`);
+          if (locationAddressError) return locationAddressError;
+          if (!location.mailingSameAsBusiness) {
+            const mailingAddressError = addressError(location.mailingAddress, `${location.name || `Location ${locIdx + 1}`} mailing address`);
+            if (mailingAddressError) return mailingAddressError;
+          }
         }
       }
     }
@@ -182,9 +265,7 @@ export default function OnboardingPage() {
       const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
       hierarchy.forEach((org) => posthog.capture('workspace_created', { orgName: org.name }));
       await supabase.auth.refreshSession();
-      if (selectedPlan?.id && result.primary_org_id) {
-        await supabase.from('organizations').update({ plan_id: selectedPlan.id }).eq('id', result.primary_org_id);
-      }
+
       toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s).`);
       window.localStorage.removeItem(DRAFT_KEY);
       await refreshProfile();
@@ -200,6 +281,7 @@ export default function OnboardingPage() {
   };
 
   const handleApplyCoupon = async () => {
+    if (!selectedPlan) return toast.error('Select a plan before applying a coupon or trial code.');
     if (!couponCode.trim()) return toast.error('Enter a coupon or trial code first.');
     setCouponLoading(true);
     try {
@@ -267,13 +349,14 @@ export default function OnboardingPage() {
   };
 
   useEffect(() => {
-    if (!user || !userProfile?.payment_verified || userProfile?.organization_id || completed || finalizingOnboarding || autoFinalizeRef.current) return;
+    if (!draftReady || !user || !userProfile?.payment_verified || userProfile?.organization_id || completed || finalizingOnboarding || autoFinalizeRef.current) return;
     autoFinalizeRef.current = true;
     setFinalizingOnboarding(true);
     setStep(3);
     performOnboarding().finally(() => setFinalizingOnboarding(false));
-  }, [user, userProfile?.payment_verified, userProfile?.organization_id, completed, finalizingOnboarding]);
+  }, [draftReady, user, userProfile?.payment_verified, userProfile?.organization_id, completed, finalizingOnboarding]);
 
+  if (userProfile?.role && userProfile.role !== 'tenant_super_admin' && !completed) return <Navigate to="/" replace />;
   if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) return <Navigate to="/business-verification" replace />;
   if (userProfile?.organization_id && userProfile?.payment_verified && !completed) return <Navigate to="/" replace />;
 

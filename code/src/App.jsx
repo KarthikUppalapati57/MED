@@ -936,7 +936,7 @@ const AuthenticatedApp = () => {
 
   // SaaS Redirection Logic
   const isPlatformAdmin = role?.includes('platform_admin');
-  const isTenantOwner = role === 'tenant_super_admin' || role === 'org_manager';
+  const isTenantOnboardingOwner = role === 'tenant_super_admin';
   const mfaResolved = !needsMFAChallenge || isDeviceTrusted; // MFA is either passed or device is trusted
   
   const isUnassignedUser = !userProfile?.organization_id;
@@ -952,14 +952,14 @@ const AuthenticatedApp = () => {
   const mfaStatusKnown = isMfaReady || !isUnassignedUser;
   
   const businessVerificationStatus = userProfile?.business_verification_status || 'not_started';
-  const needsTenantOnboardingPayment = isTenantOwner && businessVerificationStatus === 'verified' && !userProfile?.payment_verified;
+  const needsTenantOnboardingPayment = isTenantOnboardingOwner && businessVerificationStatus === 'verified' && !userProfile?.payment_verified;
   
   // Setup covers unassigned users plus tenant owners who created hierarchy but still need plan/payment.
   const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && mfaStatusKnown && (isUnassignedUser || needsTenantOnboardingPayment);
   
-  const needsBusinessVerification = needsSetupFlow && isTenantOwner && isUnassignedUser && businessVerificationStatus !== 'verified';
-  const needsOnboarding = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified';
-  const needsAssignment = needsSetupFlow && !isTenantOwner;
+  const needsBusinessVerification = needsSetupFlow && isTenantOnboardingOwner && isUnassignedUser && businessVerificationStatus !== 'verified';
+  const needsOnboarding = needsSetupFlow && isTenantOnboardingOwner && businessVerificationStatus === 'verified';
+  const needsAssignment = needsSetupFlow && !isTenantOnboardingOwner;
 
   if (isLoadingAuth) {
     return (

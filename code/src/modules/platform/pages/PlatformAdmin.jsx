@@ -88,6 +88,7 @@ export default function PlatformAdmin() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteSelectedModules, setInviteSelectedModules] = useState([...ALL_MODULE_KEYS].filter(k => k !== 'platform'));
+  const [inviteRequiresBusinessVerification, setInviteRequiresBusinessVerification] = useState(true);
   const [inviteAccessLevels, setInviteAccessLevels] = useState({
     read: true,
     write: false,
@@ -258,8 +259,8 @@ export default function PlatformAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('invitations')
-        .select('id, email, role, organization_id, brand_id, location_id, token, accepted_at, expires_at, created_at')
-        .eq('role', 'owner')
+        .select('id, email, role, organization_id, brand_id, location_id, token, accepted_at, expires_at, created_at, metadata')
+        .in('role', ['tenant_super_admin', 'owner'])
         .order('created_at', { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -310,7 +311,7 @@ export default function PlatformAdmin() {
         .insert([{
           email: inviteEmail,
           token,
-          role: "owner",
+          role: "tenant_super_admin",
           invited_by: user?.id,
           expires_at: expiresAt.toISOString(),
           organization_id: null,
@@ -318,7 +319,8 @@ export default function PlatformAdmin() {
           location_id: null,
           metadata: { 
             modules: inviteSelectedModules,
-            access: inviteAccessLevels 
+            access: inviteAccessLevels,
+            business_verification_required: inviteRequiresBusinessVerification
           }
         }]).select().single();
 
@@ -350,7 +352,7 @@ export default function PlatformAdmin() {
         p_event_name: 'user.invitation.sent',
         p_entity_type: 'invitation',
         p_entity_id: null,
-        p_payload: { email: inviteEmail, role: 'owner' }
+        p_payload: { email: inviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification }
       });
       if (eventErr) console.warn('Failed to emit domain event:', eventErr);
 
@@ -363,7 +365,7 @@ export default function PlatformAdmin() {
       } else {
         toast.success("Onboarding link generated and invitation email sent!", { id: toastId });
       }
-      posthog.capture('client_invited', { email: inviteEmail, role: 'owner' });
+      posthog.capture('client_invited', { email: inviteEmail, role: 'tenant_super_admin', business_verification_required: inviteRequiresBusinessVerification });
     } catch (e) {
       console.error('Invite generation failed:', e);
       toast.error(e.message || "Failed to generate invitation", { id: toastId });
@@ -403,7 +405,7 @@ export default function PlatformAdmin() {
         .insert([{
           email: onboardingEmail,
           token,
-          role: "owner",
+          role: "tenant_super_admin",
           invited_by: user?.id,
           expires_at: expiresAt.toISOString(),
           organization_id: null,
@@ -412,6 +414,7 @@ export default function PlatformAdmin() {
           metadata: { 
             modules: ALL_MODULE_KEYS.filter(k => k !== 'platform'),
             access: { read: true, write: true, update: true },
+            business_verification_required: true,
             demo_request_id: request.id,
             demo_request_email: request.email,
             onboarding_email: onboardingEmail
@@ -965,6 +968,32 @@ The Restops Platform Team
                   />
                 </div>
               </div>
+              <div className="rounded-2xl border border-border bg-secondary/30 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <Label className="text-sm font-bold text-foreground">Business Verification</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">Require EIN/SSN, contact, and address verification before hierarchy setup.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={inviteRequiresBusinessVerification}
+                    onClick={() => setInviteRequiresBusinessVerification((current) => !current)}
+                    className={cn(
+                      "relative h-7 w-12 shrink-0 rounded-full transition-colors",
+                      inviteRequiresBusinessVerification ? "bg-slate-900" : "bg-muted"
+                    )}
+                  >
+                    <span className={cn(
+                      "absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                      inviteRequiresBusinessVerification ? "translate-x-6" : "translate-x-1"
+                    )} />
+                  </button>
+                </div>
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  {inviteRequiresBusinessVerification ? 'Business verification required' : 'Business verification skipped'}
+                </p>
+              </div>
 
               <div className="space-y-3">
                 <Label className="text-sm font-bold text-foreground">Granular Access Permissions</Label>
@@ -1071,7 +1100,7 @@ The Restops Platform Team
             </TableHeader>
             <TableBody>
               {pendingClientInvites.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No pending invitations</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No pending invitations</TableCell></TableRow>
               ) : pendingClientInvites.map(invite => (
                 <TableRow key={invite.id} className="hover:bg-secondary/50 transition-colors">
                   <TableCell className="font-semibold text-sm text-foreground">{invite.email}</TableCell>
@@ -1089,6 +1118,9 @@ The Restops Platform Team
                       {Object.entries(invite.metadata?.access || {}).filter(([_, v]) => v).map(([k]) => (
                         <Badge key={k} className="bg-resend-blue/5 text-resend-blue text-[9px] uppercase font-bold border-none">{k}</Badge>
                       ))}
+                      {invite.metadata?.business_verification_required === false && (
+                        <Badge className="bg-amber-100 text-amber-700 text-[9px] uppercase font-bold border-none">No verification</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-[10px] text-muted-foreground">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
@@ -1688,3 +1720,4 @@ The Restops Platform Team
     </div>
   );
 }
+
