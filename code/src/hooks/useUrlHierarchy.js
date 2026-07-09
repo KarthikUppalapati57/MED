@@ -44,7 +44,6 @@ const EXCLUDED_PATHS = new Set([
   '/privacy',
   '/cookies',
   '/docs',
-  '/verify-payment',
   '/onboarding',
   '/pending-assignment',
   '/update-password',

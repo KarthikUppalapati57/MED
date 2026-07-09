@@ -171,7 +171,7 @@ export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
 // These authenticated setup routes are handled by App.jsx state gates before the
 // normal module router. They are not subscription modules.
-const UNGATED_AUTH_PAGES = new Set(["OnboardingPage", "PaymentVerification"]);
+const UNGATED_AUTH_PAGES = new Set(["OnboardingPage"]);
 
 // Core modules that are always accessible regardless of subscription plan.
 const CORE_MODULE_KEYS = ["dashboard", "setup"];

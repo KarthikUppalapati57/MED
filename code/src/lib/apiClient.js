@@ -6,7 +6,7 @@ const TABLE_SCOPE_COLUMNS = {
   auto_orders: ['organization_id', 'brand_id', 'location_id'],
   budget_targets: ['organization_id', 'brand_id', 'location_id'],
   closed_periods: ['organization_id'],
-  count_sessions: ['organization_id', 'location_id'],
+  count_sessions: ['organization_id'],
   count_sheets: ['organization_id', 'location_id'],
   employees: ['organization_id', 'location_id'],
   employee_shifts: ['organization_id', 'location_id'],

@@ -1,4 +1,4 @@
-﻿import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import Stripe from 'https://esm.sh/stripe@14.17.0?target=deno'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -30,9 +30,7 @@ serve(async (req) => {
     })
 
     const { data: authData, error: authError } = await userClient.auth.getUser()
-    if (authError || !authData?.user) {
-      throw new Error('Authentication required')
-    }
+    if (authError || !authData?.user) throw new Error('Authentication required')
 
     const {
       priceId,
@@ -50,16 +48,17 @@ serve(async (req) => {
 
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
-      .select('id, email, organization_id, payment_verified, payment_method_type, business_verification_status')
+      .select('id, email, tenant_id, organization_id, payment_verified, payment_method_type, business_verification_status')
       .eq('id', authData.user.id)
       .single()
 
     if (profileError || !profile) throw new Error('Profile not found')
     if (profile.business_verification_status !== 'verified') throw new Error('Business verification is required before checkout')
-    if (!profile.payment_verified) throw new Error('Payment method verification is required before checkout')
 
-    const organizationId = organization_id || org_id || profile.organization_id
-    if (!organizationId) throw new Error('Organization setup must be completed before checkout')
+    // Checkout is the RestOps subscription payment step. During first onboarding,
+    // hierarchy may still be a client-side draft, so organization_id can be absent.
+    const tenantId = profile.tenant_id || null
+    const organizationId = organization_id || org_id || profile.organization_id || null
 
     const { data: plan, error: planError } = await adminClient
       .from('plans')
@@ -85,66 +84,84 @@ serve(async (req) => {
     }
 
     if (Number(plan.price_monthly) === 0) {
-      await adminClient
-        .from('organizations')
-        .update({ plan_id: plan.id })
-        .eq('id', organizationId)
+      if (organizationId) {
+        await adminClient.from('organizations').update({ plan_id: plan.id }).eq('id', organizationId)
+      }
 
-      return new Response(JSON.stringify({ success: true, url: successUrl || '/', freePlan: true }), {
+      await adminClient
+        .from('profiles')
+        .update({ payment_verified: true, payment_method_type: 'free_plan', updated_at: new Date().toISOString() })
+        .eq('id', authData.user.id)
+
+      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=free', freePlan: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
     }
 
     if (!stripe) {
-      const mockUrl = `${successUrl || '/'}?checkout=mock&plan=${encodeURIComponent(plan.id)}${coupon ? `&coupon=${encodeURIComponent(coupon)}` : ''}`
+      await adminClient
+        .from('profiles')
+        .update({ payment_verified: true, payment_method_type: 'mock_subscription', updated_at: new Date().toISOString() })
+        .eq('id', authData.user.id)
+
+      const baseUrl = successUrl || '/onboarding'
+      const separator = baseUrl.includes('?') ? '&' : '?'
+      const mockUrl = `${baseUrl}${separator}checkout=mock&plan=${encodeURIComponent(plan.id)}${coupon ? `&coupon=${encodeURIComponent(coupon)}` : ''}`
       return new Response(JSON.stringify({ success: true, url: mockUrl, providerMode: 'stripe_secret_missing' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
     }
 
-    const { data: org, error: orgError } = await adminClient
-      .from('organizations')
-      .select('id, name, stripe_customer_id')
-      .eq('id', organizationId)
-      .single()
+    let org: { id: string; name: string; stripe_customer_id: string | null } | null = null
+    if (organizationId) {
+      const { data: orgData, error: orgError } = await adminClient
+        .from('organizations')
+        .select('id, name, stripe_customer_id')
+        .eq('id', organizationId)
+        .single()
 
-    if (orgError || !org) throw new Error('Organization not found')
+      if (orgError || !orgData) throw new Error('Organization not found')
+      org = orgData
+    }
 
-    let customerId = org.stripe_customer_id
+    let customerId = org?.stripe_customer_id || null
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: profile.email || authData.user.email || undefined,
-        name: org.name,
+        name: org?.name || profile.email || authData.user.email || 'RestOps tenant',
         metadata: {
-          organization_id: organizationId,
+          tenant_id: tenantId || '',
+          organization_id: organizationId || '',
           user_id: authData.user.id,
         },
       })
       customerId = customer.id
-      await adminClient
-        .from('organizations')
-        .update({ stripe_customer_id: customerId })
-        .eq('id', organizationId)
+      if (organizationId) {
+        await adminClient.from('organizations').update({ stripe_customer_id: customerId }).eq('id', organizationId)
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
-      success_url: successUrl || `${new URL(req.url).origin}/`,
+      success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
       cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
       metadata: {
-        organization_id: organizationId,
+        tenant_id: tenantId || '',
+        organization_id: organizationId || '',
         user_id: authData.user.id,
         plan_id: plan.id,
         coupon_code: coupon || '',
-        payment_method_type: profile.payment_method_type || '',
+        payment_method_type: 'stripe_subscription',
       },
       subscription_data: {
         metadata: {
-          organization_id: organizationId,
+          tenant_id: tenantId || '',
+          organization_id: organizationId || '',
+          user_id: authData.user.id,
           plan_id: plan.id,
         },
       },

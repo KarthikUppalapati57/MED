@@ -20,7 +20,6 @@ import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePass
 initGlobalErrorHandlers();
 
 const OnboardingPage = setupRoutes.OnboardingPage;
-const PaymentVerification = setupRoutes.PaymentVerification;
 const BusinessVerification = setupRoutes.BusinessVerification;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
@@ -945,7 +944,7 @@ const AuthenticatedApp = () => {
  // CRITICAL FIX: Don't make setup flow decisions until MFA status is known 
   // isMfaReady takes ~1.5s to resolve after login. During that gap, needsMFASetup
   // is false (because isMfaReady is false), which causes needsSetupFlow to be true,
-  // prematurely routing new users to /verify-payment BEFORE MFA setup is evaluated.
+  // prematurely routing new users into onboarding before MFA setup is evaluated.
   // Then when isMfaReady resolves, the user gets yanked to MFA setup, creating a loop.
   //
   // Fix: For unassigned users (new signups), require isMfaReady before entering setup flow.
@@ -959,7 +958,6 @@ const AuthenticatedApp = () => {
   const needsSetupFlow = user && mfaResolved && !needsMFASetup && !isPlatformAdmin && mfaStatusKnown && (isUnassignedUser || needsTenantOnboardingPayment);
   
   const needsBusinessVerification = needsSetupFlow && isTenantOwner && isUnassignedUser && businessVerificationStatus !== 'verified';
-  const needsPaymentVerification = false;
   const needsOnboarding = needsSetupFlow && isTenantOwner && businessVerificationStatus === 'verified';
   const needsAssignment = needsSetupFlow && !isTenantOwner;
 
@@ -1022,16 +1020,14 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : (needsBusinessVerification || needsPaymentVerification || needsOnboarding || needsAssignment) ? (
+      ) : (needsBusinessVerification || needsOnboarding || needsAssignment) ? (
         <>
           {needsBusinessVerification && <Route path="/business-verification" element={<BusinessVerification />} />}
-          {needsPaymentVerification && <Route path="/verify-payment" element={<PaymentVerification />} />}
           {needsOnboarding && <Route path="/onboarding" element={<OnboardingPage />} />}
           {needsAssignment && <Route path="/pending-assignment" element={<PendingAssignmentPage />} />}
           <Route path="*" element={
             <Navigate to={
               needsBusinessVerification ? "/business-verification" :
-              needsPaymentVerification ? "/verify-payment" :
               needsOnboarding ? "/onboarding" :
               "/pending-assignment"
             } replace />
@@ -1042,7 +1038,6 @@ const AuthenticatedApp = () => {
           {/* Redirect away from onboarding/payment pages once fully set up */}
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/business-verification" element={<Navigate to="/" replace />} />
-          <Route path="/verify-payment" element={<Navigate to="/" replace />} />
           <Route path="/onboarding" element={<Navigate to="/" replace />} />
           <Route path="/pending-assignment" element={<Navigate to="/" replace />} />
           <Route

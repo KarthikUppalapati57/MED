@@ -123,17 +123,15 @@ export default function PlatformOrganizations() {
   const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews } = useAuthQuery({
     queryKey: ['platform_onboarding_reviews'],
     queryFn: async () => {
-      const [verificationsResult, profilesResult, addressesResult, bankAccountsResult, signaturesResult, eventsResult, invitesResult] = await Promise.all([
+      const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult] = await Promise.all([
         supabase.from('business_verifications').select('*').in('verification_status', ['pending_review', 'failed', 'verified']).order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified').in('business_verification_status', ['pending_review', 'failed', 'verified']),
         supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('onboarding_bank_accounts').select('id, user_id, organization_id, bank_name, account_type, account_number_last4, routing_number_last4, is_default, status, payment_account_id, created_at').order('created_at', { ascending: false }).limit(200),
-        supabase.from('tenant_payment_authorizations').select('id, user_id, organization_id, onboarding_bank_account_id, payment_account_id, signer_full_name, signer_title, consent_version, signed_at, status').order('signed_at', { ascending: false }).limit(200),
         supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, event_data, created_at').order('created_at', { ascending: false }).limit(200),
         supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_manager', 'tenant_super_admin']).order('created_at', { ascending: false }).limit(100),
       ]);
 
-      const results = [verificationsResult, profilesResult, addressesResult, bankAccountsResult, signaturesResult, eventsResult, invitesResult];
+      const results = [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult];
       const failed = results.find((result) => result.error);
       if (failed?.error) throw failed.error;
 
@@ -144,8 +142,6 @@ export default function PlatformOrganizations() {
           verification,
           profile,
           addresses: (addressesResult.data || []).filter((address) => address.user_id === verification.user_id),
-          bankAccounts: (bankAccountsResult.data || []).filter((account) => account.user_id === verification.user_id),
-          signatures: (signaturesResult.data || []).filter((signature) => signature.user_id === verification.user_id),
           events: (eventsResult.data || []).filter((event) => event.user_id === verification.user_id).slice(0, 5),
           invites: (invitesResult.data || []).filter((invite) => invite.email?.toLowerCase() === profile?.email?.toLowerCase()),
         };
@@ -198,8 +194,6 @@ export default function PlatformOrganizations() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, invalidateUsers)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'plans' }, invalidatePlans)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'business_verifications' }, invalidateOnboardingReviews)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'onboarding_bank_accounts' }, invalidateOnboardingReviews)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tenant_payment_authorizations' }, invalidateOnboardingReviews)
       .subscribe();
       
     return () => {
@@ -874,16 +868,16 @@ export default function PlatformOrganizations() {
                               <p className="mt-1 text-lg font-black text-foreground">{verification.trust_score ?? 'N/A'}</p>
                             </div>
                             <div className="rounded-xl border border-border bg-secondary/30 p-3">
-                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Bank auth</p>
-                              <p className="mt-1 text-sm font-bold text-foreground">{item.bankAccounts.some((account) => ['authorized', 'verified'].includes(account.status)) ? 'Complete' : 'Missing'}</p>
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Business verification</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{verification.verification_status === 'verified' ? 'Approved' : verification.verification_status === 'failed' ? 'Needs review' : 'Pending'}</p>
                             </div>
                             <div className="rounded-xl border border-border bg-secondary/30 p-3">
-                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Signature</p>
-                              <p className="mt-1 text-sm font-bold text-foreground">{item.signatures.some((signature) => signature.status === 'active') ? 'Captured' : 'Missing'}</p>
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Hierarchy</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.organization_id ? 'Submitted' : 'Not submitted'}</p>
                             </div>
                             <div className="rounded-xl border border-border bg-secondary/30 p-3">
-                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Payment</p>
-                              <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.payment_verified ? 'Verified' : 'Not verified'}</p>
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">RestOps payment</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.payment_verified ? 'Complete' : 'Pending'}</p>
                             </div>
                           </div>
 
@@ -893,7 +887,7 @@ export default function PlatformOrganizations() {
                             </div>
                           )}
 
-                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                             <div>
                               <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Addresses</p>
                               <div className="space-y-2 text-xs text-muted-foreground">
@@ -901,17 +895,6 @@ export default function PlatformOrganizations() {
                                   <div key={address.id} className="rounded-lg border border-border bg-secondary/20 p-2">
                                     <p className="font-bold text-foreground">{address.address_type}</p>
                                     <p>{[address.address_line_1, address.address_line_2, address.city, address.state, address.zip_code].filter(Boolean).join(', ')}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Bank accounts</p>
-                              <div className="space-y-2 text-xs text-muted-foreground">
-                                {item.bankAccounts.length === 0 ? <p>No bank account collected.</p> : item.bankAccounts.map((account) => (
-                                  <div key={account.id} className="rounded-lg border border-border bg-secondary/20 p-2">
-                                    <p className="font-bold text-foreground">{account.bank_name} ****{account.account_number_last4}</p>
-                                    <p>{account.account_type} | {account.status} | routing ****{account.routing_number_last4}</p>
                                   </div>
                                 ))}
                               </div>
@@ -1215,7 +1198,7 @@ export default function PlatformOrganizations() {
             </DialogTitle>
             <DialogDescription>
               {reviewActionDialog?.action === 'approve'
-                ? 'This will unlock the tenant to continue to payment setup.'
+                ? 'This will unlock the tenant to continue to hierarchy and RestOps payment setup.'
                 : reviewActionDialog?.action === 'reject'
                 ? 'This will block onboarding and notify the tenant with the reason.'
                 : 'This will keep the tenant in pending review and notify them what to provide.'}

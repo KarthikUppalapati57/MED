@@ -23,7 +23,6 @@ const PlatformPlans = React.lazy(() => import('./modules/platform/pages/Platform
 const PlatformInvoices = React.lazy(() => import('./modules/platform/pages/PlatformInvoices'));
 const PlatformOrganizations = React.lazy(() => import('./modules/platform/pages/PlatformOrganizations'));
 const PlatformAuditLogs = React.lazy(() => import('./modules/platform/pages/PlatformAuditLogs'));
-const PaymentVerification = React.lazy(() => import('./modules/setup/pages/PaymentVerification'));
 const Profile = React.lazy(() => import('./modules/dashboard/pages/Profile'));
 const Labor = React.lazy(() => import('./modules/labor/pages/Labor'));
 const Accounting = React.lazy(() => import('./modules/accounting/pages/Accounting'));
@@ -80,7 +79,6 @@ export const legacyRoutes = {
     "PlatformInvoices": PlatformInvoices,
     "PlatformOrganizations": PlatformOrganizations,
     "PlatformAuditLogs": PlatformAuditLogs,
-    "PaymentVerification": PaymentVerification,
     "Profile": Profile,
     "Labor": Labor,
     "Accounting": Accounting,
@@ -159,6 +157,5 @@ export const canonicalRoutes = [
 
 export const setupRoutes = {
     BusinessVerification,
-    PaymentVerification,
     OnboardingPage,
 };

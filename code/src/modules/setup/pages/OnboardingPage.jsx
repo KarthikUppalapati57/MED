@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -67,6 +67,8 @@ export default function OnboardingPage() {
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [finalizingOnboarding, setFinalizingOnboarding] = useState(false);
+  const autoFinalizeRef = useRef(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -116,9 +118,9 @@ export default function OnboardingPage() {
   const removeBrand = (orgIdx, brandIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx && org.brands.length > 1 ? { ...org, brands: org.brands.filter((_, nextIndex) => nextIndex !== brandIdx) } : org));
   const removeLocation = (orgIdx, brandIdx, locIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx ? { ...org, brands: org.brands.map((brand, nextBrandIdx) => nextBrandIdx === brandIdx && brand.locations.length > 1 ? { ...brand, locations: brand.locations.filter((_, nextLocIdx) => nextLocIdx !== locIdx) } : brand) } : org));
 
-  const saveDraft = () => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, businessIdentity, organizations, selectedPlan, couponCode, updatedAt: new Date().toISOString() }));
-    toast.success('Onboarding draft saved.');
+  const saveDraft = (nextStep = step, showToast = true) => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode, updatedAt: new Date().toISOString() }));
+    if (showToast) toast.success('Onboarding draft saved.');
   };
 
   const validateBusinessIdentity = () => {
@@ -180,9 +182,13 @@ export default function OnboardingPage() {
       const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
       hierarchy.forEach((org) => posthog.capture('workspace_created', { orgName: org.name }));
       await supabase.auth.refreshSession();
+      if (selectedPlan?.id && result.primary_org_id) {
+        await supabase.from('organizations').update({ plan_id: selectedPlan.id }).eq('id', result.primary_org_id);
+      }
       toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s).`);
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 3, businessIdentity, organizations, selectedPlan, couponCode }));
+      window.localStorage.removeItem(DRAFT_KEY);
       await refreshProfile();
+      setCompleted(true);
       return true;
     } catch (error) {
       console.error('Onboarding failed:', error);
@@ -211,20 +217,34 @@ export default function OnboardingPage() {
 
   const handleSubscribe = async () => {
     if (!selectedPlan) return toast.error('Please select a plan to continue.');
-    if (!selectedPlan.stripe_price_id) {
-      window.localStorage.removeItem(DRAFT_KEY);
-      setCompleted(true);
-      return toast.success('Free plan selected.');
-    }
+    const hierarchyError = validateHierarchy();
+    if (hierarchyError) return toast.error(hierarchyError);
+
+    saveDraft(3, false);
     setCheckoutLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', { body: { priceId: selectedPlan.stripe_price_id, successUrl: `${window.location.origin}/`, cancelUrl: `${window.location.origin}/onboarding` } });
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          planId: selectedPlan.id,
+          priceId: selectedPlan.stripe_price_id || null,
+          couponCode: couponCode.trim() || null,
+          successUrl: `${window.location.origin}/onboarding?checkout=success`,
+          cancelUrl: `${window.location.origin}/onboarding`,
+        },
+      });
       if (error) throw error;
       if (!data?.url) throw new Error('No checkout URL returned');
-      window.localStorage.removeItem(DRAFT_KEY);
+
+      if (data.freePlan || data.providerMode === 'stripe_secret_missing') {
+        await refreshProfile();
+        await performOnboarding();
+        return;
+      }
+
       window.location.href = data.url;
     } catch (error) {
       toast.error(error.message || 'Failed to start checkout process.');
+    } finally {
       setCheckoutLoading(false);
     }
   };
@@ -237,11 +257,22 @@ export default function OnboardingPage() {
       return setStep(2);
     }
     if (step === 2) {
-      if (await performOnboarding()) setStep(3);
+      const error = validateHierarchy();
+      if (error) return toast.error(error);
+      saveDraft(3);
+      setStep(3);
       return;
     }
     await handleSubscribe();
   };
+
+  useEffect(() => {
+    if (!user || !userProfile?.payment_verified || userProfile?.organization_id || completed || finalizingOnboarding || autoFinalizeRef.current) return;
+    autoFinalizeRef.current = true;
+    setFinalizingOnboarding(true);
+    setStep(3);
+    performOnboarding().finally(() => setFinalizingOnboarding(false));
+  }, [user, userProfile?.payment_verified, userProfile?.organization_id, completed, finalizingOnboarding]);
 
   if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) return <Navigate to="/business-verification" replace />;
   if (userProfile?.organization_id && userProfile?.payment_verified && !completed) return <Navigate to="/" replace />;
@@ -433,10 +464,10 @@ export default function OnboardingPage() {
           )}
 
           <CardFooter className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <Button type="button" variant="outline" onClick={saveDraft} disabled={loading || checkoutLoading} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
+            <Button type="button" variant="outline" onClick={() => saveDraft()} disabled={loading || checkoutLoading || finalizingOnboarding} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
             <div className="flex w-full gap-3 sm:w-auto">
-              <Button type="button" variant="ghost" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading || checkoutLoading} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{step === 3 ? 'Complete' : 'Next'} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
+              <Button type="button" variant="ghost" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading || checkoutLoading || finalizingOnboarding} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{step === 3 ? 'Complete' : 'Next'} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
             </div>
           </CardFooter>
         </Card>
