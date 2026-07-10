@@ -7,6 +7,8 @@ import posthog from '@/lib/posthog';
 // Canonical app URL use VITE_APP_URL if set, otherwise fall back to current origin.
 // This prevents the password reset redirecting to Vercel's default login page.
 const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+const runtimeAppUrl = () => window.location.origin || APP_URL;
+const passwordRecoveryUrl = () => `${runtimeAppUrl()}/update-password?type=recovery`;
 
 const AuthContext = createContext(null);
 
@@ -452,7 +454,7 @@ export const AuthProvider = ({ children }) => {
               setIsLoadingAuth(false);
               // Navigate to update-password page
               if (!window.location.pathname.includes('update-password')) {
-                window.location.replace(`${APP_URL}/update-password?type=recovery`);
+                window.location.replace(passwordRecoveryUrl());
               }
             }
           } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
@@ -462,7 +464,7 @@ export const AuthProvider = ({ children }) => {
               setIsMfaReady(true);
               setIsLoadingAuth(false);
               if (!window.location.pathname.includes('update-password')) {
-                window.location.replace(`${APP_URL}/update-password?type=recovery`);
+                window.location.replace(passwordRecoveryUrl());
               }
               return;
             }
@@ -761,7 +763,7 @@ export const AuthProvider = ({ children }) => {
       // (not Vercel's default). The Supabase Dashboard must also list
       // this URL under Authentication > URL Configuration > Redirect URLs.
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${APP_URL}/update-password`,
+        redirectTo: passwordRecoveryUrl(),
       });
       if (error) {
         setAuthError(error);

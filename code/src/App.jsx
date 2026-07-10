@@ -906,6 +906,18 @@ function UpdatePasswordPage() {
   );
 }
 
+function RecoveryRedirectGuard({ children }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isPasswordRecoveryActive(location) && location.pathname !== '/update-password') {
+      navigate('/update-password?type=recovery', { replace: true });
+    }
+  }, [location, navigate]);
+
+  return children;
+}
 // Authenticated App 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
@@ -1040,8 +1052,8 @@ const AuthenticatedApp = () => {
  {/* Conditional route blocks each state gets ONLY its relevant routes */}
       {!user ? (
         <>
-          <Route path="/" element={lazyElement(<LandingPage />, 'Loading...')} />
-          <Route path="/landing" element={lazyElement(<LandingPage />, 'Loading...')} />
+          <Route path="/" element={<RecoveryRedirectGuard>{lazyElement(<LandingPage />, 'Loading...')}</RecoveryRedirectGuard>} />
+          <Route path="/landing" element={<RecoveryRedirectGuard>{lazyElement(<LandingPage />, 'Loading...')}</RecoveryRedirectGuard>} />
           <Route path="/index.html" element={<Navigate to="/" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
