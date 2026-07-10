@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, Send, ShieldCheck, Mail } from 'lucide-react';
+import { Loader2, CheckCircle2, Send, ShieldCheck, Mail, Building2, CreditCard } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
@@ -19,7 +20,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const [step, setStep] = useState(1);
   const [vendorId, setVendorId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [devOtp, setDevOtp] = useState(null); // To display for dev
+  const [devOtp, setDevOtp] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -54,7 +55,6 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     }
     setLoading(true);
     try {
-      // 1. Create Vendor
       const newVendor = await api.entities.Vendor.create({
         organization_id: organization?.id,
         brand_id: brand?.id || null,
@@ -67,7 +67,6 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       });
       setVendorId(newVendor.id);
 
-      // 2. Request OTP
       const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
         body: { action: 'send-otp', payload: { vendor_id: newVendor.id } }
       });
@@ -75,9 +74,9 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      setDevOtp(data.devOtp); // For developer use
+      setDevOtp(data.devOtp);
       toast.success("OTP sent successfully to vendor!");
-      setStep(1.5); // Move to OTP verification sub-step
+      setStep(1.5);
     } catch (err) {
       toast.error(err.message || "Failed to initiate onboarding");
     } finally {
@@ -116,7 +115,6 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       if (data?.error) throw new Error(data.error);
 
       toast.success(`Magic link for ${type === 'tax' ? 'Tax info' : 'Bank details'} sent to vendor!`);
-      // Simulating moving to next step. In reality, the tenant waits for the vendor.
       if (type === 'tax') setStep(3);
       if (type === 'bank') setStep(4);
       
@@ -146,150 +144,234 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     }
   };
 
+  // Helper to map our logic state to a visual stepper
+  const getVisualStepIndex = () => {
+    if (step === 1) return 1;
+    if (step === 1.5) return 2;
+    if (step === 2 || step === 3) return 3;
+    if (step === 4) return 4;
+    return 1;
+  };
+
+  const visualStep = getVisualStepIndex();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Vendor Onboarding Wizard</DialogTitle>
-          <DialogDescription>
-            Step-by-step process to securely onboard a new vendor.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4">
-          {/* STEP 1: Basic Info */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2"><Mail className="w-5 h-5"/> Step 1: Basic Details</h3>
-              <p className="text-sm text-muted-foreground">Enter vendor details to begin verification.</p>
-              <div className="grid gap-3">
-                <div>
-                  <Label>Vendor Name *</Label>
-                  <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Acme Corp" />
-                </div>
-                <div>
-                  <Label>Email *</Label>
-                  <Input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="billing@acmecorp.com" type="email" />
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+1 555-0123" />
-                </div>
-                <div>
-                  <Label>Contact Name</Label>
-                  <Input value={formData.contact_name} onChange={e => setFormData({...formData, contact_name: e.target.value})} placeholder="John Doe" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 1.5: OTP Verification */}
-          {step === 1.5 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2"><ShieldCheck className="w-5 h-5"/> Verify Vendor</h3>
-              <p className="text-sm text-muted-foreground">An OTP has been sent to {formData.email || formData.phone}.</p>
-              
+      <DialogContent className="sm:max-w-5xl h-[85vh] p-0 overflow-hidden flex flex-col bg-secondary/30">
+        <div className="flex-1 overflow-y-auto p-6 md:p-10">
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <Label>Enter OTP</Label>
-                <Input value={otpInput} onChange={e => setOtpInput(e.target.value)} placeholder="123456" className="text-xl tracking-widest text-center h-12" maxLength={6}/>
+                <p className="text-sm font-medium text-primary mb-1">Vendor Onboarding</p>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Add a new vendor</h1>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <ShieldCheck className="inline-block w-4 h-4 mr-1 mb-0.5" /> Secure Workflow
               </div>
             </div>
-          )}
 
-          {/* STEP 2: Tax Info Magic Link */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Step 2: Secure Tax Information (W9 / SSN / EIN)</h3>
-              <p className="text-sm text-muted-foreground">
-                We need to collect the vendor's Tax ID and W9 document securely. Send them a magic link so they can upload it directly.
-              </p>
-              <div className="p-4 border rounded-md bg-muted/30 text-center space-y-3">
-                <Button onClick={() => handleSendMagicLink('tax')} disabled={loading}>
-                  <Send className="w-4 h-4 mr-2" /> Send Tax Info Magic Link
-                </Button>
-                <p className="text-xs text-muted-foreground">The vendor will receive an email with a secure, 24-hour link.</p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Bank Details Magic Link */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Step 3: Secure Bank Details</h3>
-              <p className="text-sm text-muted-foreground">
-                Now that tax info is pending/completed, send another magic link for the vendor to securely enter their bank account details.
-              </p>
-              <div className="p-4 border rounded-md bg-muted/30 text-center space-y-3">
-                <Button onClick={() => handleSendMagicLink('bank')} disabled={loading}>
-                  <Send className="w-4 h-4 mr-2" /> Send Banking Magic Link
-                </Button>
-                <p className="text-xs text-muted-foreground">This separates tax collection from banking collection for added security.</p>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Payment Settings */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-resend-green" /> Step 4: Finalize Configuration</h3>
-              <p className="text-sm text-muted-foreground">
-                Set up default payment preferences for this vendor.
-              </p>
-              <div className="grid gap-4 mt-4 p-4 border rounded-md bg-white">
-                <div className="space-y-2">
-                  <Label>Default Payment Method</Label>
-                  <Select value={paymentSettings.default_payment_method} onValueChange={v => setPaymentSettings({...paymentSettings, default_payment_method: v})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="stripe">Stripe (ACH)</SelectItem>
-                      <SelectItem value="paypal">PayPal</SelectItem>
-                      <SelectItem value="dwolla">Dwolla</SelectItem>
-                      <SelectItem value="check">Check</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable AutoPay</Label>
-                    <p className="text-xs text-muted-foreground">Automatically pay approved invoices.</p>
+            {/* Stepper */}
+            <div className="mb-8 grid gap-2 sm:grid-cols-4">
+              {['Basic Details', 'Verification', 'Information', 'Payment Setup'].map((label, index) => {
+                const itemStep = index + 1;
+                const active = visualStep === itemStep;
+                const done = visualStep > itemStep;
+                return (
+                  <div key={label} className={`rounded-md border px-4 py-3 text-sm transition-colors ${active ? 'border-primary bg-primary/10 text-primary shadow-sm' : done ? 'border-primary/30 bg-primary/5 text-foreground' : 'bg-card text-muted-foreground'}`}>
+                    <div className="flex items-center gap-2 font-medium">
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${active || done ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : itemStep}
+                      </span>
+                      {label}
+                    </div>
                   </div>
-                  <Switch checked={paymentSettings.autopay_enabled} onCheckedChange={c => setPaymentSettings({...paymentSettings, autopay_enabled: c})} />
-                </div>
-              </div>
+                );
+              })}
             </div>
-          )}
 
+            <Card className="border-border bg-card shadow-sm">
+              {step === 1 && (
+                <>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary"/> Basic Details</CardTitle>
+                    <CardDescription>Enter the vendor's primary contact information to begin the onboarding process.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="vendor-name" className="text-sm font-medium">Vendor Name <span className="text-destructive">*</span></Label>
+                        <Input id="vendor-name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Acme Corp" className="h-11 bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vendor-email" className="text-sm font-medium">Email <span className="text-destructive">*</span></Label>
+                        <Input id="vendor-email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="billing@acmecorp.com" type="email" className="h-11 bg-muted/20" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="vendor-phone" className="text-sm font-medium">Phone</Label>
+                        <Input id="vendor-phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+1 555-0123" className="h-11 bg-muted/20" />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="vendor-contact" className="text-sm font-medium">Primary Contact Name</Label>
+                        <Input id="vendor-contact" value={formData.contact_name} onChange={e => setFormData({...formData, contact_name: e.target.value})} placeholder="John Doe" className="h-11 bg-muted/20" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </>
+              )}
+
+              {step === 1.5 && (
+                <>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-primary"/> Verify Vendor Identity</CardTitle>
+                    <CardDescription>To ensure security, we've sent a One-Time Password (OTP) to {formData.email}.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="max-w-sm mx-auto my-8 space-y-4 text-center">
+                      <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Mail className="w-8 h-8 text-primary" />
+                      </div>
+                      <Label className="text-base">Enter the 6-digit code</Label>
+                      <Input 
+                        value={otpInput} 
+                        onChange={e => setOtpInput(e.target.value)} 
+                        placeholder="• • • • • •" 
+                        className="text-3xl tracking-[1em] text-center h-16 font-mono bg-muted/20 placeholder:tracking-widest" 
+                        maxLength={6}
+                      />
+                      {devOtp && (
+                        <p className="text-xs text-muted-foreground mt-4">Developer Note: The OTP is <strong>{devOtp}</strong></p>
+                      )}
+                    </div>
+                  </CardContent>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary"/> Tax Information Collection</CardTitle>
+                    <CardDescription>Request secure tax information (W9 / SSN / EIN) directly from the vendor.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 text-center space-y-4 my-4">
+                      <div className="bg-background w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-sm">
+                        <Send className="w-6 h-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Send Secure Magic Link</h3>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        The vendor will receive an email with a secure, 24-hour link to upload their tax documents. This keeps sensitive data out of your inbox.
+                      </p>
+                      <div className="pt-4">
+                        <Button onClick={() => handleSendMagicLink('tax')} disabled={loading} size="lg" className="w-full sm:w-auto">
+                          {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                          Send Tax Info Request
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary"/> Bank Details Collection</CardTitle>
+                    <CardDescription>Request secure banking details for invoice payouts.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 text-center space-y-4 my-4">
+                      <div className="bg-background w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-sm">
+                        <Building2 className="w-6 h-6 text-primary" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">Send Banking Magic Link</h3>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        Now that the tax info request is sent, send a separate magic link for the vendor to securely enter their bank account details.
+                      </p>
+                      <div className="pt-4">
+                        <Button onClick={() => handleSendMagicLink('bank')} disabled={loading} size="lg" className="w-full sm:w-auto">
+                          {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                          Send Banking Request
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </>
+              )}
+
+              {step === 4 && (
+                <>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-resend-green" /> Finalize Configuration</CardTitle>
+                    <CardDescription>Set up default payment preferences while you wait for the vendor to submit their information.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid gap-6 mt-2 p-6 border rounded-lg bg-muted/10">
+                      <div className="space-y-3">
+                        <Label className="text-base font-medium">Default Payment Method</Label>
+                        <Select value={paymentSettings.default_payment_method} onValueChange={v => setPaymentSettings({...paymentSettings, default_payment_method: v})}>
+                          <SelectTrigger className="h-11 bg-card w-full max-w-md">
+                            <SelectValue placeholder="Select a payment method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="stripe">Stripe (ACH)</SelectItem>
+                            <SelectItem value="paypal">PayPal</SelectItem>
+                            <SelectItem value="dwolla">Dwolla</SelectItem>
+                            <SelectItem value="check">Check</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="h-px bg-border my-2"></div>
+                      
+                      <div className="flex items-center justify-between max-w-md">
+                        <div className="pr-4">
+                          <Label className="text-base font-medium">Enable AutoPay</Label>
+                          <p className="text-sm text-muted-foreground mt-1">Automatically pay approved invoices from this vendor using the default method.</p>
+                        </div>
+                        <Switch 
+                          checked={paymentSettings.autopay_enabled} 
+                          onCheckedChange={c => setPaymentSettings({...paymentSettings, autopay_enabled: c})} 
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </>
+              )}
+            </Card>
+          </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+        {/* Fixed Footer */}
+        <div className="border-t bg-background p-4 sm:px-10 flex items-center justify-end gap-3 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading} className="text-muted-foreground">
+            Cancel
+          </Button>
           
           {step === 1 && (
-            <Button onClick={handleCreateVendorAndSendOtp} disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Continue
+            <Button onClick={handleCreateVendorAndSendOtp} disabled={loading} size="lg" className="min-w-[140px]">
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Continue
             </Button>
           )}
           
           {step === 1.5 && (
-            <Button onClick={handleVerifyOtp} disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Verify OTP
+            <Button onClick={handleVerifyOtp} disabled={loading} size="lg" className="min-w-[140px]">
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Verify OTP
             </Button>
           )}
 
           {(step === 2 || step === 3) && (
-            <Button variant="ghost" onClick={() => setStep(step + 1)}>
+            <Button variant="outline" onClick={() => setStep(step + 1)} className="min-w-[140px]" size="lg">
               Skip for now
             </Button>
           )}
 
           {step === 4 && (
-            <Button onClick={handleFinalize} disabled={loading} className="bg-resend-green hover:bg-resend-green/90 text-white">
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Complete Onboarding
+            <Button onClick={handleFinalize} disabled={loading} size="lg" className="min-w-[180px] bg-primary hover:bg-primary/90">
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />} 
+              Complete Onboarding
             </Button>
           )}
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
