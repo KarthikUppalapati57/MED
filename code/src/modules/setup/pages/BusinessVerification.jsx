@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
@@ -75,11 +75,12 @@ function statusFromScore(score) {
 }
 
 export default function BusinessVerification() {
-  const { user, userProfile, refreshProfile } = useAuth();
+  const { user, userProfile, refreshProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(true);
+  const [submittedForReview, setSubmittedForReview] = useState(false);
   const [stepError, setStepError] = useState('');
   const [stepKey, setStepKey] = useState('business_information');
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
@@ -236,6 +237,43 @@ export default function BusinessVerification() {
     return <Navigate to="/onboarding" replace />;
   }
 
+  if (submittedForReview || userProfile?.business_verification_status === 'pending_review') {
+    const goToLanding = async () => {
+      try {
+        await logout();
+      } finally {
+        navigate('/landing', { replace: true });
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
+        <Card className="w-full max-w-lg border-none bg-card/90 text-center shadow-2xl ring-1 ring-border/60 backdrop-blur-xl">
+          <CardHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+              <Clock3 className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-black tracking-tight">Business Verification Submitted</CardTitle>
+              <CardDescription className="text-base">
+                Platform admin will verify your business details and notify you when your account is approved.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border bg-secondary/40 p-4 text-left text-sm">
+              <p className="font-bold text-foreground">What happens next?</p>
+              <p className="mt-1 text-muted-foreground">You can leave this page now. After approval, sign in again to continue hierarchy setup.</p>
+            </div>
+            <Button type="button" onClick={goToLanding} className="w-full">
+              Go to Landing Page
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const validate = () => {
     if (!form.legalName.trim()) return 'Legal business name is required.';
     if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
@@ -359,7 +397,8 @@ export default function BusinessVerification() {
         toast.success('Business verified. Continue to onboarding.');
         navigate('/onboarding', { replace: true });
       } else if (result?.status === 'pending_review') {
-        toast.info('Business submitted for manual review. We will unlock payment setup after approval.');
+        setSubmittedForReview(true);
+        toast.info('Business submitted for manual review. We will notify you after approval.');
       } else {
         toast.error('Business verification failed. Please review and resubmit.');
       }
