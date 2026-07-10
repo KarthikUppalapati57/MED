@@ -10,6 +10,12 @@ function normalizeOtpPhone(value) {
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
   return String(value || '').trim();
 }
+
+function getOnboardingOtpRedirectUrl() {
+  if (typeof window === 'undefined') return undefined;
+  return `${window.location.origin}/setup/business-verification`;
+}
+
 const TABLE_SCOPE_COLUMNS = {
   accounting_sync_logs: ['organization_id'],
   ai_insights: ['organization_id'],
@@ -478,55 +484,81 @@ export const api = {
       const normalizedChannel = String(channel || '').toLowerCase();
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
 
-      if (normalizedChannel === 'email') {
-        const { error } = await supabase.auth.signInWithOtp({
-          email: normalizedTarget,
-          options: { shouldCreateUser: false },
-        });
-        if (error) throw error;
-      } else if (normalizedChannel === 'phone') {
-        const { error } = await supabase.auth.updateUser({ phone: normalizedTarget });
-        if (error) throw error;
-      } else {
-        throw new Error('OTP channel must be email or phone');
-      }
+      try {
+        if (normalizedChannel === 'email') {
+          const { error } = await supabase.auth.signInWithOtp({
+            email: normalizedTarget,
+            options: {
+              shouldCreateUser: false,
+              emailRedirectTo: getOnboardingOtpRedirectUrl(),
+              data: {
+                otp_context: 'onboarding_contact_verification',
+                otp_channel: 'email',
+              },
+            },
+          });
+          if (error) throw error;
+        } else if (normalizedChannel === 'phone') {
+          const { error } = await supabase.auth.updateUser({ phone: normalizedTarget });
+          if (error) throw error;
+        } else {
+          throw new Error('OTP channel must be email or phone');
+        }
 
-      return {
-        success: true,
-        otp_id: `supabase_auth_${normalizedChannel}`,
-        channel: normalizedChannel,
-        target: normalizedTarget,
-      };
+        return {
+          success: true,
+          otp_id: `supabase_auth_${normalizedChannel}`,
+          channel: normalizedChannel,
+          target: normalizedTarget,
+        };
+      } catch (authError) {
+        const { data, error } = await supabase.rpc('request_onboarding_contact_dev_otp', {
+          p_channel: normalizedChannel,
+          p_target: normalizedTarget,
+        });
+        if (error) throw authError;
+        return data;
+      }
     },
     verifyContactOtp: async ({ channel, target, code }) => {
       const normalizedChannel = String(channel || '').toLowerCase();
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
       const token = String(code || '').trim();
 
-      if (normalizedChannel === 'email') {
-        const { error } = await supabase.auth.verifyOtp({
-          email: normalizedTarget,
-          token,
-          type: 'email',
-        });
-        if (error) throw error;
-      } else if (normalizedChannel === 'phone') {
-        const { error } = await supabase.auth.verifyOtp({
-          phone: normalizedTarget,
-          token,
-          type: 'phone_change',
-        });
-        if (error) throw error;
-      } else {
-        throw new Error('OTP channel must be email or phone');
-      }
+      try {
+        if (normalizedChannel === 'email') {
+          const { error } = await supabase.auth.verifyOtp({
+            email: normalizedTarget,
+            token,
+            type: 'email',
+          });
+          if (error) throw error;
+        } else if (normalizedChannel === 'phone') {
+          const { error } = await supabase.auth.verifyOtp({
+            phone: normalizedTarget,
+            token,
+            type: 'phone_change',
+          });
+          if (error) throw error;
+        } else {
+          throw new Error('OTP channel must be email or phone');
+        }
 
-      const { data, error } = await supabase.rpc('mark_onboarding_contact_verified', {
-        p_channel: normalizedChannel,
-        p_target: normalizedTarget,
-      });
-      if (error) throw error;
-      return data;
+        const { data, error } = await supabase.rpc('mark_onboarding_contact_verified', {
+          p_channel: normalizedChannel,
+          p_target: normalizedTarget,
+        });
+        if (error) throw error;
+        return data;
+      } catch (authError) {
+        const { data, error } = await supabase.rpc('verify_onboarding_contact_dev_otp', {
+          p_channel: normalizedChannel,
+          p_target: normalizedTarget,
+          p_code: token,
+        });
+        if (error) throw authError;
+        return data;
+      }
     },
     submitBusinessVerification: async (payload) => {
       const { data, error } = await supabase.rpc('submit_business_verification', {
