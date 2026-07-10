@@ -61,8 +61,6 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
         location_id: location?.id || null,
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
-        contact_name: formData.contact_name,
         onboarding_status: 'pending_otp'
       });
       setVendorId(newVendor.id);
