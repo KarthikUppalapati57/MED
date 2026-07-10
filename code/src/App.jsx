@@ -493,21 +493,9 @@ function LoginPage() {
     e.preventDefault();
     setLocalError('');
     setIsSubmitting(true);
-    
+
     try {
-      const { data: exists, error: checkError } = await supabase
-        .rpc('check_email_exists', { email_to_check: email.trim().toLowerCase() });
-      
-      if (checkError) throw checkError;
-      
-      if (!exists) {
-        setLocalError('This email is not registered in our database.');
-        setIsSubmitting(false);
-        return;
-      }
-      
       const { error } = await resetPassword(email.trim());
-      setIsSubmitting(false);
       if (error) {
         setLocalError(error.message);
       } else {
@@ -516,6 +504,7 @@ function LoginPage() {
     } catch (err) {
       console.error('Error during password reset:', err);
       setLocalError(err.message || 'An error occurred during password reset.');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -1158,4 +1147,3 @@ function App() {
 }
 
 export default App
-
