@@ -470,11 +470,14 @@ export default function PlatformOrganizations() {
 
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const isBusinessReviewMode = searchParams.get('review') === 'business';
+  const businessReviewItems = onboardingReviews.filter((item) => item.verification.verification_status !== 'verified');
   const tenantReviewItems = onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
-  const selectedOrgReviewItems = selectedOrgId
+  const selectedOrgReviewItems = isBusinessReviewMode
+    ? businessReviewItems
+    : selectedOrgId
     ? onboardingReviews.filter((item) => item.verification.organization_id === selectedOrgId || item.profile?.organization_id === selectedOrgId)
     : tenantReviewItems;
-  const pendingTenantReviewCount = tenantReviewItems.filter((item) => item.verification.verification_status !== 'verified').length;
+  const pendingTenantReviewCount = businessReviewItems.length;
   const shouldShowTenantReviewPanel = isBusinessReviewMode || selectedOrgReviewItems.length > 0;
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
 
