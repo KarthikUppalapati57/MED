@@ -23,12 +23,23 @@ const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCo
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
 const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
-const createOrganization = () => ({ name: '', slug: '', slugManual: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
+const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
 const createBusinessIdentity = () => ({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
 const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
 const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
-const normalizeOrganization = (org = {}) => ({ ...createOrganization(), ...org, businessAddress: normalizeAddress(org.businessAddress || org.address), mailingAddress: normalizeAddress(org.mailingAddress), mailingSameAsBusiness: org.mailingSameAsBusiness !== false, brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()] });
+const normalizeOrganization = (org = {}) => {
+  const businessAddress = normalizeAddress(org.businessAddress || org.address);
+  return {
+    ...createOrganization(),
+    ...org,
+    addressEnabled: org.addressEnabled === true || (Boolean(org.businessAddress || org.address) && addressComplete(businessAddress)),
+    businessAddress,
+    mailingAddress: normalizeAddress(org.mailingAddress),
+    mailingSameAsBusiness: org.mailingSameAsBusiness !== false,
+    brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()],
+  };
+};
 const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 const isValidPostalCode = (address) => {
@@ -303,17 +314,19 @@ export default function OnboardingPage() {
       if (!brandName) throw new Error(`Row ${rowIdx + 2}: brand_name is required.`);
       if (!locationName) throw new Error(`Row ${rowIdx + 2}: location_name is required.`);
 
-      const orgBusinessAddress = addressFromRow(row, 'organization_address');
-      const orgAddressError = addressError(orgBusinessAddress, `Row ${rowIdx + 2} organization business/service address`);
-      if (orgAddressError) throw new Error(orgAddressError);
+      const orgAddressEnabled = hasAddressValues(row, 'organization_address');
+      const orgBusinessAddress = orgAddressEnabled ? addressFromRow(row, 'organization_address') : emptyAddress();
+      if (orgAddressEnabled) {
+        const orgAddressError = addressError(orgBusinessAddress, `Row ${rowIdx + 2} organization business/service address`);
+        if (orgAddressError) throw new Error(orgAddressError);
+      }
 
       const orgMailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'organization_mailing_same_as_business'), true);
       const orgMailingAddress = orgMailingSameAsBusiness ? emptyAddress() : addressFromRow(row, 'organization_mailing_address');
-      if (!orgMailingSameAsBusiness) {
+      if (orgAddressEnabled && !orgMailingSameAsBusiness) {
         const orgMailingAddressError = addressError(orgMailingAddress, `Row ${rowIdx + 2} organization mailing address`);
         if (orgMailingAddressError) throw new Error(orgMailingAddressError);
       }
-
       const locationAddress = addressFromRow(row, 'location_address');
       const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
       if (locationAddressError) throw new Error(locationAddressError);
@@ -325,8 +338,9 @@ export default function OnboardingPage() {
           name: orgName,
           slug: slugify(valueFor(row, 'organization_slug') || orgName),
           slugManual: Boolean(valueFor(row, 'organization_slug')),
+          addressEnabled: orgAddressEnabled,
           businessAddress: orgBusinessAddress,
-          mailingSameAsBusiness: orgMailingSameAsBusiness,
+          mailingSameAsBusiness: orgAddressEnabled ? orgMailingSameAsBusiness : true,
           mailingAddress: orgMailingAddress,
           brands: [],
         });
@@ -427,11 +441,13 @@ export default function OnboardingPage() {
       if (orgNames.has(orgName)) return `Organization name ${org.name} is duplicated.`;
       orgNames.add(orgName);
       if (!Array.isArray(org.brands) || org.brands.length === 0) return `${org.name || `Organization ${orgIdx + 1}`} requires at least one brand.`;
-      const orgAddressError = addressError(org.businessAddress, `${org.name || `Organization ${orgIdx + 1}`} business/service address`);
-      if (orgAddressError) return orgAddressError;
-      if (!org.mailingSameAsBusiness) {
-        const orgMailingAddressError = addressError(org.mailingAddress, `${org.name || `Organization ${orgIdx + 1}`} mailing address`);
-        if (orgMailingAddressError) return orgMailingAddressError;
+      if (org.addressEnabled) {
+        const orgAddressError = addressError(org.businessAddress, `${org.name || `Organization ${orgIdx + 1}`} business/service address`);
+        if (orgAddressError) return orgAddressError;
+        if (!org.mailingSameAsBusiness) {
+          const orgMailingAddressError = addressError(org.mailingAddress, `${org.name || `Organization ${orgIdx + 1}`} mailing address`);
+          if (orgMailingAddressError) return orgMailingAddressError;
+        }
       }
       const brandNames = new Set();
       for (const [brandIdx, brand] of org.brands.entries()) {
@@ -467,10 +483,10 @@ export default function OnboardingPage() {
     slug: org.slug.trim(),
     metadata: {
       tenant_business_identity: businessIdentity,
-      organization_address: org.businessAddress,
-      organization_business_address: org.businessAddress,
-      organization_mailing_same_as_business: org.mailingSameAsBusiness,
-      organization_mailing_address: org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress,
+      organization_address: org.addressEnabled ? org.businessAddress : null,
+      organization_business_address: org.addressEnabled ? org.businessAddress : null,
+      organization_mailing_same_as_business: org.addressEnabled ? org.mailingSameAsBusiness : true,
+      organization_mailing_address: org.addressEnabled ? (org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress) : null,
     },
     brands: org.brands.map((brand) => ({
       name: brand.name.trim(),
@@ -719,16 +735,23 @@ export default function OnboardingPage() {
                     </div>
 
                     <div className="mb-5 space-y-3">
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground">Organization Business/Service Address</h3>
-                        <p className="text-xs text-muted-foreground">Required for every organization in the tenant hierarchy.</p>
-                      </div>
-                      <AddressFields idPrefix={`org-${orgIdx}-business-address`} value={org.businessAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, businessAddress: value }))} required />
                       <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
-                        <div><p className="text-sm font-medium text-foreground">Organization mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go somewhere else.</p></div>
-                        <Switch checked={org.mailingSameAsBusiness} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Add organization address</p>
+                          <p className="text-xs text-muted-foreground">Optional. Enable it only when this organization has its own business/service or mailing address.</p>
+                        </div>
+                        <Switch checked={org.addressEnabled} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, addressEnabled: checked, mailingSameAsBusiness: checked ? current.mailingSameAsBusiness : true }))} />
                       </div>
-                      {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required line1Label="Mailing Address" />}
+                      {org.addressEnabled && (
+                        <div className="space-y-3">
+                          <AddressFields idPrefix={`org-${orgIdx}-business-address`} value={org.businessAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, businessAddress: value }))} required />
+                          <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                            <div><p className="text-sm font-medium text-foreground">Organization mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go somewhere else.</p></div>
+                            <Switch checked={org.mailingSameAsBusiness} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} />
+                          </div>
+                          {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required line1Label="Mailing Address" />}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-4 border-l pl-4 sm:ml-4 sm:pl-5">
@@ -765,6 +788,12 @@ export default function OnboardingPage() {
                                     <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}-state`} value={location.businessAddress.state} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: { ...current.businessAddress, state: event.target.value } }))} className="h-10 bg-card" />
                                   </div>
                                   {brand.locations.length > 1 && <Button type="button" variant="ghost" size="icon" className="self-end" onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}><Trash2 className="h-4 w-4" /></Button>}
+                                </div>
+                                <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                  <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: businessIdentity.businessAddress, mailingAddress: businessIdentity.businessAddress, mailingSameAsBusiness: true }))}>Same as tenant</Button>
+                                  {org.addressEnabled && addressComplete(org.businessAddress) && <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: org.businessAddress, mailingAddress: org.businessAddress, mailingSameAsBusiness: true }))}>Same as organization</Button>}
+                                  {brand.addressEnabled && addressComplete(brand.address) && <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: brand.address, mailingAddress: brand.address, mailingSameAsBusiness: true }))}>Same as brand</Button>}
+                                  <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: DEV_TEST_ADDRESS, mailingAddress: DEV_TEST_ADDRESS, mailingSameAsBusiness: true }))}>Use test address</Button>
                                 </div>
                                 <AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-business`} value={location.businessAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: value }))} required compact />
                                 <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"><p className="text-sm font-medium text-foreground">Mailing same as business/service</p><Switch checked={location.mailingSameAsBusiness} onCheckedChange={(checked) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} /></div>
