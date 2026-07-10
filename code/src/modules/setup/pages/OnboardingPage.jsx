@@ -17,6 +17,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Download, Loader2, Plus, Save, Tra
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
 const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalCode: '', country: 'United States' });
+const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city: 'Knoxville', state: 'TN', postalCode: '37902', country: 'United States' };
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
@@ -154,13 +155,13 @@ function FieldLabel({ htmlFor, children, required = false }) {
   return <Label htmlFor={htmlFor} className="text-sm font-medium text-foreground">{children}{required && <span className="text-destructive"> *</span>}</Label>;
 }
 
-function AddressFields({ idPrefix, value, onChange, required = false, compact = false }) {
+function AddressFields({ idPrefix, value, onChange, required = false, compact = false, line1Label = 'Business/Service Address' }) {
   const update = (field, nextValue) => onChange({ ...value, [field]: nextValue });
   return (
     <div className={compact ? 'space-y-3' : 'rounded-md border bg-muted/20 p-4 space-y-3'}>
       <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
         <div className="space-y-1.5">
-          <FieldLabel htmlFor={`${idPrefix}-line1`} required={required}>Business/Service Address</FieldLabel>
+          <FieldLabel htmlFor={`${idPrefix}-line1`} required={required}>{line1Label}</FieldLabel>
           <Input id={`${idPrefix}-line1`} value={value.line1} onChange={(event) => update('line1', event.target.value)} className="h-10 bg-card" />
         </div>
         <div className="space-y-1.5">
@@ -658,9 +659,19 @@ export default function OnboardingPage() {
                 </div>
 
                 <div className="space-y-3 border-t border-border/70 pt-5">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Tenant Business/Service Address</h3>
-                    <p className="text-xs text-muted-foreground">Required for the tenant business identity before organization hierarchy setup.</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Tenant Business/Service Address</h3>
+                      <p className="text-xs text-muted-foreground">Required for the tenant business identity before organization hierarchy setup.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBusinessIdentity((prev) => ({ ...prev, businessAddress: DEV_TEST_ADDRESS, mailingAddress: DEV_TEST_ADDRESS, mailingSameAsBusiness: true }))}
+                    >
+                      Use test address
+                    </Button>
                   </div>
                   <AddressFields idPrefix="tenant-business-address" value={businessIdentity.businessAddress} onChange={(value) => updateBusinessIdentityAddress('businessAddress', value)} required />
                   <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
@@ -671,7 +682,7 @@ export default function OnboardingPage() {
                     <Switch checked={businessIdentity.mailingSameAsBusiness} onCheckedChange={(checked) => updateBusinessIdentity('mailingSameAsBusiness', checked)} />
                   </div>
                   {!businessIdentity.mailingSameAsBusiness && (
-                    <AddressFields idPrefix="tenant-mailing-address" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentityAddress('mailingAddress', value)} required />
+                    <AddressFields idPrefix="tenant-mailing-address" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentityAddress('mailingAddress', value)} required line1Label="Mailing Address" />
                   )}
                 </div>
 
@@ -717,7 +728,7 @@ export default function OnboardingPage() {
                         <div><p className="text-sm font-medium text-foreground">Organization mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go somewhere else.</p></div>
                         <Switch checked={org.mailingSameAsBusiness} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} />
                       </div>
-                      {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required />}
+                      {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required line1Label="Mailing Address" />}
                     </div>
 
                     <div className="space-y-4 border-l pl-4 sm:ml-4 sm:pl-5">
@@ -757,7 +768,7 @@ export default function OnboardingPage() {
                                 </div>
                                 <AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-business`} value={location.businessAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: value }))} required compact />
                                 <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"><p className="text-sm font-medium text-foreground">Mailing same as business/service</p><Switch checked={location.mailingSameAsBusiness} onCheckedChange={(checked) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} /></div>
-                                {!location.mailingSameAsBusiness && <div className="mt-3"><AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-mailing`} value={location.mailingAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingAddress: value }))} required compact /></div>}
+                                {!location.mailingSameAsBusiness && <div className="mt-3"><AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-mailing`} value={location.mailingAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingAddress: value }))} required compact line1Label="Mailing Address" /></div>}
                               </div>
                             ))}
                             <Button type="button" variant="ghost" onClick={() => addLocation(orgIdx, brandIdx)}><Plus className="mr-2 h-4 w-4" /> Add Location</Button>
