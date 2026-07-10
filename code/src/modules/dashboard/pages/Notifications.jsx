@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
+import { getNotificationAction } from '@/lib/notificationActions';
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -101,29 +102,6 @@ export default function Notifications() {
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
-
-  const getNotificationAction = (notif) => {
-    const invoiceId = notif.metadata?.invoice_id || notif.reference_id;
-    if (invoiceId && (notif.type === 'invoice' || notif.type === 'approval' || notif.type === 'invoice_approved')) {
-      return {
-        label: 'Review Invoice',
-        path: `/Invoices?invoice=${invoiceId}`,
-      };
-    }
-    if (notif.type === 'payment' || notif.type === 'payment_failed') {
-      return {
-        label: 'Open Payments',
-        path: '/Payments?tab=invoices',
-      };
-    }
-    if (notif.type === 'inventory' || notif.type === 'low_inventory') {
-      return {
-        label: 'Open Inventory',
-        path: '/Inventory',
-      };
-    }
-    return null;
-  };
 
   const handleOpenAction = async (notif) => {
     const action = getNotificationAction(notif);

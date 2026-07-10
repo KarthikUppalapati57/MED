@@ -1,4 +1,5 @@
 ﻿import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -25,6 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 export default function PlatformOrganizations() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState(null);
   
@@ -185,6 +187,12 @@ export default function PlatformOrganizations() {
       return data;
     }
   });
+
+  React.useEffect(() => {
+    if (searchParams.get('review') === 'business') {
+      setSelectedOrgId(null);
+    }
+  }, [searchParams]);
 
   React.useEffect(() => {
     const channel = supabase.channel('platform-orgs-realtime')
@@ -546,7 +554,10 @@ export default function PlatformOrganizations() {
               return (
                 <button 
                   key={org.id}
-                  onClick={() => setSelectedOrgId(org.id)}
+                  onClick={() => {
+                    setSelectedOrgId(org.id);
+                    if (searchParams.get('review')) setSearchParams({});
+                  }}
                   className={cn(
                     "w-full text-left p-3 rounded-xl transition-all flex items-center gap-3 border border-transparent",
                     isSelected 

@@ -57,6 +57,7 @@ import { isPageInEnabledModules } from '@/lib/moduleConfig';
 import ContextSwitcher from '@/components/ContextSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
+import { getNotificationAction } from '@/lib/notificationActions';
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 import AiInsightsAssistant from '@/modules/ai_insights/components/AiInsightsAssistant';
@@ -341,6 +342,14 @@ export default function Layout({ children, currentPageName }) {
     queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
   };
 
+  const handleNotificationClick = async (notif) => {
+    const action = getNotificationAction(notif);
+    await markAsRead(notif.id);
+    if (action?.path) {
+      navigate(action.path);
+    }
+  };
+
   const markAllAsRead = async () => {
     await supabase
       .from('notifications')
@@ -612,7 +621,7 @@ export default function Layout({ children, currentPageName }) {
                     <DropdownMenuItem
                       key={notif.id}
                       className="p-3 cursor-pointer"
-                      onClick={() => markAsRead(notif.id)}
+                      onClick={() => handleNotificationClick(notif)}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
@@ -622,6 +631,11 @@ export default function Layout({ children, currentPageName }) {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{notif.message || notif.body}</p>
+                        {getNotificationAction(notif) && (
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-primary mt-1">
+                            {getNotificationAction(notif).label}
+                          </p>
+                        )}
                       </div>
                       <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
                     </DropdownMenuItem>
