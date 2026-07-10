@@ -15,7 +15,7 @@ import RestopsLogo from '@/components/RestopsLogo';
 import { legacyRoutes as Pages, canonicalRoutes, setupRoutes, Layout, mainPage } from './router';
 import LegacyRedirectHandler from '@/lib/LegacyRedirectHandler';
 import { useUrlHierarchy } from '@/hooks/useUrlHierarchy';
-import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
+import { PASSWORD_POLICY_DESCRIPTION, sanitizePasswordInput, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
 
 initGlobalErrorHandlers();
 
@@ -244,12 +244,17 @@ function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const passwordMatch = validatePasswordConfirmation(form.password, form.confirm);
+    const password = sanitizePasswordInput(form.password);
+    const confirmation = sanitizePasswordInput(form.confirm);
+    if (password !== form.password || confirmation !== form.confirm) {
+      setForm((current) => ({ ...current, password, confirm: confirmation }));
+    }
+    const passwordMatch = validatePasswordConfirmation(password, confirmation);
     if (!passwordMatch.isValid) {
       setError(passwordMatch.message);
       return;
     }
-    const passwordPolicy = validatePasswordPolicy(form.password, {
+    const passwordPolicy = validatePasswordPolicy(password, {
       email: form.email,
       fullName: form.full_name,
     });
@@ -273,7 +278,7 @@ function SignupPage() {
 
     const cleanToken = token;
 
-    const { data, error: signUpError } = await signUp(form.email, form.password, {
+    const { data, error: signUpError } = await signUp(form.email, password, {
       full_name: form.full_name,
       role: mappedRole, // Use the mapped role instead of the deprecated one
       invite_token: cleanToken,
@@ -357,7 +362,7 @@ function SignupPage() {
               <input
                 type="text"
                 value={form.full_name}
-                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, full_name: e.target.value }))}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 disabled={inviteLoading || !inviteInfo}
@@ -368,7 +373,7 @@ function SignupPage() {
               <input
                 type="email"
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 readOnly={!!inviteInfo?.email}
@@ -383,7 +388,7 @@ function SignupPage() {
                 type="password"
                 autoComplete="new-password"
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 disabled={inviteLoading || !inviteInfo}
@@ -396,7 +401,7 @@ function SignupPage() {
                 type="password"
                 autoComplete="new-password"
                 value={form.confirm}
-                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                onChange={(e) => setForm((current) => ({ ...current, confirm: e.target.value }))}
                 className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
                 required
                 disabled={inviteLoading || !inviteInfo}

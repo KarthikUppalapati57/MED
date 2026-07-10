@@ -41,6 +41,10 @@ function normalize(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+export function sanitizePasswordInput(value) {
+  return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+}
+
 function compact(value) {
   return normalize(value).replace(/[^a-z0-9]/g, '');
 }
@@ -132,7 +136,7 @@ export function validatePasswordPolicy(password, context = {}) {
 }
 
 export function validatePasswordConfirmation(password, confirmation) {
-  if ((password || '') !== (confirmation || '')) {
+  if (sanitizePasswordInput(password) !== sanitizePasswordInput(confirmation)) {
     return {
       isValid: false,
       message: 'Passwords do not match. Re-enter the same new password in both fields.',
