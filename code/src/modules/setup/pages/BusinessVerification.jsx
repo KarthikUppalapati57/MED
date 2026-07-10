@@ -552,8 +552,9 @@ export default function BusinessVerification() {
                           }}
                           placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
                         />
-                        <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending || emailVerified} className="shrink-0">
+                        <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending} className="min-w-[112px] shrink-0 gap-2">
                           {contactOtp.email.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : emailVerified ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                          {contactOtp.email.sending ? 'Sending' : emailVerified ? 'Reverify' : contactOtp.email.otpId ? 'Resend' : 'Send OTP'}
                         </Button>
                       </div>
                       {!emailVerified && contactOtp.email.otpId && (
@@ -580,8 +581,9 @@ export default function BusinessVerification() {
                           }}
                           placeholder="(865) 555-0142"
                         />
-                        <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending || phoneVerified} className="shrink-0">
+                        <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending} className="min-w-[112px] shrink-0 gap-2">
                           {contactOtp.phone.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneVerified ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                          {contactOtp.phone.sending ? 'Sending' : phoneVerified ? 'Reverify' : contactOtp.phone.otpId ? 'Resend' : 'Send OTP'}
                         </Button>
                       </div>
                       {!phoneVerified && contactOtp.phone.otpId && (
