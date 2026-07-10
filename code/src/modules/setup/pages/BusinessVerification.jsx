@@ -56,6 +56,20 @@ function normalizeZip(value) {
   return value.replace(/[^0-9-]/g, '').slice(0, 10);
 }
 
+function normalizeTaxIdentifier(value) {
+  return value.replace(/\D/g, '').slice(0, 9);
+}
+
+function formatTaxIdentifier(value, identifierType) {
+  const digits = normalizeTaxIdentifier(value);
+  if (identifierType === 'ein') {
+    return digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
+  }
+  if (digits.length > 5) return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  if (digits.length > 3) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return digits;
+}
+
 function maskIdentifier(identifier) {
   const digits = identifier.replace(/\D/g, '');
   return digits.slice(-4);
@@ -83,6 +97,7 @@ export default function BusinessVerification() {
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(true);
+  const [stepError, setStepError] = useState('');
   const [stepKey, setStepKey] = useState('business_information');
   const [sameMailing, setSameMailing] = useState(true);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
@@ -190,6 +205,7 @@ export default function BusinessVerification() {
     if (!form.legalName.trim()) return 'Legal business name is required.';
     if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
     if (isTaxVerificationEnabled && !form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
+    if (isTaxVerificationEnabled && normalizeTaxIdentifier(form.taxIdentifier).length !== 9) return requiredIdentifierType === 'ein' ? 'EIN must be 9 digits.' : 'SSN must be 9 digits.';
     return null;
   };
 
@@ -227,15 +243,20 @@ export default function BusinessVerification() {
 
   const goToStep = async (nextKey) => {
     const nextIndex = BUSINESS_STEPS.findIndex((step) => step.key === nextKey);
+    setStepError('');
     if (nextIndex > currentStepIndex) {
       const validationMessage = validateCurrentStep();
       if (validationMessage) {
+        setStepError(validationMessage);
         toast.error(validationMessage);
         return;
       }
     }
     const saved = await saveDraft(nextKey, { silent: true });
-    if (saved) setStepKey(nextKey);
+    if (saved) {
+      setStepError('');
+      setStepKey(nextKey);
+    }
   };
 
   const goNext = () => {
@@ -270,6 +291,7 @@ export default function BusinessVerification() {
     if (!form.legalName.trim()) return 'Legal business name is required.';
     if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
     if (isTaxVerificationEnabled && !form.taxIdentifier.trim()) return requiredIdentifierType === 'ein' ? 'EIN is required.' : 'SSN is required for this verification path.';
+    if (isTaxVerificationEnabled && normalizeTaxIdentifier(form.taxIdentifier).length !== 9) return requiredIdentifierType === 'ein' ? 'EIN must be 9 digits.' : 'SSN must be 9 digits.';
     if (!form.email.includes('@')) return 'A valid business email is required.';
     if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
     if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
@@ -367,8 +389,10 @@ export default function BusinessVerification() {
     }));
   };
   const saveVerification = async () => {
+    setStepError('');
     const validationMessage = validate();
     if (validationMessage) {
+      setStepError(validationMessage);
       toast.error(validationMessage);
       return;
     }
@@ -503,12 +527,14 @@ export default function BusinessVerification() {
                     </div>
                     <div className="space-y-1">
                       <Label>{requiredIdentifierType === 'ein' ? 'EIN' : 'SSN'}</Label>
-                      <Input value={form.taxIdentifier} onChange={(e) => setForm({ ...form, taxIdentifier: e.target.value, identifierType: requiredIdentifierType })} disabled={!isTaxVerificationEnabled} placeholder={isTaxVerificationEnabled ? (requiredIdentifierType === 'ein' ? '12-3456789' : '123-45-6789') : 'Verification disabled by Platform Admin'} />
+                      <Input value={formatTaxIdentifier(form.taxIdentifier, requiredIdentifierType)} onChange={(e) => setForm({ ...form, taxIdentifier: normalizeTaxIdentifier(e.target.value), identifierType: requiredIdentifierType })} disabled={!isTaxVerificationEnabled} placeholder={isTaxVerificationEnabled ? (requiredIdentifierType === 'ein' ? '12-3456789' : '123-45-6789') : 'Verification disabled by Platform Admin'} inputMode="numeric" />
+                      {isTaxVerificationEnabled && <p className="text-xs text-muted-foreground">Enter the 9-digit {requiredIdentifierType.toUpperCase()}.</p>}
                       {!isTaxVerificationEnabled && <p className="text-xs text-amber-600">This verification type is disabled. No EIN/SSN is required for this onboarding.</p>}
                     </div>
                     <div className="space-y-1">
                       <Label>Website</Label>
                       <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} placeholder="https://restaurant.com" />
+                      <p className="text-xs text-muted-foreground">Optional. You can leave this blank and continue.</p>
                     </div>
                   </div>
                 )}
@@ -616,6 +642,11 @@ export default function BusinessVerification() {
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business address:</b><br /><span className="text-muted-foreground">{[form.businessAddress.line1, form.businessAddress.city, form.businessAddress.state, form.businessAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Service address:</b><br /><span className="text-muted-foreground">{[form.serviceAddress.line1, form.serviceAddress.city, form.serviceAddress.state, form.serviceAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
                     </div>
+                  </div>
+                )}
+                {stepError && (
+                  <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+                    {stepError}
                   </div>
                 )}
               </>
