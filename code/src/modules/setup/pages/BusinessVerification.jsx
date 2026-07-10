@@ -108,6 +108,7 @@ export default function BusinessVerification() {
       verifiedTarget: '',
       sending: false,
       verifying: false,
+      verifiedAt: null,
     },
     phone: {
       otpId: null,
@@ -115,6 +116,7 @@ export default function BusinessVerification() {
       verifiedTarget: '',
       sending: false,
       verifying: false,
+      verifiedAt: null,
     },
   });
   const [form, setForm] = useState({
@@ -135,8 +137,8 @@ export default function BusinessVerification() {
   const isTaxVerificationEnabled = requiredIdentifierType === 'ein' ? verificationSettings.ein_verification_enabled : verificationSettings.ssn_verification_enabled;
   const isIndividualOwner = requiredIdentifierType === 'ssn';
   const contactEmailLabel = isIndividualOwner ? 'Contact Email' : 'Business Email';
-  const emailVerified = contactOtp.email.verifiedTarget === normalizeEmail(form.email);
-  const phoneVerified = contactOtp.phone.verifiedTarget === normalizePhone(form.phone);
+  const emailVerified = Boolean(contactOtp.email.verifiedAt && contactOtp.email.verifiedTarget === normalizeEmail(form.email));
+  const phoneVerified = Boolean(contactOtp.phone.verifiedAt && contactOtp.phone.verifiedTarget === normalizePhone(form.phone));
 
   const trustScore = useMemo(() => scoreBusiness({
     identifierType: requiredIdentifierType,
@@ -323,7 +325,7 @@ export default function BusinessVerification() {
 
     setContactOtp((prev) => ({
       ...prev,
-      [channel]: { ...prev[channel], sending: true, otpId: null, code: '' },
+      [channel]: { ...prev[channel], sending: true, otpId: null, code: '', verifiedTarget: '', verifiedAt: null },
     }));
 
     try {
@@ -335,6 +337,7 @@ export default function BusinessVerification() {
           otpId: result.otp_id,
           code: '',
           verifiedTarget: '',
+          verifiedAt: null,
           sending: false,
         },
       }));
@@ -366,6 +369,7 @@ export default function BusinessVerification() {
         [channel]: {
           ...prev[channel],
           verifiedTarget: result.target,
+          verifiedAt: result.verified_at || new Date().toISOString(),
           verifying: false,
           code: '',
         },
@@ -545,7 +549,7 @@ export default function BusinessVerification() {
                           value={form.email}
                           onChange={(e) => {
                             setForm({ ...form, email: e.target.value });
-                            setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '' } }));
+                            setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '', verifiedAt: null } }));
                           }}
                           placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
                         />
@@ -573,7 +577,7 @@ export default function BusinessVerification() {
                           value={form.phone}
                           onChange={(e) => {
                             setForm({ ...form, phone: e.target.value });
-                            setContactOtp((prev) => ({ ...prev, phone: { ...prev.phone, verifiedTarget: '' } }));
+                            setContactOtp((prev) => ({ ...prev, phone: { ...prev.phone, verifiedTarget: '', verifiedAt: null } }));
                           }}
                           placeholder="(865) 555-0142"
                         />
