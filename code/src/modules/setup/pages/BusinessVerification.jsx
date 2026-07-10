@@ -108,7 +108,6 @@ export default function BusinessVerification() {
       verifiedTarget: '',
       sending: false,
       verifying: false,
-      devCode: '',
     },
     phone: {
       otpId: null,
@@ -116,7 +115,6 @@ export default function BusinessVerification() {
       verifiedTarget: '',
       sending: false,
       verifying: false,
-      devCode: '',
     },
   });
   const [form, setForm] = useState({
@@ -325,7 +323,7 @@ export default function BusinessVerification() {
 
     setContactOtp((prev) => ({
       ...prev,
-      [channel]: { ...prev[channel], sending: true, otpId: null, code: '', devCode: '' },
+      [channel]: { ...prev[channel], sending: true, otpId: null, code: '' },
     }));
 
     try {
@@ -336,7 +334,6 @@ export default function BusinessVerification() {
           ...prev[channel],
           otpId: result.otp_id,
           code: '',
-          devCode: result.dev_code || '',
           verifiedTarget: '',
           sending: false,
         },
@@ -565,7 +562,6 @@ export default function BusinessVerification() {
                               {contactOtp.email.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
                             </Button>
                           </div>
-                          {contactOtp.email.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.email.devCode}</p>}
                         </div>
                       )}
                       {emailVerified && <p className="text-xs font-medium text-resend-green">Email verified.</p>}
@@ -594,7 +590,6 @@ export default function BusinessVerification() {
                               {contactOtp.phone.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
                             </Button>
                           </div>
-                          {contactOtp.phone.devCode && <p className="text-xs text-muted-foreground">Development OTP: {contactOtp.phone.devCode}</p>}
                         </div>
                       )}
                       {phoneVerified && <p className="text-xs font-medium text-resend-green">Phone verified.</p>}
