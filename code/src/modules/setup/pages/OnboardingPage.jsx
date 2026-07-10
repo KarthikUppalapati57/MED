@@ -23,10 +23,12 @@ const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?
 const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
 const createOrganization = () => ({ name: '', slug: '', slugManual: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
+const createBusinessIdentity = () => ({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
 const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
 const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
 const normalizeOrganization = (org = {}) => ({ ...createOrganization(), ...org, businessAddress: normalizeAddress(org.businessAddress || org.address), mailingAddress: normalizeAddress(org.mailingAddress), mailingSameAsBusiness: org.mailingSameAsBusiness !== false, brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()] });
+const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 const isValidPostalCode = (address) => {
   const country = normalizeKey(address?.country);
@@ -199,7 +201,7 @@ export default function OnboardingPage() {
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
-  const [businessIdentity, setBusinessIdentity] = useState({ companyName: '', ownershipModel: 'corporate', website: 'https://' });
+  const [businessIdentity, setBusinessIdentity] = useState(createBusinessIdentity());
   const [organizations, setOrganizations] = useState([createOrganization()]);
 
   useEffect(() => {
@@ -210,7 +212,7 @@ export default function OnboardingPage() {
     }
     try {
       const draft = JSON.parse(saved);
-      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, companyName: draft.businessIdentity.companyName || '', ownershipModel: draft.businessIdentity.ownershipModel || 'corporate', website: draft.businessIdentity.website || 'https://' }));
+      if (draft.businessIdentity) setBusinessIdentity((prev) => normalizeBusinessIdentity({ ...prev, ...draft.businessIdentity }));
       if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
@@ -258,6 +260,7 @@ export default function OnboardingPage() {
   }, [organizations]);
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
+  const updateBusinessIdentityAddress = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: normalizeAddress(value) }));
   const updateOrganization = (orgIdx, updater) => setOrganizations((prev) => prev.map((org, index) => (index === orgIdx ? updater(org) : org)));
   const updateBrand = (orgIdx, brandIdx, updater) => updateOrganization(orgIdx, (org) => ({ ...org, brands: org.brands.map((brand, index) => (index === brandIdx ? updater(brand) : brand)) }));
   const updateLocation = (orgIdx, brandIdx, locIdx, updater) => updateBrand(orgIdx, brandIdx, (brand) => ({ ...brand, locations: brand.locations.map((location, index) => (index === locIdx ? updater(location) : location)) }));
@@ -399,6 +402,12 @@ export default function OnboardingPage() {
     if (!businessIdentity.ownershipModel) return 'Ownership model is required.';
     const websiteValidation = websiteError(businessIdentity.website);
     if (websiteValidation) return websiteValidation;
+    const tenantAddressError = addressError(businessIdentity.businessAddress, 'Tenant business/service address');
+    if (tenantAddressError) return tenantAddressError;
+    if (!businessIdentity.mailingSameAsBusiness) {
+      const tenantMailingAddressError = addressError(businessIdentity.mailingAddress, 'Tenant mailing address');
+      if (tenantMailingAddressError) return tenantMailingAddressError;
+    }
     return null;
   };
 
@@ -646,6 +655,24 @@ export default function OnboardingPage() {
                     <FieldLabel htmlFor="website">Website</FieldLabel>
                     <Input id="website" value={businessIdentity.website} onChange={(event) => updateBusinessIdentity('website', event.target.value)} className="h-11 bg-card" placeholder="https://" />
                   </div>
+                </div>
+
+                <div className="space-y-3 border-t border-border/70 pt-5">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Tenant Business/Service Address</h3>
+                    <p className="text-xs text-muted-foreground">Required for the tenant business identity before organization hierarchy setup.</p>
+                  </div>
+                  <AddressFields idPrefix="tenant-business-address" value={businessIdentity.businessAddress} onChange={(value) => updateBusinessIdentityAddress('businessAddress', value)} required />
+                  <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Tenant mailing address is same as business/service address</p>
+                      <p className="text-xs text-muted-foreground">Turn this off when billing or mail should go somewhere else.</p>
+                    </div>
+                    <Switch checked={businessIdentity.mailingSameAsBusiness} onCheckedChange={(checked) => updateBusinessIdentity('mailingSameAsBusiness', checked)} />
+                  </div>
+                  {!businessIdentity.mailingSameAsBusiness && (
+                    <AddressFields idPrefix="tenant-mailing-address" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentityAddress('mailingAddress', value)} required />
+                  )}
                 </div>
 
               </CardContent>
