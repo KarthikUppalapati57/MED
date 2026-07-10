@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -127,7 +127,7 @@ export default function PlatformOrganizations() {
         supabase.from('business_verifications').select('*').in('verification_status', ['pending_review', 'failed', 'verified']).order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified').in('business_verification_status', ['pending_review', 'failed', 'verified']),
         supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, event_data, created_at').order('created_at', { ascending: false }).limit(200),
+        supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, metadata, created_at').order('created_at', { ascending: false }).limit(200),
         supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_manager', 'tenant_super_admin']).order('created_at', { ascending: false }).limit(100),
       ]);
 
@@ -1376,3 +1376,4 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
