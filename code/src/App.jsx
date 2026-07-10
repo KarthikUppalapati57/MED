@@ -764,7 +764,7 @@ function PendingAssignmentPage() {
 
 // Update Password Page 
 function UpdatePasswordPage() {
-  const { user } = useAuth();
+  const { user, mfaLevel, mfaFactors, refreshMFAStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isRecovery = isPasswordRecoveryActive(location);
@@ -775,6 +775,17 @@ function UpdatePasswordPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [forceRecoveryMfa, setForceRecoveryMfa] = useState(false);
+
+  const verifiedTotpFactor = mfaFactors?.find((factor) => factor.factor_type === 'totp' && factor.status === 'verified');
+  const needsRecoveryMfa = isRecovery && verifiedTotpFactor && (forceRecoveryMfa || mfaLevel?.current !== 'aal2');
+
+  useEffect(() => {
+    if (isRecovery) {
+      refreshMFAStatus?.();
+    }
+  }, [isRecovery, refreshMFAStatus]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -809,6 +820,29 @@ function UpdatePasswordPage() {
     }
 
     try {
+      if (needsRecoveryMfa) {
+        const normalizedCode = mfaCode.replace(/\D/g, '').slice(0, 6);
+        if (normalizedCode.length !== 6) {
+          setError('Enter the 6-digit MFA code from your authenticator app.');
+          setLoading(false);
+          return;
+        }
+
+        const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+          factorId: verifiedTotpFactor.id,
+        });
+        if (challengeError) throw challengeError;
+
+        const { error: verifyError } = await supabase.auth.mfa.verify({
+          factorId: verifiedTotpFactor.id,
+          challengeId: challenge.id,
+          code: normalizedCode,
+        });
+        if (verifyError) throw verifyError;
+
+        await refreshMFAStatus?.();
+      }
+
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       
@@ -816,7 +850,17 @@ function UpdatePasswordPage() {
       notify('success', 'Password updated successfully!');
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Failed to update password');
+      const message = err.message || 'Failed to update password';
+      if (isRecovery && message.toLowerCase().includes('aal2')) {
+        setForceRecoveryMfa(true);
+        setError(
+          verifiedTotpFactor
+            ? 'Enter your MFA code and try Update Password again.'
+            : 'MFA verification is required before changing this password. Sign in again from the reset link and try once more.'
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -887,6 +931,22 @@ function UpdatePasswordPage() {
               required
             />
           </div>
+          {needsRecoveryMfa && (
+            <div className="space-y-1.5 rounded-lg border border-border/60 bg-secondary/20 p-3">
+              <label className="block text-sm font-semibold text-foreground">MFA Code</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-center text-lg tracking-[0.35em] text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all duration-200 placeholder:text-muted-foreground"
+                placeholder="000000"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Enter your authenticator app code to authorize this password reset.</p>
+            </div>
+          )}
           {error && <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">{error}</p>}
           <button
             type="submit"
