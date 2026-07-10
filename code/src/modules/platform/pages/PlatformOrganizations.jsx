@@ -1178,15 +1178,71 @@ export default function PlatformOrganizations() {
             </div>
           </ScrollArea>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-secondary/20">
-            <div className="w-24 h-24 bg-card shadow-sm rounded-[2rem] flex items-center justify-center mb-6 border border-border/50 rotate-12 transition-transform duration-500 hover:rotate-0">
-              <Building2 className="w-10 h-10 text-muted-foreground/50" />
+          <ScrollArea className="flex-1 bg-secondary/20">
+            <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center p-8">
+              {selectedOrgReviewItems.length > 0 ? (
+                <div className="space-y-4 text-left">
+                  <div className="flex flex-col gap-2 text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+                      <ClipboardCheck className="h-7 w-7 text-primary" />
+                    </div>
+                    <h2 className="text-xl font-black text-foreground tracking-tight">Pending Tenant Onboarding Reviews</h2>
+                    <p className="text-sm text-muted-foreground">These tenants have not created an organization yet. Approve business verification here so they can continue to hierarchy setup.</p>
+                  </div>
+                  <div className="grid gap-4">
+                    {selectedOrgReviewItems.map((item) => {
+                      const verification = item.verification;
+                      const statusTone = verification.verification_status === 'failed' ? 'bg-red-50 text-red-700 border-red-100' : verification.verification_status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100';
+                      return (
+                        <Card key={verification.id} className="border-0 bg-card shadow-sm">
+                          <CardHeader className="border-b border-border/50 bg-secondary/20">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4 text-primary" /> {item.profile?.full_name || verification.legal_business_name || 'Pending tenant'}</CardTitle>
+                                <p className="mt-1 text-xs text-muted-foreground">{item.profile?.email || verification.metadata?.email || 'No email'} | Step: {item.profile?.onboarding_current_step || 'business_verification'}</p>
+                              </div>
+                              <Badge variant="outline" className={`w-fit text-[10px] font-bold uppercase ${statusTone}`}>{verification.verification_status}</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4 p-5">
+                            <div className="grid gap-3 md:grid-cols-3">
+                              <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Trust score</p>
+                                <p className="mt-1 text-lg font-black text-foreground">{verification.trust_score ?? 'N/A'}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Business</p>
+                                <p className="mt-1 text-sm font-bold text-foreground">{verification.legal_business_name || 'Not provided'}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Hierarchy</p>
+                                <p className="mt-1 text-sm font-bold text-foreground">Not submitted</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                              <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                              <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="w-24 h-24 bg-card shadow-sm rounded-[2rem] flex items-center justify-center mb-6 border border-border/50 rotate-12 transition-transform duration-500 hover:rotate-0">
+                    <Building2 className="w-10 h-10 text-muted-foreground/50" />
+                  </div>
+                  <h2 className="text-xl font-black text-foreground tracking-tight">Select an Organization</h2>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-sm">
+                    Click an organization from the sidebar to view its complete brand, location, and user hierarchy.
+                  </p>
+                </div>
+              )}
             </div>
-            <h2 className="text-xl font-black text-foreground tracking-tight">Select an Organization</h2>
-            <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-              Click an organization from the sidebar to view its complete brand, location, and user hierarchy.
-            </p>
-          </div>
+          </ScrollArea>
         )}
       </div>
 
@@ -1376,4 +1432,5 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
 
