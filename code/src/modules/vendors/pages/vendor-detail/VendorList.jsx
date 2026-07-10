@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -62,6 +62,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
+import VendorOnboardingWizard from './VendorOnboardingWizard';
 
 const VendorStatementsTab = React.lazy(() => import('./VendorStatementsTab'));
 
@@ -100,6 +101,7 @@ export default function VendorList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -345,7 +347,7 @@ export default function VendorList() {
             <Sparkles className="h-4 w-4 mr-2" />
             Suggestions
           </Button>
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
+          <Button onClick={() => setOnboardingOpen(true)} className="bg-primary hover:bg-primary">
             <Plus className="h-4 w-4 mr-2" />
             Add Vendor
           </Button>
@@ -636,11 +638,14 @@ export default function VendorList() {
         </TabsContent>
       </Tabs>
 
-      {/* Vendor Form Dialog */}
+      {/* Vendor Onboarding Wizard */}
+      <VendorOnboardingWizard open={onboardingOpen} onOpenChange={setOnboardingOpen} />
+
+      {/* Vendor Form Dialog (Edit Only) */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingVendor ? 'Edit Vendor' : 'Add Vendor'}</DialogTitle>
+            <DialogTitle>Edit Vendor</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

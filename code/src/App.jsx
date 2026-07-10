@@ -44,6 +44,8 @@ const TermsOfService = React.lazy(() => import('./modules/public/pages/TermsOfSe
 const PrivacyPolicy = React.lazy(() => import('./modules/public/pages/PrivacyPolicy'));
 const CookiePolicy = React.lazy(() => import('./modules/public/pages/CookiePolicy'));
 const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
+const VendorOnboardingTax = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingTax'));
+const VendorOnboardingBank = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingBank'));
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
 const INVITE_VALIDATION_TIMEOUT_MS = 15000;
@@ -1029,6 +1031,8 @@ const AuthenticatedApp = () => {
       <Route path="/privacy" element={lazyElement(<PrivacyPolicy />, 'Loading privacy policy...')} />
       <Route path="/cookies" element={lazyElement(<CookiePolicy />, 'Loading cookie policy...')} />
       <Route path="/docs" element={lazyElement(<Documentation />, 'Loading documentation...')} />
+      <Route path="/vendor-onboarding/tax/:token" element={lazyElement(<VendorOnboardingTax />, 'Loading secure portal...')} />
+      <Route path="/vendor-onboarding/bank/:token" element={lazyElement(<VendorOnboardingBank />, 'Loading secure portal...')} />
       <Route path="/signup/:token" element={user ? <Navigate to="/" /> : <SignupPage />} />
       <Route path="/mfa-setup" element={user ? lazyElement(<MFASetupPage />, 'Loading MFA setup...') : <Navigate to="/" />} />
       <Route path="/update-password" element={<UpdatePasswordPage />} />
