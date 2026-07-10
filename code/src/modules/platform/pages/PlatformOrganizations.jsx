@@ -126,7 +126,7 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_onboarding_reviews'],
     queryFn: async () => {
       const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult] = await Promise.all([
-        supabase.from('business_verifications').select('*').in('verification_status', ['pending_review', 'failed', 'verified']).order('created_at', { ascending: false }).limit(100),
+        supabase.rpc('platform_business_verification_reviews'),
         supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified').in('business_verification_status', ['pending_review', 'failed', 'verified']),
         supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, metadata, created_at').order('created_at', { ascending: false }).limit(200),
