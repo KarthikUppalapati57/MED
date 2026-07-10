@@ -75,13 +75,12 @@ function maskIdentifier(identifier) {
   return digits.slice(-4);
 }
 
-function scoreBusiness({ identifierType, website, phone, email, businessAddress, serviceAddress, taxVerificationEnabled = true }) {
+function scoreBusiness({ identifierType, website, phone, email, businessAddress, taxVerificationEnabled = true }) {
   let score = taxVerificationEnabled ? (identifierType === 'ein' ? 50 : 45) : 60;
   if (email.includes('@')) score += 10;
   if (phone.replace(/\D/g, '').length >= 10) score += 10;
   if (website.trim()) score += 10;
   if (businessAddress.zip.length >= 5) score += 10;
-  if (serviceAddress.zip.length >= 5) score += 10;
   return Math.min(score, 100);
 }
 
@@ -129,8 +128,6 @@ export default function BusinessVerification() {
     website: '',
     businessAddress: initialAddress,
     mailingAddress: initialAddress,
-    serviceAddress: initialAddress,
-    serviceLocationName: '',
   });
 
   const requiredIdentifierType = identifierTypeForBusinessType(form.businessType);
@@ -146,7 +143,6 @@ export default function BusinessVerification() {
     phone: form.phone,
     email: form.email,
     businessAddress: form.businessAddress,
-    serviceAddress: form.serviceAddress,
     taxVerificationEnabled: isTaxVerificationEnabled,
   }), [form, requiredIdentifierType, isTaxVerificationEnabled]);
   const currentStepIndex = Math.max(0, BUSINESS_STEPS.findIndex((step) => step.key === stepKey));
@@ -220,10 +216,9 @@ export default function BusinessVerification() {
   };
 
   const validateAddresses = () => {
-    for (const [label, address] of [['Business address', form.businessAddress], ['Service address', form.serviceAddress]]) {
-      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
-        return `${label} must include street, city, state, and ZIP.`;
-      }
+    const businessAddress = form.businessAddress;
+    if (!businessAddress.line1.trim() || !businessAddress.city.trim() || !businessAddress.state || businessAddress.zip.replace(/\D/g, '').length < 5) {
+      return 'Business address must include street, city, state, and ZIP.';
     }
     if (!sameMailing) {
       const address = form.mailingAddress;
@@ -296,10 +291,8 @@ export default function BusinessVerification() {
     if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
     if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
     if (!phoneVerified) return 'Verify the business phone with OTP before continuing.';
-    for (const [label, address] of [['Business address', form.businessAddress], ['Service address', form.serviceAddress]]) {
-      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
-        return `${label} must include street, city, state, and ZIP.`;
-      }
+    if (!form.businessAddress.line1.trim() || !form.businessAddress.city.trim() || !form.businessAddress.state || form.businessAddress.zip.replace(/\D/g, '').length < 5) {
+      return 'Business address must include street, city, state, and ZIP.';
     }
     if (!sameMailing) {
       const address = form.mailingAddress;
@@ -614,17 +607,7 @@ export default function BusinessVerification() {
                       </Button>
                     </div>
                     {!sameMailing && <AddressFields title="Mailing Address" addressKey="mailingAddress" icon={MapPin} />}
-                    <div className="space-y-3 rounded-lg border bg-secondary/30 p-4">
-                      <div className="flex items-center gap-2 font-semibold text-foreground">
-                        <MapPin className="h-4 w-4 text-primary" />
-                        Service Address
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Location Name</Label>
-                        <Input value={form.serviceLocationName} onChange={(e) => setForm({ ...form, serviceLocationName: e.target.value })} placeholder="Downtown Restaurant" />
-                      </div>
-                      <AddressFields title="Restaurant Location" addressKey="serviceAddress" icon={MapPin} />
-                    </div>
+
                   </div>
                 )}
 
@@ -641,7 +624,7 @@ export default function BusinessVerification() {
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business:</b> {form.legalName || 'Not entered'}<br /><span className="text-muted-foreground">{form.businessType} / {requiredIdentifierType.toUpperCase()}</span></div>
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Contact:</b> {form.email || 'No email'}<br /><span className="text-muted-foreground">{form.phone || 'No phone'}</span></div>
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business address:</b><br /><span className="text-muted-foreground">{[form.businessAddress.line1, form.businessAddress.city, form.businessAddress.state, form.businessAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
-                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Service address:</b><br /><span className="text-muted-foreground">{[form.serviceAddress.line1, form.serviceAddress.city, form.serviceAddress.state, form.serviceAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
+
                     </div>
                   </div>
                 )}

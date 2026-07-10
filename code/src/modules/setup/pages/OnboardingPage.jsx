@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import posthog from '@/lib/posthog';
+import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -21,11 +22,11 @@ const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCo
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
 const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
-const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, address: emptyAddress(), brands: [createBrand()] });
+const createOrganization = () => ({ name: '', slug: '', slugManual: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
 const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
 const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
 const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
-const normalizeOrganization = (org = {}) => ({ ...createOrganization(), ...org, address: normalizeAddress(org.address), brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()] });
+const normalizeOrganization = (org = {}) => ({ ...createOrganization(), ...org, businessAddress: normalizeAddress(org.businessAddress || org.address), mailingAddress: normalizeAddress(org.mailingAddress), mailingSameAsBusiness: org.mailingSameAsBusiness !== false, brands: Array.isArray(org.brands) && org.brands.length ? org.brands.map(normalizeBrand) : [createBrand()] });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 const isValidPostalCode = (address) => {
   const country = normalizeKey(address?.country);
@@ -49,6 +50,102 @@ const websiteError = (value) => {
   } catch {
     return 'Website must be a valid URL.';
   }
+};
+
+const HIERARCHY_TEMPLATE_COLUMNS = [
+  'organization_name',
+  'organization_slug',
+  'organization_address_line1',
+  'organization_address_line2',
+  'organization_city',
+  'organization_state',
+  'organization_postal_code',
+  'organization_country',
+  'organization_mailing_same_as_business',
+  'organization_mailing_address_line1',
+  'organization_mailing_address_line2',
+  'organization_mailing_city',
+  'organization_mailing_state',
+  'organization_mailing_postal_code',
+  'organization_mailing_country',
+  'brand_name',
+  'brand_address_line1',
+  'brand_address_line2',
+  'brand_city',
+  'brand_state',
+  'brand_postal_code',
+  'brand_country',
+  'location_name',
+  'location_address_line1',
+  'location_address_line2',
+  'location_city',
+  'location_state',
+  'location_postal_code',
+  'location_country',
+  'location_mailing_same_as_business',
+  'location_mailing_address_line1',
+  'location_mailing_address_line2',
+  'location_mailing_city',
+  'location_mailing_state',
+  'location_mailing_postal_code',
+  'location_mailing_country',
+];
+
+const HIERARCHY_TEMPLATE_ROWS = [
+  {
+    organization_name: 'Karthik Restaurant Group',
+    organization_slug: 'karthik-restaurant-group',
+    organization_address_line1: '100 Corporate Center Dr',
+    organization_city: 'Knoxville',
+    organization_state: 'TN',
+    organization_postal_code: '37902',
+    organization_country: 'United States',
+    organization_mailing_same_as_business: 'yes',
+    brand_name: 'Downtown Grill',
+    location_name: 'Downtown Knoxville',
+    location_address_line1: '123 Main St',
+    location_city: 'Knoxville',
+    location_state: 'TN',
+    location_postal_code: '37902',
+    location_country: 'United States',
+    location_mailing_same_as_business: 'yes',
+  },
+  {
+    organization_name: 'Karthik Restaurant Group',
+    organization_slug: 'karthik-restaurant-group',
+    organization_address_line1: '100 Corporate Center Dr',
+    organization_city: 'Knoxville',
+    organization_state: 'TN',
+    organization_postal_code: '37902',
+    organization_country: 'United States',
+    organization_mailing_same_as_business: 'yes',
+    brand_name: 'Downtown Grill',
+    location_name: 'West Knoxville',
+    location_address_line1: '500 Park Ave',
+    location_city: 'Knoxville',
+    location_state: 'TN',
+    location_postal_code: '37919',
+    location_country: 'United States',
+    location_mailing_same_as_business: 'yes',
+  },
+];
+
+const valueFor = (row, key) => String(row?.[key] || '').trim();
+const hasAddressValues = (row, prefix) => ['line1', 'line2', 'city', 'state', 'postal_code', 'country'].some((field) => valueFor(row, `${prefix}_${field}`));
+const addressFromRow = (row, prefix) => ({
+  line1: valueFor(row, `${prefix}_line1`),
+  line2: valueFor(row, `${prefix}_line2`),
+  city: valueFor(row, `${prefix}_city`),
+  state: valueFor(row, `${prefix}_state`),
+  postalCode: valueFor(row, `${prefix}_postal_code`),
+  country: valueFor(row, `${prefix}_country`) || 'United States',
+});
+const parseCsvBoolean = (value, defaultValue = true) => {
+  const normalized = normalizeKey(value);
+  if (!normalized) return defaultValue;
+  if (['yes', 'y', 'true', '1', 'same'].includes(normalized)) return true;
+  if (['no', 'n', 'false', '0', 'different'].includes(normalized)) return false;
+  return defaultValue;
 };
 
 function FieldLabel({ htmlFor, children, required = false }) {
@@ -97,11 +194,12 @@ export default function OnboardingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [finalizingOnboarding, setFinalizingOnboarding] = useState(false);
   const autoFinalizeRef = useRef(false);
+  const hierarchyImportInputRef = useRef(null);
   const [draftReady, setDraftReady] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
-  const [businessIdentity, setBusinessIdentity] = useState({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
+  const [businessIdentity, setBusinessIdentity] = useState({ companyName: '', ownershipModel: 'corporate', website: 'https://' });
   const [organizations, setOrganizations] = useState([createOrganization()]);
 
   useEffect(() => {
@@ -112,7 +210,7 @@ export default function OnboardingPage() {
     }
     try {
       const draft = JSON.parse(saved);
-      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, ...draft.businessIdentity, businessAddress: normalizeAddress(draft.businessIdentity.businessAddress), mailingAddress: normalizeAddress(draft.businessIdentity.mailingAddress), mailingSameAsBusiness: draft.businessIdentity.mailingSameAsBusiness !== false }));
+      if (draft.businessIdentity) setBusinessIdentity((prev) => ({ ...prev, companyName: draft.businessIdentity.companyName || '', ownershipModel: draft.businessIdentity.ownershipModel || 'corporate', website: draft.businessIdentity.website || 'https://' }));
       if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
@@ -171,6 +269,126 @@ export default function OnboardingPage() {
   const removeBrand = (orgIdx, brandIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx && org.brands.length > 1 ? { ...org, brands: org.brands.filter((_, nextIndex) => nextIndex !== brandIdx) } : org));
   const removeLocation = (orgIdx, brandIdx, locIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx ? { ...org, brands: org.brands.map((brand, nextBrandIdx) => nextBrandIdx === brandIdx && brand.locations.length > 1 ? { ...brand, locations: brand.locations.filter((_, nextLocIdx) => nextLocIdx !== locIdx) } : brand) } : org));
 
+  const downloadHierarchyTemplate = () => {
+    const csv = Papa.unparse({ fields: HIERARCHY_TEMPLATE_COLUMNS, data: HIERARCHY_TEMPLATE_ROWS });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'restops-organization-hierarchy-template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const importHierarchyRows = (rows) => {
+    const normalizedRows = rows
+      .map((row) => Object.fromEntries(Object.entries(row || {}).map(([key, value]) => [normalizeKey(key).replace(/\s+/g, '_'), String(value || '').trim()])))
+      .filter((row) => valueFor(row, 'organization_name') || valueFor(row, 'brand_name') || valueFor(row, 'location_name'));
+
+    if (!normalizedRows.length) throw new Error('The uploaded template does not contain hierarchy rows.');
+
+    const orgMap = new Map();
+    for (const [rowIdx, row] of normalizedRows.entries()) {
+      const orgName = valueFor(row, 'organization_name');
+      const brandName = valueFor(row, 'brand_name');
+      const locationName = valueFor(row, 'location_name');
+
+      if (!orgName) throw new Error(`Row ${rowIdx + 2}: organization_name is required.`);
+      if (!brandName) throw new Error(`Row ${rowIdx + 2}: brand_name is required.`);
+      if (!locationName) throw new Error(`Row ${rowIdx + 2}: location_name is required.`);
+
+      const orgBusinessAddress = addressFromRow(row, 'organization_address');
+      const orgAddressError = addressError(orgBusinessAddress, `Row ${rowIdx + 2} organization business/service address`);
+      if (orgAddressError) throw new Error(orgAddressError);
+
+      const orgMailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'organization_mailing_same_as_business'), true);
+      const orgMailingAddress = orgMailingSameAsBusiness ? emptyAddress() : addressFromRow(row, 'organization_mailing_address');
+      if (!orgMailingSameAsBusiness) {
+        const orgMailingAddressError = addressError(orgMailingAddress, `Row ${rowIdx + 2} organization mailing address`);
+        if (orgMailingAddressError) throw new Error(orgMailingAddressError);
+      }
+
+      const locationAddress = addressFromRow(row, 'location_address');
+      const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
+      if (locationAddressError) throw new Error(locationAddressError);
+
+      const orgKey = normalizeKey(valueFor(row, 'organization_slug') || orgName);
+      if (!orgMap.has(orgKey)) {
+        orgMap.set(orgKey, {
+          ...createOrganization(),
+          name: orgName,
+          slug: slugify(valueFor(row, 'organization_slug') || orgName),
+          slugManual: Boolean(valueFor(row, 'organization_slug')),
+          businessAddress: orgBusinessAddress,
+          mailingSameAsBusiness: orgMailingSameAsBusiness,
+          mailingAddress: orgMailingAddress,
+          brands: [],
+        });
+      }
+
+      const org = orgMap.get(orgKey);
+      const brandKey = normalizeKey(brandName);
+      let brand = org.brands.find((item) => normalizeKey(item.name) === brandKey);
+      if (!brand) {
+        const brandAddressEnabled = hasAddressValues(row, 'brand_address');
+        brand = {
+          ...createBrand(),
+          name: brandName,
+          addressEnabled: brandAddressEnabled,
+          address: brandAddressEnabled ? addressFromRow(row, 'brand_address') : emptyAddress(),
+          locations: [],
+        };
+        org.brands.push(brand);
+      }
+
+      const mailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'location_mailing_same_as_business'), true);
+      const mailingAddress = mailingSameAsBusiness ? emptyAddress() : addressFromRow(row, 'location_mailing_address');
+      if (!mailingSameAsBusiness) {
+        const mailingAddressError = addressError(mailingAddress, `Row ${rowIdx + 2} location mailing address`);
+        if (mailingAddressError) throw new Error(mailingAddressError);
+      }
+
+      brand.locations.push({
+        name: locationName,
+        businessAddress: locationAddress,
+        mailingSameAsBusiness,
+        mailingAddress,
+      });
+    }
+
+    const importedOrganizations = Array.from(orgMap.values()).map(normalizeOrganization);
+    const orgCount = importedOrganizations.length;
+    const brandCount = importedOrganizations.reduce((sum, org) => sum + org.brands.length, 0);
+    const locationCount = importedOrganizations.reduce((sum, org) => sum + org.brands.reduce((brandSum, brand) => brandSum + brand.locations.length, 0), 0);
+    setOrganizations(importedOrganizations);
+    toast.success(`Imported ${orgCount} organization(s), ${brandCount} brand(s), and ${locationCount} location(s).`);
+  };
+
+  const handleHierarchyTemplateUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      complete: ({ data, errors }) => {
+        if (errors?.length) {
+          toast.error(errors[0]?.message || 'Could not read the hierarchy template.');
+          return;
+        }
+        try {
+          importHierarchyRows(data);
+        } catch (error) {
+          toast.error(error.message || 'Could not import hierarchy template.');
+        }
+      },
+      error: (error) => toast.error(error.message || 'Could not import hierarchy template.'),
+    });
+  };
+
   const saveDraft = (nextStep = step, showToast = true) => {
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode, updatedAt: new Date().toISOString() }));
     if (showToast) toast.success('Onboarding draft saved.');
@@ -181,12 +399,6 @@ export default function OnboardingPage() {
     if (!businessIdentity.ownershipModel) return 'Ownership model is required.';
     const websiteValidation = websiteError(businessIdentity.website);
     if (websiteValidation) return websiteValidation;
-    const businessAddressError = addressError(businessIdentity.businessAddress, 'Business/service address');
-    if (businessAddressError) return businessAddressError;
-    if (!businessIdentity.mailingSameAsBusiness) {
-      const mailingAddressError = addressError(businessIdentity.mailingAddress, 'Mailing address');
-      if (mailingAddressError) return mailingAddressError;
-    }
     return null;
   };
 
@@ -205,9 +417,11 @@ export default function OnboardingPage() {
       if (orgNames.has(orgName)) return `Organization name ${org.name} is duplicated.`;
       orgNames.add(orgName);
       if (!Array.isArray(org.brands) || org.brands.length === 0) return `${org.name || `Organization ${orgIdx + 1}`} requires at least one brand.`;
-      if (org.addressEnabled) {
-        const orgAddressError = addressError(org.address, `${org.name || `Organization ${orgIdx + 1}`} address`);
-        if (orgAddressError) return orgAddressError;
+      const orgAddressError = addressError(org.businessAddress, `${org.name || `Organization ${orgIdx + 1}`} business/service address`);
+      if (orgAddressError) return orgAddressError;
+      if (!org.mailingSameAsBusiness) {
+        const orgMailingAddressError = addressError(org.mailingAddress, `${org.name || `Organization ${orgIdx + 1}`} mailing address`);
+        if (orgMailingAddressError) return orgMailingAddressError;
       }
       const brandNames = new Set();
       for (const [brandIdx, brand] of org.brands.entries()) {
@@ -241,7 +455,13 @@ export default function OnboardingPage() {
   const buildHierarchyPayload = () => organizations.map((org) => ({
     name: org.name.trim(),
     slug: org.slug.trim(),
-    metadata: { tenant_business_identity: businessIdentity, organization_address: org.addressEnabled ? org.address : null },
+    metadata: {
+      tenant_business_identity: businessIdentity,
+      organization_address: org.businessAddress,
+      organization_business_address: org.businessAddress,
+      organization_mailing_same_as_business: org.mailingSameAsBusiness,
+      organization_mailing_address: org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress,
+    },
     brands: org.brands.map((brand) => ({
       name: brand.name.trim(),
       metadata: { brand_address: brand.addressEnabled ? brand.address : null },
@@ -427,12 +647,7 @@ export default function OnboardingPage() {
                     <Input id="website" value={businessIdentity.website} onChange={(event) => updateBusinessIdentity('website', event.target.value)} className="h-11 bg-card" placeholder="https://" />
                   </div>
                 </div>
-                <AddressFields idPrefix="business-address" value={businessIdentity.businessAddress} onChange={(value) => updateBusinessIdentity('businessAddress', value)} required />
-                <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
-                  <div><p className="text-sm font-medium text-foreground">Mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go to a different address.</p></div>
-                  <Switch checked={businessIdentity.mailingSameAsBusiness} onCheckedChange={(checked) => updateBusinessIdentity('mailingSameAsBusiness', checked)} />
-                </div>
-                {!businessIdentity.mailingSameAsBusiness && <AddressFields idPrefix="business-mailing" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentity('mailingAddress', value)} required />}
+
               </CardContent>
             </>
           )}
@@ -441,7 +656,12 @@ export default function OnboardingPage() {
             <>
               <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div><CardTitle>Organization Hierarchy</CardTitle><CardDescription>Define your Tenant -&gt; Organization -&gt; Brand -&gt; Location structure.</CardDescription></div>
-                <Button type="button" variant="outline" onClick={addOrganization} className="shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Organization</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={downloadHierarchyTemplate} className="shrink-0"><Download className="mr-2 h-4 w-4" /> Download Template</Button>
+                  <Button type="button" variant="outline" onClick={() => hierarchyImportInputRef.current?.click()} className="shrink-0"><Upload className="mr-2 h-4 w-4" /> Upload Template</Button>
+                  <Button type="button" variant="outline" onClick={addOrganization} className="shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Organization</Button>
+                  <input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" />
+                </div>
               </CardHeader>
               <CardContent className="space-y-5">
                 {organizations.map((org, orgIdx) => (
@@ -460,11 +680,18 @@ export default function OnboardingPage() {
                       {organizations.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeOrganization(orgIdx)}><Trash2 className="h-4 w-4" /></Button>}
                     </div>
 
-                    <div className="mb-5 flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
-                      <div><p className="text-sm font-medium text-foreground">Add organization address</p><p className="text-xs text-muted-foreground">Optional for organizations; locations still require addresses.</p></div>
-                      <Switch checked={org.addressEnabled} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, addressEnabled: checked }))} />
+                    <div className="mb-5 space-y-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Organization Business/Service Address</h3>
+                        <p className="text-xs text-muted-foreground">Required for every organization in the tenant hierarchy.</p>
+                      </div>
+                      <AddressFields idPrefix={`org-${orgIdx}-business-address`} value={org.businessAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, businessAddress: value }))} required />
+                      <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                        <div><p className="text-sm font-medium text-foreground">Organization mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go somewhere else.</p></div>
+                        <Switch checked={org.mailingSameAsBusiness} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} />
+                      </div>
+                      {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required />}
                     </div>
-                    {org.addressEnabled && <div className="mb-5"><AddressFields idPrefix={`org-${orgIdx}-address`} value={org.address} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, address: value }))} required /></div>}
 
                     <div className="space-y-4 border-l pl-4 sm:ml-4 sm:pl-5">
                       {org.brands.map((brand, brandIdx) => (
