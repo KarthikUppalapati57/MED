@@ -19,6 +19,21 @@ import { PASSWORD_POLICY_DESCRIPTION, sanitizePasswordInput, validatePasswordCon
 
 initGlobalErrorHandlers();
 
+function isPasswordRecoveryActive(location) {
+  const searchParams = new URLSearchParams(location?.search || '');
+  const hashParams = new URLSearchParams((location?.hash || '').replace(/^#/, ''));
+  try {
+    return sessionStorage.getItem(PASSWORD_RECOVERY_ACTIVE_KEY) === 'true'
+      || searchParams.get('type') === 'recovery'
+      || hashParams.get('type') === 'recovery';
+  } catch {
+    return searchParams.get('type') === 'recovery' || hashParams.get('type') === 'recovery';
+  }
+}
+
+function clearPasswordRecoveryActive() {
+  try { sessionStorage.removeItem(PASSWORD_RECOVERY_ACTIVE_KEY); } catch {}
+}
 const OnboardingPage = setupRoutes.OnboardingPage;
 const BusinessVerification = setupRoutes.BusinessVerification;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -32,6 +47,7 @@ const Documentation = React.lazy(() => import('./modules/public/pages/Documentat
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
 const INVITE_VALIDATION_TIMEOUT_MS = 15000;
+const PASSWORD_RECOVERY_ACTIVE_KEY = 'restops_password_recovery_active';
 
 const withTimeout = (promise, timeoutMs, message) => {
   let timeoutId;
@@ -749,9 +765,7 @@ function UpdatePasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
-  const isRecovery = searchParams.get('type') === 'recovery' || hashParams.get('type') === 'recovery';
+  const isRecovery = isPasswordRecoveryActive(location);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
@@ -796,6 +810,7 @@ function UpdatePasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       
+      clearPasswordRecoveryActive();
       notify('success', 'Password updated successfully!');
       navigate('/');
     } catch (err) {
@@ -893,11 +908,7 @@ function UpdatePasswordPage() {
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   const location = useLocation();
-  const routeSearchParams = new URLSearchParams(location.search);
-  const routeHashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
-  const isPasswordRecoveryRoute = location.pathname === '/update-password' && (
-    routeSearchParams.get('type') === 'recovery' || routeHashParams.get('type') === 'recovery'
-  );
+  const isPasswordRecoveryRoute = isPasswordRecoveryActive(location);
 
   // Sync URL hierarchy params (?company= / ?store=) with AuthContext
   useUrlHierarchy();

@@ -15,7 +15,29 @@ const AuthContext = createContext(null);
 // the role is available IMMEDIATELY (no flash of 'ground_staff').
 const PROFILE_CACHE_KEY = 'restops_profile_cache';
 const PENDING_INVITE_TOKEN_KEY = 'restops_pending_invite_token';
+const PASSWORD_RECOVERY_ACTIVE_KEY = 'restops_password_recovery_active';
 
+function isPasswordRecoveryUrl() {
+  try {
+    const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const searchParams = new URLSearchParams(window.location.search || '');
+    return hashParams.get('type') === 'recovery' || searchParams.get('type') === 'recovery';
+  } catch {
+    return false;
+  }
+}
+
+function setPasswordRecoveryActive() {
+  try { sessionStorage.setItem(PASSWORD_RECOVERY_ACTIVE_KEY, 'true'); } catch {}
+}
+
+function isPasswordRecoveryActive() {
+  try { return sessionStorage.getItem(PASSWORD_RECOVERY_ACTIVE_KEY) === 'true' || isPasswordRecoveryUrl(); } catch { return isPasswordRecoveryUrl(); }
+}
+
+function clearPasswordRecoveryActive() {
+  try { sessionStorage.removeItem(PASSWORD_RECOVERY_ACTIVE_KEY); } catch {}
+}
 function normalizeInviteToken(token) {
   return String(token || '').replace(/[\n\r.,!?>\]]+$/, '').trim();
 }
@@ -407,6 +429,8 @@ export const AuthProvider = ({ children }) => {
     let subscription = null;
 
     const initAuth = async () => {
+      if (isPasswordRecoveryUrl()) setPasswordRecoveryActive();
+
       // Ensure session is fully restored from storage before handling auth state
       await supabase.auth.getSession();
       
@@ -420,6 +444,7 @@ export const AuthProvider = ({ children }) => {
         
         try {
           if (event === 'PASSWORD_RECOVERY') {
+            setPasswordRecoveryActive();
             // Password recovery event: user clicked the reset link in email.
             // We must redirect to /update-password BEFORE any other routing kicks in.
             if (currentUser) {
@@ -431,6 +456,17 @@ export const AuthProvider = ({ children }) => {
               }
             }
           } else if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+            if (currentUser && isPasswordRecoveryActive()) {
+              setPasswordRecoveryActive();
+              setUser(currentUser);
+              setIsMfaReady(true);
+              setIsLoadingAuth(false);
+              if (!window.location.pathname.includes('update-password')) {
+                window.location.replace(`${APP_URL}/update-password?type=recovery`);
+              }
+              return;
+            }
+
             if (currentUser) {
               // 0. Safety Check: If the user ID has changed, or we're starting fresh, clear the stale cache
               const currentCache = getCachedProfile();
@@ -543,6 +579,7 @@ export const AuthProvider = ({ children }) => {
             setMfaFactors([]);
             setIsMfaReady(false);
             clearCachedProfile();
+            clearPasswordRecoveryActive();
             // Clear all cached query data to prevent data leaks after logout
             clearAllQueries();
             posthog.reset();
