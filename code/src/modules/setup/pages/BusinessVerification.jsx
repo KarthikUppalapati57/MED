@@ -363,7 +363,7 @@ export default function BusinessVerification() {
     setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], verifying: true } }));
 
     try {
-      const result = await api.onboarding.verifyContactOtp({ otpId: state.otpId, code: state.code });
+      const result = await api.onboarding.verifyContactOtp({ channel, target: channel === 'email' ? form.email : form.phone, code: state.code });
       setContactOtp((prev) => ({
         ...prev,
         [channel]: {

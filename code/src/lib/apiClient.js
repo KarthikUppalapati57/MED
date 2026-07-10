@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabaseClient';
 
+function normalizeOtpEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeOtpPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return String(value || '').trim();
+}
 const TABLE_SCOPE_COLUMNS = {
   accounting_sync_logs: ['organization_id'],
   ai_insights: ['organization_id'],
@@ -465,17 +475,55 @@ export const api = {
       return data;
     },
     requestContactOtp: async ({ channel, target }) => {
-      const { data, error } = await supabase.rpc('request_onboarding_contact_otp', {
-        p_channel: channel,
-        p_target: target,
-      });
-      if (error) throw error;
-      return data;
+      const normalizedChannel = String(channel || '').toLowerCase();
+      const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
+
+      if (normalizedChannel === 'email') {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: normalizedTarget,
+          options: { shouldCreateUser: false },
+        });
+        if (error) throw error;
+      } else if (normalizedChannel === 'phone') {
+        const { error } = await supabase.auth.updateUser({ phone: normalizedTarget });
+        if (error) throw error;
+      } else {
+        throw new Error('OTP channel must be email or phone');
+      }
+
+      return {
+        success: true,
+        otp_id: `supabase_auth_${normalizedChannel}`,
+        channel: normalizedChannel,
+        target: normalizedTarget,
+      };
     },
-    verifyContactOtp: async ({ otpId, code }) => {
-      const { data, error } = await supabase.rpc('verify_onboarding_contact_otp', {
-        p_otp_id: otpId,
-        p_code: code,
+    verifyContactOtp: async ({ channel, target, code }) => {
+      const normalizedChannel = String(channel || '').toLowerCase();
+      const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
+      const token = String(code || '').trim();
+
+      if (normalizedChannel === 'email') {
+        const { error } = await supabase.auth.verifyOtp({
+          email: normalizedTarget,
+          token,
+          type: 'email',
+        });
+        if (error) throw error;
+      } else if (normalizedChannel === 'phone') {
+        const { error } = await supabase.auth.verifyOtp({
+          phone: normalizedTarget,
+          token,
+          type: 'phone_change',
+        });
+        if (error) throw error;
+      } else {
+        throw new Error('OTP channel must be email or phone');
+      }
+
+      const { data, error } = await supabase.rpc('mark_onboarding_contact_verified', {
+        p_channel: normalizedChannel,
+        p_target: normalizedTarget,
       });
       if (error) throw error;
       return data;
