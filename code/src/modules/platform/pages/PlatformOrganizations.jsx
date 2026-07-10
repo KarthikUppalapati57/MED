@@ -122,7 +122,7 @@ export default function PlatformOrganizations() {
     enabled: !!selectedOrgId
   });
 
-  const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews } = useAuthQuery({
+  const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews, error: onboardingReviewsError } = useAuthQuery({
     queryKey: ['platform_onboarding_reviews'],
     queryFn: async () => {
       const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult] = await Promise.all([
@@ -469,9 +469,13 @@ export default function PlatformOrganizations() {
   };
 
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
+  const isBusinessReviewMode = searchParams.get('review') === 'business';
+  const tenantReviewItems = onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
   const selectedOrgReviewItems = selectedOrgId
     ? onboardingReviews.filter((item) => item.verification.organization_id === selectedOrgId || item.profile?.organization_id === selectedOrgId)
-    : onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
+    : tenantReviewItems;
+  const pendingTenantReviewCount = tenantReviewItems.filter((item) => item.verification.verification_status !== 'verified').length;
+  const shouldShowTenantReviewPanel = isBusinessReviewMode || selectedOrgReviewItems.length > 0;
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
 
   const refreshOnboardingReview = () => {
@@ -528,6 +532,23 @@ export default function PlatformOrganizations() {
             </div>
             <h2 className="font-black tracking-tight text-lg">Organizations</h2>
           </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setSelectedOrgId(null);
+              setSearchParams({ review: 'business' });
+            }}
+            variant={isBusinessReviewMode ? 'default' : 'outline'}
+            className={cn(
+              'w-full justify-between h-10 px-3 font-bold',
+              isBusinessReviewMode ? 'bg-primary text-primary-foreground' : 'border-primary/30 text-primary hover:bg-primary/10'
+            )}
+          >
+            <span className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Business Reviews</span>
+            <Badge className={cn('border-0', isBusinessReviewMode ? 'bg-primary-foreground text-primary' : 'bg-primary text-primary-foreground')}>
+              {isLoadingOnboardingReviews ? '...' : pendingTenantReviewCount}
+            </Badge>
+          </Button>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
@@ -615,7 +636,7 @@ export default function PlatformOrganizations() {
 
       {/* Right Content: Detail View */}
       <div className="flex-1 bg-secondary/10 flex flex-col h-full overflow-hidden relative">
-        {selectedOrg ? (
+        {selectedOrg && !isBusinessReviewMode ? (
           <ScrollArea className="flex-1">
             <div className="p-8 w-full max-w-[2400px] mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-300">
               
@@ -1191,7 +1212,7 @@ export default function PlatformOrganizations() {
         ) : (
           <ScrollArea className="flex-1 bg-secondary/20">
             <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center p-8">
-              {selectedOrgReviewItems.length > 0 ? (
+              {shouldShowTenantReviewPanel ? (
                 <div className="space-y-4 text-left">
                   <div className="flex flex-col gap-2 text-center">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
@@ -1200,6 +1221,31 @@ export default function PlatformOrganizations() {
                     <h2 className="text-xl font-black text-foreground tracking-tight">Pending Tenant Onboarding Reviews</h2>
                     <p className="text-sm text-muted-foreground">These tenants have not created an organization yet. Approve business verification here so they can continue to hierarchy setup.</p>
                   </div>
+                  {isLoadingOnboardingReviews ? (
+                    <Card className="border-0 bg-card shadow-sm">
+                      <CardContent className="flex items-center justify-center gap-3 p-8 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading business reviews...
+                      </CardContent>
+                    </Card>
+                  ) : onboardingReviewsError ? (
+                    <Card className="border-0 bg-card shadow-sm">
+                      <CardContent className="space-y-3 p-6 text-center">
+                        <AlertTriangle className="mx-auto h-8 w-8 text-destructive" />
+                        <h3 className="font-black text-foreground">Could not load business reviews</h3>
+                        <p className="text-sm text-muted-foreground">{onboardingReviewsError.message || 'Check the business verification tables and permissions.'}</p>
+                        <Button size="sm" variant="outline" onClick={refreshOnboardingReview}>Retry</Button>
+                      </CardContent>
+                    </Card>
+                  ) : selectedOrgReviewItems.length === 0 ? (
+                    <Card className="border-0 bg-card shadow-sm">
+                      <CardContent className="space-y-3 p-8 text-center">
+                        <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-500" />
+                        <h3 className="font-black text-foreground">No pending tenant business reviews</h3>
+                        <p className="text-sm text-muted-foreground">When a tenant submits business verification before hierarchy setup, it will appear here with Approve, Reject, and Request Info actions.</p>
+                        <Button size="sm" variant="outline" onClick={refreshOnboardingReview}>Refresh</Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
                   <div className="grid gap-4">
                     {selectedOrgReviewItems.map((item) => {
                       const verification = item.verification;
@@ -1240,6 +1286,7 @@ export default function PlatformOrganizations() {
                       );
                     })}
                   </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-center">
