@@ -15,23 +15,45 @@ export default class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
 
+  async clearAppCachesAndReload() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+      }
+    } catch (cleanupError) {
+      console.warn('Failed to clear app caches after chunk error:', cleanupError);
+    } finally {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('t', Date.now().toString());
+      window.location.replace(newUrl.toString());
+    }
+  }
+
   componentDidCatch(error, info) {
-    // Auto-reload once on chunk loading errors (due to new deployments)
-    const isChunkLoadError = 
-      error?.message?.includes('Failed to fetch dynamically imported module') ||
-      error?.message?.includes('Importing a module script failed');
+    const message = `${error?.message || ''}\n${error?.stack || ''}`;
+    // Auto-reload once on chunk loading errors (usually stale assets after a deploy).
+    const isChunkLoadError =
+      message.includes('Failed to fetch dynamically imported module') ||
+      message.includes('Importing a module script failed') ||
+      message.includes('is not a valid JavaScript MIME type') ||
+      message.includes("'text/html' is not a valid JavaScript MIME type") ||
+      message.includes('Expected a JavaScript module script but the server responded with a MIME type of text/html');
 
     if (isChunkLoadError) {
       const hasReloaded = sessionStorage.getItem('chunk_failed_reload');
       if (!hasReloaded) {
         sessionStorage.setItem('chunk_failed_reload', 'true');
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.set('t', Date.now().toString());
-        window.location.href = newUrl.toString();
+        this.clearAppCachesAndReload();
         return;
       }
     } else {
-      // Clear flag on non-chunk errors
+      // Clear flag on non-chunk errors.
       sessionStorage.removeItem('chunk_failed_reload');
     }
 
@@ -43,7 +65,7 @@ export default class ErrorBoundary extends React.Component {
 
   handleReset = () => {
     sessionStorage.removeItem('chunk_failed_reload');
-    this.setState({ hasError: false, error: null });
+    this.clearAppCachesAndReload();
   };
 
   render() {
@@ -100,7 +122,7 @@ export default class ErrorBoundary extends React.Component {
                   sessionStorage.removeItem('chunk_failed_reload');
                   if (window.history.length > 2) {
                     window.history.back();
-                    setTimeout(() => window.location.reload(), 100);
+                    setTimeout(() => this.clearAppCachesAndReload(), 100);
                   } else {
                     window.location.href = '/';
                   }
@@ -112,7 +134,7 @@ export default class ErrorBoundary extends React.Component {
               <button
                 onClick={() => {
                   sessionStorage.removeItem('chunk_failed_reload');
-                  window.location.reload();
+                  this.clearAppCachesAndReload();
                 }}
                 className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
               >
@@ -127,4 +149,3 @@ export default class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-

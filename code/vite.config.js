@@ -52,20 +52,6 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
-            urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname.startsWith('/assets/') && url.pathname.endsWith('.js'),
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'runtime-js-chunks',
-              expiration: {
-                maxEntries: 80,
-                maxAgeSeconds: 60 * 60 * 24 * 30
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          },
-          {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
