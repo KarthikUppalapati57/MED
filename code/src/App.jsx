@@ -750,7 +750,8 @@ function UpdatePasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const isRecovery = searchParams.get('type') === 'recovery';
+  const hashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const isRecovery = searchParams.get('type') === 'recovery' || hashParams.get('type') === 'recovery';
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
@@ -892,6 +893,11 @@ function UpdatePasswordPage() {
 const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   const location = useLocation();
+  const routeSearchParams = new URLSearchParams(location.search);
+  const routeHashParams = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const isPasswordRecoveryRoute = location.pathname === '/update-password' && (
+    routeSearchParams.get('type') === 'recovery' || routeHashParams.get('type') === 'recovery'
+  );
 
   // Sync URL hierarchy params (?company= / ?store=) with AuthContext
   useUrlHierarchy();
@@ -966,6 +972,17 @@ const AuthenticatedApp = () => {
     );
   }
 
+  // Password recovery sessions are allowed to reach the reset form before MFA.
+  // Supabase issues a short-lived recovery session specifically for updating the password;
+  // challenging MFA here can fail because the recovery callback may not have a normal bearer token yet.
+  if (isPasswordRecoveryRoute) {
+    return (
+      <Routes>
+        <Route path="/update-password" element={<UpdatePasswordPage />} />
+        <Route path="*" element={<Navigate to="/update-password?type=recovery" replace />} />
+      </Routes>
+    );
+  }
   // For new users (unassigned), wait for MFA status before rendering anything.
   // This prevents the flash where the user briefly sees payment verification
   // before being redirected to MFA setup.
