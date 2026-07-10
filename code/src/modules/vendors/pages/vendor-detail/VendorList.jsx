@@ -62,7 +62,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
-import VendorOnboardingWizard from './VendorOnboardingWizard';
+import VendorOnboardingWizard from '../../components/VendorOnboardingWizard';
 
 const VendorStatementsTab = React.lazy(() => import('./VendorStatementsTab'));
 
