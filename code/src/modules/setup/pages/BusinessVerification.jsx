@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
@@ -25,12 +25,9 @@ const INDIVIDUAL_OWNER_TYPES = new Set(['sole_proprietor', 'independent_contract
 function identifierTypeForBusinessType(businessType) {
   return INDIVIDUAL_OWNER_TYPES.has(businessType) ? 'ssn' : 'ein';
 }
-const STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'];
-
 const BUSINESS_STEPS = [
   { key: 'business_information', label: 'Business' },
   { key: 'contact_verification', label: 'Contact' },
-  { key: 'address_verification', label: 'Addresses' },
   { key: 'business_review', label: 'Review' },
 ];
 
@@ -44,18 +41,6 @@ function normalizePhone(value) {
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
   return digits;
 }
-const initialAddress = {
-  line1: '',
-  line2: '',
-  city: '',
-  state: '',
-  zip: '',
-};
-
-function normalizeZip(value) {
-  return value.replace(/[^0-9-]/g, '').slice(0, 10);
-}
-
 function normalizeTaxIdentifier(value) {
   return value.replace(/\D/g, '').slice(0, 9);
 }
@@ -75,12 +60,11 @@ function maskIdentifier(identifier) {
   return digits.slice(-4);
 }
 
-function scoreBusiness({ identifierType, website, phone, email, businessAddress, taxVerificationEnabled = true }) {
-  let score = taxVerificationEnabled ? (identifierType === 'ein' ? 50 : 45) : 60;
+function scoreBusiness({ identifierType, website, phone, email, taxVerificationEnabled = true }) {
+  let score = taxVerificationEnabled ? (identifierType === 'ein' ? 60 : 55) : 70;
   if (email.includes('@')) score += 10;
   if (phone.replace(/\D/g, '').length >= 10) score += 10;
   if (website.trim()) score += 10;
-  if (businessAddress.zip.length >= 5) score += 10;
   return Math.min(score, 100);
 }
 
@@ -98,7 +82,6 @@ export default function BusinessVerification() {
   const [loadingDraft, setLoadingDraft] = useState(true);
   const [stepError, setStepError] = useState('');
   const [stepKey, setStepKey] = useState('business_information');
-  const [sameMailing, setSameMailing] = useState(true);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
   const [contactOtp, setContactOtp] = useState({
     email: {
@@ -126,8 +109,6 @@ export default function BusinessVerification() {
     email: user?.email || '',
     phone: '',
     website: '',
-    businessAddress: initialAddress,
-    mailingAddress: initialAddress,
   });
 
   const requiredIdentifierType = identifierTypeForBusinessType(form.businessType);
@@ -142,7 +123,6 @@ export default function BusinessVerification() {
     website: form.website,
     phone: form.phone,
     email: form.email,
-    businessAddress: form.businessAddress,
     taxVerificationEnabled: isTaxVerificationEnabled,
   }), [form, requiredIdentifierType, isTaxVerificationEnabled]);
   const currentStepIndex = Math.max(0, BUSINESS_STEPS.findIndex((step) => step.key === stepKey));
@@ -165,7 +145,6 @@ export default function BusinessVerification() {
         const draft = draftState?.draft || {};
         if (draft.form) {
           setForm((prev) => ({ ...prev, ...draft.form }));
-          if (typeof draft.sameMailing === 'boolean') setSameMailing(draft.sameMailing);
         }
         if (draftState?.current_step && BUSINESS_STEPS.some((step) => step.key === draftState.current_step)) {
           setStepKey(draftState.current_step);
@@ -178,7 +157,7 @@ export default function BusinessVerification() {
     return () => { cancelled = true; };
   }, []);
 
-  const buildDraftPayload = () => ({ form: { ...form, identifierType: requiredIdentifierType }, sameMailing });
+  const buildDraftPayload = () => ({ form: { ...form, identifierType: requiredIdentifierType } });
 
   const saveDraft = async (targetStep = stepKey, options = {}) => {
     if (!user?.id) return false;
@@ -215,24 +194,9 @@ export default function BusinessVerification() {
     return null;
   };
 
-  const validateAddresses = () => {
-    const businessAddress = form.businessAddress;
-    if (!businessAddress.line1.trim() || !businessAddress.city.trim() || !businessAddress.state || businessAddress.zip.replace(/\D/g, '').length < 5) {
-      return 'Business address must include street, city, state, and ZIP.';
-    }
-    if (!sameMailing) {
-      const address = form.mailingAddress;
-      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
-        return 'Mailing address must include street, city, state, and ZIP.';
-      }
-    }
-    return null;
-  };
-
   const validateCurrentStep = () => {
     if (stepKey === 'business_information') return validateBusinessInfo();
     if (stepKey === 'contact_verification') return validateContact();
-    if (stepKey === 'address_verification') return validateAddresses();
     return validate();
   };
 
@@ -272,16 +236,6 @@ export default function BusinessVerification() {
     return <Navigate to="/onboarding" replace />;
   }
 
-  const updateAddress = (key, field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: {
-        ...prev[key],
-        [field]: field === 'zip' ? normalizeZip(value) : value,
-      },
-    }));
-  };
-
   const validate = () => {
     if (!form.legalName.trim()) return 'Legal business name is required.';
     if (form.identifierType !== requiredIdentifierType) return isIndividualOwner ? 'SSN is required for this tenant type.' : 'EIN is required for this tenant type.';
@@ -291,15 +245,6 @@ export default function BusinessVerification() {
     if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
     if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
     if (!phoneVerified) return 'Verify the business phone with OTP before continuing.';
-    if (!form.businessAddress.line1.trim() || !form.businessAddress.city.trim() || !form.businessAddress.state || form.businessAddress.zip.replace(/\D/g, '').length < 5) {
-      return 'Business address must include street, city, state, and ZIP.';
-    }
-    if (!sameMailing) {
-      const address = form.mailingAddress;
-      if (!address.line1.trim() || !address.city.trim() || !address.state || address.zip.replace(/\D/g, '').length < 5) {
-        return 'Mailing address must include street, city, state, and ZIP.';
-      }
-    }
     return null;
   };
 
@@ -402,13 +347,12 @@ export default function BusinessVerification() {
         ...form,
         identifierType: requiredIdentifierType,
         taxIdentifier: isTaxVerificationEnabled ? form.taxIdentifier : '',
-        sameMailing,
       });
 
       await refreshProfile();
 
       if (result?.tax_identifier_required === false) {
-        toast.info('Tax ID verification is currently disabled by Platform Admin; continuing with contact and address verification.');
+        toast.info('Tax ID verification is currently disabled by Platform Admin; continuing with contact verification.');
       }
 
       if (result?.status === 'verified') {
@@ -426,43 +370,6 @@ export default function BusinessVerification() {
       setLoading(false);
     }
   };
-  const AddressFields = ({ title, addressKey, icon: Icon }) => {
-    const address = form[addressKey];
-    return (
-      <div className="space-y-3 rounded-lg border bg-secondary/30 p-4">
-        <div className="flex items-center gap-2 font-semibold text-foreground">
-          <Icon className="h-4 w-4 text-primary" />
-          {title}
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="space-y-1 md:col-span-2">
-            <Label>Address Line 1</Label>
-            <Input value={address.line1} onChange={(e) => updateAddress(addressKey, 'line1', e.target.value)} placeholder="123 Main St" />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label>Address Line 2</Label>
-            <Input value={address.line2} onChange={(e) => updateAddress(addressKey, 'line2', e.target.value)} placeholder="Suite, unit, floor" />
-          </div>
-          <div className="space-y-1">
-            <Label>City</Label>
-            <Input value={address.city} onChange={(e) => updateAddress(addressKey, 'city', e.target.value)} placeholder="Knoxville" />
-          </div>
-          <div className="space-y-1">
-            <Label>State</Label>
-            <Select value={address.state} onValueChange={(value) => updateAddress(addressKey, 'state', value)}>
-              <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
-              <SelectContent>{STATES.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>ZIP Code</Label>
-            <Input value={address.zip} onChange={(e) => updateAddress(addressKey, 'zip', e.target.value)} placeholder="37920" />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
       <div className="w-full max-w-4xl space-y-6">
@@ -471,7 +378,7 @@ export default function BusinessVerification() {
             <ShieldCheck className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Verify Your Business</h1>
-          <p className="text-muted-foreground">Business and address verification happens before payment setup.</p>
+          <p className="text-muted-foreground">Business and contact verification happens before payment setup.</p>
         </div>
 
         <Card className="border-none bg-card/85 shadow-2xl ring-1 ring-border/60 backdrop-blur-xl">
@@ -486,7 +393,7 @@ export default function BusinessVerification() {
               </div>
             ) : (
               <>
-                <div className="grid gap-2 sm:grid-cols-4">
+                <div className="grid gap-2 sm:grid-cols-3">
                   {BUSINESS_STEPS.map((step, index) => (
                     <button
                       key={step.key}
@@ -594,23 +501,6 @@ export default function BusinessVerification() {
                   </div>
                 )}
 
-                {stepKey === 'address_verification' && (
-                  <div className="space-y-6">
-                    <AddressFields title="Business Address" addressKey="businessAddress" icon={MapPin} />
-                    <div className="flex items-center justify-between rounded-lg border bg-card p-4">
-                      <div>
-                        <p className="font-semibold text-foreground">Mailing address same as business address</p>
-                        <p className="text-sm text-muted-foreground">Turn this off if billing or mail should go somewhere else.</p>
-                      </div>
-                      <Button type="button" variant={sameMailing ? 'default' : 'outline'} onClick={() => setSameMailing((value) => !value)}>
-                        {sameMailing ? 'Same' : 'Different'}
-                      </Button>
-                    </div>
-                    {!sameMailing && <AddressFields title="Mailing Address" addressKey="mailingAddress" icon={MapPin} />}
-
-                  </div>
-                )}
-
                 {stepKey === 'business_review' && (
                   <div className="space-y-4">
                     <div className="rounded-lg border bg-primary/5 p-4">
@@ -618,12 +508,11 @@ export default function BusinessVerification() {
                         <FileCheck2 className="h-4 w-4 text-primary" />
                         Estimated Trust Score: {trustScore}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{isTaxVerificationEnabled ? 'Provider calls are represented by a local simulation until EIN/SSN API keys are configured.' : 'Tax ID verification is disabled for this identifier type. Contact and address verification still apply.'}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{isTaxVerificationEnabled ? 'Provider calls are represented by a local simulation until EIN/SSN API keys are configured.' : 'Tax ID verification is disabled for this identifier type. Contact verification still applies.'}</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business:</b> {form.legalName || 'Not entered'}<br /><span className="text-muted-foreground">{form.businessType} / {requiredIdentifierType.toUpperCase()}</span></div>
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Contact:</b> {form.email || 'No email'}<br /><span className="text-muted-foreground">{form.phone || 'No phone'}</span></div>
-                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business address:</b><br /><span className="text-muted-foreground">{[form.businessAddress.line1, form.businessAddress.city, form.businessAddress.state, form.businessAddress.zip].filter(Boolean).join(', ') || 'Missing'}</span></div>
 
                     </div>
                   </div>
