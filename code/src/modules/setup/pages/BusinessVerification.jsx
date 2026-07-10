@@ -366,6 +366,7 @@ export default function BusinessVerification() {
     }));
   };
   const saveVerification = async () => {
+    if (loading) return;
     setStepError('');
     const validationMessage = validate();
     if (validationMessage) {
@@ -588,4 +589,3 @@ export default function BusinessVerification() {
     </div>
   );
 }
-
