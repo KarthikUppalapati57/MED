@@ -105,7 +105,7 @@ export default function BusinessVerification() {
     email: {
       otpId: null,
       code: '',
-      verifiedTarget: userProfile?.business_email_verified_at ? userProfile.business_email || '' : '',
+      verifiedTarget: '',
       sending: false,
       verifying: false,
       devCode: '',
@@ -113,7 +113,7 @@ export default function BusinessVerification() {
     phone: {
       otpId: null,
       code: '',
-      verifiedTarget: userProfile?.business_phone_verified_at ? userProfile.business_phone || '' : '',
+      verifiedTarget: '',
       sending: false,
       verifying: false,
       devCode: '',
