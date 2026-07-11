@@ -19,6 +19,7 @@ const VendorReconciliation = React.lazy(() => import('./VendorReconciliation'));
 const VendorAuditTrail = React.lazy(() => import('./VendorAuditTrail'));
 const VendorBulkTools = React.lazy(() => import('./VendorBulkTools'));
 const VendorReceivingTab = React.lazy(() => import('./VendorReceivingTab'));
+const VendorOnboardingPanel = React.lazy(() => import('./VendorOnboardingPanel'));
 
 // Helper for unimplemented tabs linking out to master modules
 const LinkedTabPlaceholder = ({ title, description, linkText, linkPath }) => {
@@ -265,9 +266,9 @@ export default function VendorDetail() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="border-b border-border mb-6 overflow-x-auto pb-px scrollbar-hide">
               <TabsList className="h-auto p-0 bg-transparent inline-flex whitespace-nowrap min-w-max">
-                {['overview', 'items', 'order_guide', 'bulk_tools', 'invoices', 'orders', 'payments', 'receiving', 'reconciliation', 'vault', 'accounting', 'hub', 'ai_analyst', 'audit_trail'].map(tab => {
+                {['overview', 'onboarding', 'items', 'order_guide', 'bulk_tools', 'invoices', 'orders', 'payments', 'receiving', 'reconciliation', 'vault', 'accounting', 'hub', 'ai_analyst', 'audit_trail'].map(tab => {
                   // UI Lock: Hide specific tabs from lower-level staff
-                  if (!isElevatedUser && (tab === 'accounting' || tab === 'audit_trail' || tab === 'bulk_tools')) return null;
+                  if (!isElevatedUser && (tab === 'accounting' || tab === 'audit_trail' || tab === 'bulk_tools' || tab === 'onboarding')) return null;
                   return (
                     <TabsTrigger 
                       key={tab}
@@ -282,6 +283,7 @@ export default function VendorDetail() {
             </div>
 
             <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab /></TabsContent>
+            {isElevatedUser && <TabsContent value="onboarding" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorOnboardingPanel vendorId={id} /></LazyVendorTab></TabsContent>}
             <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorItemsTab vendorId={id} /></LazyVendorTab></TabsContent>
             <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><OrderGuideTab vendorId={id} /></LazyVendorTab></TabsContent>
             {isElevatedUser && <TabsContent value="bulk_tools" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorBulkTools vendorId={id} /></LazyVendorTab></TabsContent>}

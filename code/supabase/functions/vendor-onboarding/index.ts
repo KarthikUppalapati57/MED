@@ -15,6 +15,40 @@ function hashOtp(otp: string) {
   return crypto.createHash("sha256").update(otp).digest("hex");
 }
 
+function generateOtp() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+function isProduction() {
+  return ["production", "prod"].includes((Deno.env.get("APP_ENV") || Deno.env.get("ENVIRONMENT") || "").toLowerCase());
+}
+
+async function sendTransactionalEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  const from = Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
+
+  if (!apiKey) {
+    console.log(`[EMAIL SKIPPED] ${subject} -> ${to}\n${text}`);
+    return { sent: false, skipped: true };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to, subject, text }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Email delivery failed: ${body}`);
+  }
+
+  return { sent: true, skipped: false };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -36,7 +70,7 @@ serve(async (req) => {
       const { vendor_id } = payload;
       if (!vendor_id) return jsonResponse({ error: "Missing vendor_id" }, 400);
 
-      const otp = "123456";
+      const otp = generateOtp();
       const otpHash = hashOtp(otp);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
@@ -57,6 +91,13 @@ serve(async (req) => {
         });
       if (challengeError) throw challengeError;
 
+      const { data: vendorContact, error: contactError } = await supabase
+        .from("vendors")
+        .select("name, email, contact_name")
+        .eq("id", vendor_id)
+        .single();
+      if (contactError) throw contactError;
+
       const { error: vendorError } = await supabase
         .from("vendors")
         .update({ onboarding_status: "pending_otp" })
@@ -70,8 +111,17 @@ serve(async (req) => {
         actor_type: "system",
       });
 
-      console.log(`[DEV ONLY] OTP for vendor ${vendor_id} is ${otp}`);
-      return jsonResponse({ message: "OTP generated", devOtp: otp });
+      if (vendorContact?.email) {
+        await sendTransactionalEmail({
+          to: vendorContact.email,
+          subject: "Your vendor onboarding verification code",
+          text: `Hi ${vendorContact.contact_name || vendorContact.name || "there"},\n\nYour vendor onboarding verification code is ${otp}. It expires in 10 minutes.\n\nRestops Platform`,
+        });
+      }
+
+      const response: Record<string, unknown> = { message: "OTP generated" };
+      if (!isProduction()) response.devOtp = otp;
+      return jsonResponse(response);
     }
 
     if (action === "verify-otp") {
@@ -157,9 +207,29 @@ serve(async (req) => {
       const routeType = type === "documents" ? "tax" : type;
       const baseUrl = Deno.env.get("PUBLIC_APP_URL") || "http://localhost:5173";
       const magicLinkUrl = `${baseUrl}/vendor-onboarding/${routeType}/${token}`;
-      console.log(`[DEV ONLY] Magic Link for ${type}: ${magicLinkUrl}`);
 
-      return jsonResponse({ message: "Magic link sent", magicLinkUrl, token, link: linkResult });
+      const { data: vendorContact, error: contactError } = await supabase
+        .from("vendors")
+        .select("name, email, contact_name")
+        .eq("id", vendor_id)
+        .single();
+      if (contactError) throw contactError;
+
+      if (vendorContact?.email) {
+        const label = type === "bank" ? "banking details" : type === "documents" ? "documents" : "tax information and W-9";
+        await sendTransactionalEmail({
+          to: vendorContact.email,
+          subject: `Secure vendor onboarding request: ${label}`,
+          text: `Hi ${vendorContact.contact_name || vendorContact.name || "there"},\n\nPlease use this secure link to submit your ${label}:\n${magicLinkUrl}\n\nThis link expires automatically.\n\nRestops Platform`,
+        });
+      }
+
+      const response: Record<string, unknown> = { message: "Magic link sent", link: linkResult };
+      if (!isProduction()) {
+        response.magicLinkUrl = magicLinkUrl;
+        response.token = token;
+      }
+      return jsonResponse(response);
     }
 
     if (action === "submit-tax-info") {
