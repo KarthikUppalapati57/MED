@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CheckCircle2, Download, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Download, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -21,13 +21,13 @@ const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city:
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
-const createLocation = () => ({ name: '', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
-const createBrand = () => ({ name: '', addressEnabled: false, address: emptyAddress(), locations: [createLocation()] });
+const createLocation = () => ({ name: '', businessAddressSource: 'custom', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
+const createBrand = () => ({ name: '', addressEnabled: false, addressSource: 'custom', address: emptyAddress(), locations: [createLocation()] });
 const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
 const createBusinessIdentity = () => ({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
-const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
-const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
+const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddressSource: location.businessAddressSource || 'custom', businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
+const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, addressSource: brand.addressSource || 'custom', address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
 const normalizeOrganization = (org = {}) => {
   const businessAddress = normalizeAddress(org.businessAddress || org.address);
   return {
@@ -215,6 +215,9 @@ export default function OnboardingPage() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [businessIdentity, setBusinessIdentity] = useState(createBusinessIdentity());
   const [organizations, setOrganizations] = useState([createOrganization()]);
+  const [hierarchyMode, setHierarchyMode] = useState('manual');
+  const [hierarchyView, setHierarchyView] = useState('build');
+  const [expandedOrganizations, setExpandedOrganizations] = useState(() => new Set([0]));
 
   useEffect(() => {
     const saved = window.localStorage.getItem(DRAFT_KEY);
@@ -229,6 +232,8 @@ export default function OnboardingPage() {
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
       if (draft.couponCode) setCouponCode(draft.couponCode);
+      if (draft.hierarchyMode) setHierarchyMode(draft.hierarchyMode);
+      if (draft.hierarchyView) setHierarchyView(draft.hierarchyView);
     } catch (error) {
       console.warn('Failed to restore onboarding draft:', error);
     } finally {
@@ -277,7 +282,11 @@ export default function OnboardingPage() {
   const updateBrand = (orgIdx, brandIdx, updater) => updateOrganization(orgIdx, (org) => ({ ...org, brands: org.brands.map((brand, index) => (index === brandIdx ? updater(brand) : brand)) }));
   const updateLocation = (orgIdx, brandIdx, locIdx, updater) => updateBrand(orgIdx, brandIdx, (brand) => ({ ...brand, locations: brand.locations.map((location, index) => (index === locIdx ? updater(location) : location)) }));
   const handleOrgNameChange = (orgIdx, value) => updateOrganization(orgIdx, (org) => ({ ...org, name: value, slug: org.slugManual ? org.slug : slugify(value) }));
-  const addOrganization = () => setOrganizations((prev) => [...prev, createOrganization()]);
+  const addOrganization = () => setOrganizations((prev) => {
+    const nextIndex = prev.length;
+    setExpandedOrganizations((current) => new Set([...current, nextIndex]));
+    return [...prev, createOrganization()];
+  });
   const addBrand = (orgIdx) => updateOrganization(orgIdx, (org) => ({ ...org, brands: [...org.brands, createBrand()] }));
   const addLocation = (orgIdx, brandIdx) => updateBrand(orgIdx, brandIdx, (brand) => ({ ...brand, locations: [...brand.locations, createLocation()] }));
   const removeOrganization = (orgIdx) => organizations.length > 1 && setOrganizations((prev) => prev.filter((_, index) => index !== orgIdx));
@@ -408,9 +417,97 @@ export default function OnboardingPage() {
   };
 
   const saveDraft = (nextStep = step, showToast = true) => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode, updatedAt: new Date().toISOString() }));
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode, hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
     if (showToast) toast.success('Onboarding draft saved.');
   };
+
+  const applyLocationBusinessAddress = (orgIdx, brandIdx, locIdx, source, address) => {
+    updateLocation(orgIdx, brandIdx, locIdx, (current) => ({
+      ...current,
+      businessAddressSource: source,
+      businessAddress: normalizeAddress(address),
+      mailingAddress: current.mailingSameAsBusiness ? normalizeAddress(address) : current.mailingAddress,
+    }));
+  };
+
+  const toggleOrganizationExpanded = (orgIdx) => setExpandedOrganizations((current) => {
+    const next = new Set(current);
+    if (next.has(orgIdx)) next.delete(orgIdx);
+    else next.add(orgIdx);
+    return next;
+  });
+
+  const organizationCounts = (org) => {
+    const brandCount = org.brands.length;
+    const locationCount = org.brands.reduce((sum, brand) => sum + brand.locations.length, 0);
+    return { brandCount, locationCount };
+  };
+
+  const hierarchyIssues = useMemo(() => {
+    const issues = [];
+    if (!organizations.length) issues.push({ scope: 'hierarchy', message: 'Add at least one organization.' });
+    const orgSlugs = new Set();
+    const orgNames = new Set();
+
+    organizations.forEach((org, orgIdx) => {
+      const orgLabel = org.name.trim() || `Organization ${orgIdx + 1}`;
+      if (!org.name.trim()) issues.push({ scope: 'organization', orgIdx, message: `${orgLabel} needs a name.` });
+      if (!org.slug.trim()) issues.push({ scope: 'organization', orgIdx, message: `${orgLabel} needs a workspace slug.` });
+      else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(org.slug.trim())) issues.push({ scope: 'organization', orgIdx, message: `${orgLabel} slug can use lowercase letters, numbers, and hyphens only.` });
+      const orgSlug = normalizeKey(org.slug);
+      if (orgSlug && orgSlugs.has(orgSlug)) issues.push({ scope: 'organization', orgIdx, message: `Organization slug ${org.slug} is duplicated.` });
+      if (orgSlug) orgSlugs.add(orgSlug);
+      const orgName = normalizeKey(org.name);
+      if (orgName && orgNames.has(orgName)) issues.push({ scope: 'organization', orgIdx, message: `Organization name ${org.name} is duplicated.` });
+      if (orgName) orgNames.add(orgName);
+      if (!org.brands.length) issues.push({ scope: 'organization', orgIdx, message: `${orgLabel} needs at least one brand.` });
+      if (org.addressEnabled) {
+        const orgAddressError = addressError(org.businessAddress, `${orgLabel} business/service address`);
+        if (orgAddressError) issues.push({ scope: 'organization', orgIdx, message: orgAddressError });
+        if (!org.mailingSameAsBusiness) {
+          const orgMailingAddressError = addressError(org.mailingAddress, `${orgLabel} mailing address`);
+          if (orgMailingAddressError) issues.push({ scope: 'organization', orgIdx, message: orgMailingAddressError });
+        }
+      }
+
+      org.brands.forEach((brand, brandIdx) => {
+        const brandLabel = brand.name.trim() || `Brand ${brandIdx + 1}`;
+        if (!brand.name.trim()) issues.push({ scope: 'brand', orgIdx, brandIdx, message: `${brandLabel} is required in ${orgLabel}.` });
+        if (brand.addressEnabled) {
+          const brandAddressError = addressError(brand.address, `${brandLabel} address`);
+          if (brandAddressError) issues.push({ scope: 'brand', orgIdx, brandIdx, message: brandAddressError });
+        }
+        const locationNames = new Set();
+        if (!brand.locations.length) issues.push({ scope: 'brand', orgIdx, brandIdx, message: `${brandLabel} needs at least one location.` });
+        brand.locations.forEach((location, locIdx) => {
+          const locLabel = location.name.trim() || `Location ${locIdx + 1}`;
+          if (!location.name.trim()) issues.push({ scope: 'location', orgIdx, brandIdx, locIdx, message: `${locLabel} needs a name.` });
+          const locationName = normalizeKey(location.name);
+          if (locationName && locationNames.has(locationName)) issues.push({ scope: 'location', orgIdx, brandIdx, locIdx, message: `Location name ${location.name} is duplicated in ${brandLabel}.` });
+          if (locationName) locationNames.add(locationName);
+          const locationAddressError = addressError(location.businessAddress, `${locLabel} business/service address`);
+          if (locationAddressError) issues.push({ scope: 'location', orgIdx, brandIdx, locIdx, message: locationAddressError });
+          if (!location.mailingSameAsBusiness) {
+            const mailingAddressError = addressError(location.mailingAddress, `${locLabel} mailing address`);
+            if (mailingAddressError) issues.push({ scope: 'location', orgIdx, brandIdx, locIdx, message: mailingAddressError });
+          }
+        });
+      });
+    });
+    return issues;
+  }, [organizations]);
+
+  const issueCountForOrganization = (orgIdx) => hierarchyIssues.filter((issue) => issue.orgIdx === orgIdx).length;
+  const firstHierarchyIssue = hierarchyIssues[0]?.message || null;
+  const locationIssueCount = hierarchyIssues.filter((issue) => issue.scope === 'location').length;
+  const checklist = [
+    { label: 'All organizations have a unique name and slug', ok: !hierarchyIssues.some((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message))?.message },
+    { label: 'Every brand is linked to a valid organization', ok: !hierarchyIssues.some((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message))?.message },
+    { label: 'Every location has a complete business/service address', ok: !hierarchyIssues.some((issue) => issue.scope === 'location' && issue.message.toLowerCase().includes('business/service')), detail: hierarchyIssues.find((issue) => issue.scope === 'location' && issue.message.toLowerCase().includes('business/service'))?.message },
+    { label: 'Every location has a complete mailing address or is marked same as business', ok: !hierarchyIssues.some((issue) => issue.scope === 'location' && /mailing/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'location' && /mailing/i.test(issue.message))?.message },
+    { label: 'No duplicate location names within any brand', ok: !hierarchyIssues.some((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location'), detail: hierarchyIssues.find((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location')?.message },
+    { label: 'Postal codes are valid for the stated country', ok: !hierarchyIssues.some((issue) => /postal code/i.test(issue.message)), detail: hierarchyIssues.find((issue) => /postal code/i.test(issue.message))?.message },
+  ];
 
   const validateBusinessIdentity = () => {
     if (!businessIdentity.companyName.trim()) return 'Company name is required.';
@@ -587,7 +684,13 @@ export default function OnboardingPage() {
       const error = validateBusinessIdentity();
       if (error) return toast.error(error);
       saveDraft();
+      setHierarchyView('build');
       return setStep(2);
+    }
+    if (step === 2 && hierarchyView === 'build') {
+      saveDraft(2);
+      setHierarchyView('review');
+      return;
     }
     if (step === 2) {
       const error = validateHierarchy();
@@ -599,6 +702,13 @@ export default function OnboardingPage() {
     await handleSubscribe();
   };
 
+  const goBack = () => {
+    if (step === 2 && hierarchyView === 'review') return setHierarchyView('build');
+    setStep((current) => Math.max(1, current - 1));
+  };
+
+  const nextLabel = step === 2 && hierarchyView === 'build' ? 'Continue to review' : step === 2 ? 'Confirm & continue' : step === 3 ? 'Complete' : 'Next';
+
   useEffect(() => {
     if (!draftReady || !user || !userProfile?.payment_verified || userProfile?.organization_id || completed || finalizingOnboarding || autoFinalizeRef.current) return;
     autoFinalizeRef.current = true;
@@ -607,6 +717,57 @@ export default function OnboardingPage() {
     performOnboarding().finally(() => setFinalizingOnboarding(false));
   }, [draftReady, user, userProfile?.payment_verified, userProfile?.organization_id, completed, finalizingOnboarding]);
 
+  const renderHierarchyBuild = () => (
+    <>
+      <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle>Organization Hierarchy</CardTitle>
+          <CardDescription>Define your Organization -&gt; Brand -&gt; Location structure. Addresses are optional above the location level, mandatory at it.</CardDescription>
+        </div>
+        <div className="grid grid-cols-2 rounded-md border bg-muted/20 p-1 text-xs font-medium">
+          <button type="button" onClick={() => setHierarchyMode('manual')} className={`rounded px-4 py-2 transition ${hierarchyMode === 'manual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Build manually</button>
+          <button type="button" onClick={() => setHierarchyMode('upload')} className={`rounded px-4 py-2 transition ${hierarchyMode === 'upload' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Upload template</button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {hierarchyMode === 'upload' ? (
+          <div className="space-y-5">
+            <div className="rounded-md border border-dashed bg-muted/20 p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><h3 className="font-semibold text-foreground">Upload hierarchy template</h3><p className="mt-1 text-sm text-muted-foreground">Upload does not create records immediately. A valid file merges into the manual tree for review and editing.</p></div>
+                <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={downloadHierarchyTemplate}><Download className="mr-2 h-4 w-4" /> Download blank template</Button><Button type="button" onClick={() => hierarchyImportInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload CSV</Button><input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" /></div>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2"><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Required columns</h4><p className="text-sm text-muted-foreground">organization_name, brand_name, location_name, location_address_line1, location_city, location_state, location_postal_code</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Optional columns</h4><p className="text-sm text-muted-foreground">Organization address, brand address, location mailing address, and every standard line2/postal/country companion.</p></div></div>
+            <div className="rounded-md border bg-card p-4"><div className="mb-3 flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-foreground">Import preview</h4><span className="text-xs text-muted-foreground">{totals.locationCount} parsed location rows in the current tree</span></div><div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Brand</th><th>Location</th><th>City</th><th>Postal code</th></tr></thead><tbody>{organizations.flatMap((org) => org.brands.flatMap((brand) => brand.locations.map((location) => { const issue = !addressComplete(location.businessAddress); return <tr key={`${org.name}-${brand.name}-${location.name}`} className={issue ? 'bg-destructive/10 text-destructive' : 'border-t'}><td className="py-2">{org.name || '- missing'}</td><td>{brand.name || '- missing'}</td><td>{location.name || '- missing'}</td><td>{location.businessAddress.city || '- missing'}</td><td>{location.businessAddress.postalCode || '- missing'}</td></tr>; })))}</tbody></table></div></div>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="font-mono text-sm text-muted-foreground"><span className="font-semibold text-foreground">{organizations.length}</span> organizations - <span className="font-semibold text-foreground">{totals.brandCount}</span> brands - <span className="font-semibold text-foreground">{totals.locationCount}</span> locations</div><Button type="button" size="sm" onClick={addOrganization}><Plus className="mr-2 h-4 w-4" /> Add organization</Button></div>
+            {organizations.map((org, orgIdx) => { const counts = organizationCounts(org); const expanded = expandedOrganizations.has(orgIdx); const flagged = issueCountForOrganization(orgIdx); return (
+              <div key={`org-${orgIdx}`} className="rounded-md border bg-card">
+                <button type="button" onClick={() => toggleOrganizationExpanded(orgIdx)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"><div className="flex items-center gap-3">{expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}<div><div className="font-semibold text-foreground">{org.name || `Organization ${orgIdx + 1}`}</div><div className="text-xs text-muted-foreground">{counts.brandCount} brand(s) - {counts.locationCount} location(s)</div></div></div><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${flagged ? 'border-amber-500/40 bg-amber-500/10 text-amber-400' : 'border-primary/40 bg-primary/10 text-primary'}`}>{flagged ? `${flagged} needs attention` : 'Complete'}</span></button>
+                {expanded && <div className="space-y-5 border-t p-4"><div className="grid gap-4 md:grid-cols-2"><div className="space-y-1.5"><FieldLabel htmlFor={`org-${orgIdx}-name`} required>Organization name</FieldLabel><Input id={`org-${orgIdx}-name`} value={org.name} onChange={(event) => handleOrgNameChange(orgIdx, event.target.value)} className="h-10 bg-card" /></div><div className="space-y-1.5"><FieldLabel htmlFor={`org-${orgIdx}-slug`} required>Workspace slug</FieldLabel><Input id={`org-${orgIdx}-slug`} value={org.slug} onChange={(event) => updateOrganization(orgIdx, (current) => ({ ...current, slug: slugify(event.target.value), slugManual: true }))} className="h-10 bg-card" /></div></div>
+                  <div className="rounded-md border border-dashed bg-muted/10 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-foreground">Organization address</p><p className="text-xs text-muted-foreground">Optional - add it once here and brands or locations below can reuse it.</p></div><Switch checked={org.addressEnabled} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, addressEnabled: checked, mailingSameAsBusiness: checked ? current.mailingSameAsBusiness : true }))} /></div>{org.addressEnabled && <div className="mt-3"><AddressFields idPrefix={`org-${orgIdx}-business-address`} value={org.businessAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, businessAddress: value }))} required /></div>}</div>
+                  <div className="space-y-4 border-l pl-4 sm:ml-3 sm:pl-5">{org.brands.map((brand, brandIdx) => (<div key={`org-${orgIdx}-brand-${brandIdx}`} className="space-y-3"><div className="flex items-start gap-3"><div className="flex-1 space-y-1.5"><FieldLabel htmlFor={`brand-${orgIdx}-${brandIdx}`} required>Brand</FieldLabel><Input id={`brand-${orgIdx}-${brandIdx}`} value={brand.name} onChange={(event) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, name: event.target.value }))} className="h-10 bg-card" /></div>{org.brands.length > 1 && <Button type="button" variant="ghost" size="icon" className="mt-6" onClick={() => removeBrand(orgIdx, brandIdx)}><Trash2 className="h-4 w-4" /></Button>}</div>
+                    <div className="rounded-md border border-dashed bg-muted/10 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold text-foreground">Brand address</p><p className="text-xs text-muted-foreground">Optional - add only if this brand has its own registered address.</p></div><Switch checked={brand.addressEnabled} onCheckedChange={(checked) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, addressEnabled: checked, addressSource: checked ? current.addressSource : 'custom' }))} /></div>{brand.addressEnabled && <div className="mt-3 space-y-3"><div className="flex flex-wrap gap-2"><Button type="button" variant={brand.addressSource === 'organization' ? 'default' : 'outline'} size="sm" disabled={!addressComplete(org.businessAddress)} onClick={() => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, addressSource: 'organization', address: org.businessAddress }))}>Same as organization</Button><Button type="button" variant={brand.addressSource === 'custom' ? 'default' : 'outline'} size="sm" onClick={() => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, addressSource: 'custom' }))}>Custom address</Button></div>{brand.addressSource === 'organization' ? <div className="rounded-md border bg-muted/20 px-3 py-2 font-mono text-xs text-muted-foreground">ORG {formatAddress(org.businessAddress) || 'Add an organization address above to reuse it here'}</div> : <AddressFields idPrefix={`brand-${orgIdx}-${brandIdx}-address`} value={brand.address} onChange={(value) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, address: value }))} required compact />}</div>}</div>
+                    <div className="space-y-3 sm:ml-4">{brand.locations.map((location, locIdx) => { const issue = hierarchyIssues.find((item) => item.orgIdx === orgIdx && item.brandIdx === brandIdx && item.locIdx === locIdx); return (<div key={`org-${orgIdx}-brand-${brandIdx}-loc-${locIdx}`} className={`rounded-md border p-3 ${issue ? 'border-amber-500/40 bg-amber-500/10' : 'bg-card'}`}><div className="mb-3 grid gap-3 md:grid-cols-[1fr_auto]"><div className="space-y-1.5"><FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}`} required>Location name</FieldLabel><Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}`} value={location.name} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, name: event.target.value }))} className="h-10 bg-card" /></div>{brand.locations.length > 1 && <Button type="button" variant="ghost" size="icon" className="self-end" onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}><Trash2 className="h-4 w-4" /></Button>}</div><div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>Business address:</span><Button type="button" variant={location.businessAddressSource === 'tenant' ? 'default' : 'outline'} size="sm" onClick={() => applyLocationBusinessAddress(orgIdx, brandIdx, locIdx, 'tenant', businessIdentity.businessAddress)}>Same as tenant</Button><Button type="button" variant={location.businessAddressSource === 'organization' ? 'default' : 'outline'} size="sm" disabled={!addressComplete(org.businessAddress)} onClick={() => applyLocationBusinessAddress(orgIdx, brandIdx, locIdx, 'organization', org.businessAddress)}>Same as organization</Button><Button type="button" variant={location.businessAddressSource === 'brand' ? 'default' : 'outline'} size="sm" disabled={!addressComplete(brand.address)} onClick={() => applyLocationBusinessAddress(orgIdx, brandIdx, locIdx, 'brand', brand.address)}>Same as brand</Button><Button type="button" variant={location.businessAddressSource === 'custom' ? 'default' : 'outline'} size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddressSource: 'custom' }))}>Custom address</Button></div>{location.businessAddressSource === 'custom' ? <AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-business`} value={location.businessAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: value }))} required compact /> : <div className="rounded-md border bg-muted/20 px-3 py-2 font-mono text-xs text-muted-foreground">{location.businessAddressSource.toUpperCase()} {formatAddress(location.businessAddress) || 'No address available from selected source'}</div>}<div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"><p className="text-sm font-medium text-foreground">Mailing address is same as business/service address</p><Switch checked={location.mailingSameAsBusiness} onCheckedChange={(checked) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} /></div>{!location.mailingSameAsBusiness && <div className="mt-3"><AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-mailing`} value={location.mailingAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingAddress: value }))} required compact line1Label="Mailing Address" /></div>}{issue && <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-amber-400"><AlertTriangle className="h-3.5 w-3.5" /> {issue.message}</div>}</div>); })}<Button type="button" variant="ghost" size="sm" onClick={() => addLocation(orgIdx, brandIdx)}><Plus className="mr-2 h-4 w-4" /> Add location</Button></div>
+                  </div>))}<Button type="button" variant="ghost" size="sm" onClick={() => addBrand(orgIdx)}><Plus className="mr-2 h-4 w-4" /> Add brand</Button></div>
+                </div>}
+              </div>
+            ); })}
+          </div>
+        )}
+      </CardContent>
+    </>
+  );
+
+  const renderHierarchyReview = () => (
+    <>
+      <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between"><div><CardTitle>Review & confirm</CardTitle><CardDescription>Every organization, brand, and location you entered - checked automatically before your workspace is created.</CardDescription></div><Button type="button" variant="ghost" onClick={() => setHierarchyView('build')}><ArrowLeft className="mr-2 h-4 w-4" /> Back to edit</Button></CardHeader>
+      <CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-3">{[['Organizations', organizations.length], ['Brands', totals.brandCount], ['Locations', totals.locationCount]].map(([label, value]) => <div key={label} className="rounded-md border bg-card p-4"><div className="text-3xl font-bold text-foreground">{value}</div><div className="mt-1 text-xs font-semibold uppercase text-muted-foreground">{label}</div></div>)}</div>{hierarchyIssues.length > 0 && <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-400">{locationIssueCount || hierarchyIssues.length} item(s) need attention - fix them before you can confirm.</div>}<div className="rounded-md border bg-card">{checklist.map((item) => <div key={item.label} className="flex items-start gap-3 border-b px-4 py-3 last:border-b-0"><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border ${item.ok ? 'border-primary text-primary' : 'border-amber-500 text-amber-400'}`}>{item.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}</span><div><p className="text-sm font-medium text-foreground">{item.label}</p>{!item.ok && item.detail && <p className="mt-1 text-xs text-amber-400">{item.detail}</p>}</div></div>)}</div><div className="rounded-md border bg-card">{organizations.map((org, orgIdx) => { const flagged = issueCountForOrganization(orgIdx); return <div key={`review-org-${orgIdx}`} className="border-b last:border-b-0"><div className="flex items-center justify-between gap-3 px-4 py-3"><h3 className="font-semibold text-foreground">{org.name || `Organization ${orgIdx + 1}`}</h3><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${flagged ? 'border-amber-500/40 bg-amber-500/10 text-amber-400' : 'border-primary/40 bg-primary/10 text-primary'}`}>{flagged ? `${flagged} flagged` : 'Complete'}</span></div>{org.brands.map((brand, brandIdx) => <div key={`review-brand-${orgIdx}-${brandIdx}`} className="border-t px-6 py-3"><p className="mb-2 text-sm font-semibold text-foreground">{brand.name || `Brand ${brandIdx + 1}`}</p><div className="space-y-2 border-l pl-4">{brand.locations.map((location, locIdx) => { const issue = hierarchyIssues.find((item) => item.orgIdx === orgIdx && item.brandIdx === brandIdx && item.locIdx === locIdx); return <div key={`review-location-${orgIdx}-${brandIdx}-${locIdx}`} className={`flex items-start justify-between gap-3 border-l-2 pl-3 ${issue ? 'border-amber-500 text-amber-400' : 'border-border text-muted-foreground'}`}><div><p className="text-sm font-semibold text-foreground">{location.name || `Location ${locIdx + 1}`}</p><p className="font-mono text-xs">{formatAddress(location.businessAddress) || 'Address missing'}{location.businessAddressSource !== 'custom' ? ` - same as ${location.businessAddressSource}` : ''}</p>{issue && <p className="mt-1 text-xs font-semibold text-amber-400">{issue.message}</p>}</div><Button type="button" variant="ghost" size="sm" onClick={() => { setHierarchyView('build'); setExpandedOrganizations((current) => new Set([...current, orgIdx])); }}>Edit</Button></div>; })}</div></div>)}</div>; })}</div></CardContent>
+    </>
+  );
   if (userProfile?.role && userProfile.role !== 'tenant_super_admin' && !completed) return <Navigate to="/" replace />;
   if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) return <Navigate to="/business-verification" replace />;
   if (userProfile?.organization_id && userProfile?.payment_verified && !completed) return <Navigate to="/" replace />;
@@ -706,112 +867,7 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {step === 2 && (
-            <>
-              <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div><CardTitle>Organization Hierarchy</CardTitle><CardDescription>Define your Tenant -&gt; Organization -&gt; Brand -&gt; Location structure.</CardDescription></div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={downloadHierarchyTemplate} className="shrink-0"><Download className="mr-2 h-4 w-4" /> Download Template</Button>
-                  <Button type="button" variant="outline" onClick={() => hierarchyImportInputRef.current?.click()} className="shrink-0"><Upload className="mr-2 h-4 w-4" /> Upload Template</Button>
-                  <Button type="button" variant="outline" onClick={addOrganization} className="shrink-0"><Plus className="mr-2 h-4 w-4" /> Add Organization</Button>
-                  <input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {organizations.map((org, orgIdx) => (
-                  <div key={`org-${orgIdx}`} className="rounded-md border p-4 sm:p-5">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div className="grid flex-1 gap-3 md:grid-cols-[1fr_280px]">
-                        <div className="space-y-1.5">
-                          <FieldLabel htmlFor={`org-${orgIdx}-name`} required>Organization Name</FieldLabel>
-                          <Input id={`org-${orgIdx}-name`} value={org.name} onChange={(event) => handleOrgNameChange(orgIdx, event.target.value)} className="h-11 bg-card" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <FieldLabel htmlFor={`org-${orgIdx}-slug`} required>Slug</FieldLabel>
-                          <Input id={`org-${orgIdx}-slug`} value={org.slug} onChange={(event) => updateOrganization(orgIdx, (current) => ({ ...current, slug: slugify(event.target.value), slugManual: true }))} className="h-11 bg-card" />
-                        </div>
-                      </div>
-                      {organizations.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeOrganization(orgIdx)}><Trash2 className="h-4 w-4" /></Button>}
-                    </div>
-
-                    <div className="mb-5 space-y-3">
-                      <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Add organization address</p>
-                          <p className="text-xs text-muted-foreground">Optional. Enable it only when this organization has its own business/service or mailing address.</p>
-                        </div>
-                        <Switch checked={org.addressEnabled} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, addressEnabled: checked, mailingSameAsBusiness: checked ? current.mailingSameAsBusiness : true }))} />
-                      </div>
-                      {org.addressEnabled && (
-                        <div className="space-y-3">
-                          <AddressFields idPrefix={`org-${orgIdx}-business-address`} value={org.businessAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, businessAddress: value }))} required />
-                          <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
-                            <div><p className="text-sm font-medium text-foreground">Organization mailing address is same as business/service address</p><p className="text-xs text-muted-foreground">Turn this off when mail should go somewhere else.</p></div>
-                            <Switch checked={org.mailingSameAsBusiness} onCheckedChange={(checked) => updateOrganization(orgIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} />
-                          </div>
-                          {!org.mailingSameAsBusiness && <AddressFields idPrefix={`org-${orgIdx}-mailing-address`} value={org.mailingAddress} onChange={(value) => updateOrganization(orgIdx, (current) => ({ ...current, mailingAddress: value }))} required line1Label="Mailing Address" />}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-4 border-l pl-4 sm:ml-4 sm:pl-5">
-                      {org.brands.map((brand, brandIdx) => (
-                        <div key={`org-${orgIdx}-brand-${brandIdx}`} className="rounded-md bg-muted/30 p-4">
-                          <div className="mb-4 flex items-start justify-between gap-3">
-                            <div className="flex-1 space-y-1.5">
-                              <FieldLabel htmlFor={`brand-${orgIdx}-${brandIdx}`} required>Brand</FieldLabel>
-                              <Input id={`brand-${orgIdx}-${brandIdx}`} value={brand.name} onChange={(event) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, name: event.target.value }))} className="h-11 bg-card" />
-                            </div>
-                            {org.brands.length > 1 && <Button type="button" variant="ghost" size="icon" onClick={() => removeBrand(orgIdx, brandIdx)}><Trash2 className="h-4 w-4" /></Button>}
-                          </div>
-
-                          <div className="mb-4 flex items-center justify-between rounded-md border bg-card px-4 py-3">
-                            <div><p className="text-sm font-medium text-foreground">Add brand address</p><p className="text-xs text-muted-foreground">Optional unless enabled.</p></div>
-                            <Switch checked={brand.addressEnabled} onCheckedChange={(checked) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, addressEnabled: checked }))} />
-                          </div>
-                          {brand.addressEnabled && <div className="mb-4"><AddressFields idPrefix={`brand-${orgIdx}-${brandIdx}-address`} value={brand.address} onChange={(value) => updateBrand(orgIdx, brandIdx, (current) => ({ ...current, address: value }))} required /></div>}
-
-                          <div className="space-y-3 sm:ml-4">
-                            {brand.locations.map((location, locIdx) => (
-                              <div key={`org-${orgIdx}-brand-${brandIdx}-loc-${locIdx}`} className="rounded-md bg-card p-3 shadow-sm ring-1 ring-border">
-                                <div className="mb-3 grid gap-3 md:grid-cols-[1.3fr_1fr_1fr_auto]">
-                                  <div className="space-y-1.5">
-                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}`} required>Location Name</FieldLabel>
-                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}`} value={location.name} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, name: event.target.value }))} className="h-10 bg-card" />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}-city`} required>City</FieldLabel>
-                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}-city`} value={location.businessAddress.city} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: { ...current.businessAddress, city: event.target.value } }))} className="h-10 bg-card" />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <FieldLabel htmlFor={`loc-${orgIdx}-${brandIdx}-${locIdx}-state`} required>State/Region</FieldLabel>
-                                    <Input id={`loc-${orgIdx}-${brandIdx}-${locIdx}-state`} value={location.businessAddress.state} onChange={(event) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: { ...current.businessAddress, state: event.target.value } }))} className="h-10 bg-card" />
-                                  </div>
-                                  {brand.locations.length > 1 && <Button type="button" variant="ghost" size="icon" className="self-end" onClick={() => removeLocation(orgIdx, brandIdx, locIdx)}><Trash2 className="h-4 w-4" /></Button>}
-                                </div>
-                                <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                                  <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: businessIdentity.businessAddress, mailingAddress: businessIdentity.businessAddress, mailingSameAsBusiness: true }))}>Same as tenant</Button>
-                                  {org.addressEnabled && addressComplete(org.businessAddress) && <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: org.businessAddress, mailingAddress: org.businessAddress, mailingSameAsBusiness: true }))}>Same as organization</Button>}
-                                  {brand.addressEnabled && addressComplete(brand.address) && <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: brand.address, mailingAddress: brand.address, mailingSameAsBusiness: true }))}>Same as brand</Button>}
-                                  <Button type="button" variant="outline" size="sm" onClick={() => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: DEV_TEST_ADDRESS, mailingAddress: DEV_TEST_ADDRESS, mailingSameAsBusiness: true }))}>Use test address</Button>
-                                </div>
-                                <AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-business`} value={location.businessAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, businessAddress: value }))} required compact />
-                                <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"><p className="text-sm font-medium text-foreground">Mailing same as business/service</p><Switch checked={location.mailingSameAsBusiness} onCheckedChange={(checked) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingSameAsBusiness: checked }))} /></div>
-                                {!location.mailingSameAsBusiness && <div className="mt-3"><AddressFields idPrefix={`loc-${orgIdx}-${brandIdx}-${locIdx}-mailing`} value={location.mailingAddress} onChange={(value) => updateLocation(orgIdx, brandIdx, locIdx, (current) => ({ ...current, mailingAddress: value }))} required compact line1Label="Mailing Address" /></div>}
-                              </div>
-                            ))}
-                            <Button type="button" variant="ghost" onClick={() => addLocation(orgIdx, brandIdx)}><Plus className="mr-2 h-4 w-4" /> Add Location</Button>
-                          </div>
-                        </div>
-                      ))}
-                      <Button type="button" variant="ghost" onClick={() => addBrand(orgIdx)}><Plus className="mr-2 h-4 w-4" /> Add Brand</Button>
-                    </div>
-                  </div>
-                ))}
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>Total organizations: <span className="font-semibold text-foreground">{organizations.length}</span></span><span>Total brands: <span className="font-semibold text-foreground">{totals.brandCount}</span></span><span>Total locations: <span className="font-semibold text-foreground">{totals.locationCount}</span></span></div>
-              </CardContent>
-            </>
-          )}
+          {step === 2 && (hierarchyView === 'review' ? renderHierarchyReview() : renderHierarchyBuild())}
 
           {step === 3 && (
             <>
@@ -848,8 +904,8 @@ export default function OnboardingPage() {
           <CardFooter className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
             <Button type="button" variant="outline" onClick={() => saveDraft()} disabled={loading || checkoutLoading || finalizingOnboarding} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
             <div className="flex w-full gap-3 sm:w-auto">
-              <Button type="button" variant="ghost" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || loading || checkoutLoading || finalizingOnboarding} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{step === 3 ? 'Complete' : 'Next'} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
+              <Button type="button" variant="ghost" onClick={goBack} disabled={step === 1 || loading || checkoutLoading || finalizingOnboarding} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding || (step === 2 && hierarchyView === 'review' && hierarchyIssues.length > 0)} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{nextLabel} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
             </div>
           </CardFooter>
         </Card>

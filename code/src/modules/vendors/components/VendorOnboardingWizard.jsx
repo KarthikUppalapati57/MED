@@ -349,7 +349,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
           
           {step === 1 && (
             <Button onClick={handleCreateVendorAndSendOtp} disabled={loading} size="lg" className="min-w-[140px]">
-              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Continue
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Save & Continue
             </Button>
           )}
           
@@ -368,7 +368,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
           {step === 4 && (
             <Button onClick={handleFinalize} disabled={loading} size="lg" className="min-w-[180px] bg-primary hover:bg-primary/90">
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />} 
-              Complete Onboarding
+              Save & Complete
             </Button>
           )}
         </div>
