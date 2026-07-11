@@ -271,7 +271,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
-    if (!checkoutStatus || !['success', 'free', 'mock'].includes(checkoutStatus)) return;
+    if (!checkoutStatus || !['success', 'free', 'mock', 'trial'].includes(checkoutStatus)) return;
     if (!draftReady || !user || completed || finalizingOnboarding || autoFinalizeRef.current) return;
 
     autoFinalizeRef.current = true;
@@ -680,7 +680,7 @@ export default function OnboardingPage() {
       if (error) throw error;
       if (!data?.url) throw new Error('No checkout URL returned');
 
-      if (data.freePlan || data.providerMode === 'stripe_secret_missing') {
+      if (data.freePlan || data.couponTrial || data.providerMode === 'stripe_secret_missing') {
         await refreshProfile();
         await performOnboarding();
         return;
