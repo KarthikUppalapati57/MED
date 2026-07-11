@@ -20,6 +20,7 @@ const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalC
 const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city: 'Knoxville', state: 'TN', postalCode: '37902', country: 'United States' };
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
+const normalizeCouponCodeInput = (value) => String(value || '').trim().replace(/\s+-\s+\d+\s*(month|months|mo).*$/i, '').toUpperCase();
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
 const createLocation = () => ({ name: '', businessAddressSource: 'custom', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
 const createBrand = () => ({ name: '', addressEnabled: false, addressSource: 'custom', address: emptyAddress(), locations: [createLocation()] });
@@ -231,7 +232,7 @@ export default function OnboardingPage() {
       if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
-      if (draft.couponCode) setCouponCode(draft.couponCode);
+      if (draft.couponCode) setCouponCode(normalizeCouponCodeInput(draft.couponCode));
       if (draft.hierarchyMode) setHierarchyMode(draft.hierarchyMode);
       if (draft.hierarchyView) setHierarchyView(draft.hierarchyView);
     } catch (error) {
@@ -248,7 +249,7 @@ export default function OnboardingPage() {
   }, []);
   useEffect(() => {
     const inviteCoupon = userProfile?.coupon_code || userProfile?.metadata?.coupon_code || userProfile?.metadata?.coupon?.code;
-    if (inviteCoupon && !couponCode.trim()) setCouponCode(inviteCoupon);
+    if (inviteCoupon && !couponCode.trim()) setCouponCode(normalizeCouponCodeInput(inviteCoupon));
   }, [userProfile?.coupon_code, userProfile?.metadata, couponCode]);
 
 
@@ -417,7 +418,7 @@ export default function OnboardingPage() {
   };
 
   const saveDraft = (nextStep = step, showToast = true) => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode, hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode: normalizeCouponCodeInput(couponCode), hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
     if (showToast) toast.success('Onboarding draft saved.');
   };
 
@@ -630,12 +631,14 @@ export default function OnboardingPage() {
 
   const handleApplyCoupon = async () => {
     if (!selectedPlan) return toast.error('Select a plan before applying a coupon or trial code.');
-    if (!couponCode.trim()) return toast.error('Enter a coupon or trial code first.');
+    const normalizedCouponCode = normalizeCouponCodeInput(couponCode);
+    if (!normalizedCouponCode) return toast.error('Enter a coupon or trial code first.');
+    if (normalizedCouponCode !== couponCode) setCouponCode(normalizedCouponCode);
     setCouponLoading(true);
     try {
-      const result = await api.onboarding.applyCoupon({ code: couponCode.trim(), planId: selectedPlan?.id || null });
+      const result = await api.onboarding.applyCoupon({ code: normalizedCouponCode, planId: selectedPlan?.id || null });
       setCouponResult(result?.coupon || null);
-      toast.success(`Applied ${result?.coupon?.code || couponCode.trim()}`);
+      toast.success(`Applied ${result?.coupon?.code || normalizedCouponCode}`);
       await refreshProfile();
     } catch (error) {
       setCouponResult(null);
@@ -657,7 +660,7 @@ export default function OnboardingPage() {
         body: {
           planId: selectedPlan.id,
           priceId: selectedPlan.stripe_price_id || null,
-          couponCode: couponCode.trim() || null,
+          couponCode: normalizeCouponCodeInput(couponCode) || null,
           successUrl: `${window.location.origin}/onboarding?checkout=success`,
           cancelUrl: `${window.location.origin}/onboarding`,
         },
@@ -892,7 +895,7 @@ export default function OnboardingPage() {
                 <div className="rounded-md border bg-muted/20 p-4">
                   <Label htmlFor="coupon-code">Coupon or Trial Code</Label>
                   <div className="mt-2 flex gap-2">
-                    <Input id="coupon-code" value={couponCode} onChange={(event) => setCouponCode(event.target.value)} placeholder="Enter code" className="h-11 bg-card" />
+                    <Input id="coupon-code" value={couponCode} onChange={(event) => setCouponCode(normalizeCouponCodeInput(event.target.value))} placeholder="Enter code" className="h-11 bg-card uppercase" />
                     <Button type="button" variant="outline" onClick={handleApplyCoupon} disabled={couponLoading || !couponCode.trim()} className="h-11 min-w-[112px]">{couponLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying</> : 'Apply'}</Button>
                   </div>
                   {couponResult && <div className="mt-3 rounded-md border border-primary/20 bg-primary/5 p-3 text-sm text-foreground"><span className="font-semibold">{couponResult.code}</span><span className="text-muted-foreground"> applied</span>{couponResult.trial_days > 0 && <span className="text-muted-foreground"> for {couponResult.trial_days} trial days</span>}{couponResult.discount_type === 'percent' && <span className="text-muted-foreground"> for {couponResult.discount_value}% off</span>}</div>}

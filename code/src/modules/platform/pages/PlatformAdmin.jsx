@@ -40,10 +40,27 @@ const TABS = [
   { id: 'ocr', label: 'OCR Review Queue', icon: FileText }
 ];
 
-const createTenantCouponCode = (email) => {
-  const prefix = String(email || 'tenant').split('@')[0].replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase() || 'TENANT';
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `RESTOPS-${prefix}-${suffix}`;
+const createSecureToken = (length = 20) => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(length);
+  if (window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+};
+
+const createTenantCouponCode = () => {
+  const token = createSecureToken(20);
+  return `RST-${token.slice(0, 5)}-${token.slice(5, 10)}-${token.slice(10, 15)}-${token.slice(15, 20)}`;
+};
+
+const getInviteCoupon = (invite) => {
+  const coupon = invite?.metadata?.coupon || {};
+  const code = invite?.metadata?.coupon_code || invite?.coupon_code || coupon.code || '';
+  const months = invite?.metadata?.coupon_trial_months || invite?.coupon_trial_months || coupon.trial_months || (coupon.trial_days ? Math.max(1, Math.round(Number(coupon.trial_days) / 30)) : null);
+  return { code, months };
 };
 
 const ACCESS_LEVELS = [
@@ -319,7 +336,7 @@ export default function PlatformAdmin() {
       let couponMetadata = null;
       if (inviteIncludesCoupon) {
         const trialMonths = Math.max(1, Math.min(24, Number(inviteCouponMonths) || 1));
-        const couponCode = (inviteCouponCode.trim() || createTenantCouponCode(normalizedInviteEmail)).toUpperCase();
+        const couponCode = createTenantCouponCode();
         const { data: coupon, error: couponErr } = await supabase
           .from('onboarding_coupons')
           .insert({
@@ -1115,12 +1132,9 @@ The Restops Platform Team
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs font-bold text-foreground">Coupon Code</Label>
-                      <Input
-                        value={inviteCouponCode}
-                        onChange={(event) => setInviteCouponCode(event.target.value.toUpperCase())}
-                        placeholder="Auto-generate if blank"
-                        className="h-10 rounded-xl bg-card uppercase"
-                      />
+                      <div className="flex h-10 items-center rounded-xl border border-border bg-muted/30 px-3 text-xs font-semibold text-muted-foreground">
+                        Secure one-use code generated on send
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1228,6 +1242,7 @@ The Restops Platform Team
                 <TableHead className="text-[11px] font-bold">CLIENT EMAIL</TableHead>
                 <TableHead className="text-[11px] font-bold">MODULES</TableHead>
                 <TableHead className="text-[11px] font-bold">ACCESS</TableHead>
+                <TableHead className="text-[11px] font-bold">COUPON</TableHead>
                 <TableHead className="text-[11px] font-bold">CREATED</TableHead>
                 <TableHead className="text-[11px] font-bold">STATUS</TableHead>
                 <TableHead className="text-[11px] font-bold">ACTIONS</TableHead>
@@ -1235,8 +1250,10 @@ The Restops Platform Team
             </TableHeader>
             <TableBody>
               {pendingClientInvites.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No pending invitations</TableCell></TableRow>
-              ) : pendingClientInvites.map(invite => (
+                <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">No pending invitations</TableCell></TableRow>
+              ) : pendingClientInvites.map(invite => {
+                const coupon = getInviteCoupon(invite);
+                return (
                 <TableRow key={invite.id} className="hover:bg-secondary/50 transition-colors">
                   <TableCell className="font-semibold text-sm text-foreground">{invite.email}</TableCell>
                   <TableCell>
@@ -1257,6 +1274,15 @@ The Restops Platform Team
                         <Badge className="bg-amber-100 text-amber-700 text-[9px] uppercase font-bold border-none">No verification</Badge>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {coupon.code ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 text-[9px] font-bold border-none">
+                        {coupon.code}{coupon.months ? ` - ${coupon.months} mo` : ''}
+                      </Badge>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">None</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-[10px] text-muted-foreground">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
@@ -1290,7 +1316,9 @@ The Restops Platform Team
                             to_name: invite.email.split('@')[0],
                             role: "Tenant Super Admin",
                             org_name: "Restops Platform",
-                            invite_link: link
+                            invite_link: link,
+                            coupon_code: coupon.code || null,
+                            coupon_trial_months: coupon.months || null
                           });
                           
                           if (!emailResult.success) {
@@ -1314,7 +1342,8 @@ The Restops Platform Team
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -1337,17 +1366,19 @@ The Restops Platform Team
               <TableRow className="bg-secondary/50">
                 <TableHead className="text-[11px] font-bold">CLIENT EMAIL</TableHead>
                 <TableHead className="text-[11px] font-bold">MODULES</TableHead>
+                <TableHead className="text-[11px] font-bold">COUPON</TableHead>
                 <TableHead className="text-[11px] font-bold">CREATED</TableHead>
                 <TableHead className="text-[11px] font-bold">STATUS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {clientHistoryInvites.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground">No history available</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No history available</TableCell></TableRow>
               ) : clientHistoryInvites.map(invite => {
                 const isAccepted = !!invite.accepted_at;
                 const hasProfile = allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase());
                 const isExpired = new Date(invite.expires_at) <= new Date();
+                const coupon = getInviteCoupon(invite);
                 
                 let statusBadge;
                 if (isAccepted || hasProfile) {
@@ -1367,6 +1398,15 @@ The Restops Platform Team
                           </Badge>
                         ))}
                       </div>
+                    </TableCell>
+                    <TableCell className="opacity-70">
+                      {coupon.code ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 text-[9px] font-bold border-none">
+                          {coupon.code}{coupon.months ? ` - ${coupon.months} mo` : ''}
+                        </Badge>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">None</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-[10px] text-muted-foreground opacity-70">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>{statusBadge}</TableCell>
