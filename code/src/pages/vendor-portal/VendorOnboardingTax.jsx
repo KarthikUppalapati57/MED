@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,6 @@ import { Loader2, ShieldCheck, UploadCloud } from 'lucide-react';
 
 export default function VendorOnboardingTax() {
   const { token } = useParams();
-  const navigate = useNavigate();
   const [taxId, setTaxId] = useState('');
   const [w9File, setW9File] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -79,8 +78,7 @@ export default function VendorOnboardingTax() {
             </div>
             <CardTitle>Successfully Submitted</CardTitle>
             <CardDescription>
-              Your tax information and W9 document have been securely received. You can now close this window. 
-              You will receive another email shortly to securely enter your bank details for payments.
+              Your tax information and W9 document have been securely received for review. You can now close this window.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -97,7 +95,7 @@ export default function VendorOnboardingTax() {
             Secure Tax Information
           </CardTitle>
           <CardDescription>
-            Please provide your Tax ID (SSN/EIN) and upload your W9 document. This information is encrypted end-to-end.
+            Please provide your Tax ID (SSN/EIN) and upload your W9 document. This information is stored securely and reviewed before banking is unlocked.
           </CardDescription>
         </CardHeader>
         <CardContent>

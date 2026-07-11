@@ -22,8 +22,8 @@ BEGIN
 
   SET LOCAL ROLE service_role;
 
-  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, verification_state)
-  VALUES (v_vendor, v_org, 'verified')
+  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, verification_state, callback_status)
+  VALUES (v_vendor, v_org, 'verified', 'confirmed')
   RETURNING id INTO v_bank_default;
 
   PERFORM public.store_vendor_banking_secret(v_bank_default, '000111222333', '021000021');
@@ -39,8 +39,8 @@ BEGIN
     RAISE EXCEPTION 'first banking row did not auto-default with secret + last4';
   END IF;
 
-  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, verification_state)
-  VALUES (v_vendor, v_org, 'verified')
+  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, verification_state, callback_status)
+  VALUES (v_vendor, v_org, 'verified', 'confirmed')
   RETURNING id INTO v_bank_fallback;
 
   PERFORM public.store_vendor_banking_secret(v_bank_fallback, '999888777666', '011000015');

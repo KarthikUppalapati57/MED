@@ -57,10 +57,9 @@ export default function VendorOnboardingBank() {
             <div className="mx-auto bg-green-100 p-3 rounded-full w-16 h-16 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <CardTitle>Onboarding Complete</CardTitle>
+            <CardTitle>Bank Details Submitted</CardTitle>
             <CardDescription>
-              Your banking information has been securely saved. You have successfully completed the onboarding process! 
-              You may now close this window.
+              Your banking information has been securely received. Payments remain locked until our team confirms the change by phone using the contact already on file.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -77,7 +76,7 @@ export default function VendorOnboardingBank() {
             Secure Banking Information
           </CardTitle>
           <CardDescription>
-            Please provide your bank account details for ACH payments. This connection is encrypted and secure.
+            Please provide your bank account details for ACH payments. Payments stay locked until callback verification is complete.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,7 +105,7 @@ export default function VendorOnboardingBank() {
                 value={bankDetails.accountNumber} 
                 onChange={e => setBankDetails({...bankDetails, accountNumber: e.target.value})} 
                 type="password" 
-                placeholder="••••••••••••" 
+                placeholder="************" 
                 required 
               />
             </div>

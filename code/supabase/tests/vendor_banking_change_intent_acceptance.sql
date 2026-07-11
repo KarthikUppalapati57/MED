@@ -41,17 +41,23 @@ BEGIN
      SET organization_id = v_org,
          brand_id = v_brand,
          location_id = v_location,
-         role = 'location_manager',
-         access_level = 'location',
+         role = 'branch_manager',
+         access_level = 'brand',
          updated_at = now()
    WHERE id = v_user;
 
   INSERT INTO public.organization_members (organization_id, user_id, role)
-  VALUES (v_org, v_user, 'location_manager');
+  VALUES (v_org, v_user, 'branch_manager');
 
-  INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status)
-  VALUES (v_org, v_brand, v_location, 'Vendor Intent Supplier', 'active')
+  INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, onboarding_status)
+  VALUES (v_org, v_brand, v_location, 'Vendor Intent Supplier', 'active', 'otp_verified')
   RETURNING id INTO v_vendor;
+
+  INSERT INTO public.vendor_documents (vendor_id, organization_id, brand_id, location_id, document_type, storage_path, status)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'w9', 'test/vendor-intent-w9.pdf', 'on_file');
+
+  INSERT INTO public.vendor_tax_information (vendor_id, organization_id, brand_id, location_id, legal_name, w9_status, verification_status, verification_method)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'Vendor Intent Legal', 'verified', 'verified', 'manual_review');
 
   SET LOCAL ROLE service_role;
 
@@ -61,6 +67,7 @@ BEGIN
     brand_id,
     location_id,
     verification_state,
+    callback_status,
     verified_at
   ) VALUES (
     v_vendor,
@@ -68,6 +75,7 @@ BEGIN
     v_brand,
     v_location,
     'verified',
+    'confirmed',
     now()
   )
   RETURNING id INTO v_default_a;
@@ -108,10 +116,25 @@ BEGIN
     WHERE id = v_add_b
       AND is_default = false
       AND is_active = true
-      AND verification_state = 'verified'
+      AND verification_state = 'pending'
+      AND callback_status = 'pending'
       AND account_last4 = '7666'
   ) THEN
-    RAISE EXCEPTION 'add intent account B should be active verified non-default: %', v_submit;
+    RAISE EXCEPTION 'add intent account B should be active pending callback as non-default: %', v_submit;
+  END IF;
+
+  PERFORM public.confirm_vendor_banking_callback((v_submit->>'banking_change_request_id')::uuid, 'confirmed add account');
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.vendor_banking_details
+    WHERE id = v_add_b
+      AND is_default = false
+      AND is_active = true
+      AND verification_state = 'verified'
+      AND callback_status = 'confirmed'
+  ) THEN
+    RAISE EXCEPTION 'add intent account B was not callback-confirmed as non-default';
   END IF;
 
   IF NOT EXISTS (
@@ -153,12 +176,27 @@ BEGIN
     SELECT 1
     FROM public.vendor_banking_details
     WHERE id = v_replace_c
+      AND is_default = false
+      AND is_active = true
+      AND verification_state = 'pending'
+      AND callback_status = 'pending'
+      AND account_last4 = '6777'
+  ) THEN
+    RAISE EXCEPTION 'replace intent account C should be pending callback before confirmation: %', v_submit;
+  END IF;
+
+  PERFORM public.confirm_vendor_banking_callback((v_submit->>'banking_change_request_id')::uuid, 'confirmed replacement account');
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.vendor_banking_details
+    WHERE id = v_replace_c
       AND is_default = true
       AND is_active = true
       AND verification_state = 'verified'
-      AND account_last4 = '6777'
+      AND callback_status = 'confirmed'
   ) THEN
-    RAISE EXCEPTION 'replace intent account C should be active verified default: %', v_submit;
+    RAISE EXCEPTION 'replace intent account C was not confirmed as default';
   END IF;
 
   IF NOT EXISTS (
@@ -185,6 +223,7 @@ BEGIN
     brand_id,
     location_id,
     verification_state,
+    callback_status,
     verified_at
   ) VALUES (
     v_vendor,
@@ -192,6 +231,7 @@ BEGIN
     v_brand,
     v_location,
     'verified',
+    'confirmed',
     now()
   )
   RETURNING id INTO v_manual_d;

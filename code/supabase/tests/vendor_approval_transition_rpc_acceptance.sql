@@ -21,6 +21,8 @@ DECLARE
   v_branch_vendor uuid;
   v_location_vendor uuid;
   v_out_of_brand_vendor uuid;
+  v_owner_bank uuid;
+  v_branch_bank uuid;
 BEGIN
   INSERT INTO vendor_approval_transition_ids(key, value) VALUES
     ('org', v_org),
@@ -97,6 +99,26 @@ BEGIN
     ('branch_vendor', v_branch_vendor),
     ('location_vendor', v_location_vendor),
     ('out_of_brand_vendor', v_out_of_brand_vendor);
+
+  INSERT INTO public.vendor_documents (vendor_id, organization_id, brand_id, location_id, document_type, storage_path, status)
+  VALUES
+    (v_owner_vendor, v_org, v_brand1, NULL, 'w9', 'test/owner-w9.pdf', 'on_file'),
+    (v_branch_vendor, v_org, v_brand1, NULL, 'w9', 'test/branch-w9.pdf', 'on_file');
+
+  INSERT INTO public.vendor_tax_information (vendor_id, organization_id, brand_id, location_id, legal_name, w9_status, verification_status, verification_method)
+  VALUES
+    (v_owner_vendor, v_org, v_brand1, NULL, 'Owner Vendor Legal', 'verified', 'verified', 'manual_review'),
+    (v_branch_vendor, v_org, v_brand1, NULL, 'Branch Vendor Legal', 'verified', 'verified', 'manual_review');
+
+  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, brand_id, location_id, verification_state, callback_status, verified_at)
+  VALUES (v_owner_vendor, v_org, v_brand1, NULL, 'verified', 'confirmed', now())
+  RETURNING id INTO v_owner_bank;
+  PERFORM public.store_vendor_banking_secret(v_owner_bank, '111222333444', '021000021');
+
+  INSERT INTO public.vendor_banking_details (vendor_id, organization_id, brand_id, location_id, verification_state, callback_status, verified_at)
+  VALUES ((SELECT value FROM vendor_approval_transition_ids WHERE key = 'branch_vendor'), v_org, v_brand1, NULL, 'verified', 'confirmed', now())
+  RETURNING id INTO v_branch_bank;
+  PERFORM public.store_vendor_banking_secret(v_branch_bank, '555666777888', '021000021');
 END $$;
 
 DO $$
