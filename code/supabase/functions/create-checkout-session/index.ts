@@ -70,16 +70,14 @@ serve(async (req) => {
     if (plan.is_active !== true) throw new Error('Selected plan is not active')
 
     const resolvedPriceId = priceId || plan.stripe_price_id
-    if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
-      throw new Error('Selected paid plan is missing a Stripe price ID')
-    }
 
     let coupon: string | undefined
+    let couponTrialDays = 0
     if (couponCode) {
       const normalizedCouponCode = String(couponCode).trim()
       const { data: existingCoupon } = await adminClient
         .from('onboarding_coupons')
-        .select('id, code')
+        .select('id, code, trial_days, discount_type')
         .ilike('code', normalizedCouponCode)
         .maybeSingle()
 
@@ -95,6 +93,7 @@ serve(async (req) => {
 
       if (existingCoupon && existingRedemption) {
         coupon = existingCoupon.code
+        couponTrialDays = Number(existingCoupon.trial_days || 0)
       } else {
         const { data: appliedCoupon, error: couponError } = await userClient.rpc('apply_onboarding_coupon', {
           p_code: normalizedCouponCode,
@@ -102,7 +101,36 @@ serve(async (req) => {
         })
         if (couponError) throw couponError
         coupon = appliedCoupon?.coupon?.code
+        couponTrialDays = Number(appliedCoupon?.coupon?.trial_days || 0)
       }
+    }
+
+    if (coupon && couponTrialDays > 0) {
+      await adminClient
+        .from('profiles')
+        .update({
+          payment_verified: true,
+          payment_method_type: 'trial_coupon',
+          pending_onboarding_plan_id: plan.id,
+          pending_payment_metadata: {
+            provider: 'trial_coupon',
+            plan_id: plan.id,
+            coupon_code: coupon,
+            trial_days: couponTrialDays,
+            completed_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authData.user.id)
+
+      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=free', couponTrial: true, trialDays: couponTrialDays }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
+      throw new Error('Selected paid plan is missing a Stripe price ID')
     }
 
     if (Number(plan.price_monthly) === 0) {

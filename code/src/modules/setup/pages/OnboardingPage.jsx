@@ -905,6 +905,10 @@ export default function OnboardingPage() {
                   ))}
                 </div>
 
+                <div className="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  Payment details are collected securely in Stripe Checkout after you click Complete. If a trial coupon is applied, payment setup is skipped until the trial period ends.
+                </div>
+
                 <div className="rounded-md border bg-muted/20 p-4">
                   <Label htmlFor="coupon-code">Coupon or Trial Code</Label>
                   <div className="mt-2 flex gap-2">
