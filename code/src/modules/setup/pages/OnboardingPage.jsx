@@ -43,6 +43,8 @@ const normalizeOrganization = (org = {}) => {
 };
 const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
+const addressPayloadOrUndefined = (address) => address && typeof address === 'object' && addressComplete(address) ? address : undefined;
+
 const isValidPostalCode = (address) => {
   const country = normalizeKey(address?.country);
   const postalCode = String(address?.postalCode || '').trim();
@@ -588,27 +590,34 @@ export default function OnboardingPage() {
     return null;
   };
 
-  const buildHierarchyPayload = () => organizations.map((org) => ({
-    name: org.name.trim(),
-    slug: org.slug.trim(),
-    metadata: {
-      tenant_business_identity: businessIdentity,
-      organization_address: org.addressEnabled ? org.businessAddress : null,
-      organization_business_address: org.addressEnabled ? org.businessAddress : null,
-      organization_mailing_same_as_business: org.addressEnabled ? org.mailingSameAsBusiness : true,
-      organization_mailing_address: org.addressEnabled ? (org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress) : null,
-    },
-    brands: org.brands.map((brand) => ({
-      name: brand.name.trim(),
-      metadata: { brand_address: brand.addressEnabled ? brand.address : null },
-      locations: brand.locations.map((location) => ({
-        name: location.name.trim(),
-        address: formatAddress(location.businessAddress),
-        business_address: location.businessAddress,
-        mailing_address: location.mailingSameAsBusiness ? location.businessAddress : location.mailingAddress,
-      })),
-    })),
-  }));
+  const buildHierarchyPayload = () => organizations.map((org) => {
+    const orgBusinessAddress = org.addressEnabled ? addressPayloadOrUndefined(org.businessAddress) : undefined;
+    const orgMailingAddress = org.addressEnabled ? addressPayloadOrUndefined(org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress) : undefined;
+
+    return {
+      name: org.name.trim(),
+      slug: org.slug.trim(),
+      metadata: {
+        tenant_business_identity: businessIdentity,
+        ...(orgBusinessAddress ? { organization_address: orgBusinessAddress, organization_business_address: orgBusinessAddress } : {}),
+        organization_mailing_same_as_business: org.addressEnabled ? org.mailingSameAsBusiness : true,
+        ...(orgMailingAddress ? { organization_mailing_address: orgMailingAddress } : {}),
+      },
+      brands: org.brands.map((brand) => {
+        const brandAddress = brand.addressEnabled ? addressPayloadOrUndefined(brand.address) : undefined;
+        return {
+          name: brand.name.trim(),
+          metadata: brandAddress ? { brand_address: brandAddress } : {},
+          locations: brand.locations.map((location) => ({
+            name: location.name.trim(),
+            address: formatAddress(location.businessAddress),
+            business_address: addressPayloadOrUndefined(location.businessAddress),
+            mailing_address: addressPayloadOrUndefined(location.mailingSameAsBusiness ? location.businessAddress : location.mailingAddress),
+          })),
+        };
+      }),
+    };
+  });
 
   const performOnboarding = async () => {
     if (!user) {
