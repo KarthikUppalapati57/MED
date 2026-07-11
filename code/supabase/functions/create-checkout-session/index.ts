@@ -76,12 +76,33 @@ serve(async (req) => {
 
     let coupon: string | undefined
     if (couponCode) {
-      const { data: appliedCoupon, error: couponError } = await userClient.rpc('apply_onboarding_coupon', {
-        p_code: couponCode,
-        p_plan_id: selectedPlanId,
-      })
-      if (couponError) throw couponError
-      coupon = appliedCoupon?.coupon?.code
+      const normalizedCouponCode = String(couponCode).trim()
+      const { data: existingCoupon } = await adminClient
+        .from('onboarding_coupons')
+        .select('id, code')
+        .ilike('code', normalizedCouponCode)
+        .maybeSingle()
+
+      const { data: existingRedemption } = existingCoupon
+        ? await adminClient
+            .from('onboarding_coupon_redemptions')
+            .select('id')
+            .eq('coupon_id', existingCoupon.id)
+            .eq('user_id', authData.user.id)
+            .in('status', ['applied', 'consumed'])
+            .maybeSingle()
+        : { data: null }
+
+      if (existingCoupon && existingRedemption) {
+        coupon = existingCoupon.code
+      } else {
+        const { data: appliedCoupon, error: couponError } = await userClient.rpc('apply_onboarding_coupon', {
+          p_code: normalizedCouponCode,
+          p_plan_id: selectedPlanId,
+        })
+        if (couponError) throw couponError
+        coupon = appliedCoupon?.coupon?.code
+      }
     }
 
     if (Number(plan.price_monthly) === 0) {

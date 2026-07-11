@@ -55,6 +55,18 @@ const addressError = (address, label) => {
   if (!isValidPostalCode(address)) return `${label} postal code is invalid.`;
   return null;
 };
+const getFunctionErrorMessage = async (error) => {
+  if (error?.context && typeof error.context.json === 'function') {
+    try {
+      const body = await error.context.json();
+      return body?.error || body?.message || error.message;
+    } catch {
+      return error.message;
+    }
+  }
+  return error?.message;
+};
+
 const websiteError = (value) => {
   const website = String(value || '').trim();
   if (!website || website === 'https://' || website === 'http://') return null;
@@ -676,7 +688,8 @@ export default function OnboardingPage() {
 
       window.location.href = data.url;
     } catch (error) {
-      toast.error(error.message || 'Failed to start checkout process.');
+      const message = await getFunctionErrorMessage(error);
+      toast.error(message || 'Failed to start checkout process.');
     } finally {
       setCheckoutLoading(false);
     }
