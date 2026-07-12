@@ -77,8 +77,8 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
         body: { action: 'send-otp', payload: { vendor_id: newVendor.id } }
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (error) throw error;
 
       setDevOtp(data.devOtp);
       toast.success("OTP sent successfully to vendor!");
@@ -98,8 +98,8 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
         body: { action: 'verify-otp', payload: { vendor_id: vendorId, otp: otpInput } }
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (error) throw error;
 
       toast.success("OTP verified!");
       setStep(2);
@@ -117,8 +117,8 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
         body: { action: 'send-magic-link', payload: { vendor_id: vendorId, type } }
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (error) throw error;
 
       toast.success(`Magic link for ${type === 'tax' ? 'Tax info' : 'Bank details'} sent to vendor!`);
       if (type === 'tax') setStep(3);
