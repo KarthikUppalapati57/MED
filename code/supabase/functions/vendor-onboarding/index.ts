@@ -25,7 +25,7 @@ function isProduction() {
 
 async function sendTransactionalEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
+  const from = Deno.env.get("VENDOR_ONBOARDING_FROM_EMAIL") || Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
 
   if (!apiKey) {
     console.log(`[EMAIL SKIPPED] ${subject} -> ${to}\n${text}`);
