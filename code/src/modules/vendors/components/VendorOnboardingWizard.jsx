@@ -12,6 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, Send, ShieldCheck, Mail, Building2, CreditCard } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+const formatUSPhoneInput = (value) => {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
 
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const { organization, brand, location } = useAuth();
@@ -208,7 +214,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="vendor-phone" className="text-sm font-medium">Phone</Label>
-                        <Input id="vendor-phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+1 555-0123" className="h-11 bg-muted/20" />
+                        <Input id="vendor-phone" value={formData.phone} onChange={e => setFormData({...formData, phone: formatUSPhoneInput(e.target.value)})} placeholder="(555) 010-0000" className="h-11 bg-muted/20" inputMode="tel" />
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="vendor-contact" className="text-sm font-medium">Primary Contact Name</Label>
