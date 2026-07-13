@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, Download, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -220,6 +220,8 @@ export default function OnboardingPage() {
   const [completed, setCompleted] = useState(false);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [bankAccount, setBankAccount] = useState({ bankName: '', accountHolderName: '', accountType: 'checking', routingNumber: '', accountNumber: '' });
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [finalizingOnboarding, setFinalizingOnboarding] = useState(false);
   const autoFinalizeRef = useRef(false);
@@ -246,6 +248,8 @@ export default function OnboardingPage() {
       if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 3));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
+      if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
+      if (draft.bankAccount) setBankAccount((prev) => ({ ...prev, ...draft.bankAccount, accountNumber: '', routingNumber: '' }));
       if (draft.couponCode) setCouponCode(normalizeCouponCodeInput(draft.couponCode));
       if (draft.hierarchyMode) setHierarchyMode(draft.hierarchyMode);
       if (draft.hierarchyView) setHierarchyView(draft.hierarchyView);
@@ -273,7 +277,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
-    if (!checkoutStatus || !['success', 'free', 'mock', 'trial'].includes(checkoutStatus)) return;
+    if (!checkoutStatus || !['success', 'free', 'mock', 'trial', 'ach'].includes(checkoutStatus)) return;
     if (!draftReady || !user || completed || finalizingOnboarding || autoFinalizeRef.current) return;
 
     autoFinalizeRef.current = true;
@@ -292,6 +296,7 @@ export default function OnboardingPage() {
   }, [organizations]);
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
+  const updateBankAccount = (field, value) => setBankAccount((prev) => ({ ...prev, [field]: value }));
   const updateBusinessIdentityAddress = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: normalizeAddress(value) }));
   const updateOrganization = (orgIdx, updater) => setOrganizations((prev) => prev.map((org, index) => (index === orgIdx ? updater(org) : org)));
   const updateBrand = (orgIdx, brandIdx, updater) => updateOrganization(orgIdx, (org) => ({ ...org, brands: org.brands.map((brand, index) => (index === brandIdx ? updater(brand) : brand)) }));
@@ -432,7 +437,7 @@ export default function OnboardingPage() {
   };
 
   const saveDraft = (nextStep = step, showToast = true) => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, couponCode: normalizeCouponCodeInput(couponCode), hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, paymentMethod, bankAccount: { ...bankAccount, accountNumber: '', routingNumber: '' }, couponCode: normalizeCouponCodeInput(couponCode), hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
     if (showToast) toast.success('Onboarding draft saved.');
   };
 
@@ -671,6 +676,14 @@ export default function OnboardingPage() {
 
   const handleSubscribe = async () => {
     if (!selectedPlan) return toast.error('Please select a plan to continue.');
+    if (Number(selectedPlan.price_monthly || 0) > 0 && paymentMethod === 'ach') {
+      const routingDigits = String(bankAccount.routingNumber || '').replace(/\D/g, '');
+      const accountDigits = String(bankAccount.accountNumber || '').replace(/\D/g, '');
+      if (!bankAccount.bankName.trim()) return toast.error('Enter the bank name for ACH setup.');
+      if (!bankAccount.accountHolderName.trim()) return toast.error('Enter the account holder name for ACH setup.');
+      if (!/^\d{9}$/.test(routingDigits)) return toast.error('Enter a valid 9-digit routing number.');
+      if (!/^\d{4,17}$/.test(accountDigits)) return toast.error('Enter a valid bank account number.');
+    }
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
 
@@ -682,6 +695,8 @@ export default function OnboardingPage() {
           planId: selectedPlan.id,
           priceId: selectedPlan.stripe_price_id || null,
           couponCode: normalizeCouponCodeInput(couponCode) || null,
+          paymentMethod,
+          bankAccount: paymentMethod === 'ach' ? bankAccount : null,
           successUrl: `${window.location.origin}/onboarding?checkout=success`,
           cancelUrl: `${window.location.origin}/onboarding`,
         },
@@ -689,7 +704,7 @@ export default function OnboardingPage() {
       if (error) throw error;
       if (!data?.url) throw new Error('No checkout URL returned');
 
-      if (data.freePlan) {
+      if (data.freePlan || data.ach) {
         await refreshProfile();
         await performOnboarding();
         return;
@@ -914,9 +929,55 @@ export default function OnboardingPage() {
                   ))}
                 </div>
 
-                <div className="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  Payment details are collected securely in Stripe Checkout after you click Complete. If a trial coupon is applied, payment setup is skipped until the trial period ends.
-                </div>
+                {Number(selectedPlan?.price_monthly || 0) > 0 && (
+                  <div className="rounded-md border bg-muted/20 p-4">
+                    <div className="mb-3">
+                      <h3 className="text-sm font-semibold text-foreground">Payment Method</h3>
+                      <p className="text-xs text-muted-foreground">Choose how RestOps should collect billing details now. Trial coupons still require a payment method so billing can start automatically after the trial.</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button type="button" onClick={() => setPaymentMethod('card')} className={`rounded-md border p-4 text-left transition hover:border-primary ${paymentMethod === 'card' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
+                        <CreditCard className="mb-2 h-5 w-5 text-primary" />
+                        <p className="font-semibold text-foreground">Credit or Debit Card</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Secure subscription checkout through Stripe.</p>
+                      </button>
+                      <button type="button" onClick={() => setPaymentMethod('ach')} className={`rounded-md border p-4 text-left transition hover:border-primary ${paymentMethod === 'ach' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
+                        <Landmark className="mb-2 h-5 w-5 text-primary" />
+                        <p className="font-semibold text-foreground">Bank ACH</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Secure bank setup through Dwolla.</p>
+                      </button>
+                    </div>
+                    {paymentMethod === 'ach' && (
+                      <div className="mt-4 rounded-md border bg-card p-4">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <FieldLabel htmlFor="ach-bank-name" required>Bank Name</FieldLabel>
+                            <Input id="ach-bank-name" value={bankAccount.bankName} onChange={(event) => updateBankAccount('bankName', event.target.value)} className="h-10 bg-card" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <FieldLabel htmlFor="ach-holder-name" required>Account Holder Name</FieldLabel>
+                            <Input id="ach-holder-name" value={bankAccount.accountHolderName} onChange={(event) => updateBankAccount('accountHolderName', event.target.value)} className="h-10 bg-card" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <FieldLabel htmlFor="ach-account-type" required>Account Type</FieldLabel>
+                            <Select value={bankAccount.accountType} onValueChange={(value) => updateBankAccount('accountType', value)}>
+                              <SelectTrigger id="ach-account-type" className="h-10 bg-card"><SelectValue /></SelectTrigger>
+                              <SelectContent><SelectItem value="checking">Checking</SelectItem><SelectItem value="savings">Savings</SelectItem></SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <FieldLabel htmlFor="ach-routing" required>Routing Number</FieldLabel>
+                            <Input id="ach-routing" value={bankAccount.routingNumber} onChange={(event) => updateBankAccount('routingNumber', event.target.value.replace(/\D/g, '').slice(0, 9))} inputMode="numeric" className="h-10 bg-card" />
+                          </div>
+                          <div className="space-y-1.5 md:col-span-2">
+                            <FieldLabel htmlFor="ach-account" required>Account Number</FieldLabel>
+                            <Input id="ach-account" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount('accountNumber', event.target.value.replace(/\D/g, '').slice(0, 17))} inputMode="numeric" type="password" className="h-10 bg-card" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="rounded-md border bg-muted/20 p-4">
                   <Label htmlFor="coupon-code">Coupon or Trial Code</Label>
@@ -942,4 +1003,10 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
+
+
+
+
+
 

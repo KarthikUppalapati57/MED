@@ -4,12 +4,60 @@ import Stripe from 'https://esm.sh/stripe@14.17.0?target=deno'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+const dwollaKey = Deno.env.get('DWOLLA_KEY') ?? ''
+const dwollaSecret = Deno.env.get('DWOLLA_SECRET') ?? ''
+const dwollaEnvironment = (Deno.env.get('DWOLLA_ENVIRONMENT') ?? 'sandbox').toLowerCase()
+const dwollaBaseUrl = dwollaEnvironment === 'production' ? 'https://api.dwolla.com' : 'https://api-sandbox.dwolla.com'
 const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
       httpClient: Stripe.createFetchHttpClient(),
     })
   : null
+
+async function getDwollaAccessToken() {
+  if (!dwollaKey || !dwollaSecret) {
+    throw new Error('Dwolla is not configured. Bank ACH setup requires DWOLLA_KEY and DWOLLA_SECRET.')
+  }
+
+  const credentials = btoa(`${dwollaKey}:${dwollaSecret}`)
+  const response = await fetch(`${dwollaBaseUrl}/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/vnd.dwolla.v1.hal+json',
+    },
+    body: 'grant_type=client_credentials',
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Dwolla authentication failed: ${body || response.statusText}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
+}
+
+async function createDwollaResource(path: string, payload: Record<string, unknown>, accessToken: string) {
+  const response = await fetch(`${dwollaBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/vnd.dwolla.v1.hal+json',
+      Accept: 'application/vnd.dwolla.v1.hal+json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Dwolla request failed: ${body || response.statusText}`)
+  }
+
+  return response.headers.get('location')
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,14 +89,18 @@ serve(async (req) => {
       plan_id,
       org_id,
       organization_id,
+      paymentMethod = 'card',
+      bankAccount = null,
     } = await req.json()
 
     const selectedPlanId = planId || plan_id
+    const selectedPaymentMethod = String(paymentMethod || 'card').toLowerCase()
+    if (!['card', 'ach'].includes(selectedPaymentMethod)) throw new Error('Payment method must be card or ach')
     if (!selectedPlanId) throw new Error('Missing plan ID')
 
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
-      .select('id, email, tenant_id, organization_id, payment_verified, payment_method_type, business_verification_status')
+      .select('id, email, full_name, tenant_id, organization_id, payment_verified, payment_method_type, business_verification_status')
       .eq('id', authData.user.id)
       .single()
 
@@ -69,7 +121,7 @@ serve(async (req) => {
     if (planError || !plan) throw new Error('Invalid plan ID')
     if (plan.is_active !== true) throw new Error('Selected plan is not active')
 
-    const resolvedPriceId = priceId || plan.stripe_price_id
+    let resolvedPriceId = priceId || plan.stripe_price_id
 
     let coupon: string | undefined
     let couponTrialDays = 0
@@ -104,11 +156,6 @@ serve(async (req) => {
         couponTrialDays = Number(appliedCoupon?.coupon?.trial_days || 0)
       }
     }
-
-    if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
-      throw new Error('Selected paid plan is missing a Stripe price ID')
-    }
-
     if (Number(plan.price_monthly) === 0) {
       if (organizationId) {
         await adminClient.from('organizations').update({ plan_id: plan.id }).eq('id', organizationId)
@@ -136,10 +183,85 @@ serve(async (req) => {
       })
     }
 
+    if (selectedPaymentMethod === 'ach') {
+      const account = bankAccount && typeof bankAccount === 'object' ? bankAccount as Record<string, unknown> : {}
+      const routingNumber = String(account.routingNumber || '').replace(/\D/g, '')
+      const accountNumber = String(account.accountNumber || '').replace(/\D/g, '')
+      const bankAccountType = String(account.accountType || 'checking').toLowerCase()
+      const bankName = String(account.bankName || 'Tenant bank account').trim()
+      const holderName = String(account.accountHolderName || profile.full_name || profile.email || authData.user.email || 'RestOps Tenant').trim()
+
+      if (!/^\d{9}$/.test(routingNumber)) throw new Error('A valid 9-digit routing number is required for ACH setup')
+      if (!/^\d{4,17}$/.test(accountNumber)) throw new Error('A valid bank account number is required for ACH setup')
+      if (!['checking', 'savings'].includes(bankAccountType)) throw new Error('Bank account type must be checking or savings')
+
+      const [firstName, ...lastNameParts] = holderName.split(/\s+/)
+      const lastName = lastNameParts.join(' ') || 'Tenant'
+      const accessToken = await getDwollaAccessToken()
+      const customerUrl = await createDwollaResource('/customers', {
+        firstName: firstName || 'RestOps',
+        lastName,
+        email: profile.email || authData.user.email,
+        type: 'unverified',
+        businessName: holderName,
+      }, accessToken)
+
+      if (!customerUrl) throw new Error('Dwolla customer creation did not return a resource URL')
+      const fundingSourcePath = customerUrl.replace(dwollaBaseUrl, '') + '/funding-sources'
+      const fundingSourceUrl = await createDwollaResource(fundingSourcePath, {
+        routingNumber,
+        accountNumber,
+        bankAccountType,
+        name: bankName,
+      }, accessToken)
+
+      if (!fundingSourceUrl) throw new Error('Dwolla funding source creation did not return a resource URL')
+
+      await adminClient
+        .from('profiles')
+        .update({
+          payment_verified: true,
+          payment_method_type: 'ach',
+          pending_onboarding_plan_id: plan.id,
+          pending_payment_metadata: {
+            provider: 'dwolla',
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            trial_days: couponTrialDays || 0,
+            dwolla_customer_url: customerUrl,
+            dwolla_funding_source_url: fundingSourceUrl,
+            bank_name: bankName,
+            account_type: bankAccountType,
+            account_last4: accountNumber.slice(-4),
+            completed_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authData.user.id)
+
+      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=ach', ach: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
     if (!stripe) {
       throw new Error('Stripe is not configured. Payment method collection is required for paid and trial plans.')
     }
 
+    if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
+      const price = await stripe.prices.create({
+        unit_amount: Math.round(Number(plan.price_monthly) * 100),
+        currency: 'usd',
+        recurring: { interval: 'month' },
+        product_data: {
+          name: plan.name || `RestOps ${plan.id}`,
+          metadata: { plan_id: plan.id },
+        },
+        metadata: { plan_id: plan.id },
+      })
+      resolvedPriceId = price.id
+      await adminClient.from('plans').update({ stripe_price_id: resolvedPriceId }).eq('id', plan.id)
+    }
     let org: { id: string; name: string; stripe_customer_id: string | null } | null = null
     if (organizationId) {
       const { data: orgData, error: orgError } = await adminClient
@@ -190,6 +312,7 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
+      payment_method_types: ['card'],
       line_items: [{ price: resolvedPriceId, quantity: 1 }],
       success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
       cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
