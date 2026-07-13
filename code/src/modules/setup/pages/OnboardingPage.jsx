@@ -643,8 +643,9 @@ export default function OnboardingPage() {
 
       toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s).`);
       window.localStorage.removeItem(DRAFT_KEY);
-      await refreshProfile();
       setCompleted(true);
+      refreshProfile().catch((profileError) => console.warn('Profile refresh after onboarding failed:', profileError));
+      window.setTimeout(() => navigate('/', { replace: true }), 1200);
       return true;
     } catch (error) {
       console.error('Onboarding failed:', error);
