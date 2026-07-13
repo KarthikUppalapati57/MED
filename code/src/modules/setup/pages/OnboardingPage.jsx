@@ -689,7 +689,7 @@ export default function OnboardingPage() {
       if (error) throw error;
       if (!data?.url) throw new Error('No checkout URL returned');
 
-      if (data.freePlan || data.couponTrial || data.providerMode === 'stripe_secret_missing') {
+      if (data.freePlan) {
         await refreshProfile();
         await performOnboarding();
         return;

@@ -105,30 +105,6 @@ serve(async (req) => {
       }
     }
 
-    if (coupon && couponTrialDays > 0) {
-      await adminClient
-        .from('profiles')
-        .update({
-          payment_verified: true,
-          payment_method_type: 'trial_coupon',
-          pending_onboarding_plan_id: plan.id,
-          pending_payment_metadata: {
-            provider: 'trial_coupon',
-            plan_id: plan.id,
-            coupon_code: coupon,
-            trial_days: couponTrialDays,
-            completed_at: new Date().toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authData.user.id)
-
-      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=free', couponTrial: true, trialDays: couponTrialDays }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
-    }
-
     if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
       throw new Error('Selected paid plan is missing a Stripe price ID')
     }
@@ -161,30 +137,7 @@ serve(async (req) => {
     }
 
     if (!stripe) {
-      await adminClient
-        .from('profiles')
-        .update({
-          payment_verified: true,
-          payment_method_type: 'mock_subscription',
-          pending_onboarding_plan_id: plan.id,
-          pending_payment_metadata: {
-            provider: 'mock_subscription',
-            plan_id: plan.id,
-            coupon_code: coupon || '',
-            completed_at: new Date().toISOString(),
-            reason: 'stripe_secret_missing',
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authData.user.id)
-
-      const baseUrl = successUrl || '/onboarding'
-      const separator = baseUrl.includes('?') ? '&' : '?'
-      const mockUrl = `${baseUrl}${separator}checkout=mock&plan=${encodeURIComponent(plan.id)}${coupon ? `&coupon=${encodeURIComponent(coupon)}` : ''}`
-      return new Response(JSON.stringify({ success: true, url: mockUrl, providerMode: 'stripe_secret_missing' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
+      throw new Error('Stripe is not configured. Payment method collection is required for paid and trial plans.')
     }
 
     let org: { id: string; name: string; stripe_customer_id: string | null } | null = null
@@ -227,6 +180,8 @@ serve(async (req) => {
           plan_id: plan.id,
           coupon_code: coupon || '',
           checkout_status: 'created',
+          trial_days: couponTrialDays || 0,
+          requires_payment_method_collection: couponTrialDays > 0,
         },
         updated_at: new Date().toISOString(),
       })
@@ -246,12 +201,16 @@ serve(async (req) => {
         coupon_code: coupon || '',
         payment_method_type: 'stripe_subscription',
       },
+      payment_method_collection: couponTrialDays > 0 ? 'always' : 'if_required',
       subscription_data: {
+        ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
         metadata: {
           tenant_id: tenantId || '',
           organization_id: organizationId || '',
           user_id: authData.user.id,
           plan_id: plan.id,
+          coupon_code: coupon || '',
+          trial_days: String(couponTrialDays || 0),
         },
       },
       allow_promotion_codes: true,
@@ -267,6 +226,8 @@ serve(async (req) => {
           coupon_code: coupon || '',
           checkout_status: 'session_created',
           checkout_session_id: session.id,
+          trial_days: couponTrialDays || 0,
+          requires_payment_method_collection: couponTrialDays > 0,
           stripe_customer_id: customerId,
         },
         updated_at: new Date().toISOString(),
@@ -285,3 +246,4 @@ serve(async (req) => {
     })
   }
 })
+
