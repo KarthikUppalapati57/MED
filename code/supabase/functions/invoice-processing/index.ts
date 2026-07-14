@@ -67,6 +67,306 @@ function firstNumber(...values) {
   return null;
 }
 
+function normalizeCompactValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function fieldValue(field) {
+  if (!field || typeof field !== 'object') return null;
+  for (const key of ['valueString', 'valueDate', 'valueTime', 'valuePhoneNumber', 'valueNumber', 'valueInteger', 'valueCurrency']) {
+    if (Object.prototype.hasOwnProperty.call(field, key)) {
+      const value = field[key];
+      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'amount')) return value.amount;
+      return value;
+    }
+  }
+  return field.content ?? null;
+}
+
+function compactField(field) {
+  if (!field || typeof field !== 'object') return null;
+  const value = fieldValue(field);
+  const compact = {
+    value,
+    confidence: field.confidence ?? null,
+  };
+  if (field.content !== undefined && normalizeCompactValue(field.content) !== normalizeCompactValue(value)) {
+    compact.content = field.content;
+  }
+  return compact;
+}
+
+function compactTable(table) {
+  const rowCount = table?.rowCount || 0;
+  const columnCount = table?.columnCount || 0;
+  const rows = Array.from({ length: rowCount }, () => Array.from({ length: columnCount }, () => null));
+  for (const cell of table?.cells || []) {
+    if (Number.isInteger(cell.rowIndex) && Number.isInteger(cell.columnIndex) && cell.rowIndex < rowCount && cell.columnIndex < columnCount) {
+      rows[cell.rowIndex][cell.columnIndex] = cell.content || null;
+    }
+  }
+  return { row_count: rowCount, column_count: columnCount, rows };
+}
+
+function headerPairsFromTables(tables = [], maxTables = 4) {
+  const pairs = [];
+  for (const [tableIndex, table] of tables.slice(0, maxTables).entries()) {
+    const compact = compactTable(table);
+    if (compact.rows.length < 2) continue;
+    const header = compact.rows[0];
+    const values = compact.rows[1];
+    if (header.filter(Boolean).length < 2) continue;
+
+    header.forEach((label, columnIndex) => {
+      if (!label) return;
+      pairs.push({
+        label,
+        value: values[columnIndex] || null,
+        table_index: tableIndex,
+        column_index: columnIndex,
+      });
+    });
+  }
+  return pairs;
+}
+
+function compactLineItems(fields = {}) {
+  const items = fields.Items?.valueArray || [];
+  return items.map((item) => {
+    const itemFields = item?.valueObject || {};
+    const compactItem = {};
+    const fieldConfidence = {};
+
+    for (const [name, value] of Object.entries(itemFields)) {
+      const compact = compactField(value);
+      if (!compact) continue;
+      compactItem[name] = compact.value;
+      if (compact.content !== undefined) compactItem[`${name}_content`] = compact.content;
+      if (compact.confidence !== null && compact.confidence !== undefined) fieldConfidence[name] = compact.confidence;
+    }
+
+    if (Object.keys(fieldConfidence).length) compactItem.field_confidence = fieldConfidence;
+    return compactItem;
+  }).filter((item) => Object.keys(item).length > 0);
+}
+
+function relevantContentSnippets(content = '', maxChars = 2500) {
+  const patterns = /invoice|vendor|supplier|account|customer|purchase|po\b|order|terms|due|subtotal|tax|freight|fuel|delivery|total|amount|balance|remit|payment|\$/i;
+  const snippets = [];
+  let used = 0;
+
+  for (const rawLine of String(content || '').split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+/g, ' ').trim();
+    if (!line || !patterns.test(line)) continue;
+    if (used + line.length + 1 > maxChars) break;
+    snippets.push(line);
+    used += line.length + 1;
+  }
+
+  return snippets;
+}
+
+function simplifyAzureDocumentIntelligenceResult(adiResult) {
+  const analyze = adiResult?.analyzeResult || {};
+  const doc = (analyze.documents || [])[0] || {};
+  const fields = doc.fields || {};
+  const headerFields = {};
+
+  for (const [name, value] of Object.entries(fields)) {
+    if (['Items', 'TaxDetails'].includes(name)) continue;
+    const compact = compactField(value);
+    if (compact) headerFields[name] = compact;
+  }
+
+  return {
+    status: adiResult?.status,
+    document_type: doc.docType || 'invoice',
+    page_count: Array.isArray(analyze.pages) ? analyze.pages.length : null,
+    header_fields: headerFields,
+    header_table_pairs: headerPairsFromTables(analyze.tables || []),
+    line_items: compactLineItems(fields),
+    content_snippets: relevantContentSnippets(analyze.content || ''),
+    compaction_notes: [
+      'Dropped pages, boundingRegions, spans, polygons, styles, full raw content, and full table metadata.',
+      'Use header_table_pairs to resolve conflicts between ADI prebuilt fields and visible table/header cells.',
+      'Keep distinct document identifiers separate: invoice_number, account_number, customer_number, order_number, purchase_order_number.',
+    ],
+  };
+}
+
+async function extractWithAzureDocumentIntelligence(fileBlob) {
+  const endpoint = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')?.trim();
+  const model = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_MODEL')?.trim() || 'prebuilt-invoice';
+  const apiVersion = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_API_VERSION')?.trim() || '2024-11-30';
+
+  if (!endpoint || !key) throw new Error('Azure Document Intelligence is not configured.');
+
+  const analyzeUrl = `${endpoint}/documentintelligence/documentModels/${encodeURIComponent(model)}:analyze?api-version=${encodeURIComponent(apiVersion)}`;
+  const analyzeResponse = await fetch(analyzeUrl, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': key,
+      'Content-Type': fileBlob.type || 'application/pdf',
+    },
+    body: fileBlob,
+  });
+
+  if (!analyzeResponse.ok) {
+    throw new Error(`Azure Document Intelligence submit failed: ${analyzeResponse.status} ${await analyzeResponse.text()}`);
+  }
+
+  const operationUrl = analyzeResponse.headers.get('Operation-Location');
+  if (!operationUrl) throw new Error('Azure Document Intelligence did not return Operation-Location.');
+
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const pollResponse = await fetch(operationUrl, {
+      headers: { 'Ocp-Apim-Subscription-Key': key },
+    });
+    if (!pollResponse.ok) {
+      throw new Error(`Azure Document Intelligence poll failed: ${pollResponse.status} ${await pollResponse.text()}`);
+    }
+    const result = await pollResponse.json();
+    if (!['notStarted', 'running'].includes(result.status)) {
+      if (result.status !== 'succeeded') throw new Error(`Azure Document Intelligence failed: ${JSON.stringify(result).slice(0, 1500)}`);
+      return result;
+    }
+  }
+
+  throw new Error('Azure Document Intelligence timed out.');
+}
+
+function buildAzureOpenAIInvoicePrompt(compactExtraction) {
+  return {
+    task: 'Map compact Azure Document Intelligence invoice extraction into the invoice JSON shape used by the MED invoice workflow.',
+    output_shape: {
+      vendor_name: null,
+      vendor_address: null,
+      invoice_number: null,
+      account_number: null,
+      customer_number: null,
+      order_number: null,
+      purchase_order_number: null,
+      invoice_date: null,
+      due_date: null,
+      payment_terms: null,
+      subtotal: null,
+      tax_amount: null,
+      fuel_surcharge: null,
+      delivery_fee: null,
+      other_charges: null,
+      total_amount: null,
+      payment_status: 'unpaid',
+      paid_status_detection: null,
+      line_items: [
+        {
+          vendor_item_code: null,
+          description: null,
+          quantity: null,
+          unit: null,
+          unit_price: null,
+          extended_price: null,
+          pack_size: null,
+          label: null,
+          ai_confidence: null,
+        },
+      ],
+      validation: {
+        needs_review: false,
+        warnings: [],
+        errors: [],
+      },
+    },
+    rules: [
+      'Return only valid JSON. Do not include markdown fences or explanations.',
+      'Use only values present in the compact extraction payload. Do not invent values.',
+      'Dates must be YYYY-MM-DD. Money and quantities must be numbers.',
+      'Prefer visible header_table_pairs over ADI prebuilt fields when they conflict.',
+      'Keep document identifiers separate. Never map order_number into purchase_order_number unless there is a visible Purchase Order/PO label with that value.',
+      'If an invoice number is not visible, return invoice_number as null. The application will generate a fallback invoice number.',
+      'Use the supplier/vendor as vendor_name, not bill-to, ship-to, or customer recipient.',
+      'Preserve all invoice line items. Use shipped/invoiced quantity when available.',
+      'Set validation.needs_review true when required fields are missing, confidence is low, or totals do not reconcile.',
+    ],
+    compact_extraction: compactExtraction,
+  };
+}
+
+async function mapWithAzureOpenAI(compactExtraction) {
+  const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_OPENAI_API_KEY')?.trim();
+  const deployment = Deno.env.get('AZURE_OPENAI_DEPLOYMENT')?.trim();
+  const apiVersion = Deno.env.get('AZURE_OPENAI_API_VERSION')?.trim() || 'v1';
+
+  if (!endpoint || !key || !deployment) throw new Error('Azure OpenAI is not configured.');
+
+  let url;
+  const body = {
+    model: deployment,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a precise invoice extraction mapper. Return only JSON that matches the requested output shape.',
+      },
+      {
+        role: 'user',
+        content: JSON.stringify(buildAzureOpenAIInvoicePrompt(compactExtraction)),
+      },
+    ],
+    max_completion_tokens: 12000,
+  };
+
+  if (apiVersion.toLowerCase() === 'v1') {
+    url = endpoint.endsWith('/openai/v1') ? `${endpoint}/chat/completions` : `${endpoint}/openai/v1/chat/completions`;
+  } else {
+    url = `${endpoint}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+    delete body.model;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': key,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Azure OpenAI mapping failed: ${response.status} ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  const content = payload.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error('Azure OpenAI mapping returned no content.');
+
+  const cleanJson = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  return {
+    data: JSON.parse(cleanJson),
+    rawText: content,
+    usage: payload.usage || null,
+  };
+}
+
+function vendorPrefix(vendorName) {
+  const cleaned = String(vendorName || 'VENDOR').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (cleaned || 'VENDOR').slice(0, 12);
+}
+
+function dateCompact(value) {
+  const normalized = normalizeDate(value);
+  if (!normalized) return null;
+  return normalized.replace(/-/g, '');
+}
+
+function generatedInvoiceNumber(normalized, record) {
+  const datePart = dateCompact(normalized.invoice_date) || dateCompact(normalized.due_date) || dateCompact(record.created_at) || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const shortId = String(record.id || crypto.randomUUID()).replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${vendorPrefix(normalized.vendor_name || record.vendor_name)}${datePart}${shortId}`;
+}
+
 function parseUsFoodsRawText(rawText = '') {
   if (!/US\s*Foods/i.test(rawText)) return null;
 
@@ -247,6 +547,10 @@ function normalizeExtraction(data = {}) {
     vendor_name: firstValue(data.vendor_name, data.supplier_name, data.remit_to_name),
     invoice_number: firstValue(data.invoice_number, data.invoice_no, data.invoice_id),
     account_number: firstValue(data.account_number, data.customer_number, data.customer_id, data.customer_account_number),
+    customer_number: firstValue(data.customer_number, data.customer_id, data.customer_account_number),
+    order_number: firstValue(data.order_number, data.order_no, data.sales_order_number),
+    purchase_order_number: firstValue(data.purchase_order_number, data.purchase_order, data.po_number, data.po),
+    vendor_address: firstValue(data.vendor_address, data.supplier_address, data.remit_to_address),
     invoice_date: normalizeDate(data.invoice_date),
     due_date: normalizeDate(data.due_date),
     payment_terms: firstValue(data.payment_terms, data.terms),
@@ -259,6 +563,7 @@ function normalizeExtraction(data = {}) {
     line_items: lineItems,
     payment_status: paidDetection.should_mark_paid ? 'paid' : 'unpaid',
     paid_status_detection: paidDetection.detected ? paidDetection : null,
+    validation: data.validation || null,
   };
 }
 function getDoclingBackendUrl() {
@@ -393,61 +698,77 @@ async function processInvoiceBackground(record, supabaseClient) {
       log_data: { point: 'download_success', size: fileBlob.size }
     });
 
-    // 2. Try Docling first, then fall back to Gemini Vision for scanned/image-heavy invoices.
-    console.log("Routing file to Python Docling backend for extraction...");
+    // 2. Extract with Azure Document Intelligence, then map compact output with Azure OpenAI.
+    console.log("Routing file to Azure Document Intelligence for extraction...");
     
     let extractedData;
     let rawText = '';
-    let extractionMethod = 'docling+gemini';
+    let extractionMethod = 'azure_document_intelligence+azure_openai';
+    let compactExtraction = null;
+    let azureOpenAIUsage = null;
 
-    try {
-      const backendUrl = getDoclingBackendUrl();
-      const formData = new FormData();
-      formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'invoking_azure_document_intelligence' }
+    });
 
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
-      });
+    const azureDocumentResult = await extractWithAzureDocumentIntelligence(fileBlob);
+    compactExtraction = simplifyAzureDocumentIntelligenceResult(azureDocumentResult);
 
-      const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!extractionResponse.ok) {
-        const errText = await extractionResponse.text();
-        throw new Error(`Python backend failed: ${extractionResponse.status} ${errText}`);
+    await supabaseClient.from('debug_logs').insert({
+      log_data: {
+        point: 'azure_document_intelligence_success',
+        page_count: compactExtraction.page_count,
+        line_items_count: compactExtraction.line_items?.length || 0
       }
+    });
 
-      extractedData = await extractionResponse.json();
-      rawText = extractedData.raw_text || '';
-      extractedData = repairExtractionFromRawText(extractedData, rawText);
+    const mappedResult = await mapWithAzureOpenAI(compactExtraction);
+    extractedData = mappedResult.data?.invoice && typeof mappedResult.data.invoice === 'object'
+      ? { ...mappedResult.data.invoice, validation: mappedResult.data.validation || mappedResult.data.invoice.validation }
+      : mappedResult.data;
+    rawText = JSON.stringify({
+      compact_extraction: compactExtraction,
+      mapped_invoice: extractedData,
+    });
+    azureOpenAIUsage = mappedResult.usage;
 
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'docling_response_success' }
-      });
-    } catch (doclingError) {
-      console.warn('Docling extraction failed, falling back to Gemini Vision:', doclingError);
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'docling_failed_gemini_fallback', error: doclingError.message }
-      });
-
-      const geminiResult = await extractWithGeminiVision(fileBlob);
-      extractedData = repairExtractionFromRawText(geminiResult.data, geminiResult.rawText);
-      rawText = geminiResult.rawText;
-      extractionMethod = 'gemini_vision_fallback';
-
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'gemini_fallback_success' }
-      });
-    }
+    await supabaseClient.from('debug_logs').insert({
+      log_data: {
+        point: 'azure_openai_mapping_success',
+        usage: azureOpenAIUsage
+      }
+    });
 // 3. Update invoice with extracted data in the shared public table
     console.log(`Updating invoice ${record.id} to pending_review in public schema...`);
     
     const normalized = normalizeExtraction(extractedData);
+    const sourceInvoiceNumber = normalized.invoice_number;
+    const finalInvoiceNumber = sourceInvoiceNumber || generatedInvoiceNumber(normalized, record);
+    const generatedInvoiceMetadata = sourceInvoiceNumber ? null : {
+      generated_invoice_number: true,
+      generated_invoice_number_reason: 'missing_source_invoice_number',
+      source_invoice_number: null,
+      generated_invoice_number_value: finalInvoiceNumber,
+      generated_invoice_number_format: 'VENDORYYYYMMDDSHORTID',
+    };
+    const validationResults = {
+      ...(record.validation_results || {}),
+      ...(normalized.validation && typeof normalized.validation === 'object' ? { extraction_validation: normalized.validation } : {}),
+      ...(normalized.paid_status_detection ? { paid_status_detection: normalized.paid_status_detection } : {}),
+      extraction_metadata: {
+        ...((record.validation_results || {}).extraction_metadata || {}),
+        extraction_method: extractionMethod,
+        customer_number: normalized.customer_number || null,
+        order_number: normalized.order_number || null,
+        vendor_address: normalized.vendor_address || null,
+        azure_openai_usage: azureOpenAIUsage || null,
+        ...(generatedInvoiceMetadata || {}),
+      },
+    };
+
     const updatePayload = {
       vendor_name: normalized.vendor_name || record.vendor_name,
-      invoice_number: normalized.invoice_number || record.invoice_number,
+      invoice_number: finalInvoiceNumber || record.invoice_number,
       account_number: normalized.account_number,
       invoice_date: normalized.invoice_date,
       due_date: normalized.due_date,
@@ -462,10 +783,9 @@ async function processInvoiceBackground(record, supabaseClient) {
       payment_status: normalized.payment_status,
       status: 'pending_review',
       ap_status: 'processing',
+      purchase_order_number: normalized.purchase_order_number,
       raw_text: rawText || extractedData.raw_text || '',
-      validation_results: normalized.paid_status_detection
-        ? { ...(record.validation_results || {}), paid_status_detection: normalized.paid_status_detection }
-        : record.validation_results,
+      validation_results: validationResults,
       extraction_method: extractionMethod,
     };
 
