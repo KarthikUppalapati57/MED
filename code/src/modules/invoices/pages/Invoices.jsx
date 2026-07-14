@@ -483,7 +483,7 @@ export default function Invoices() {
       payment_status: 'unpaid',
       source,
       file_type: fileType,
-      vendor_name: extracting,
+      vendor_name: 'extracting',
       invoice_number: 'pending extraction',
       total_amount: 0,
       validation_results: {
