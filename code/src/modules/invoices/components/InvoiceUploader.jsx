@@ -160,9 +160,9 @@ export default function InvoiceUploader({
         file_url: filePath,
         file_type: fileToProcess.type,
         source,
-        vendor_name: 'extracting',
-        invoice_number: 'pending extraction',
-        total_amount: 0,
+        vendor_name: null,
+        invoice_number: null,
+        total_amount: null,
       };
 
       if (draftInvoice?.id && onFinalizeUploadDraft) {

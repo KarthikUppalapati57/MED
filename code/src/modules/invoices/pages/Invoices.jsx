@@ -483,9 +483,9 @@ export default function Invoices() {
       payment_status: 'unpaid',
       source,
       file_type: fileType,
-      vendor_name: 'extracting',
-      invoice_number: 'pending extraction',
-      total_amount: 0,
+      vendor_name: null,
+      invoice_number: null,
+      total_amount: null,
       validation_results: {
         upload_state: 'pending_storage',
         original_file_name: fileName,
