@@ -288,6 +288,8 @@ function buildAzureOpenAIInvoicePrompt(compactExtraction) {
       'If an invoice number is not visible, return invoice_number as null. The application will generate a fallback invoice number.',
       'Use the supplier/vendor as vendor_name, not bill-to, ship-to, or customer recipient.',
       'Preserve all invoice line items. Use shipped/invoiced quantity when available.',
+      'For every line item, map ADI ProductCode, ProductNumber, ItemNumber, ItemCode, SKU, SUPC, or Code to vendor_item_code. Keep the value even when confidence is low; low confidence should create a validation warning, not a null vendor_item_code.',
+      'If a product/item code appears in a line item table under a product/code/SKU/SUPC column, output that value as vendor_item_code.',
       'Set validation.needs_review true when required fields are missing, confidence is low, or totals do not reconcile.',
     ],
     compact_extraction: compactExtraction,
@@ -495,28 +497,54 @@ function mapLineItemsForRpc(lineItems = []) {
 function normalizeLineItem(item = {}) {
   const quantity = firstNumber(
     item.quantity,
+    item.Quantity,
     item.qty,
+    item.Qty,
     item.shipped_quantity,
+    item.ShippedQuantity,
     item.shipped_qty,
+    item.ShippedQty,
     item.invoice_quantity,
+    item.InvoiceQuantity,
     item.invoice_qty,
+    item.InvoiceQty,
     item.order_quantity,
-    item.order_qty
+    item.OrderQuantity,
+    item.order_qty,
+    item.OrderQty
   );
-  const unitPrice = firstNumber(item.unit_price, item.price, item.pricing_unit_price, item.invoice_unit_price);
-  const extendedPrice = firstNumber(item.extended_price, item.extended, item.total_price, item.line_total, item.amount);
+  const unitPrice = firstNumber(item.unit_price, item.UnitPrice, item.price, item.Price, item.pricing_unit_price, item.invoice_unit_price);
+  const extendedPrice = firstNumber(item.extended_price, item.ExtendedPrice, item.extended, item.total_price, item.TotalPrice, item.line_total, item.LineTotal, item.amount, item.Amount);
 
   return {
-    vendor_item_code: firstValue(item.vendor_item_code, item.product_number, item.item_number, item.item_code, item.product_id) || '',
-    description: firstValue(item.description, item.item_description, item.vendor_item_description, item.product_description, item.name) || '',
+    vendor_item_code: firstValue(
+      item.vendor_item_code,
+      item.product_code,
+      item.ProductCode,
+      item.product_number,
+      item.ProductNumber,
+      item.item_number,
+      item.ItemNumber,
+      item.item_code,
+      item.ItemCode,
+      item.product_id,
+      item.ProductId,
+      item.sku,
+      item.SKU,
+      item.supc,
+      item.SUPC,
+      item.code,
+      item.Code
+    ) || '',
+    description: firstValue(item.description, item.Description, item.item_description, item.vendor_item_description, item.product_description, item.ProductDescription, item.name, item.Name) || '',
     quantity: quantity ?? '',
-    unit: firstValue(item.unit, item.pricing_unit, item.uom, item.unit_of_measure) || '',
+    unit: firstValue(item.unit, item.Unit, item.pricing_unit, item.PricingUnit, item.uom, item.UOM, item.unit_of_measure) || '',
     unit_price: unitPrice ?? '',
-    discount: firstNumber(item.discount) ?? 0,
-    adjustment: firstNumber(item.adjustment) ?? 0,
+    discount: firstNumber(item.discount, item.Discount) ?? 0,
+    adjustment: firstNumber(item.adjustment, item.Adjustment) ?? 0,
     extended_price: extendedPrice ?? (quantity !== null && unitPrice !== null ? quantity * unitPrice : 0),
-    pack_size: firstValue(item.pack_size, item.pack, item.size) || '',
-    label: firstValue(item.label, item.brand) || '',
+    pack_size: firstValue(item.pack_size, item.PackSize, item.pack, item.Pack, item.size, item.Size) || '',
+    label: firstValue(item.label, item.Label, item.brand, item.Brand) || '',
     ai_confidence: firstNumber(item.ai_confidence, item.confidence) ?? null,
   };
 }
