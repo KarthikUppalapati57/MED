@@ -151,6 +151,112 @@ function compactLineItems(fields = {}) {
   }).filter((item) => Object.keys(item).length > 0);
 }
 
+function compactHeaderLabel(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function findHeaderColumn(headers = [], patterns = []) {
+  return headers.findIndex((header) => patterns.some((pattern) => pattern.test(compactHeaderLabel(header))));
+}
+
+function rowCell(row = [], index) {
+  if (!Number.isInteger(index) || index < 0) return null;
+  return cleanString(row[index]);
+}
+
+function tableHeaderCandidates(rows = []) {
+  const candidates = [];
+  const maxHeaderStart = Math.min(rows.length, 6);
+
+  for (let start = 0; start < maxHeaderStart; start += 1) {
+    for (const span of [1, 2, 3]) {
+      const headerRows = rows.slice(start, start + span);
+      if (!headerRows.length) continue;
+      const columnCount = Math.max(...headerRows.map((row) => row.length), 0);
+      const headers = Array.from({ length: columnCount }, (_, columnIndex) => {
+        const parts = [];
+        for (const row of headerRows) {
+          const value = cleanString(row[columnIndex]);
+          if (value && !parts.some((part) => compactHeaderLabel(part) === compactHeaderLabel(value))) {
+            parts.push(value);
+          }
+        }
+        return parts.join(' ');
+      });
+      candidates.push({ start, span, headers });
+    }
+  }
+
+  return candidates;
+}
+
+function extractTableLineItems(tables = []) {
+  const codePatterns = [/product.*number/, /product.*code/, /item.*number/, /item\s*#/, /\bsku\b/, /\bsupc\b/, /vendor.*item/, /^code$/];
+  const descriptionPatterns = [/description/, /item.*description/, /product.*description/, /^name$/];
+  const quantityPatterns = [/\bshp\b/, /ship/, /shipped/, /quantity/, /\bqty\b/, /\bord\b/, /ordered/];
+  const unitPatterns = [/sales.*unit/, /pricing.*unit/, /\buom\b/, /^unit$/];
+  const unitPricePatterns = [/unit.*price/, /price/];
+  const extendedPricePatterns = [/extended.*price/, /ext.*amount/, /line.*total/, /total/, /amount/];
+  const packPatterns = [/pack.*size/, /^pack$/, /\bsize\b/];
+  const labelPatterns = [/^label$/, /brand/, /manufacturer/, /mfr/];
+  const sectionPatterns = /^(refrigerated|frozen|dry|produce|meat|seafood|dairy|beverage|delivery summary|invoice line details)$/i;
+  const results = [];
+
+  for (const [tableIndex, table] of tables.entries()) {
+    const compact = compactTable(table);
+    if (!compact.rows.length) continue;
+
+    let selected = null;
+    for (const candidate of tableHeaderCandidates(compact.rows)) {
+      const columns = {
+        code: findHeaderColumn(candidate.headers, codePatterns),
+        description: findHeaderColumn(candidate.headers, descriptionPatterns),
+        quantity: findHeaderColumn(candidate.headers, quantityPatterns),
+        unit: findHeaderColumn(candidate.headers, unitPatterns),
+        unit_price: findHeaderColumn(candidate.headers, unitPricePatterns),
+        extended_price: findHeaderColumn(candidate.headers, extendedPricePatterns),
+        pack_size: findHeaderColumn(candidate.headers, packPatterns),
+        label: findHeaderColumn(candidate.headers, labelPatterns),
+      };
+      if (columns.description >= 0 && (columns.code >= 0 || columns.unit_price >= 0 || columns.extended_price >= 0)) {
+        selected = { ...candidate, columns };
+        break;
+      }
+    }
+
+    if (!selected) continue;
+
+    for (let rowIndex = selected.start + selected.span; rowIndex < compact.rows.length; rowIndex += 1) {
+      const row = compact.rows[rowIndex] || [];
+      const description = rowCell(row, selected.columns.description);
+      const vendorItemCode = rowCell(row, selected.columns.code);
+      const unitPrice = rowCell(row, selected.columns.unit_price);
+      const extendedPrice = rowCell(row, selected.columns.extended_price);
+      const packSize = rowCell(row, selected.columns.pack_size);
+      const label = rowCell(row, selected.columns.label);
+
+      if (!description && !vendorItemCode) continue;
+      if (description && sectionPatterns.test(description) && !vendorItemCode && !unitPrice && !extendedPrice) continue;
+      if (!vendorItemCode && !unitPrice && !extendedPrice && !packSize && !label) continue;
+
+      results.push({
+        source_table_index: tableIndex,
+        source_row_index: rowIndex,
+        vendor_item_code: vendorItemCode,
+        description,
+        quantity: firstNumber(rowCell(row, selected.columns.quantity)),
+        unit: rowCell(row, selected.columns.unit),
+        unit_price: firstNumber(unitPrice),
+        extended_price: firstNumber(extendedPrice),
+        pack_size: packSize,
+        label,
+      });
+    }
+  }
+
+  return results;
+}
+
 function relevantContentSnippets(content = '', maxChars = 2500) {
   const patterns = /invoice|vendor|supplier|account|customer|purchase|po\b|order|terms|due|subtotal|tax|freight|fuel|delivery|total|amount|balance|remit|payment|\$/i;
   const snippets = [];
@@ -172,6 +278,7 @@ function simplifyAzureDocumentIntelligenceResult(adiResult) {
   const doc = (analyze.documents || [])[0] || {};
   const fields = doc.fields || {};
   const headerFields = {};
+  const tableLineItems = extractTableLineItems(analyze.tables || []);
 
   for (const [name, value] of Object.entries(fields)) {
     if (['Items', 'TaxDetails'].includes(name)) continue;
@@ -186,10 +293,12 @@ function simplifyAzureDocumentIntelligenceResult(adiResult) {
     header_fields: headerFields,
     header_table_pairs: headerPairsFromTables(analyze.tables || []),
     line_items: compactLineItems(fields),
+    table_line_items: tableLineItems,
     content_snippets: relevantContentSnippets(analyze.content || ''),
     compaction_notes: [
       'Dropped pages, boundingRegions, spans, polygons, styles, full raw content, and full table metadata.',
       'Use header_table_pairs to resolve conflicts between ADI prebuilt fields and visible table/header cells.',
+      'Use table_line_items for exact row values such as vendor_item_code, pack_size, and label when prebuilt Items misses them.',
       'Keep distinct document identifiers separate: invoice_number, account_number, customer_number, order_number, purchase_order_number.',
     ],
   };
@@ -290,6 +399,7 @@ function buildAzureOpenAIInvoicePrompt(compactExtraction) {
       'Preserve all invoice line items. Use shipped/invoiced quantity when available.',
       'For every line item, map ADI ProductCode, ProductNumber, ItemNumber, ItemCode, SKU, SUPC, or Code to vendor_item_code. Keep the value even when confidence is low; low confidence should create a validation warning, not a null vendor_item_code.',
       'If a product/item code appears in a line item table under a product/code/SKU/SUPC column, output that value as vendor_item_code.',
+      'If table_line_items is present, use it as the preferred source for line item vendor_item_code, pack_size, and label/brand values.',
       'Set validation.needs_review true when required fields are missing, confidence is low, or totals do not reconcile.',
     ],
     compact_extraction: compactExtraction,
@@ -484,6 +594,75 @@ function repairExtractionFromRawText(data = {}, rawText = '') {
   return data;
 }
 
+function normalizeMatchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function descriptionsLikelyMatch(left, right) {
+  const a = normalizeMatchText(left);
+  const b = normalizeMatchText(right);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+
+  const aPrefix = a.slice(0, 24);
+  const bPrefix = b.slice(0, 24);
+  return aPrefix.length >= 12 && bPrefix.length >= 12 && (aPrefix.includes(bPrefix) || bPrefix.includes(aPrefix));
+}
+
+function backfillLineItemsFromTables(data = {}, tableLineItems = []) {
+  if (!Array.isArray(data.line_items) || !Array.isArray(tableLineItems) || !tableLineItems.length) return data;
+
+  const usableTableItems = tableLineItems.filter((item) =>
+    cleanString(item?.description) ||
+    cleanString(item?.vendor_item_code) ||
+    cleanString(item?.pack_size) ||
+    cleanString(item?.label)
+  );
+  const usedTableIndexes = new Set();
+
+  const enrichedLineItems = data.line_items.map((lineItem, index) => {
+    const needsCode = !cleanString(lineItem?.vendor_item_code) && !cleanString(lineItem?.product_number);
+    const needsPack = !cleanString(lineItem?.pack_size) && !cleanString(lineItem?.PackSize) && !cleanString(lineItem?.pack);
+    const needsLabel = !cleanString(lineItem?.label) && !cleanString(lineItem?.Label) && !cleanString(lineItem?.brand);
+    if (!needsCode && !needsPack && !needsLabel) return lineItem;
+
+    const description = firstValue(
+      lineItem?.description,
+      lineItem?.Description,
+      lineItem?.item_description,
+      lineItem?.vendor_item_description,
+      lineItem?.product_description,
+      lineItem?.name
+    );
+
+    let tableIndex = usableTableItems.findIndex((tableItem, candidateIndex) =>
+      !usedTableIndexes.has(candidateIndex) && descriptionsLikelyMatch(description, tableItem.description)
+    );
+    if (tableIndex < 0 && usableTableItems[index]) tableIndex = index;
+
+    const tableItem = tableIndex >= 0 ? usableTableItems[tableIndex] : null;
+    if (!tableItem) return lineItem;
+    usedTableIndexes.add(tableIndex);
+
+    return {
+      ...lineItem,
+      vendor_item_code: cleanString(lineItem?.vendor_item_code) || cleanString(lineItem?.product_number) || cleanString(tableItem.vendor_item_code) || lineItem?.vendor_item_code,
+      product_number: cleanString(lineItem?.product_number) || cleanString(tableItem.vendor_item_code) || lineItem?.product_number,
+      pack_size: cleanString(lineItem?.pack_size) || cleanString(tableItem.pack_size) || lineItem?.pack_size,
+      label: cleanString(lineItem?.label) || cleanString(tableItem.label) || lineItem?.label,
+      unit: cleanString(lineItem?.unit) || cleanString(tableItem.unit) || lineItem?.unit,
+      unit_price: firstNumber(lineItem?.unit_price, tableItem.unit_price) ?? lineItem?.unit_price,
+      extended_price: firstNumber(lineItem?.extended_price, tableItem.extended_price) ?? lineItem?.extended_price,
+    };
+  });
+
+  return { ...data, line_items: enrichedLineItems };
+}
+
 function mapLineItemsForRpc(lineItems = []) {
   return lineItems.map((item) => ({
     item_name: item.description || item.item_name || '',
@@ -492,6 +671,8 @@ function mapLineItemsForRpc(lineItems = []) {
     total_price: firstNumber(item.extended_price, item.total_price, item.amount) || 0,
     vendor_item_code: item.vendor_item_code || item.product_number || '',
     vendor_unit: item.unit || item.vendor_unit || '',
+    pack_size: item.pack_size || '',
+    label: item.label || '',
   })).filter((item) => item.item_name || item.vendor_item_code);
 }
 function normalizeLineItem(item = {}) {
@@ -754,6 +935,7 @@ async function processInvoiceBackground(record, supabaseClient) {
     extractedData = mappedResult.data?.invoice && typeof mappedResult.data.invoice === 'object'
       ? { ...mappedResult.data.invoice, validation: mappedResult.data.validation || mappedResult.data.invoice.validation }
       : mappedResult.data;
+    extractedData = backfillLineItemsFromTables(extractedData, compactExtraction.table_line_items || []);
     rawText = JSON.stringify({
       compact_extraction: compactExtraction,
       mapped_invoice: extractedData,
@@ -763,7 +945,8 @@ async function processInvoiceBackground(record, supabaseClient) {
     await supabaseClient.from('debug_logs').insert({
       log_data: {
         point: 'azure_openai_mapping_success',
-        usage: azureOpenAIUsage
+        usage: azureOpenAIUsage,
+        table_line_items_count: compactExtraction.table_line_items?.length || 0,
       }
     });
 // 3. Update invoice with extracted data in the shared public table
