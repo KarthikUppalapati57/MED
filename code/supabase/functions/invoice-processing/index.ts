@@ -67,119 +67,485 @@ function firstNumber(...values) {
   return null;
 }
 
-function parseUsFoodsRawText(rawText = '') {
-  if (!/US\s*Foods/i.test(rawText)) return null;
+function normalizeCompactValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\s+/g, ' ').trim().toLowerCase();
+}
 
-  const source = rawText.replace(/\u00a0/g, ' ');
-  const invoiceNumber = firstValue(
-    source.match(/INVOICE DATE\s*\r?\n\s*(\d{4,})\s*\r?\n\s*ACCOUNT NUMBER INVOICE NUMBER/i)?.[1],
-    source.match(/ACCOUNT NUMBER\s+INVOICE NUMBER\s*\r?\n\s*\d+\s+\r?\n?\s*(\d{4,})/i)?.[1]
-  );
-  const accountNumber = firstValue(
-    source.match(/Page \d+ of \d+\s*\r?\n\s*(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1],
-    source.match(/(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1]
-  );
-  const invoiceDate = normalizeDate(source.match(/(\d{2}\/\d{2}\/\d{4})\s*\r?\n\s*INVOICE DATE/i)?.[1]);
-  const paymentTerms = firstValue(
-    source.match(/ORDER NUMBER PAYMENT TERMS ROUTE NUMBER\s*\r?\n\s*\d+\s+(NET\s+\d+\s+DAYS|NET\s+\d+|DUE\s+ON\s+RECEIPT|[A-Z ]+?)\s+\d+/i)?.[1]
-  );
-  const dueDate = normalizeDate(
-    source.match(/PLEASE REMIT THIS AMOUNT BY[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+\$[\d,]+\.\d{2}/i)?.[1]
-  );
-  const totalAmount = firstNumber(
-    source.match(/Product Total\s+\$?([\d,]+\.\d{2})/i)?.[1],
-    source.match(/DELIVERY SUMMARY TOTALS[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]
-  );
-  const taxAmount = firstNumber(source.match(/Rate:\s*[\d.]+\s+\$([\d,]+\.\d{2})/i)?.[1]);
-  const fuelSurcharge = firstNumber(source.match(/FUEL SURCHARGE\s+\$([\d,]+\.\d{2})/i)?.[1]);
-  const allowance = firstNumber(source.match(/INVENTORY ALLOWANCE\s+-\$([\d,]+\.\d{2})/i)?.[1]);
-  const grossAmount = firstNumber(source.match(/TOTAL GROSS WEIGHT SHIPPED[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]);
+function fieldValue(field) {
+  if (!field || typeof field !== 'object') return null;
+  for (const key of ['valueString', 'valueDate', 'valueTime', 'valuePhoneNumber', 'valueNumber', 'valueInteger', 'valueCurrency']) {
+    if (Object.prototype.hasOwnProperty.call(field, key)) {
+      const value = field[key];
+      if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'amount')) return value.amount;
+      return value;
+    }
+  }
+  return field.content ?? null;
+}
 
-  const lineSectionEnd = source.search(/HAZARD MATERIALS SUMMARY|STORAGE LOCATION TOTAL|DELIVERY SUMMARY/i);
-  const lineSource = lineSectionEnd > -1 ? source.slice(0, lineSectionEnd) : source;
-  const lineItems = [];
-  const seen = new Set();
-  const rowPattern = /^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+([A-Z]+)\s+(\d{5,})\s+(.+?)\s+\$([\d,]+\.\d{2,4})\s+\$(-?[\d,]+\.\d{2})\s*$/gm;
-  let match;
+function compactField(field) {
+  if (!field || typeof field !== 'object') return null;
+  const value = fieldValue(field);
+  const compact = {
+    value,
+    confidence: field.confidence ?? null,
+  };
+  if (field.content !== undefined && normalizeCompactValue(field.content) !== normalizeCompactValue(value)) {
+    compact.content = field.content;
+  }
+  return compact;
+}
 
-  while ((match = rowPattern.exec(lineSource)) !== null) {
-    const [, ordered, shipped, adjusted, salesUnit, productNumber, rawMiddle, unitPriceRaw, extendedRaw] = match;
-    const middleTokens = rawMiddle.trim().split(/\s+/);
-    let pricingUnit = salesUnit;
-    let packSize = '';
+function compactTable(table) {
+  const rowCount = table?.rowCount || 0;
+  const columnCount = table?.columnCount || 0;
+  const rows = Array.from({ length: rowCount }, () => Array.from({ length: columnCount }, () => null));
+  for (const cell of table?.cells || []) {
+    if (Number.isInteger(cell.rowIndex) && Number.isInteger(cell.columnIndex) && cell.rowIndex < rowCount && cell.columnIndex < columnCount) {
+      rows[cell.rowIndex][cell.columnIndex] = cell.content || null;
+    }
+  }
+  return { row_count: rowCount, column_count: columnCount, rows };
+}
 
-    if (middleTokens.length && /^[A-Z]{1,4}$/.test(middleTokens[middleTokens.length - 1])) {
-      pricingUnit = middleTokens.pop();
+function headerPairsFromTables(tables = [], maxTables = 4) {
+  const pairs = [];
+  for (const [tableIndex, table] of tables.slice(0, maxTables).entries()) {
+    const compact = compactTable(table);
+    if (compact.rows.length < 2) continue;
+    const header = compact.rows[0];
+    const values = compact.rows[1];
+    if (header.filter(Boolean).length < 2) continue;
+
+    header.forEach((label, columnIndex) => {
+      if (!label) return;
+      pairs.push({
+        label,
+        value: values[columnIndex] || null,
+        table_index: tableIndex,
+        column_index: columnIndex,
+      });
+    });
+  }
+  return pairs;
+}
+
+function compactLineItems(fields = {}) {
+  const items = fields.Items?.valueArray || [];
+  return items.map((item) => {
+    const itemFields = item?.valueObject || {};
+    const compactItem = {};
+    const fieldConfidence = {};
+
+    for (const [name, value] of Object.entries(itemFields)) {
+      const compact = compactField(value);
+      if (!compact) continue;
+      compactItem[name] = compact.value;
+      if (compact.content !== undefined) compactItem[`${name}_content`] = compact.content;
+      if (compact.confidence !== null && compact.confidence !== undefined) fieldConfidence[name] = compact.confidence;
     }
 
-    if (middleTokens.length && /^[A-Z]$/.test(middleTokens[middleTokens.length - 1])) {
-      middleTokens.pop();
-    }
+    if (Object.keys(fieldConfidence).length) compactItem.field_confidence = fieldConfidence;
+    return compactItem;
+  }).filter((item) => Object.keys(item).length > 0);
+}
 
-    if (middleTokens.length >= 2 && /\d/.test(middleTokens[middleTokens.length - 2])) {
-      const unitToken = middleTokens[middleTokens.length - 1];
-      if (/^(GA|GAL|LB|OZ|EA|CT|CS|PK|BG|SL|DZ)$/i.test(unitToken)) {
-        packSize = `${middleTokens[middleTokens.length - 2]} ${middleTokens[middleTokens.length - 1]}`;
-        middleTokens.splice(middleTokens.length - 2, 2);
+function compactHeaderLabel(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function findHeaderColumn(headers = [], patterns = []) {
+  return headers.findIndex((header) => patterns.some((pattern) => pattern.test(compactHeaderLabel(header))));
+}
+
+function rowCell(row = [], index) {
+  if (!Number.isInteger(index) || index < 0) return null;
+  return cleanString(row[index]);
+}
+
+function tableHeaderCandidates(rows = []) {
+  const candidates = [];
+  const maxHeaderStart = Math.min(rows.length, 6);
+
+  for (let start = 0; start < maxHeaderStart; start += 1) {
+    for (const span of [1, 2, 3]) {
+      const headerRows = rows.slice(start, start + span);
+      if (!headerRows.length) continue;
+      const columnCount = Math.max(...headerRows.map((row) => row.length), 0);
+      const headers = Array.from({ length: columnCount }, (_, columnIndex) => {
+        const parts = [];
+        for (const row of headerRows) {
+          const value = cleanString(row[columnIndex]);
+          if (value && !parts.some((part) => compactHeaderLabel(part) === compactHeaderLabel(value))) {
+            parts.push(value);
+          }
+        }
+        return parts.join(' ');
+      });
+      candidates.push({ start, span, headers });
+    }
+  }
+
+  return candidates;
+}
+
+function extractTableLineItems(tables = []) {
+  const codePatterns = [/product.*number/, /product.*code/, /item.*number/, /item\s*#/, /\bsku\b/, /\bsupc\b/, /vendor.*item/, /^code$/];
+  const descriptionPatterns = [/description/, /item.*description/, /product.*description/, /^name$/];
+  const quantityPatterns = [/\bshp\b/, /ship/, /shipped/, /quantity/, /\bqty\b/, /\bord\b/, /ordered/];
+  const unitPatterns = [/sales.*unit/, /pricing.*unit/, /\buom\b/, /^unit$/];
+  const unitPricePatterns = [/unit.*price/, /price/];
+  const extendedPricePatterns = [/extended.*price/, /ext.*amount/, /line.*total/, /total/, /amount/];
+  const packPatterns = [/pack.*size/, /^pack$/, /\bsize\b/];
+  const labelPatterns = [/^label$/, /brand/, /manufacturer/, /mfr/];
+  const sectionPatterns = /^(refrigerated|frozen|dry|produce|meat|seafood|dairy|beverage|delivery summary|invoice line details)$/i;
+  const results = [];
+
+  for (const [tableIndex, table] of tables.entries()) {
+    const compact = compactTable(table);
+    if (!compact.rows.length) continue;
+
+    let selected = null;
+    for (const candidate of tableHeaderCandidates(compact.rows)) {
+      const columns = {
+        code: findHeaderColumn(candidate.headers, codePatterns),
+        description: findHeaderColumn(candidate.headers, descriptionPatterns),
+        quantity: findHeaderColumn(candidate.headers, quantityPatterns),
+        unit: findHeaderColumn(candidate.headers, unitPatterns),
+        unit_price: findHeaderColumn(candidate.headers, unitPricePatterns),
+        extended_price: findHeaderColumn(candidate.headers, extendedPricePatterns),
+        pack_size: findHeaderColumn(candidate.headers, packPatterns),
+        label: findHeaderColumn(candidate.headers, labelPatterns),
+      };
+      if (columns.description >= 0 && (columns.code >= 0 || columns.unit_price >= 0 || columns.extended_price >= 0)) {
+        selected = { ...candidate, columns };
+        break;
       }
     }
 
-    const description = middleTokens.join(' ').replace(/\s+/g, ' ').trim();
-    const key = `${productNumber}:${extendedRaw}`;
-    if (!description || seen.has(key)) continue;
-    seen.add(key);
+    if (!selected) continue;
 
-    lineItems.push({
-      vendor_item_code: productNumber,
-      description,
-      quantity: parseQuantity(shipped) ?? parseQuantity(ordered) ?? 0,
-      unit: pricingUnit,
-      unit_price: firstNumber(unitPriceRaw) ?? 0,
-      extended_price: firstNumber(extendedRaw) ?? 0,
-      pack_size: packSize,
-      label: '',
-      discount: 0,
-      adjustment: parseQuantity(adjusted) || 0,
-      ai_confidence: 0.98,
-    });
+    for (let rowIndex = selected.start + selected.span; rowIndex < compact.rows.length; rowIndex += 1) {
+      const row = compact.rows[rowIndex] || [];
+      const description = rowCell(row, selected.columns.description);
+      const vendorItemCode = rowCell(row, selected.columns.code);
+      const unitPrice = rowCell(row, selected.columns.unit_price);
+      const extendedPrice = rowCell(row, selected.columns.extended_price);
+      const packSize = rowCell(row, selected.columns.pack_size);
+      const label = rowCell(row, selected.columns.label);
+
+      if (!description && !vendorItemCode) continue;
+      if (description && sectionPatterns.test(description) && !vendorItemCode && !unitPrice && !extendedPrice) continue;
+      if (!vendorItemCode && !unitPrice && !extendedPrice && !packSize && !label) continue;
+
+      results.push({
+        source_table_index: tableIndex,
+        source_row_index: rowIndex,
+        vendor_item_code: vendorItemCode,
+        description,
+        quantity: firstNumber(rowCell(row, selected.columns.quantity)),
+        unit: rowCell(row, selected.columns.unit),
+        unit_price: firstNumber(unitPrice),
+        extended_price: firstNumber(extendedPrice),
+        pack_size: packSize,
+        label,
+      });
+    }
+  }
+
+  return results;
+}
+
+function relevantContentSnippets(content = '', maxChars = 2500) {
+  const patterns = /invoice|vendor|supplier|account|customer|purchase|po\b|order|terms|due|subtotal|tax|freight|fuel|delivery|total|amount|balance|remit|payment|\$/i;
+  const snippets = [];
+  let used = 0;
+
+  for (const rawLine of String(content || '').split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+/g, ' ').trim();
+    if (!line || !patterns.test(line)) continue;
+    if (used + line.length + 1 > maxChars) break;
+    snippets.push(line);
+    used += line.length + 1;
+  }
+
+  return snippets;
+}
+
+function simplifyAzureDocumentIntelligenceResult(adiResult) {
+  const analyze = adiResult?.analyzeResult || {};
+  const doc = (analyze.documents || [])[0] || {};
+  const fields = doc.fields || {};
+  const headerFields = {};
+  const tableLineItems = extractTableLineItems(analyze.tables || []);
+
+  for (const [name, value] of Object.entries(fields)) {
+    if (['Items', 'TaxDetails'].includes(name)) continue;
+    const compact = compactField(value);
+    if (compact) headerFields[name] = compact;
   }
 
   return {
-    vendor_name: 'US Foods',
-    invoice_number: invoiceNumber,
-    account_number: accountNumber,
-    customer_number: accountNumber,
-    invoice_date: invoiceDate,
-    due_date: null,
-    payment_terms: paymentTerms,
-    subtotal: totalAmount,
-    tax_amount: taxAmount,
-    fuel_surcharge: fuelSurcharge,
-    delivery_fee: 0,
-    other_charges: allowance ? -allowance : 0,
-    total_amount: grossAmount ?? totalAmount,
-    payment_status: 'unpaid',
-    line_items: lineItems,
+    status: adiResult?.status,
+    document_type: doc.docType || 'invoice',
+    page_count: Array.isArray(analyze.pages) ? analyze.pages.length : null,
+    header_fields: headerFields,
+    header_table_pairs: headerPairsFromTables(analyze.tables || []),
+    line_items: compactLineItems(fields),
+    table_line_items: tableLineItems,
+    content_snippets: relevantContentSnippets(analyze.content || ''),
+    compaction_notes: [
+      'Dropped pages, boundingRegions, spans, polygons, styles, full raw content, and full table metadata.',
+      'Use header_table_pairs to resolve conflicts between ADI prebuilt fields and visible table/header cells.',
+      'Use table_line_items for exact row values such as vendor_item_code, pack_size, and label when prebuilt Items misses them.',
+      'Keep distinct document identifiers separate: invoice_number, account_number, customer_number, order_number, purchase_order_number.',
+    ],
   };
 }
 
-function repairExtractionFromRawText(data = {}, rawText = '') {
-  const usFoods = parseUsFoodsRawText(rawText);
-  if (usFoods) {
-    const currentLineCount = Array.isArray(data.line_items) ? data.line_items.length : 0;
-    const repairedLineCount = Array.isArray(usFoods.line_items) ? usFoods.line_items.length : 0;
-    const currentVendor = cleanString(data.vendor_name) || '';
-    const vendorLooksLikeBillTo = /CRAVEN|WING|CHOTO|CUSTOMER|BILL TO/i.test(currentVendor);
+async function extractWithAzureDocumentIntelligence(fileBlob) {
+  const endpoint = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')?.trim();
+  const model = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_MODEL')?.trim() || 'prebuilt-invoice';
+  const apiVersion = Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_API_VERSION')?.trim() || '2024-11-30';
 
-    return {
-      ...data,
-      ...Object.fromEntries(Object.entries(usFoods).filter(([, value]) => value !== null && value !== undefined && value !== '')),
-      vendor_name: vendorLooksLikeBillTo || !currentVendor ? usFoods.vendor_name : (usFoods.vendor_name || data.vendor_name),
-      line_items: repairedLineCount > currentLineCount ? usFoods.line_items : data.line_items,
-    };
+  if (!endpoint || !key) throw new Error('Azure Document Intelligence is not configured.');
+
+  const analyzeUrl = `${endpoint}/documentintelligence/documentModels/${encodeURIComponent(model)}:analyze?api-version=${encodeURIComponent(apiVersion)}`;
+  const analyzeResponse = await fetch(analyzeUrl, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': key,
+      'Content-Type': fileBlob.type || 'application/pdf',
+    },
+    body: fileBlob,
+  });
+
+  if (!analyzeResponse.ok) {
+    throw new Error(`Azure Document Intelligence submit failed: ${analyzeResponse.status} ${await analyzeResponse.text()}`);
   }
 
-  return data;
+  const operationUrl = analyzeResponse.headers.get('Operation-Location');
+  if (!operationUrl) throw new Error('Azure Document Intelligence did not return Operation-Location.');
+
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const pollResponse = await fetch(operationUrl, {
+      headers: { 'Ocp-Apim-Subscription-Key': key },
+    });
+    if (!pollResponse.ok) {
+      throw new Error(`Azure Document Intelligence poll failed: ${pollResponse.status} ${await pollResponse.text()}`);
+    }
+    const result = await pollResponse.json();
+    if (!['notStarted', 'running'].includes(result.status)) {
+      if (result.status !== 'succeeded') throw new Error(`Azure Document Intelligence failed: ${JSON.stringify(result).slice(0, 1500)}`);
+      return result;
+    }
+  }
+
+  throw new Error('Azure Document Intelligence timed out.');
+}
+
+function buildAzureOpenAIInvoicePrompt(compactExtraction) {
+  return {
+    task: 'Map compact Azure Document Intelligence invoice extraction into the invoice JSON shape used by the MED invoice workflow.',
+    output_shape: {
+      vendor_name: null,
+      vendor_address: null,
+      invoice_number: null,
+      account_number: null,
+      customer_number: null,
+      order_number: null,
+      purchase_order_number: null,
+      invoice_date: null,
+      due_date: null,
+      payment_terms: null,
+      subtotal: null,
+      tax_amount: null,
+      fuel_surcharge: null,
+      delivery_fee: null,
+      other_charges: null,
+      total_amount: null,
+      payment_status: 'unpaid',
+      paid_status_detection: null,
+      line_items: [
+        {
+          vendor_item_code: null,
+          description: null,
+          quantity: null,
+          unit: null,
+          unit_price: null,
+          extended_price: null,
+          pack_size: null,
+          label: null,
+          ai_confidence: null,
+        },
+      ],
+      validation: {
+        needs_review: false,
+        warnings: [],
+        errors: [],
+      },
+    },
+    rules: [
+      'Return only valid JSON. Do not include markdown fences or explanations.',
+      'Use only values present in the compact extraction payload. Do not invent values.',
+      'Dates must be YYYY-MM-DD. Money and quantities must be numbers.',
+      'Prefer visible header_table_pairs over ADI prebuilt fields when they conflict.',
+      'Keep document identifiers separate. Never map order_number into purchase_order_number unless there is a visible Purchase Order/PO label with that value.',
+      'If an invoice number is not visible, return invoice_number as null. The application will generate a fallback invoice number.',
+      'Use the supplier/vendor as vendor_name, not bill-to, ship-to, or customer recipient.',
+      'Preserve all invoice line items. Use shipped/invoiced quantity when available.',
+      'For every line item, map ADI ProductCode, ProductNumber, ItemNumber, ItemCode, SKU, SUPC, or Code to vendor_item_code. Keep the value even when confidence is low; low confidence should create a validation warning, not a null vendor_item_code.',
+      'If a product/item code appears in a line item table under a product/code/SKU/SUPC column, output that value as vendor_item_code.',
+      'If table_line_items is present, use it as the preferred source for line item vendor_item_code, pack_size, and label/brand values.',
+      'Set validation.needs_review true when required fields are missing, confidence is low, or totals do not reconcile.',
+    ],
+    compact_extraction: compactExtraction,
+  };
+}
+
+async function mapWithAzureOpenAI(compactExtraction) {
+  const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_OPENAI_API_KEY')?.trim();
+  const deployment = Deno.env.get('AZURE_OPENAI_DEPLOYMENT')?.trim();
+  const apiVersion = Deno.env.get('AZURE_OPENAI_API_VERSION')?.trim() || 'v1';
+
+  if (!endpoint || !key || !deployment) throw new Error('Azure OpenAI is not configured.');
+
+  let url;
+  const body = {
+    model: deployment,
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a precise invoice extraction mapper. Return only JSON that matches the requested output shape.',
+      },
+      {
+        role: 'user',
+        content: JSON.stringify(buildAzureOpenAIInvoicePrompt(compactExtraction)),
+      },
+    ],
+    max_completion_tokens: 12000,
+  };
+
+  if (apiVersion.toLowerCase() === 'v1') {
+    url = endpoint.endsWith('/openai/v1') ? `${endpoint}/chat/completions` : `${endpoint}/openai/v1/chat/completions`;
+  } else {
+    url = `${endpoint}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+    delete body.model;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': key,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Azure OpenAI mapping failed: ${response.status} ${await response.text()}`);
+  }
+
+  const payload = await response.json();
+  const content = payload.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error('Azure OpenAI mapping returned no content.');
+
+  const cleanJson = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  return {
+    data: JSON.parse(cleanJson),
+    rawText: content,
+    usage: payload.usage || null,
+  };
+}
+
+function vendorPrefix(vendorName) {
+  const cleaned = String(vendorName || 'VENDOR').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (cleaned || 'VENDOR').slice(0, 12);
+}
+
+function dateCompact(value) {
+  const normalized = normalizeDate(value);
+  if (!normalized) return null;
+  return normalized.replace(/-/g, '');
+}
+
+function generatedInvoiceNumber(normalized, record) {
+  const datePart = dateCompact(normalized.invoice_date) || dateCompact(normalized.due_date) || dateCompact(record.created_at) || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const shortId = String(record.id || crypto.randomUUID()).replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${vendorPrefix(normalized.vendor_name || record.vendor_name)}${datePart}${shortId}`;
+}
+
+function normalizeMatchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function descriptionsLikelyMatch(left, right) {
+  const a = normalizeMatchText(left);
+  const b = normalizeMatchText(right);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+
+  const aPrefix = a.slice(0, 24);
+  const bPrefix = b.slice(0, 24);
+  return aPrefix.length >= 12 && bPrefix.length >= 12 && (aPrefix.includes(bPrefix) || bPrefix.includes(aPrefix));
+}
+
+function backfillLineItemsFromTables(data = {}, tableLineItems = []) {
+  if (!Array.isArray(data.line_items) || !Array.isArray(tableLineItems) || !tableLineItems.length) return data;
+
+  const usableTableItems = tableLineItems.filter((item) =>
+    cleanString(item?.description) ||
+    cleanString(item?.vendor_item_code) ||
+    cleanString(item?.pack_size) ||
+    cleanString(item?.label)
+  );
+  const usedTableIndexes = new Set();
+
+  const enrichedLineItems = data.line_items.map((lineItem, index) => {
+    const needsCode = !cleanString(lineItem?.vendor_item_code) && !cleanString(lineItem?.product_number);
+    const needsPack = !cleanString(lineItem?.pack_size) && !cleanString(lineItem?.PackSize) && !cleanString(lineItem?.pack);
+    const needsLabel = !cleanString(lineItem?.label) && !cleanString(lineItem?.Label) && !cleanString(lineItem?.brand);
+    if (!needsCode && !needsPack && !needsLabel) return lineItem;
+
+    const description = firstValue(
+      lineItem?.description,
+      lineItem?.Description,
+      lineItem?.item_description,
+      lineItem?.vendor_item_description,
+      lineItem?.product_description,
+      lineItem?.name
+    );
+
+    let tableIndex = usableTableItems.findIndex((tableItem, candidateIndex) =>
+      !usedTableIndexes.has(candidateIndex) && descriptionsLikelyMatch(description, tableItem.description)
+    );
+    if (tableIndex < 0 && usableTableItems[index]) tableIndex = index;
+
+    const tableItem = tableIndex >= 0 ? usableTableItems[tableIndex] : null;
+    if (!tableItem) return lineItem;
+    usedTableIndexes.add(tableIndex);
+
+    return {
+      ...lineItem,
+      vendor_item_code: cleanString(lineItem?.vendor_item_code) || cleanString(lineItem?.product_number) || cleanString(tableItem.vendor_item_code) || lineItem?.vendor_item_code,
+      product_number: cleanString(lineItem?.product_number) || cleanString(tableItem.vendor_item_code) || lineItem?.product_number,
+      pack_size: cleanString(lineItem?.pack_size) || cleanString(tableItem.pack_size) || lineItem?.pack_size,
+      label: cleanString(lineItem?.label) || cleanString(tableItem.label) || lineItem?.label,
+      unit: cleanString(lineItem?.unit) || cleanString(tableItem.unit) || lineItem?.unit,
+      unit_price: firstNumber(lineItem?.unit_price, tableItem.unit_price) ?? lineItem?.unit_price,
+      extended_price: firstNumber(lineItem?.extended_price, tableItem.extended_price) ?? lineItem?.extended_price,
+    };
+  });
+
+  return { ...data, line_items: enrichedLineItems };
 }
 
 function mapLineItemsForRpc(lineItems = []) {
@@ -190,33 +556,61 @@ function mapLineItemsForRpc(lineItems = []) {
     total_price: firstNumber(item.extended_price, item.total_price, item.amount) || 0,
     vendor_item_code: item.vendor_item_code || item.product_number || '',
     vendor_unit: item.unit || item.vendor_unit || '',
+    pack_size: item.pack_size || '',
+    label: item.label || '',
   })).filter((item) => item.item_name || item.vendor_item_code);
 }
 function normalizeLineItem(item = {}) {
   const quantity = firstNumber(
     item.quantity,
+    item.Quantity,
     item.qty,
+    item.Qty,
     item.shipped_quantity,
+    item.ShippedQuantity,
     item.shipped_qty,
+    item.ShippedQty,
     item.invoice_quantity,
+    item.InvoiceQuantity,
     item.invoice_qty,
+    item.InvoiceQty,
     item.order_quantity,
-    item.order_qty
+    item.OrderQuantity,
+    item.order_qty,
+    item.OrderQty
   );
-  const unitPrice = firstNumber(item.unit_price, item.price, item.pricing_unit_price, item.invoice_unit_price);
-  const extendedPrice = firstNumber(item.extended_price, item.extended, item.total_price, item.line_total, item.amount);
+  const unitPrice = firstNumber(item.unit_price, item.UnitPrice, item.price, item.Price, item.pricing_unit_price, item.invoice_unit_price);
+  const extendedPrice = firstNumber(item.extended_price, item.ExtendedPrice, item.extended, item.total_price, item.TotalPrice, item.line_total, item.LineTotal, item.amount, item.Amount);
 
   return {
-    vendor_item_code: firstValue(item.vendor_item_code, item.product_number, item.item_number, item.item_code, item.product_id) || '',
-    description: firstValue(item.description, item.item_description, item.vendor_item_description, item.product_description, item.name) || '',
+    vendor_item_code: firstValue(
+      item.vendor_item_code,
+      item.product_code,
+      item.ProductCode,
+      item.product_number,
+      item.ProductNumber,
+      item.item_number,
+      item.ItemNumber,
+      item.item_code,
+      item.ItemCode,
+      item.product_id,
+      item.ProductId,
+      item.sku,
+      item.SKU,
+      item.supc,
+      item.SUPC,
+      item.code,
+      item.Code
+    ) || '',
+    description: firstValue(item.description, item.Description, item.item_description, item.vendor_item_description, item.product_description, item.ProductDescription, item.name, item.Name) || '',
     quantity: quantity ?? '',
-    unit: firstValue(item.unit, item.pricing_unit, item.uom, item.unit_of_measure) || '',
+    unit: firstValue(item.unit, item.Unit, item.pricing_unit, item.PricingUnit, item.uom, item.UOM, item.unit_of_measure) || '',
     unit_price: unitPrice ?? '',
-    discount: firstNumber(item.discount) ?? 0,
-    adjustment: firstNumber(item.adjustment) ?? 0,
+    discount: firstNumber(item.discount, item.Discount) ?? 0,
+    adjustment: firstNumber(item.adjustment, item.Adjustment) ?? 0,
     extended_price: extendedPrice ?? (quantity !== null && unitPrice !== null ? quantity * unitPrice : 0),
-    pack_size: firstValue(item.pack_size, item.pack, item.size) || '',
-    label: firstValue(item.label, item.brand) || '',
+    pack_size: firstValue(item.pack_size, item.PackSize, item.pack, item.Pack, item.size, item.Size) || '',
+    label: firstValue(item.label, item.Label, item.brand, item.Brand) || '',
     ai_confidence: firstNumber(item.ai_confidence, item.confidence) ?? null,
   };
 }
@@ -247,6 +641,10 @@ function normalizeExtraction(data = {}) {
     vendor_name: firstValue(data.vendor_name, data.supplier_name, data.remit_to_name),
     invoice_number: firstValue(data.invoice_number, data.invoice_no, data.invoice_id),
     account_number: firstValue(data.account_number, data.customer_number, data.customer_id, data.customer_account_number),
+    customer_number: firstValue(data.customer_number, data.customer_id, data.customer_account_number),
+    order_number: firstValue(data.order_number, data.order_no, data.sales_order_number),
+    purchase_order_number: firstValue(data.purchase_order_number, data.purchase_order, data.po_number, data.po),
+    vendor_address: firstValue(data.vendor_address, data.supplier_address, data.remit_to_address),
     invoice_date: normalizeDate(data.invoice_date),
     due_date: normalizeDate(data.due_date),
     payment_terms: firstValue(data.payment_terms, data.terms),
@@ -259,6 +657,7 @@ function normalizeExtraction(data = {}) {
     line_items: lineItems,
     payment_status: paidDetection.should_mark_paid ? 'paid' : 'unpaid',
     paid_status_detection: paidDetection.detected ? paidDetection : null,
+    validation: data.validation || null,
   };
 }
 function getDoclingBackendUrl() {
@@ -320,7 +719,7 @@ async function extractWithGeminiVision(fileBlob) {
         }
       ]
     }
-    For US Foods invoices, use shipped quantity (SHP), PRODUCT NUMBER, LABEL, PACK SIZE, PRICING UNIT, UNIT PRICE, and EXTENDED PRICE when visible.
+    For line-item tables, use shipped/invoiced quantity, product/item code, label/brand, pack size, pricing unit, unit price, and extended price when visible.
     Include all line rows across all pages, excluding subtotal/summary/footer rows.
     If the invoice visibly says PAID, paid by check, paid by ACH, balance due 0, payment received, or contains a payment confirmation,
     set payment_status to paid and paid_status_detection.should_mark_paid to true. If no paid signal is visible, set payment_status to unpaid.
@@ -393,61 +792,79 @@ async function processInvoiceBackground(record, supabaseClient) {
       log_data: { point: 'download_success', size: fileBlob.size }
     });
 
-    // 2. Try Docling first, then fall back to Gemini Vision for scanned/image-heavy invoices.
-    console.log("Routing file to Python Docling backend for extraction...");
+    // 2. Extract with Azure Document Intelligence, then map compact output with Azure OpenAI.
+    console.log("Routing file to Azure Document Intelligence for extraction...");
     
     let extractedData;
     let rawText = '';
-    let extractionMethod = 'docling+gemini';
+    let extractionMethod = 'azure_document_intelligence+azure_openai';
+    let compactExtraction = null;
+    let azureOpenAIUsage = null;
 
-    try {
-      const backendUrl = getDoclingBackendUrl();
-      const formData = new FormData();
-      formData.append('file', fileBlob, filePath.split('/').pop() || 'invoice.pdf');
+    await supabaseClient.from('debug_logs').insert({
+      log_data: { point: 'invoking_azure_document_intelligence' }
+    });
 
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'invoking_docling_backend', url: `${backendUrl}/extract-invoice` }
-      });
+    const azureDocumentResult = await extractWithAzureDocumentIntelligence(fileBlob);
+    compactExtraction = simplifyAzureDocumentIntelligenceResult(azureDocumentResult);
 
-      const extractionResponse = await fetch(`${backendUrl}/extract-invoice`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!extractionResponse.ok) {
-        const errText = await extractionResponse.text();
-        throw new Error(`Python backend failed: ${extractionResponse.status} ${errText}`);
+    await supabaseClient.from('debug_logs').insert({
+      log_data: {
+        point: 'azure_document_intelligence_success',
+        page_count: compactExtraction.page_count,
+        line_items_count: compactExtraction.line_items?.length || 0
       }
+    });
 
-      extractedData = await extractionResponse.json();
-      rawText = extractedData.raw_text || '';
-      extractedData = repairExtractionFromRawText(extractedData, rawText);
+    const mappedResult = await mapWithAzureOpenAI(compactExtraction);
+    extractedData = mappedResult.data?.invoice && typeof mappedResult.data.invoice === 'object'
+      ? { ...mappedResult.data.invoice, validation: mappedResult.data.validation || mappedResult.data.invoice.validation }
+      : mappedResult.data;
+    extractedData = backfillLineItemsFromTables(extractedData, compactExtraction.table_line_items || []);
+    rawText = JSON.stringify({
+      compact_extraction: compactExtraction,
+      mapped_invoice: extractedData,
+    });
+    azureOpenAIUsage = mappedResult.usage;
 
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'docling_response_success' }
-      });
-    } catch (doclingError) {
-      console.warn('Docling extraction failed, falling back to Gemini Vision:', doclingError);
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'docling_failed_gemini_fallback', error: doclingError.message }
-      });
-
-      const geminiResult = await extractWithGeminiVision(fileBlob);
-      extractedData = repairExtractionFromRawText(geminiResult.data, geminiResult.rawText);
-      rawText = geminiResult.rawText;
-      extractionMethod = 'gemini_vision_fallback';
-
-      await supabaseClient.from('debug_logs').insert({
-        log_data: { point: 'gemini_fallback_success' }
-      });
-    }
+    await supabaseClient.from('debug_logs').insert({
+      log_data: {
+        point: 'azure_openai_mapping_success',
+        usage: azureOpenAIUsage,
+        table_line_items_count: compactExtraction.table_line_items?.length || 0,
+      }
+    });
 // 3. Update invoice with extracted data in the shared public table
     console.log(`Updating invoice ${record.id} to pending_review in public schema...`);
     
     const normalized = normalizeExtraction(extractedData);
+    const sourceInvoiceNumber = normalized.invoice_number;
+    const finalInvoiceNumber = sourceInvoiceNumber || generatedInvoiceNumber(normalized, record);
+    const generatedInvoiceMetadata = sourceInvoiceNumber ? null : {
+      generated_invoice_number: true,
+      generated_invoice_number_reason: 'missing_source_invoice_number',
+      source_invoice_number: null,
+      generated_invoice_number_value: finalInvoiceNumber,
+      generated_invoice_number_format: 'VENDORYYYYMMDDSHORTID',
+    };
+    const validationResults = {
+      ...(record.validation_results || {}),
+      ...(normalized.validation && typeof normalized.validation === 'object' ? { extraction_validation: normalized.validation } : {}),
+      ...(normalized.paid_status_detection ? { paid_status_detection: normalized.paid_status_detection } : {}),
+      extraction_metadata: {
+        ...((record.validation_results || {}).extraction_metadata || {}),
+        extraction_method: extractionMethod,
+        customer_number: normalized.customer_number || null,
+        order_number: normalized.order_number || null,
+        vendor_address: normalized.vendor_address || null,
+        azure_openai_usage: azureOpenAIUsage || null,
+        ...(generatedInvoiceMetadata || {}),
+      },
+    };
+
     const updatePayload = {
       vendor_name: normalized.vendor_name || record.vendor_name,
-      invoice_number: normalized.invoice_number || record.invoice_number,
+      invoice_number: finalInvoiceNumber || record.invoice_number,
       account_number: normalized.account_number,
       invoice_date: normalized.invoice_date,
       due_date: normalized.due_date,
@@ -462,10 +879,9 @@ async function processInvoiceBackground(record, supabaseClient) {
       payment_status: normalized.payment_status,
       status: 'pending_review',
       ap_status: 'processing',
+      purchase_order_number: normalized.purchase_order_number,
       raw_text: rawText || extractedData.raw_text || '',
-      validation_results: normalized.paid_status_detection
-        ? { ...(record.validation_results || {}), paid_status_detection: normalized.paid_status_detection }
-        : record.validation_results,
+      validation_results: validationResults,
       extraction_method: extractionMethod,
     };
 

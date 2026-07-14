@@ -156,13 +156,13 @@ export default function InvoiceUploader({
 
       const invoiceData = {
         status: 'extracting',
-        ap_status: 'processing', // DB Constraint requires ap_status
+        ap_status: 'processing',
         file_url: filePath,
         file_type: fileToProcess.type,
         source,
-        vendor_name: 'Extracting...', // Temporary placeholder
-        invoice_number: 'PENDING_EXTRACTION', // Temporary placeholder to satisfy DB constraints
-        total_amount: 0,
+        vendor_name: draftInvoice?.vendor_name || 'Pending Vendor',
+        invoice_number: draftInvoice?.invoice_number || `PENDING-${Date.now()}`,
+        total_amount: draftInvoice?.total_amount ?? 0,
       };
 
       if (draftInvoice?.id && onFinalizeUploadDraft) {

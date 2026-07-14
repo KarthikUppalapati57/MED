@@ -483,8 +483,8 @@ export default function Invoices() {
       payment_status: 'unpaid',
       source,
       file_type: fileType,
-      vendor_name: 'Uploading...',
-      invoice_number: `UPLOAD-${Date.now()}`,
+      vendor_name: 'Pending Vendor',
+      invoice_number: `PENDING-${Date.now()}`,
       total_amount: 0,
       validation_results: {
         upload_state: 'pending_storage',
