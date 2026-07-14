@@ -479,121 +479,6 @@ function generatedInvoiceNumber(normalized, record) {
   return `${vendorPrefix(normalized.vendor_name || record.vendor_name)}${datePart}${shortId}`;
 }
 
-function parseUsFoodsRawText(rawText = '') {
-  if (!/US\s*Foods/i.test(rawText)) return null;
-
-  const source = rawText.replace(/\u00a0/g, ' ');
-  const invoiceNumber = firstValue(
-    source.match(/INVOICE DATE\s*\r?\n\s*(\d{4,})\s*\r?\n\s*ACCOUNT NUMBER INVOICE NUMBER/i)?.[1],
-    source.match(/ACCOUNT NUMBER\s+INVOICE NUMBER\s*\r?\n\s*\d+\s+\r?\n?\s*(\d{4,})/i)?.[1]
-  );
-  const accountNumber = firstValue(
-    source.match(/Page \d+ of \d+\s*\r?\n\s*(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1],
-    source.match(/(\d{5,})\s*\r?\n\s*CUSTOMER NUMBER/i)?.[1]
-  );
-  const invoiceDate = normalizeDate(source.match(/(\d{2}\/\d{2}\/\d{4})\s*\r?\n\s*INVOICE DATE/i)?.[1]);
-  const paymentTerms = firstValue(
-    source.match(/ORDER NUMBER PAYMENT TERMS ROUTE NUMBER\s*\r?\n\s*\d+\s+(NET\s+\d+\s+DAYS|NET\s+\d+|DUE\s+ON\s+RECEIPT|[A-Z ]+?)\s+\d+/i)?.[1]
-  );
-  const dueDate = normalizeDate(
-    source.match(/PLEASE REMIT THIS AMOUNT BY[\s\S]*?(\d{2}\/\d{2}\/\d{4})\s+\$[\d,]+\.\d{2}/i)?.[1]
-  );
-  const totalAmount = firstNumber(
-    source.match(/Product Total\s+\$?([\d,]+\.\d{2})/i)?.[1],
-    source.match(/DELIVERY SUMMARY TOTALS[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]
-  );
-  const taxAmount = firstNumber(source.match(/Rate:\s*[\d.]+\s+\$([\d,]+\.\d{2})/i)?.[1]);
-  const fuelSurcharge = firstNumber(source.match(/FUEL SURCHARGE\s+\$([\d,]+\.\d{2})/i)?.[1]);
-  const allowance = firstNumber(source.match(/INVENTORY ALLOWANCE\s+-\$([\d,]+\.\d{2})/i)?.[1]);
-  const grossAmount = firstNumber(source.match(/TOTAL GROSS WEIGHT SHIPPED[\s\S]*?\$([\d,]+\.\d{2})/i)?.[1]);
-
-  const lineSectionEnd = source.search(/HAZARD MATERIALS SUMMARY|STORAGE LOCATION TOTAL|DELIVERY SUMMARY/i);
-  const lineSource = lineSectionEnd > -1 ? source.slice(0, lineSectionEnd) : source;
-  const lineItems = [];
-  const seen = new Set();
-  const rowPattern = /^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+([A-Z]+)\s+(\d{5,})\s+(.+?)\s+\$([\d,]+\.\d{2,4})\s+\$(-?[\d,]+\.\d{2})\s*$/gm;
-  let match;
-
-  while ((match = rowPattern.exec(lineSource)) !== null) {
-    const [, ordered, shipped, adjusted, salesUnit, productNumber, rawMiddle, unitPriceRaw, extendedRaw] = match;
-    const middleTokens = rawMiddle.trim().split(/\s+/);
-    let pricingUnit = salesUnit;
-    let packSize = '';
-
-    if (middleTokens.length && /^[A-Z]{1,4}$/.test(middleTokens[middleTokens.length - 1])) {
-      pricingUnit = middleTokens.pop();
-    }
-
-    if (middleTokens.length && /^[A-Z]$/.test(middleTokens[middleTokens.length - 1])) {
-      middleTokens.pop();
-    }
-
-    if (middleTokens.length >= 2 && /\d/.test(middleTokens[middleTokens.length - 2])) {
-      const unitToken = middleTokens[middleTokens.length - 1];
-      if (/^(GA|GAL|LB|OZ|EA|CT|CS|PK|BG|SL|DZ)$/i.test(unitToken)) {
-        packSize = `${middleTokens[middleTokens.length - 2]} ${middleTokens[middleTokens.length - 1]}`;
-        middleTokens.splice(middleTokens.length - 2, 2);
-      }
-    }
-
-    const description = middleTokens.join(' ').replace(/\s+/g, ' ').trim();
-    const key = `${productNumber}:${extendedRaw}`;
-    if (!description || seen.has(key)) continue;
-    seen.add(key);
-
-    lineItems.push({
-      vendor_item_code: productNumber,
-      description,
-      quantity: parseQuantity(shipped) ?? parseQuantity(ordered) ?? 0,
-      unit: pricingUnit,
-      unit_price: firstNumber(unitPriceRaw) ?? 0,
-      extended_price: firstNumber(extendedRaw) ?? 0,
-      pack_size: packSize,
-      label: '',
-      discount: 0,
-      adjustment: parseQuantity(adjusted) || 0,
-      ai_confidence: 0.98,
-    });
-  }
-
-  return {
-    vendor_name: 'US Foods',
-    invoice_number: invoiceNumber,
-    account_number: accountNumber,
-    customer_number: accountNumber,
-    invoice_date: invoiceDate,
-    due_date: null,
-    payment_terms: paymentTerms,
-    subtotal: totalAmount,
-    tax_amount: taxAmount,
-    fuel_surcharge: fuelSurcharge,
-    delivery_fee: 0,
-    other_charges: allowance ? -allowance : 0,
-    total_amount: grossAmount ?? totalAmount,
-    payment_status: 'unpaid',
-    line_items: lineItems,
-  };
-}
-
-function repairExtractionFromRawText(data = {}, rawText = '') {
-  const usFoods = parseUsFoodsRawText(rawText);
-  if (usFoods) {
-    const currentLineCount = Array.isArray(data.line_items) ? data.line_items.length : 0;
-    const repairedLineCount = Array.isArray(usFoods.line_items) ? usFoods.line_items.length : 0;
-    const currentVendor = cleanString(data.vendor_name) || '';
-    const vendorLooksLikeBillTo = /CRAVEN|WING|CHOTO|CUSTOMER|BILL TO/i.test(currentVendor);
-
-    return {
-      ...data,
-      ...Object.fromEntries(Object.entries(usFoods).filter(([, value]) => value !== null && value !== undefined && value !== '')),
-      vendor_name: vendorLooksLikeBillTo || !currentVendor ? usFoods.vendor_name : (usFoods.vendor_name || data.vendor_name),
-      line_items: repairedLineCount > currentLineCount ? usFoods.line_items : data.line_items,
-    };
-  }
-
-  return data;
-}
-
 function normalizeMatchText(value) {
   return String(value || '')
     .toLowerCase()
@@ -834,7 +719,7 @@ async function extractWithGeminiVision(fileBlob) {
         }
       ]
     }
-    For US Foods invoices, use shipped quantity (SHP), PRODUCT NUMBER, LABEL, PACK SIZE, PRICING UNIT, UNIT PRICE, and EXTENDED PRICE when visible.
+    For line-item tables, use shipped/invoiced quantity, product/item code, label/brand, pack size, pricing unit, unit price, and extended price when visible.
     Include all line rows across all pages, excluding subtotal/summary/footer rows.
     If the invoice visibly says PAID, paid by check, paid by ACH, balance due 0, payment received, or contains a payment confirmation,
     set payment_status to paid and paid_status_detection.should_mark_paid to true. If no paid signal is visible, set payment_status to unpaid.
