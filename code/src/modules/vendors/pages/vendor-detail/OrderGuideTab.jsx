@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { ShoppingCart, Loader2, Download, Printer } from 'lucide-react';
 import { toast } from "sonner";
 
-export default function OrderGuideTab({ vendorId }) {
+export default function OrderGuideTab({ vendorId, vendorName }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
@@ -43,6 +43,35 @@ export default function OrderGuideTab({ vendorId }) {
     if (!isNaN(qty)) {
       updateItemMutation.mutate({ id, updates: { preferred_quantity: qty } });
     }
+  };
+
+  const buildGuideRows = () => items.map(item => ({
+    name: item.vendor_item_name,
+    pack: item.pack_size || item.vendor_unit || '—',
+    price: `$${Number(item.last_price || item.default_price || 0).toFixed(2)}`,
+    qty: item.preferred_quantity || 1,
+  }));
+
+  const handlePrint = async () => {
+    if (items.length === 0) return;
+    const { exportToPDF } = await import('@/lib/exportUtils');
+    exportToPDF(
+      [
+        { header: 'Item', dataKey: 'name' },
+        { header: 'Pack Size', dataKey: 'pack' },
+        { header: 'Last Price', dataKey: 'price' },
+        { header: 'Qty', dataKey: 'qty' },
+      ],
+      buildGuideRows(),
+      `${vendorName || 'Vendor'} Order Guide`,
+      `${vendorName || 'vendor'}-order-guide.pdf`
+    );
+  };
+
+  const handleDownload = async () => {
+    if (items.length === 0) return;
+    const { exportToCSV } = await import('@/lib/exportUtils');
+    exportToCSV(buildGuideRows(), `${vendorName || 'vendor'}-order-guide`);
   };
 
   const handleGenerateOrder = async () => {
@@ -86,8 +115,8 @@ export default function OrderGuideTab({ vendorId }) {
           <p className="text-sm text-muted-foreground">Select items to appear on your standard order guide for this vendor.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon"><Printer className="h-4 w-4" /></Button>
-          <Button variant="outline" size="icon"><Download className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" disabled={items.length === 0} onClick={handlePrint}><Printer className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" disabled={items.length === 0} onClick={handleDownload}><Download className="h-4 w-4" /></Button>
           <Button onClick={handleGenerateOrder} disabled={generating} className="bg-primary">
             {generating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShoppingCart className="h-4 w-4 mr-2" />}
             Generate Order

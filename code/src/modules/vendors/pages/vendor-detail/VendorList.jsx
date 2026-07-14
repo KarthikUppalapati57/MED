@@ -60,11 +60,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
+import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import VendorOnboardingWizard from '../../components/VendorOnboardingWizard';
 
 const VendorStatementsTab = React.lazy(() => import('./VendorStatementsTab'));
+const VendorDefaultSettingsTab = React.lazy(() => import('./VendorDefaultSettingsTab'));
 
 const statusColors = {
   active: 'bg-resend-green/10 text-resend-green',
@@ -123,17 +126,20 @@ export default function VendorList() {
     notes: '',
     whatsapp_number: '',
     file_routing_preference: 'storage',
-    ap_routing_preference: 'payments'
+    ap_routing_preference: 'payments',
+    is_commissary_vendor: false,
+    is_internal_transfer_vendor: false
   });
 
   const queryClient = useQueryClient();
-  const { organization, brand, location } = useAuth();
+  const { organization, brand, location, role, isPlatformAdmin } = useAuth();
+  const isElevatedUser = isPlatformAdmin || role === 'tenant_super_admin' || role === 'org_manager' || role === 'admin';
 
   const { data, isLoading } = useAuthQuery({
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id',
+      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
@@ -212,7 +218,9 @@ export default function VendorList() {
       notes: '',
       whatsapp_number: '',
       file_routing_preference: 'storage',
-      ap_routing_preference: 'payments'
+      ap_routing_preference: 'payments',
+      is_commissary_vendor: false,
+      is_internal_transfer_vendor: false
     });
     setEditingVendor(null);
   };
@@ -234,7 +242,9 @@ export default function VendorList() {
       notes: vendor.notes || '',
       whatsapp_number: vendor.whatsapp_number || '',
       file_routing_preference: vendor.file_routing_preference || 'storage',
-      ap_routing_preference: normalizeApRouting(vendor.ap_routing_preference)
+      ap_routing_preference: normalizeApRouting(vendor.ap_routing_preference),
+      is_commissary_vendor: !!vendor.is_commissary_vendor,
+      is_internal_transfer_vendor: !!vendor.is_internal_transfer_vendor
     });
     setDialogOpen(true);
   };
@@ -251,6 +261,8 @@ export default function VendorList() {
       status: formData.status || 'active',
       file_routing_preference: formData.file_routing_preference || 'storage',
       ap_routing_preference: normalizeApRouting(formData.ap_routing_preference),
+      is_commissary_vendor: formData.is_commissary_vendor,
+      is_internal_transfer_vendor: formData.is_internal_transfer_vendor,
     };
 
     if (editingVendor) {
@@ -334,6 +346,39 @@ export default function VendorList() {
     return { totalSpent: spent, activeVendors: active, totalOrders: orders };
   }, [vendors]);
 
+  const { data: vendorItemCount = 0 } = useAuthQuery({
+    queryKey: ['vendor_items_count', organization?.id],
+    queryFn: async () => {
+      const rows = await api.entities.VendorItem.list('id', { select: 'id' });
+      return rows.length;
+    },
+    enabled: !!organization?.id,
+  });
+
+  const { data: orgInvoices = [] } = useAuthQuery({
+    queryKey: ['vendor_invoices_period', organization?.id],
+    queryFn: () => api.entities.Invoice.list('-invoice_date', { select: 'invoice_date, total_amount' }),
+    enabled: !!organization?.id,
+  });
+
+  const periodSpent = React.useMemo(() => {
+    if (periodFilter === 'all') return totalSpent;
+    const now = new Date();
+    let range;
+    if (periodFilter === 'this_period') {
+      range = { start: startOfMonth(now), end: endOfMonth(now) };
+    } else if (periodFilter === 'last_period') {
+      const lastMonth = subMonths(now, 1);
+      range = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+    } else {
+      range = { start: startOfYear(now), end: endOfYear(now) };
+    }
+    return orgInvoices.reduce((sum, inv) => {
+      if (!inv.invoice_date) return sum;
+      return isWithinInterval(new Date(inv.invoice_date), range) ? sum + Number(inv.total_amount || 0) : sum;
+    }, 0);
+  }, [periodFilter, orgInvoices, totalSpent]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -343,6 +388,11 @@ export default function VendorList() {
           <p className="text-muted-foreground mt-1">Manage your vendor relationships</p>
         </div>
         <div className="flex gap-2">
+          {isElevatedUser && (
+            <Button variant="outline" onClick={() => setActiveTab('defaults')}>
+              Configure Defaults
+            </Button>
+          )}
           <Button variant="outline" onClick={fetchSuggestions}>
             <Sparkles className="h-4 w-4 mr-2" />
             Suggestions
@@ -355,7 +405,7 @@ export default function VendorList() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Vendors</p>
@@ -370,14 +420,26 @@ export default function VendorList() {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground"># Vendor Items</p>
+            <p className="text-2xl font-bold text-foreground">{vendorItemCount}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Orders</p>
             <p className="text-2xl font-bold text-foreground">{totalOrders}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Spent</p>
-            <p className="text-2xl font-bold text-foreground">${totalSpent.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground"># Invoices Processed</p>
+            <p className="text-2xl font-bold text-foreground">{orgInvoices.length}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Total Purchased</p>
+            <p className="text-2xl font-bold text-foreground">${periodSpent.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
           </CardContent>
         </Card>
       </div>
@@ -387,6 +449,7 @@ export default function VendorList() {
           <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="vendor-items">Vendor Items</TabsTrigger>
           <TabsTrigger value="statements">Statements</TabsTrigger>
+          {isElevatedUser && <TabsTrigger value="defaults">Default Settings</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="vendors" className="space-y-4">
@@ -636,6 +699,15 @@ export default function VendorList() {
             <VendorStatementsTab vendors={vendors} />
           </React.Suspense>
         </TabsContent>
+
+        {/* Default Settings Tab */}
+        {isElevatedUser && (
+          <TabsContent value="defaults">
+            <React.Suspense fallback={<VendorTabFallback />}>
+              <VendorDefaultSettingsTab />
+            </React.Suspense>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Vendor Onboarding Wizard */}
@@ -774,6 +846,23 @@ export default function VendorList() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center justify-between rounded-lg border border-border/40 p-3">
+                <Label className="cursor-pointer">Commissary Vendor</Label>
+                <Switch
+                  checked={formData.is_commissary_vendor}
+                  onCheckedChange={(v) => setFormData({ ...formData, is_commissary_vendor: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/40 p-3">
+                <Label className="cursor-pointer">Internal Transfer Vendor</Label>
+                <Switch
+                  checked={formData.is_internal_transfer_vendor}
+                  onCheckedChange={(v) => setFormData({ ...formData, is_internal_transfer_vendor: v })}
+                />
               </div>
             </div>
 

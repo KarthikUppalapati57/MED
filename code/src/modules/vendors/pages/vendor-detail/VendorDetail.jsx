@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity } from 'lucide-react';
+import { startOfMonth, endOfMonth, subMonths, isWithinInterval, differenceInDays } from 'date-fns';
 
 const VendorItemsTab = React.lazy(() => import('./VendorItemsTab'));
 const OrderGuideTab = React.lazy(() => import('./OrderGuideTab'));
@@ -90,6 +91,41 @@ export default function VendorDetail() {
     }),
     enabled: !!id && !!vendor?.organization_id,
   });
+
+  const { data: vendorInvoices = [] } = useAuthQuery({
+    queryKey: ['vendor_invoices_spend', id, vendor?.organization_id],
+    queryFn: () => api.entities.Invoice.filter({
+      vendor_id: id,
+      organization_id: vendor?.organization_id,
+    }, {
+      select: 'invoice_date, total_amount, payment_status, updated_at',
+    }),
+    enabled: !!id && !!vendor?.organization_id,
+  });
+
+  const spendMetrics = React.useMemo(() => {
+    const now = new Date();
+    const thisMonthRange = { start: startOfMonth(now), end: endOfMonth(now) };
+    const lastMonth = subMonths(now, 1);
+    const lastMonthRange = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+
+    const sumInRange = (range) => vendorInvoices.reduce((sum, inv) => {
+      if (!inv.invoice_date) return sum;
+      const invDate = new Date(inv.invoice_date);
+      return isWithinInterval(invDate, range) ? sum + Number(inv.total_amount || 0) : sum;
+    }, 0);
+
+    const paidInvoices = vendorInvoices.filter(inv => inv.payment_status === 'paid' && inv.invoice_date && inv.updated_at);
+    const avgPaymentDays = paidInvoices.length > 0
+      ? Math.round(paidInvoices.reduce((sum, inv) => sum + differenceInDays(new Date(inv.updated_at), new Date(inv.invoice_date)), 0) / paidInvoices.length)
+      : null;
+
+    return {
+      thisPeriod: sumInRange(thisMonthRange),
+      lastPeriod: sumInRange(lastMonthRange),
+      avgPaymentDays,
+    };
+  }, [vendorInvoices]);
 
   // Data-Driven Insights
   const aiSummary = React.useMemo(() => {
@@ -240,21 +276,21 @@ export default function VendorDetail() {
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/40">
                 <div>
                   <p className="text-xs text-muted-foreground">This Period</p>
-                  <p className="font-medium">$0.00</p>
+                  <p className="font-medium">${spendMetrics.thisPeriod.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Last Period</p>
-                  <p className="font-medium">$0.00</p>
+                  <p className="font-medium">${spendMetrics.lastPeriod.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/40">
                 <div>
                   <p className="text-xs text-muted-foreground">Open AP</p>
-                  <p className="font-medium text-resend-red">$0.00</p>
+                  <p className="font-medium text-resend-red">${Number(vendor.unpaid_ap || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Avg Payment</p>
-                  <p className="font-medium">14 days</p>
+                  <p className="font-medium">{spendMetrics.avgPaymentDays != null ? `${spendMetrics.avgPaymentDays} days` : '—'}</p>
                 </div>
               </div>
             </CardContent>
@@ -285,7 +321,7 @@ export default function VendorDetail() {
             <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab /></TabsContent>
             {isElevatedUser && <TabsContent value="onboarding" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorOnboardingPanel vendorId={id} /></LazyVendorTab></TabsContent>}
             <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorItemsTab vendorId={id} /></LazyVendorTab></TabsContent>
-            <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><OrderGuideTab vendorId={id} /></LazyVendorTab></TabsContent>
+            <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><OrderGuideTab vendorId={id} vendorName={vendor.name} /></LazyVendorTab></TabsContent>
             {isElevatedUser && <TabsContent value="bulk_tools" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorBulkTools vendorId={id} /></LazyVendorTab></TabsContent>}
             <TabsContent value="invoices" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><InvoicesTab /></TabsContent>
             <TabsContent value="orders" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OrdersTab /></TabsContent>
