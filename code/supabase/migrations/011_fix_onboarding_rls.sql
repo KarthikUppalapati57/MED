@@ -4,6 +4,7 @@
 -- a brand, and a location before their JWT metadata is updated.
 
 -- 1. Allow authenticated users to create their own organization
+DROP POLICY IF EXISTS "Users can create their own organization" ON public.organizations;
 CREATE POLICY "Users can create their own organization"
 ON public.organizations
 FOR INSERT
@@ -11,6 +12,7 @@ TO authenticated
 WITH CHECK (auth.uid() = owner_id);
 
 -- 2. Allow organization owners to create brands (even if organization_id is not in their JWT yet)
+DROP POLICY IF EXISTS "Owners can create brands for their organizations" ON public.brands;
 CREATE POLICY "Owners can create brands for their organizations"
 ON public.brands
 FOR INSERT
@@ -24,6 +26,7 @@ WITH CHECK (
 );
 
 -- 3. Allow organization owners to create locations (even if organization_id is not in their JWT yet)
+DROP POLICY IF EXISTS "Owners can create locations for their organizations" ON public.locations;
 CREATE POLICY "Owners can create locations for their organizations"
 ON public.locations
 FOR INSERT
@@ -38,6 +41,7 @@ WITH CHECK (
 
 -- 4. Ensure organization owners can see their own organizations (even if organization_id is not in their JWT yet)
 -- This supplements the existing JWT-based SELECT policies.
+DROP POLICY IF EXISTS "Owners can view their own organizations" ON public.organizations;
 CREATE POLICY "Owners can view their own organizations"
 ON public.organizations
 FOR SELECT

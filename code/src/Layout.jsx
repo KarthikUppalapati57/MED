@@ -106,7 +106,7 @@ const navigation = [
     minRole: 'ground_staff',
     subItems: [
       { name: 'All Products', href: 'Products/all-products', icon: Package },
-      { name: 'Product Review', href: 'Products/new-review', icon: Check },
+      { name: 'AI Product Verification', href: 'Products/ai-verification', icon: Check },
       { name: 'Purchase Report', href: 'Products/purchase-report', icon: FileText }
     ]
   },

@@ -8,6 +8,21 @@
 
 BEGIN;
 
+-- Bootstrap auth helpers before this migration creates functions that depend on
+-- them. Later migrations harden and recreate these definitions.
+CREATE OR REPLACE FUNCTION public.get_auth_role()
+RETURNS TEXT AS $$
+  SELECT COALESCE(auth.jwt() -> 'user_metadata' ->> 'role', 'ground_staff');
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = '';
+
+CREATE OR REPLACE FUNCTION public.get_auth_org()
+RETURNS UUID AS $$
+  SELECT NULLIF(auth.jwt() -> 'user_metadata' ->> 'organization_id', '')::uuid;
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = '';
+
+GRANT EXECUTE ON FUNCTION public.get_auth_role() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_auth_org() TO anon, authenticated, service_role;
+
 -- ────────────────────────────────────────────────────────────
 -- STEP 1: Fix the profiles role constraint
 -- The old constraint allowed: ground_staff, manager, owner, admin, platform_admin

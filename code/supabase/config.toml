@@ -1,4 +1,4 @@
-project_id = "gsupqfmwlsmwoybphimx"
+project_id = "culhjthszyebfvvrfymb"
 
 [functions.invoice-processing]
 verify_jwt = false
@@ -92,3 +92,6 @@ enabled = false
 [functions.onboarding-expiry-monitor]
 verify_jwt = false
 
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

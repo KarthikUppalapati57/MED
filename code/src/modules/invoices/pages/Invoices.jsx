@@ -135,17 +135,29 @@ const INVOICE_TABLE_VIEWPORT_HEIGHT = 684;
 const INVOICE_ROW_OVERSCAN = 8;
 const IN_FLIGHT_INVOICE_STATUSES = new Set(['uploading', 'extracting']);
 
-const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems.map(item => ({
-  id: item.id || null,
-  inventory_item_id: item.product_id || null,
-  internal_product_id: item.product_id || null,
-  item_name: item.description || 'Unknown Item',
-  quantity: item.quantity || 1,
-  unit_price: item.unit_price || 0,
-  total_price: item.extended_price || 0,
-  vendor_item_code: item.vendor_item_code || null,
-  vendor_unit: item.vendor_unit || null
-}));
+const hasInvoiceLineItems = (lineItems) => Array.isArray(lineItems) && lineItems.length > 0;
+
+const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems
+  .filter(item => item && String(item.description || item.item_name || '').trim())
+  .map(item => {
+    const quantity = Number(item.quantity ?? 1) || 1;
+    const unitPrice = Number(item.unit_price ?? 0) || 0;
+    const totalPrice = Number(item.extended_price ?? item.total_price ?? (quantity * unitPrice)) || 0;
+    const internalProductId = item.internal_product_id || item.product_id || null;
+    const inventoryItemId = item.inventory_item_id || null;
+
+    return {
+      id: item.id || null,
+      inventory_item_id: inventoryItemId,
+      internal_product_id: internalProductId,
+      item_name: String(item.description || item.item_name || 'Unknown Item').trim(),
+      quantity,
+      unit_price: unitPrice,
+      total_price: totalPrice,
+      vendor_item_code: item.vendor_item_code || null,
+      vendor_unit: item.vendor_unit || item.unit || null
+    };
+  });
 const workflowStages = [
   { key: 'pending_review', label: 'Review', icon: Eye },
   { key: 'action_required', label: 'Action', icon: AlertTriangle },
@@ -381,7 +393,6 @@ export default function Invoices() {
     const cleaned = {
       ...invoiceData,
       status: invoiceData.status || 'pending_review',
-      line_items: invoiceData.line_items || [],
       validation_results: invoiceData.validation_results || {},
       organization_id: organization?.id || userProfile?.organization_id,
     };
@@ -773,6 +784,38 @@ export default function Invoices() {
     }
   };
 
+  const loadInvoiceForApproval = async (invoice) => {
+    const fullInvoice = await api.entities.Invoice.get(invoice.id);
+    if (hasInvoiceLineItems(fullInvoice.line_items)) return fullInvoice;
+
+    const normalizedLineItems = await api.entities.InvoiceLineItem.filter(
+      { invoice_id: invoice.id },
+      { orderBy: 'created_at' }
+    );
+
+    if (!hasInvoiceLineItems(normalizedLineItems)) {
+      return { ...fullInvoice, line_items: [] };
+    }
+
+    return {
+      ...fullInvoice,
+      line_items: normalizedLineItems.map(item => ({
+        id: item.id,
+        inventory_item_id: item.inventory_item_id,
+        internal_product_id: item.internal_product_id,
+        item_name: item.item_name,
+        description: item.item_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+        extended_price: item.total_price,
+        vendor_item_code: item.vendor_item_code,
+        vendor_unit: item.vendor_unit,
+        unit: item.vendor_unit,
+      })),
+    };
+  };
+
   const handleSaveValidated = async (validatedInvoice) => {
     try {
       let savedInvoice = validatedInvoice;
@@ -842,17 +885,23 @@ export default function Invoices() {
 
   const handleApprove = async (invoice) => {
     try {
+      const invoiceForApproval = await loadInvoiceForApproval(invoice);
+      if (!hasInvoiceLineItems(invoiceForApproval.line_items)) {
+        throw new Error('This invoice has no saved line items. Open it, add/review line items, then approve it.');
+      }
+
       await updateMutation.mutateAsync({ 
         id: invoice.id, 
         data: {
+          ...invoiceForApproval,
           status: 'approved',
           ap_status: 'approved',
           action_required_reason: null,
           action_required_details: null,
-          line_items: invoice.line_items,
+          line_items: invoiceForApproval.line_items,
         }
       });
-      const approvalResult = await finalizeApprovedInvoiceWorkflow({ ...invoice, status: 'approved' });
+      const approvalResult = await finalizeApprovedInvoiceWorkflow({ ...invoiceForApproval, status: 'approved', ap_status: 'approved' });
       
       posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
       toast.success(

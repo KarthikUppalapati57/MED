@@ -217,27 +217,39 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const fetchProfile = useCallback(async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          organization:organizations(*),
-          brand:brands(*),
-          location:locations(*)
-        `)
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (error) {
-        console.warn('Profile fetch error:', error.message);
+    const maxClockSkewRetries = 8;
+
+    for (let attempt = 0; attempt <= maxClockSkewRetries; attempt += 1) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            organization:organizations(*),
+            brand:brands(*),
+            location:locations(*)
+          `)
+          .eq('id', userId)
+          .maybeSingle();
+        
+        if (error) {
+          const isJwtClockSkew = String(error.message || '').includes('JWT issued at future');
+          if (isJwtClockSkew && attempt < maxClockSkewRetries) {
+            console.warn('Profile fetch hit local JWT clock skew; retrying shortly.');
+            await new Promise(resolve => window.setTimeout(resolve, 15000));
+            continue;
+          }
+          console.warn('Profile fetch error:', error.message);
+          return null;
+        }
+        return data;
+      } catch (err) {
+        console.warn('Profile fetch exception:', err);
         return null;
       }
-      return data;
-    } catch (err) {
-      console.warn('Profile fetch exception:', err);
-      return null;
     }
+
+    return null;
   }, []);
 
   const refreshProfile = useCallback(async () => {

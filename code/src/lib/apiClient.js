@@ -890,6 +890,176 @@ export const api = {
       if (error) throw error;
       return data;
     }
+  },
+  products: {
+    getCatalog: async ({
+      organizationId,
+      brandId = null,
+      locationId = null,
+      search = null,
+      sortBy = 'name',
+      page = 0,
+      pageSize = 50
+    }) => {
+      const { data, error } = await supabase.rpc('get_product_catalog', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId,
+        p_search: search,
+        p_sort_by: sortBy,
+        p_page: page,
+        p_page_size: pageSize
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    getDashboardSummary: async ({ organizationId, brandId = null, locationId = null }) => {
+      const { data, error } = await supabase.rpc('get_product_dashboard_summary', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data?.[0] || {
+        total_products: 0,
+        inventoried_count: 0,
+        tax_exempt_count: 0,
+        category_count: 0,
+        missing_product_id_count: 0,
+        uncategorized_count: 0,
+        unmapped_vendor_item_count: 0,
+        price_variance_count: 0
+      };
+    },
+    getPurchaseReport: async ({
+      organizationId,
+      brandId = null,
+      locationId = null,
+      startDate = null,
+      endDate = null,
+      categoryType = null,
+      category = null,
+      search = null
+    }) => {
+      const { data, error } = await supabase.rpc('get_product_purchase_report', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_category_type: categoryType,
+        p_category: category,
+        p_search: search
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    getVerificationQueue: async ({
+      organizationId,
+      brandId = null,
+      locationId = null,
+      status = null,
+      search = null
+    }) => {
+      const { data, error } = await supabase.rpc('get_product_verification_queue', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId,
+        p_status: status,
+        p_search: search
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    categorizeProducts: async ({
+      organizationId,
+      brandId = null,
+      locationId = null,
+      productIds = [],
+      limit = 25,
+      autoApply = true
+    }) => {
+      const { data, error } = await supabase.functions.invoke('categorize-products', {
+        body: {
+          organizationId,
+          brandId,
+          locationId,
+          productIds,
+          limit,
+          autoApply
+        }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    applyCategorySuggestion: async (productId) => {
+      const { data, error } = await supabase.rpc('apply_product_category_suggestion', {
+        p_product_id: productId
+      });
+      if (error) throw error;
+      return data;
+    },
+    rejectCategorySuggestion: async (productId) => {
+      const { data, error } = await supabase.rpc('reject_product_category_suggestion', {
+        p_product_id: productId
+      });
+      if (error) throw error;
+      return data;
+    },
+    createProductDetails: async (payload, { organizationId, brandId = null, locationId = null } = {}) => {
+      const { data, error } = await supabase.rpc('create_product_details', {
+        p_name: payload.name,
+        p_restops_product_id: payload.product_id || null,
+        p_description: payload.description || null,
+        p_category: payload.category || null,
+        p_accounting_category: payload.accounting_category || null,
+        p_is_inventoried: payload.is_inventoried,
+        p_is_tax_exempt: payload.is_tax_exempt,
+        p_report_by_unit: payload.report_by_unit || null,
+        p_base_unit: payload.base_unit || null,
+        p_latest_price: payload.latest_price ?? 0,
+        p_location_specific: payload.location_specific,
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId
+      });
+      if (error) throw error;
+      return data;
+    },
+    setInventoryTracking: async (productId, isInventoried) => {
+      const { data, error } = await supabase.rpc('set_product_inventory_tracking', {
+        p_product_id: productId,
+        p_is_inventoried: isInventoried
+      });
+      if (error) throw error;
+      return data;
+    },
+    updateProductDetails: async (productId, payload) => {
+      const { data, error } = await supabase.rpc('update_product_details', {
+        p_product_id: productId,
+        p_name: payload.name,
+        p_restops_product_id: payload.product_id || null,
+        p_description: payload.description || null,
+        p_category: payload.category || null,
+        p_accounting_category: payload.accounting_category || null,
+        p_is_inventoried: payload.is_inventoried,
+        p_is_tax_exempt: payload.is_tax_exempt,
+        p_report_by_unit: payload.report_by_unit || null,
+        p_base_unit: payload.base_unit || null,
+        p_latest_price: payload.latest_price ?? 0,
+        p_location_specific: payload.location_specific
+      });
+      if (error) throw error;
+      return data;
+    },
+    deleteProduct: async (productId) => {
+      const { data, error } = await supabase.rpc('soft_delete_product_safe', {
+        p_product_id: productId
+      });
+      if (error) throw error;
+      return data;
+    }
   }
 };
 

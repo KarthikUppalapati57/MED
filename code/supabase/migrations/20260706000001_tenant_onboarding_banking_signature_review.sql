@@ -940,6 +940,9 @@ CREATE TRIGGER trg_link_onboarding_bank_to_payment_account
   AFTER UPDATE OF organization_id ON public.onboarding_payment_methods
   FOR EACH ROW EXECUTE FUNCTION public.link_onboarding_bank_to_payment_account();
 
+ALTER TABLE public.invitations
+  ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
 DROP FUNCTION IF EXISTS public.get_invite_details(text);
 CREATE OR REPLACE FUNCTION public.get_invite_details(invite_token text)
 RETURNS TABLE (

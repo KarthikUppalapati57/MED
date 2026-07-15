@@ -912,6 +912,7 @@ async function processInvoiceBackground(record, supabaseClient) {
         });
         throw lineItemError;
       }
+
     }
 
     console.log(`Successfully processed invoice ${record.id}`);

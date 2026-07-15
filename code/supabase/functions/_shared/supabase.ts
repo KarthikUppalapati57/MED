@@ -22,11 +22,34 @@ function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
     .replace(/=+$/, '');
 }
 
-// Generate a valid platform_admin JWT locally using the shared SUPABASE_JWT_SECRET
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+  return atob(padded);
+}
+
+function getJwtSecret(): string | null {
+  const explicitSecret = Deno.env.get('SUPABASE_JWT_SECRET')
+    || Deno.env.get('SUPABASE_INTERNAL_JWT_SECRET');
+  if (explicitSecret) return explicitSecret;
+
+  const jwks = Deno.env.get('SUPABASE_JWKS');
+  if (!jwks) return null;
+
+  try {
+    const parsed = JSON.parse(jwks);
+    const octKey = parsed?.keys?.find((key: { kty?: string; k?: string }) => key?.kty === 'oct' && key?.k);
+    return octKey?.k ? base64UrlDecode(octKey.k) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Generate a valid platform_admin JWT using the deployed or local Supabase JWT secret.
 async function generateSystemJWT(): Promise<string> {
-  const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET');
+  const jwtSecret = getJwtSecret();
   if (!jwtSecret) {
-    throw new Error("SUPABASE_JWT_SECRET environment variable is missing");
+    throw new Error("SUPABASE_JWT_SECRET, SUPABASE_INTERNAL_JWT_SECRET, or SUPABASE_JWKS environment variable is missing");
   }
 
   const header = { alg: "HS256", typ: "JWT" };
