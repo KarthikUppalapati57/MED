@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
-import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
+import { revertPayoutOnFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -70,21 +70,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // release_invoice_funds already flipped invoice.status -> scheduled and
-    // payment_status -> processing, and inserted a 'processing' payments row. If the Checkbook
-    // call below fails, that state is stuck and unretryable unless we revert it here.
-    const revertOnFailure = async (reason) => {
-      await serviceSupabase
-        .from('payments')
-        .update({ status: 'failed', payout_status: 'failed', failure_reason: reason })
-        .eq('id', releaseData.payment_id)
-        .eq('organization_id', releaseData.organization_id)
-      await serviceSupabase
-        .from('invoices')
-        .update({ payment_status: 'unpaid' })
-        .eq('id', invoice_id)
-    }
-
     try {
       // 3. Call Checkbook.io API
       // Single endpoint for both digital and physical -- the payload (recipient vs.
@@ -138,8 +123,12 @@ serve(async (req) => {
       if (!checkbookResponse.ok) {
         console.error('Checkbook.io Error:', checkData);
         const reason = checkData.error || 'Failed to issue check via Checkbook.io';
-        await revertOnFailure(reason);
-        await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason });
+        await revertPayoutOnFailure(serviceSupabase, {
+          paymentId: releaseData.payment_id,
+          invoiceId: invoice_id,
+          organizationId: releaseData.organization_id,
+          reason,
+        });
         return new Response(JSON.stringify({ error: reason }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
       }
 
@@ -159,8 +148,12 @@ serve(async (req) => {
     } catch (checkError) {
       console.error('Checkbook.io call failed, reverting:', checkError)
       const reason = checkError.message || 'Checkbook.io call failed'
-      await revertOnFailure(reason)
-      await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason })
+      await revertPayoutOnFailure(serviceSupabase, {
+        paymentId: releaseData.payment_id,
+        invoiceId: invoice_id,
+        organizationId: releaseData.organization_id,
+        reason,
+      })
       return new Response(JSON.stringify({ error: reason }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 502,

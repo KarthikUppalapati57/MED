@@ -48,3 +48,25 @@ export async function notifyPaymentFailure(
     console.error('notifyPaymentFailure error (non-fatal):', err)
   }
 }
+
+// Reverts the payment/invoice state release_invoice_funds already applied optimistically
+// (payments row -> 'processing', invoice payment_status -> 'processing') back to a retryable
+// state, then notifies the releaser. Every synchronous payout-failure path (process-payout,
+// process-checkbook-payout) needs exactly this pair together -- centralized so the revert and
+// the notification can't drift out of sync with each other.
+export async function revertPayoutOnFailure(
+  serviceSupabase: any,
+  { paymentId, invoiceId, organizationId, reason }: { paymentId: string; invoiceId: string; organizationId: string; reason: string }
+) {
+  await serviceSupabase
+    .from('payments')
+    .update({ status: 'failed', payout_status: 'failed', failure_reason: reason })
+    .eq('id', paymentId)
+    .eq('organization_id', organizationId)
+  await serviceSupabase
+    .from('invoices')
+    .update({ payment_status: 'unpaid' })
+    .eq('id', invoiceId)
+
+  await notifyPaymentFailure(serviceSupabase, { paymentId, invoiceId, reason })
+}

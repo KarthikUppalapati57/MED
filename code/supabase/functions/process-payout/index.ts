@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
-import { Client } from 'npm:dwolla-v2'
-import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
+import { getDwollaAccessToken, createDwollaResource } from '../_shared/dwolla.ts'
+import { revertPayoutOnFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -103,29 +103,13 @@ serve(async (req) => {
 
     const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0);
 
-    // release_invoice_funds already flipped invoice.status -> scheduled and
-    // payment_status -> processing, and inserted a 'processing' payments row. If the Dwolla
-    // call below fails, that state is stuck and unretryable unless we revert it here.
-    const revertOnFailure = async (reason) => {
-      await serviceSupabase
-        .from('payments')
-        .update({ status: 'failed', payout_status: 'failed', failure_reason: reason })
-        .eq('id', releaseData.payment_id)
-        .eq('organization_id', releaseData.organization_id)
-      await serviceSupabase
-        .from('invoices')
-        .update({ payment_status: 'unpaid' })
-        .eq('id', invoice_id)
-    }
-
     try {
-      // 2. Initiate Dwolla Transfer
-      const dwollaClient = new Client({
-        key: Deno.env.get('DWOLLA_KEY') ?? '',
-        secret: Deno.env.get('DWOLLA_SECRET') ?? '',
-        environment: 'sandbox' // Change to 'production' for live
-      });
-
+      // 2. Initiate Dwolla Transfer -- reuses the same fetch-based token/resource helpers
+      // every other Dwolla call site in this repo uses (_shared/dwolla.ts), instead of the
+      // heavier dwolla-v2 SDK. This also fixes a real bug: the SDK client here was hardcoded
+      // to 'sandbox' regardless of DWOLLA_ENVIRONMENT, so a production deploy would have kept
+      // sending transfers to Dwolla's sandbox.
+      const accessToken = await getDwollaAccessToken()
       const requestBody = {
         _links: {
           source: { href: paymentAccount.dwolla_funding_source_url },
@@ -135,8 +119,7 @@ serve(async (req) => {
         metadata: { invoiceId: invoice_id }
       };
 
-      const transferResponse = await dwollaClient.post('transfers', requestBody);
-      const transferUrl = transferResponse.headers.get('location');
+      const transferUrl = await createDwollaResource('/transfers', requestBody, accessToken);
 
       // 3. Update the payment record with the Dwolla transfer URL
       // We use a service role client to bypass RLS for this internal system update
@@ -153,8 +136,12 @@ serve(async (req) => {
     } catch (transferError) {
       console.error('Dwolla transfer failed, reverting:', transferError)
       const reason = transferError.message || 'Dwolla transfer failed'
-      await revertOnFailure(reason)
-      await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason })
+      await revertPayoutOnFailure(serviceSupabase, {
+        paymentId: releaseData.payment_id,
+        invoiceId: invoice_id,
+        organizationId: releaseData.organization_id,
+        reason,
+      })
       return new Response(JSON.stringify({ error: reason }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 502,

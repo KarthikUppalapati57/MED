@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { useAuth } from '@/lib/AuthContext';
 
 import StripePaymentForm from './StripePaymentForm';
 import BankTransferForm from './BankTransferForm';
@@ -35,6 +36,8 @@ export default function PaymentGatewayModal({
   payment,
   onPaymentComplete,
 }) {
+  const { organization } = useAuth();
+  const [confirmed, setConfirmed] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState('stripe');
   const [processing, setProcessing] = useState(false);
@@ -51,6 +54,7 @@ export default function PaymentGatewayModal({
 
   const resetForms = () => {
     setManualForm({ type: 'cheque', cheque_number: '', reference: '', notes: '' });
+    setConfirmed(false);
     setCompleted(false);
     setProcessing(false);
     setRecordingFailed(false);
@@ -150,7 +154,11 @@ export default function PaymentGatewayModal({
             {/* Payment summary */}
             <div className="bg-secondary/40 border border-border/50 rounded-lg p-4 text-sm space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Vendor</span>
+                <span className="text-muted-foreground">From</span>
+                <span className="font-medium text-foreground">{organization?.name || 'Your organization'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">To</span>
                 <span className="font-medium text-foreground">{payment.vendor_name}</span>
               </div>
               <div className="flex justify-between">
@@ -169,6 +177,21 @@ export default function PaymentGatewayModal({
               </div>
             </div>
 
+            {!confirmed ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Confirm the details above before choosing a payment method.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={handleClose}>
+                    Cancel
+                  </Button>
+                  <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={() => setConfirmed(true)}>
+                    Confirm &amp; Continue
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <Tabs value={selectedMethod} onValueChange={setSelectedMethod} className="mt-2">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stripe" className="text-xs gap-1">
@@ -259,6 +282,7 @@ export default function PaymentGatewayModal({
                 </Button>
               </TabsContent>
             </Tabs>
+            )}
           </>
         )}
       </DialogContent>
