@@ -345,6 +345,44 @@ export const api = {
 
   },
   financial: {
+    registerInvoiceDocument: async ({
+      storagePath,
+      fileName,
+      fileType = null,
+      fileSize = null,
+      fileHash = null,
+      source = 'upload',
+      invoiceId = null,
+      organizationId = null,
+    }) => {
+      const { data, error } = await supabase.rpc('register_invoice_document', {
+        p_storage_path: storagePath,
+        p_file_name: fileName,
+        p_file_type: fileType,
+        p_file_size: fileSize,
+        p_file_hash: fileHash,
+        p_source: source,
+        p_invoice_id: invoiceId,
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    attachInvoiceDocument: async ({ documentId, invoiceId }) => {
+      const { error } = await supabase.rpc('attach_invoice_document', {
+        p_document_id: documentId,
+        p_invoice_id: invoiceId,
+      });
+      if (error) throw error;
+    },
+    findDuplicateInvoiceDocuments: async ({ organizationId, fileHash }) => {
+      const { data, error } = await supabase.rpc('find_duplicate_invoice_documents', {
+        p_organization_id: organizationId,
+        p_file_hash: fileHash,
+      });
+      if (error) throw error;
+      return data || [];
+    },
     saveInvoice: async ({ invoiceId = null, invoice = {}, lineItems = [] }) => {
       const { data, error } = await supabase.rpc('save_invoice_workflow', {
         p_invoice_id: invoiceId,

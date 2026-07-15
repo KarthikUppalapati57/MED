@@ -3,12 +3,17 @@ import { Camera, X, UploadCloud, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
+import { hashFile } from '@/lib/fileHash';
+import { useAuth } from '@/lib/AuthContext';
 // extractInvoiceData import removed
 
 export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtracted }) {
+  const { organization } = useAuth();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  
+
   const [stream, setStream] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -79,15 +84,49 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
       const blob = await res.blob();
       const file = new File([blob], `receipt_${Date.now()}.jpg`, { type: 'image/jpeg' });
       
+      const fileHash = await hashFile(file);
+
+      if (organization?.id) {
+        const duplicates = await api.financial.findDuplicateInvoiceDocuments({ organizationId: organization.id, fileHash }).catch(() => []);
+        if (duplicates.length > 0) {
+          const match = duplicates[0];
+          const proceed = window.confirm(
+            `This photo looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}` +
+            `${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}).\n\n` +
+            `Upload it again anyway?`
+          );
+          if (!proceed) {
+            setIsUploading(false);
+            setProgressMsg('');
+            return;
+          }
+        }
+      }
+
       const fileExt = file.name?.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `mobile_uploads/${fileName}`;
+      const pathOwner = organization?.id || 'unassigned';
+      const filePath = `${pathOwner}/pending/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('invoices')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
+
+      let documentId = null;
+      try {
+        documentId = await api.financial.registerInvoiceDocument({
+          storagePath: filePath,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          fileHash,
+          source: 'mobile',
+        });
+      } catch (registerError) {
+        console.error('Failed to register invoice document metadata:', registerError);
+      }
 
       // Bucket is private, store raw filePath
       const invoiceData = {
@@ -98,9 +137,13 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
         source: 'mobile_camera',
         status: 'extracting',
       };
-      
+
       toast.success('Receipt captured! Extraction is running in the background.');
-      onInvoiceExtracted(invoiceData);
+      const savedInvoice = await onInvoiceExtracted(invoiceData);
+      if (documentId && savedInvoice?.id) {
+        api.financial.attachInvoiceDocument({ documentId, invoiceId: savedInvoice.id })
+          .catch((attachError) => console.error('Failed to attach invoice document:', attachError));
+      }
       onOpenChange(false);
     } catch (err) {
       console.error('Upload failed:', err);

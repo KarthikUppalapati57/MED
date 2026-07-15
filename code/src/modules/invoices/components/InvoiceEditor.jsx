@@ -28,20 +28,29 @@ import AIEmailDrafter from '@/modules/vendors/components/AIEmailDrafter';
 export default function InvoiceEditor({ invoice, onChange }) {
   const [emailDrafterOpen, setEmailDrafterOpen] = React.useState(false);
 
+  const isManualEntry = invoice.source === 'manual_entry';
   const paidDetection = invoice.validation_results?.paid_status_detection;
   const hasPaidDetection = paidDetection?.detected;
   const isHighConfidencePaid = paidDetection?.should_mark_paid;
 
   const displayValue = (value) => (value === 0 || value ? value : '');
-  const displayMoney = (value) => (value === 0 || value ? Number(value).toFixed(2) : '');
+  const displayNumberInput = (value) => (value === 0 || value ? String(value) : '');
+  const asNumber = (value) => parseFloat(value) || 0;
+  const formatMoneyInput = (value) => {
+    if (value === '' || value === null || value === undefined) return '';
+    return asNumber(value).toFixed(2);
+  };
 
   const recalculateTotals = (items, currentInvoice) => {
-    const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.extended_price) || 0), 0);
+    const hasLineItems = Array.isArray(items) && items.length > 0;
+    const subtotal = hasLineItems
+      ? items.reduce((sum, item) => sum + asNumber(item.extended_price), 0)
+      : asNumber(currentInvoice.subtotal);
     const totalAmount = subtotal +
-      (parseFloat(currentInvoice.tax_amount) || 0) +
-      (parseFloat(currentInvoice.fuel_surcharge) || 0) +
-      (parseFloat(currentInvoice.delivery_fee) || 0) +
-      (parseFloat(currentInvoice.other_charges) || 0);
+      asNumber(currentInvoice.tax_amount) +
+      asNumber(currentInvoice.fuel_surcharge) +
+      asNumber(currentInvoice.delivery_fee) +
+      asNumber(currentInvoice.other_charges);
     return { subtotal, total_amount: totalAmount };
   };
 
@@ -75,10 +84,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
 
     // Auto-calculate extended price: (qty * price) + adj - disc
     if (['quantity', 'unit_price', 'discount', 'adjustment'].includes(field)) {
-      const qty = parseFloat(newItems[index].quantity) || 0;
-      const price = parseFloat(newItems[index].unit_price) || 0;
-      const disc = parseFloat(newItems[index].discount) || 0;
-      const adj = parseFloat(newItems[index].adjustment) || 0;
+      const qty = asNumber(newItems[index].quantity);
+      const price = asNumber(newItems[index].unit_price);
+      const disc = asNumber(newItems[index].discount);
+      const adj = asNumber(newItems[index].adjustment);
       newItems[index].extended_price = (qty * price) + adj - disc;
     }
 
@@ -109,8 +118,23 @@ export default function InvoiceEditor({ invoice, onChange }) {
   };
 
   const calculateTotal = () => {
-    return (invoice.line_items || []).reduce((sum, item) => sum + (item.extended_price || 0), 0);
+    return (invoice.line_items || []).reduce((sum, item) => sum + asNumber(item.extended_price), 0);
   };
+
+  const handleMoneyFieldBlur = (field) => {
+    const currentValue = invoice[field];
+    if (currentValue === '' || currentValue === null || currentValue === undefined) return;
+    const formattedValue = formatMoneyInput(currentValue);
+    if (formattedValue === currentValue) return;
+    handleFieldChange(field, formattedValue);
+  };
+
+  const RequiredLabel = ({ children }) => (
+    <Label>
+      {children}
+      {isManualEntry && <span className="ml-1 text-red-600" aria-label="required">*</span>}
+    </Label>
+  );
 
   return (
     <div className="space-y-6">
@@ -193,14 +217,14 @@ export default function InvoiceEditor({ invoice, onChange }) {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Vendor Name</Label>
+              <RequiredLabel>Vendor Name</RequiredLabel>
               <Input
                 value={invoice.vendor_name || ''}
                 onChange={(e) => handleFieldChange('vendor_name', e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Invoice Number</Label>
+              <RequiredLabel>Invoice Number</RequiredLabel>
               <Input
                 value={invoice.invoice_number || ''}
                 onChange={(e) => handleFieldChange('invoice_number', e.target.value)}
@@ -259,8 +283,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.subtotal)}
-                onChange={(e) => handleFieldChange('subtotal', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.subtotal)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('subtotal', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('subtotal')}
               />
             </div>
             <div className="space-y-2">
@@ -268,8 +294,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.tax_amount)}
-                onChange={(e) => handleFieldChange('tax_amount', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.tax_amount)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('tax_amount', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('tax_amount')}
               />
             </div>
             <div className="space-y-2">
@@ -277,8 +305,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.fuel_surcharge)}
-                onChange={(e) => handleFieldChange('fuel_surcharge', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.fuel_surcharge)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('fuel_surcharge', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('fuel_surcharge')}
               />
             </div>
             <div className="space-y-2">
@@ -286,8 +316,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.delivery_fee)}
-                onChange={(e) => handleFieldChange('delivery_fee', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.delivery_fee)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('delivery_fee', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('delivery_fee')}
               />
             </div>
             <div className="space-y-2">
@@ -295,17 +327,21 @@ export default function InvoiceEditor({ invoice, onChange }) {
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.other_charges)}
-                onChange={(e) => handleFieldChange('other_charges', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.other_charges)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('other_charges', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('other_charges')}
               />
             </div>
             <div className="space-y-2">
-              <Label>Total Amount</Label>
+              <RequiredLabel>Total Amount</RequiredLabel>
               <Input
                 type="number"
                 step="0.01"
-                value={displayMoney(invoice.total_amount)}
-                onChange={(e) => handleFieldChange('total_amount', parseFloat(e.target.value) || 0)}
+                value={displayNumberInput(invoice.total_amount)}
+                placeholder="0.00"
+                onChange={(e) => handleFieldChange('total_amount', e.target.value)}
+                onBlur={() => handleMoneyFieldBlur('total_amount')}
               />
             </div>
           </div>
@@ -388,8 +424,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
                     <TableCell>
                       <Input
                         type="number"
-                        value={displayValue(item.quantity)}
-                        onChange={(e) => handleLineItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        value={displayNumberInput(item.quantity)}
+                        onChange={(e) => handleLineItemChange(index, 'quantity', e.target.value)}
                         className="h-8"
                       />
                     </TableCell>
@@ -404,8 +440,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={displayMoney(item.unit_price)}
-                        onChange={(e) => handleLineItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        value={displayNumberInput(item.unit_price)}
+                        onChange={(e) => handleLineItemChange(index, 'unit_price', e.target.value)}
                         className="h-8"
                       />
                     </TableCell>
@@ -413,8 +449,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={displayMoney(item.discount)}
-                        onChange={(e) => handleLineItemChange(index, 'discount', parseFloat(e.target.value) || 0)}
+                        value={displayNumberInput(item.discount)}
+                        onChange={(e) => handleLineItemChange(index, 'discount', e.target.value)}
                         className="h-8 text-red-500"
                       />
                     </TableCell>
@@ -422,13 +458,13 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       <Input
                         type="number"
                         step="0.01"
-                        value={displayMoney(item.adjustment)}
-                        onChange={(e) => handleLineItemChange(index, 'adjustment', parseFloat(e.target.value) || 0)}
+                        value={displayNumberInput(item.adjustment)}
+                        onChange={(e) => handleLineItemChange(index, 'adjustment', e.target.value)}
                         className="h-8"
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      ${(item.extended_price || 0).toFixed(2)}
+                      ${asNumber(item.extended_price).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -460,39 +496,39 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 <span className="text-slate-500">Subtotal:</span>
                 <span className="font-medium">${calculateTotal().toFixed(2)}</span>
               </div>
-              {(invoice.tax_amount > 0) && (
+              {(asNumber(invoice.tax_amount) > 0) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Tax:</span>
-                  <span className="font-medium">${(invoice.tax_amount || 0).toFixed(2)}</span>
+                  <span className="font-medium">${asNumber(invoice.tax_amount).toFixed(2)}</span>
                 </div>
               )}
-              {(invoice.fuel_surcharge > 0) && (
+              {(asNumber(invoice.fuel_surcharge) > 0) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Fuel Surcharge:</span>
-                  <span className="font-medium">${(invoice.fuel_surcharge || 0).toFixed(2)}</span>
+                  <span className="font-medium">${asNumber(invoice.fuel_surcharge).toFixed(2)}</span>
                 </div>
               )}
-              {(invoice.delivery_fee > 0) && (
+              {(asNumber(invoice.delivery_fee) > 0) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Delivery Fee:</span>
-                  <span className="font-medium">${(invoice.delivery_fee || 0).toFixed(2)}</span>
+                  <span className="font-medium">${asNumber(invoice.delivery_fee).toFixed(2)}</span>
                 </div>
               )}
-              {(invoice.other_charges > 0) && (
+              {(asNumber(invoice.other_charges) > 0) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Other Charges:</span>
-                  <span className="font-medium">${(invoice.other_charges || 0).toFixed(2)}</span>
+                  <span className="font-medium">${asNumber(invoice.other_charges).toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-base font-semibold border-t pt-2">
                 <span>Total:</span>
                 <span className="text-teal-700">
-                  ${(invoice.total_amount || (
+                  ${asNumber(invoice.total_amount || (
                     calculateTotal() +
-                    (invoice.tax_amount || 0) +
-                    (invoice.fuel_surcharge || 0) +
-                    (invoice.delivery_fee || 0) +
-                    (invoice.other_charges || 0)
+                    asNumber(invoice.tax_amount) +
+                    asNumber(invoice.fuel_surcharge) +
+                    asNumber(invoice.delivery_fee) +
+                    asNumber(invoice.other_charges)
                   )).toFixed(2)}
                 </span>
               </div>

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
+import { hashFile } from '@/lib/fileHash';
 
 export default function InvoiceUploader({
   open,
@@ -115,6 +117,24 @@ export default function InvoiceUploader({
     let uploadedFilePath = null;
 
     try {
+      const fileHash = await hashFile(fileToProcess);
+
+      if (organizationId) {
+        const duplicates = await api.financial.findDuplicateInvoiceDocuments({ organizationId, fileHash }).catch(() => []);
+        if (duplicates.length > 0) {
+          const match = duplicates[0];
+          const proceed = window.confirm(
+            `This file looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}` +
+            `${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}).\n\n` +
+            `Upload it again anyway?`
+          );
+          if (!proceed) {
+            setUploading(false);
+            return;
+          }
+        }
+      }
+
       if (fileUrl) {
         URL.revokeObjectURL(fileUrl);
       }
@@ -135,9 +155,7 @@ export default function InvoiceUploader({
       setProgress('Uploading file...');
 
       const pathOwner = draftInvoice?.organization_id || organizationId || 'unassigned';
-      const filePath = draftInvoice?.id
-        ? `${pathOwner}/${draftInvoice.id}/${fileName}`
-        : `${pathOwner}/${fileName}`;
+      const filePath = `${pathOwner}/${draftInvoice?.id || 'pending'}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('invoices')
@@ -148,6 +166,22 @@ export default function InvoiceUploader({
 
       // Removed getPublicUrl because the bucket is now private.
       // We store the raw filePath directly in the database.
+
+      let documentId = null;
+      try {
+        documentId = await api.financial.registerInvoiceDocument({
+          storagePath: filePath,
+          fileName: fileToProcess.name,
+          fileType: fileToProcess.type,
+          fileSize: fileToProcess.size,
+          fileHash,
+          source: 'upload',
+          invoiceId: draftInvoice?.id || null,
+          organizationId: pathOwner !== 'unassigned' ? pathOwner : null,
+        });
+      } catch (registerError) {
+        console.error('Failed to register invoice document metadata:', registerError);
+      }
 
       setExtractionDone(true);
       setProgress('Upload complete! Extraction started...');
@@ -168,7 +202,11 @@ export default function InvoiceUploader({
       if (draftInvoice?.id && onFinalizeUploadDraft) {
         await onFinalizeUploadDraft(draftInvoice.id, invoiceData);
       } else {
-        onInvoiceExtracted(invoiceData);
+        const savedInvoice = await onInvoiceExtracted(invoiceData);
+        if (documentId && savedInvoice?.id) {
+          api.financial.attachInvoiceDocument({ documentId, invoiceId: savedInvoice.id })
+            .catch((attachError) => console.error('Failed to attach invoice document:', attachError));
+        }
       }
       onOpenChange(false);
       toast.success('Invoice uploaded. Extraction is running in the background.');

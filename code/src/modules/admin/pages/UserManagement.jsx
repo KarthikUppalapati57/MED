@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -105,6 +106,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
     location: member.location || '',
     status: member.status || 'active',
     invoice_approval_limit: member.profiles?.invoice_approval_limit || 0,
+    has_unlimited_approval: member.profiles?.has_unlimited_approval || false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -134,7 +136,8 @@ function UserDetailDrawer({ member, orgId, onClose }) {
       // Update invoice approval limit
       const { error: limitError } = await supabase.rpc('update_user_approval_limit', {
         target_user_id: userId,
-        new_limit: Number(form.invoice_approval_limit) || 0
+        new_limit: Number(form.invoice_approval_limit) || 0,
+        p_unlimited: form.has_unlimited_approval,
       });
       if (limitError) throw limitError;
 
@@ -296,15 +299,29 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-muted-foreground uppercase">Invoice Approval Limit ($)</Label>
-                <Input 
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase">Invoice Approval Limit ($)</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">Unlimited</Label>
+                    <Switch
+                      checked={form.has_unlimited_approval}
+                      onCheckedChange={(checked) => setForm({ ...form, has_unlimited_approval: checked })}
+                    />
+                  </div>
+                </div>
+                <Input
                   type="number"
-                  placeholder="e.g. 500" 
+                  placeholder="e.g. 500"
                   value={form.invoice_approval_limit}
                   onChange={e => setForm({...form, invoice_approval_limit: e.target.value})}
-                  className="rounded-xl border-border focus:ring-ring/10 focus:border-primary"
+                  disabled={form.has_unlimited_approval}
+                  className="rounded-xl border-border focus:ring-ring/10 focus:border-primary disabled:opacity-50"
                 />
-                <p className="text-[10px] text-muted-foreground">Invoices exceeding this amount will require higher-level approval.</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {form.has_unlimited_approval
+                    ? 'This user can approve invoices of any amount.'
+                    : 'Invoices exceeding this amount will require higher-level approval.'}
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -764,7 +781,7 @@ export default function UserManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, updated_at, location_id, brand_id, role, status')
+        .select('id, email, full_name, updated_at, location_id, brand_id, role, status, invoice_approval_limit, has_unlimited_approval')
         .eq('organization_id', activeOrgId);
 
       if (error) throw error;

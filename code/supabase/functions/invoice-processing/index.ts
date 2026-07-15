@@ -1029,6 +1029,46 @@ serve(async (req) => {
             
             if (vendor?.autopay_enabled) {
                console.log(`AutoPay enabled for vendor ${vendor.id}, scheduling payment...`);
+
+               // Auto-trigger the banking-link flow when the vendor has no Dwolla funding
+               // source on file yet, instead of silently scheduling a payment that can never
+               // actually be released. Reuses the same funding-source check process-payout
+               // already does (get_vendor_provider_link) rather than re-deriving it.
+               try {
+                  const { data: dwollaLink } = await supabaseClient
+                     .rpc('get_vendor_provider_link', { p_vendor_id: vendor.id, p_provider: 'dwolla' })
+                     .maybeSingle();
+
+                  if (!dwollaLink?.provider_funding_ref) {
+                     const { data: pendingToken } = await supabaseClient
+                        .from('vendor_banking_link_tokens')
+                        .select('id, expires_at')
+                        .eq('vendor_id', vendor.id)
+                        .eq('status', 'pending')
+                        .is('deleted_at', null)
+                        .maybeSingle();
+
+                     const hasLivePendingLink = pendingToken && new Date(pendingToken.expires_at) > new Date();
+
+                     if (!hasLivePendingLink) {
+                        const { error: linkError } = await supabaseClient.rpc('issue_vendor_banking_link', {
+                           p_vendor_id: vendor.id,
+                           p_intent: 'add',
+                        });
+                        if (linkError) {
+                           // ponytail: best-effort. A vendor who hasn't finished OTP/tax/document
+                           // onboarding yet can't receive a banking link regardless -- don't let
+                           // that block AutoPay scheduling below.
+                           console.warn(`Could not auto-issue banking link for vendor ${vendor.id}:`, linkError.message);
+                        } else {
+                           console.log(`Auto-issued banking link for vendor ${vendor.id} (missing Dwolla funding source)`);
+                        }
+                     }
+                  }
+               } catch (bankingLinkError) {
+                  console.warn(`Banking link auto-trigger failed for vendor ${vendor.id}:`, bankingLinkError);
+               }
+
                const paymentMethod = vendor.default_payment_method === 'check'
                   ? 'cheque'
                   : (vendor.default_payment_method || 'bank_transfer');

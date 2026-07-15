@@ -120,6 +120,8 @@ serve(async (req) => {
       table_name: "webhook_endpoints",
       record_id: endpoint.id,
       new_data: { url: webhookUrl, events: selectedEvents, secret_prefix: secretPrefix },
+      ip_address: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+      user_agent: req.headers.get("user-agent") || null,
     }});
 
     return json({ endpoint, signingSecret: secret });
