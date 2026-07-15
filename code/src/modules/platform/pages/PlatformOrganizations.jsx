@@ -23,6 +23,7 @@ import Papa from 'papaparse';
 import posthog from '@/lib/posthog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { sendBusinessVerificationDecisionEmail } from '@/lib/emailService';
 
 export default function PlatformOrganizations() {
   const queryClient = useQueryClient();
@@ -516,6 +517,17 @@ export default function PlatformOrganizations() {
         await api.onboarding.requestMoreInfo({ userId: item.verification.user_id, reason });
         toast.success('More information requested');
       }
+
+      const decisionEmail = item.profile?.email;
+      if (decisionEmail) {
+        sendBusinessVerificationDecisionEmail({
+          to_email: decisionEmail,
+          to_name: item.profile?.full_name,
+          decision: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'more_info',
+          reason,
+        }).catch((emailErr) => console.warn('Business verification decision email failed:', emailErr));
+      }
+
       closeReviewActionDialog();
       refreshOnboardingReview();
     } catch (err) {
@@ -922,6 +934,17 @@ export default function PlatformOrganizations() {
                             </div>
                           )}
 
+                          <div className="rounded-xl border border-border bg-secondary/30 p-3 text-sm">
+                            <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Business details</p>
+                            <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                              <p><span className="text-muted-foreground">Business type:</span> {verification.business_type || 'Not provided'}</p>
+                              <p><span className="text-muted-foreground">Tax ID:</span> {verification.identifier_last4 ? `${(verification.identifier_type || '').toUpperCase()} ending in ${verification.identifier_last4}` : 'Not provided'}</p>
+                              <p><span className="text-muted-foreground">Email:</span> {verification.metadata?.email || 'Not provided'}</p>
+                              <p><span className="text-muted-foreground">Phone:</span> {verification.metadata?.phone || 'Not provided'}</p>
+                              <p><span className="text-muted-foreground">Website:</span> {verification.metadata?.website || 'Not provided'}</p>
+                            </div>
+                          </div>
+
                           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                             <div>
                               <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Addresses</p>
@@ -1316,15 +1339,19 @@ export default function PlatformOrganizations() {
             <DialogDescription>
               {reviewActionDialog?.action === 'approve'
                 ? 'This will unlock the tenant to continue to hierarchy and RestOps payment setup.'
-                : reviewActionDialog?.action === 'reject'
-                ? 'This will block onboarding and notify the tenant with the reason.'
-                : 'This will keep the tenant in pending review and notify them what to provide.'}
+                : 'This sends the tenant back to business verification to fix and resubmit -- they will not be able to continue to hierarchy setup until approved.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="rounded-xl border bg-secondary/40 p-3 text-sm">
               <p className="font-bold text-foreground">{reviewActionDialog?.item?.profile?.email || reviewActionDialog?.item?.verification?.legal_business_name || 'Tenant'}</p>
               <p className="text-xs text-muted-foreground">Current status: {reviewActionDialog?.item?.verification?.verification_status || 'pending_review'}</p>
+              <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 border-t border-border/60 pt-2 sm:grid-cols-2">
+                <p><span className="text-muted-foreground">Business type:</span> {reviewActionDialog?.item?.verification?.business_type || 'Not provided'}</p>
+                <p><span className="text-muted-foreground">Tax ID:</span> {reviewActionDialog?.item?.verification?.identifier_last4 ? `${(reviewActionDialog.item.verification.identifier_type || '').toUpperCase()} ending in ${reviewActionDialog.item.verification.identifier_last4}` : 'Not provided'}</p>
+                <p><span className="text-muted-foreground">Email:</span> {reviewActionDialog?.item?.verification?.metadata?.email || 'Not provided'}</p>
+                <p><span className="text-muted-foreground">Phone:</span> {reviewActionDialog?.item?.verification?.metadata?.phone || 'Not provided'}</p>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>{reviewActionDialog?.action === 'approve' ? 'Approval note (optional)' : 'Message to tenant'}</Label>

@@ -224,7 +224,7 @@ VALUES
   ('org_manager', true),
   ('tenant_super_admin', true),
   ('platform_admin', true)
-ON CONFLICT (name) DO UPDATE SET is_system = true;
+ON CONFLICT (name) WHERE is_system = true DO UPDATE SET is_system = true;
 
 DO $$
 DECLARE

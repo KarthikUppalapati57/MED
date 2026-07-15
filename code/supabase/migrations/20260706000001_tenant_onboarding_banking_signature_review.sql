@@ -2,7 +2,8 @@ BEGIN;
 
 ALTER TABLE public.invitations
   ADD COLUMN IF NOT EXISTS expired_notified_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 ALTER TABLE public.notifications
   ALTER COLUMN organization_id DROP NOT NULL;

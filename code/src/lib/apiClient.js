@@ -13,7 +13,7 @@ function normalizeOtpPhone(value) {
 
 function getOnboardingOtpRedirectUrl() {
   if (typeof window === 'undefined') return undefined;
-  return `${window.location.origin}/setup/business-verification`;
+  return `${window.location.origin}/business-verification`;
 }
 
 const TABLE_SCOPE_COLUMNS = {

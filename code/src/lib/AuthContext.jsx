@@ -79,6 +79,7 @@ function setCachedProfile(profile) {
         full_name: profile.full_name,
         email: profile.email,
         payment_verified: profile.payment_verified,
+        banking_onboarding_completed: profile.banking_onboarding_completed,
         business_verification_status: profile.business_verification_status,
         business_email: profile.business_email,
         business_email_verified_at: profile.business_email_verified_at,

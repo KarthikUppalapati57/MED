@@ -12,6 +12,7 @@ const Payments = React.lazy(() => import('./modules/payments/pages/Payments'));
 const PlatformAdmin = React.lazy(() => import('./modules/platform/pages/PlatformAdmin'));
 const Products = React.lazy(() => import('./modules/products/pages/Products'));
 const OnboardingPage = React.lazy(() => import('./modules/setup/pages/OnboardingPage'));
+const CompleteOnboarding = React.lazy(() => import('./modules/setup/pages/CompleteOnboarding'));
 const Recipes = React.lazy(() => import('./modules/recipes/pages/Recipes'));
 const UserManagement = React.lazy(() => import('./modules/admin/pages/UserManagement'));
 const OrgManagement = React.lazy(() => import('./modules/admin/pages/OrgManagement'));
@@ -158,4 +159,5 @@ export const canonicalRoutes = [
 export const setupRoutes = {
     BusinessVerification,
     OnboardingPage,
+    CompleteOnboarding,
 };

@@ -83,6 +83,7 @@ export default function BusinessVerification() {
   const [submittedForReview, setSubmittedForReview] = useState(false);
   const [stepError, setStepError] = useState('');
   const [stepKey, setStepKey] = useState('business_information');
+  const [reviewFeedback, setReviewFeedback] = useState(null);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
   const [contactOtp, setContactOtp] = useState({
     email: {
@@ -149,6 +150,12 @@ export default function BusinessVerification() {
         }
         if (draftState?.current_step && BUSINESS_STEPS.some((step) => step.key === draftState.current_step)) {
           setStepKey(draftState.current_step);
+        }
+        if (draftState?.business_verification_status === 'failed' && (draftState?.rejection_reason || draftState?.more_info_reason)) {
+          setReviewFeedback({
+            reason: draftState.rejection_reason || draftState.more_info_reason,
+            isMoreInfo: Boolean(draftState.more_info_reason),
+          });
         }
       } finally {
         if (!cancelled) setLoadingDraft(false);
@@ -433,6 +440,13 @@ export default function BusinessVerification() {
               </div>
             ) : (
               <>
+                {reviewFeedback && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <p className="font-bold">{reviewFeedback.isMoreInfo ? 'Platform admin requested more information' : 'Business verification needs changes'}</p>
+                    <p className="mt-1">{reviewFeedback.reason}</p>
+                    <p className="mt-1 text-xs text-amber-700">Update the details below and resubmit for review.</p>
+                  </div>
+                )}
                 <div className="grid gap-2 sm:grid-cols-3">
                   {BUSINESS_STEPS.map((step, index) => (
                     <button

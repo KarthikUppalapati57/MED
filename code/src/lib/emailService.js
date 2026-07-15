@@ -185,6 +185,36 @@ ${status === 'approved'
 }
 
 /**
+ * Notify a tenant of a business verification review decision (approve/reject/more_info).
+ */
+export async function sendBusinessVerificationDecisionEmail({ to_email, to_name, decision, reason }) {
+  const subject = decision === 'approved'
+    ? 'Your Restops business verification was approved'
+    : decision === 'more_info'
+    ? 'Restops needs more information to verify your business'
+    : 'Your Restops business verification needs changes';
+
+  const body = decision === 'approved'
+    ? `Your business verification has been approved. Log in to continue setting up your organization.`
+    : decision === 'more_info'
+    ? `A platform admin needs more information before your business can be verified:\n\n"${reason || 'Please review your submission.'}"\n\nLog in and update your business verification to resubmit.`
+    : `Your business verification could not be approved:\n\n"${reason || 'Please review your submission.'}"\n\nLog in and update your business verification to resubmit.`;
+
+  return sendEmail({
+    to_email,
+    to_name,
+    subject,
+    message: `
+Hi ${to_name || 'there'},
+
+${body}
+
+— Restops Platform
+    `.trim(),
+  });
+}
+
+/**
  * Notify platform admin of a new access/demo request.
  */
 export async function sendRequestNotification({ to_email, to_name, requester_name, requester_email, request_type }) {

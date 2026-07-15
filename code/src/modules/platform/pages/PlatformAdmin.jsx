@@ -20,10 +20,11 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { 
-  Shield, Search, Download, CheckCircle2, X, Loader2, Trash2, Mail, Building2, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus, 
-  Receipt, History, Fingerprint, Send, FileText, Database
+import {
+  Shield, Search, Download, CheckCircle2, X, Loader2, Trash2, Mail, Building2, Plus, Copy, DollarSign, ShieldAlert, Video, UserPlus,
+  Receipt, History, Fingerprint, Send, FileText, Database, RefreshCw
 } from "lucide-react";
+import { api } from '@/lib/apiClient';
 import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
@@ -132,6 +133,7 @@ export default function PlatformAdmin() {
   
   // Confirmation Dialog States
   const [confirmDeleteInvite, setConfirmDeleteInvite] = useState(null); // stores invitation id
+  const [reissuingInviteId, setReissuingInviteId] = useState(null);
   const [confirmDeleteOrg, setConfirmDeleteOrg] = useState(null); // stores { id, name }
 
   const authChecked = !!user;
@@ -798,6 +800,21 @@ The Restops Platform Team
     }
   };
   
+  const handleReissueInvite = async (invitationId) => {
+    setReissuingInviteId(invitationId);
+    try {
+      const result = await api.onboarding.reissueOwnerInvitation(invitationId);
+      const signupLink = `${window.location.origin}/signup/${result.token}`;
+      await navigator.clipboard.writeText(signupLink).catch(() => {});
+      toast.success('Invitation reissued. New signup link copied to clipboard.');
+      queryClient.invalidateQueries({ queryKey: ['client-invites'] });
+    } catch (err) {
+      toast.error(err.message || 'Failed to reissue invitation');
+    } finally {
+      setReissuingInviteId(null);
+    }
+  };
+
   const handleDeleteOrg = async (id) => {
     setConfirmDeleteOrg(null);
     const toastId = toast.loading("Deactivating organization...");
@@ -1369,11 +1386,12 @@ The Restops Platform Team
                 <TableHead className="text-[11px] font-bold">COUPON</TableHead>
                 <TableHead className="text-[11px] font-bold">CREATED</TableHead>
                 <TableHead className="text-[11px] font-bold">STATUS</TableHead>
+                <TableHead className="text-[11px] font-bold text-right">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {clientHistoryInvites.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No history available</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No history available</TableCell></TableRow>
               ) : clientHistoryInvites.map(invite => {
                 const isAccepted = !!invite.accepted_at;
                 const hasProfile = allProfiles.some(profile => profile.email?.toLowerCase() === invite.email?.toLowerCase());
@@ -1410,6 +1428,20 @@ The Restops Platform Team
                     </TableCell>
                     <TableCell className="text-[10px] text-muted-foreground opacity-70">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>{statusBadge}</TableCell>
+                    <TableCell className="text-right">
+                      {isExpired && !isAccepted && !hasProfile && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] font-bold"
+                          disabled={reissuingInviteId === invite.id}
+                          onClick={() => handleReissueInvite(invite.id)}
+                        >
+                          {reissuingInviteId === invite.id ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1.5" />}
+                          Reissue
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}

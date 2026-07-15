@@ -36,6 +36,7 @@ function clearPasswordRecoveryActive() {
 }
 const OnboardingPage = setupRoutes.OnboardingPage;
 const BusinessVerification = setupRoutes.BusinessVerification;
+const CompleteOnboarding = setupRoutes.CompleteOnboarding;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
 const LandingPage = React.lazy(() => import('./modules/public/pages/LandingPage'));
@@ -1046,6 +1047,19 @@ const AuthenticatedApp = () => {
   const needsOnboarding = needsSetupFlow && isTenantOnboardingOwner && businessVerificationStatus === 'verified';
   const needsAssignment = needsSetupFlow && !isTenantOnboardingOwner;
 
+  // Post-hierarchy, post-subscription-payment step: the org's own operating bank account for
+  // AP/vendor bill-pay (separate from payment_verified, which is the RestOps subscription
+  // payment method and is required BEFORE hierarchy setup, not after).
+  const needsBankingSetup =
+    isTenantOnboardingOwner &&
+    !isPlatformAdmin &&
+    mfaResolved &&
+    !needsMFASetup &&
+    businessVerificationStatus === 'verified' &&
+    Boolean(userProfile?.organization_id) &&
+    Boolean(userProfile?.payment_verified) &&
+    !userProfile?.banking_onboarding_completed;
+
   if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -1118,16 +1132,18 @@ const AuthenticatedApp = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
-      ) : (needsBusinessVerification || needsOnboarding || needsAssignment) ? (
+      ) : (needsBusinessVerification || needsOnboarding || needsAssignment || needsBankingSetup) ? (
         <>
           {needsBusinessVerification && <Route path="/business-verification" element={<BusinessVerification />} />}
           {needsOnboarding && <Route path="/onboarding" element={<OnboardingPage />} />}
           {needsAssignment && <Route path="/pending-assignment" element={<PendingAssignmentPage />} />}
+          {needsBankingSetup && <Route path="/complete-onboarding" element={<CompleteOnboarding />} />}
           <Route path="*" element={
             <Navigate to={
               needsBusinessVerification ? "/business-verification" :
               needsOnboarding ? "/onboarding" :
-              "/pending-assignment"
+              needsAssignment ? "/pending-assignment" :
+              "/complete-onboarding"
             } replace />
           } />
         </>
@@ -1138,6 +1154,7 @@ const AuthenticatedApp = () => {
           <Route path="/business-verification" element={<Navigate to="/" replace />} />
           <Route path="/onboarding" element={<Navigate to="/" replace />} />
           <Route path="/pending-assignment" element={<Navigate to="/" replace />} />
+          <Route path="/complete-onboarding" element={<Navigate to="/" replace />} />
           <Route
             path="/"
             element={
