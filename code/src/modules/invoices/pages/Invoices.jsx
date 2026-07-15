@@ -803,9 +803,11 @@ export default function Invoices() {
         setEditorOpen(true);
         void triggerInvoiceExtraction(savedInvoice);
       }
+      return savedInvoice;
     } catch (err) {
       console.error('Failed to create invoice:', err);
       toast.error('Failed to save invoice: ' + (err.message || 'Unknown error'));
+      return null;
     }
   };
 

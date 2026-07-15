@@ -38,6 +38,10 @@ function normalizeAuditEntry(entry = {}) {
     user_id: entry.userId || entry.user_id || null,
     details: entry.details || null,
     record_id: entry.recordId || entry.record_id || null,
+    // user_agent is trustworthy coming from the client itself. ip_address is deliberately left
+    // unset here -- a browser can't supply its own IP in a way that's worth trusting, and
+    // capturing the real one requires a server-side (edge function/request-header) source.
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
   };
 }
 

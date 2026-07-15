@@ -192,6 +192,71 @@ serve(async (req) => {
 
                 if (!insertError) {
                    console.log('Email invoice ingested', ingestResult);
+                   if (ingestResult?.organization_id) {
+                     // Move the file out of the flat, unscoped "auto-ingested/" path into the
+                     // same organization_id/invoice_id convention the other two upload paths use,
+                     // now that the org is known (it isn't until after ingest_email_invoice runs).
+                     let finalFilePath = filePath;
+                     const scopedFilePath = `${ingestResult.organization_id}/${ingestResult.invoice_id || 'pending'}/${filename}`;
+                     const { error: moveError } = await supabase.storage
+                       .from('invoices')
+                       .move(filePath, scopedFilePath);
+                     if (moveError) {
+                       console.error('Failed to move invoice file to scoped path:', moveError.message);
+                     } else {
+                       finalFilePath = scopedFilePath;
+                       if (ingestResult?.invoice_id) {
+                         const { error: updateError } = await supabase
+                           .from('invoices')
+                           .update({ file_url: finalFilePath })
+                           .eq('id', ingestResult.invoice_id);
+                         if (updateError) {
+                           console.error('Failed to update invoice file_url after move:', updateError.message);
+                         }
+                       }
+                     }
+
+                     const digest = await crypto.subtle.digest('SHA-256', att.content);
+                     const fileHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+                     // No human is in the loop for an automated email ingest, so a duplicate here
+                     // can't be blocked with a confirm prompt like the interactive upload paths --
+                     // instead flag it on the invoice so the reviewer sees it at approval time.
+                     const { data: duplicates } = await supabase.rpc('find_duplicate_invoice_documents', {
+                       p_organization_id: ingestResult.organization_id,
+                       p_file_hash: fileHash,
+                     });
+                     const duplicateMatch = (duplicates || []).find((d) => d.invoice_id !== ingestResult?.invoice_id);
+                     if (duplicateMatch && ingestResult?.invoice_id) {
+                       const { error: flagError } = await supabase
+                         .from('invoices')
+                         .update({
+                           ap_metadata: {
+                             ...(ingestResult.ap_metadata || {}),
+                             duplicate_warning: true,
+                             duplicate_of_invoice_id: duplicateMatch.invoice_id,
+                           },
+                         })
+                         .eq('id', ingestResult.invoice_id);
+                       if (flagError) {
+                         console.error('Failed to flag duplicate invoice:', flagError.message);
+                       }
+                     }
+
+                     const { error: registerError } = await supabase.rpc('register_invoice_document', {
+                       p_storage_path: finalFilePath,
+                       p_file_name: att.filename,
+                       p_file_type: 'application/pdf',
+                       p_file_size: att.content.length,
+                       p_file_hash: fileHash,
+                       p_source: 'email',
+                       p_invoice_id: ingestResult?.invoice_id || null,
+                       p_organization_id: ingestResult.organization_id,
+                     });
+                     if (registerError) {
+                       console.error('Failed to register invoice document metadata:', registerError.message);
+                     }
+                   }
                    results.push({
                      email: user,
                      subject: parsed.subject,

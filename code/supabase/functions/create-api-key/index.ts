@@ -99,6 +99,8 @@ serve(async (req) => {
       table_name: "api_keys",
       record_id: record.id,
       new_data: { name: keyName, prefix },
+      ip_address: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+      user_agent: req.headers.get("user-agent") || null,
     }});
 
     return json({ apiKey: rawKey, record });
