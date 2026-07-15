@@ -217,7 +217,7 @@ export function BillPayWidget({ invoice }) {
               </Button>
             )}
             {!isFullyPaid && ['approved', 'scheduled'].includes(invoice.status) &&
-             ['location_manager', 'branch_manager', 'org_owner', 'platform_admin'].includes(profile?.role) && (
+             ['location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin'].includes(profile?.role) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 

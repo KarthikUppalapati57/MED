@@ -46,8 +46,8 @@ serve(async (req) => {
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['org_owner', 'branch_manager', 'platform_admin'].includes(profile.role)) {
-      return new Response(JSON.stringify({ error: 'Only org owners or branch managers can configure ACH funding sources.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
+    if (!profile || !['org_manager', 'tenant_super_admin', 'branch_manager', 'platform_admin'].includes(profile.role)) {
+      return new Response(JSON.stringify({ error: 'Only org managers or branch managers can configure ACH funding sources.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
     }
 
     const body = await req.json()

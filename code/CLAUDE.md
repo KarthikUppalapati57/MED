@@ -216,6 +216,37 @@ the Phase 3 redesign.
   `ledger_payments` (`bill_id`→`ledger_bills`→`invoices`)
 - ORG-only, append-only: `ledger_entries`
 
+- **Identity/hierarchy RLS batch (tenant_super_admin/org_manager gap fix)** —
+  `20260718000001_profiles_rls_tenant_super_admin_fix.sql` /
+  `20260718000002_organizations_rls_hierarchy_rebuild.sql` /
+  `20260718000003_brands_locations_rls_tenant_super_admin_fix.sql` /
+  `20260718000004_fix_reminders_role_list.sql`: the `20260708000002` role-model migration
+  (which introduced `tenant_super_admin`/`org_manager`, renamed `org_owner`→`org_manager`)
+  never propagated into `profiles`, `brands`, `locations`, `organizations` — those tables
+  predate it and still gated on the dead `'org_owner'` string or stale JWT-`user_metadata`/
+  `owner_id` policies, so neither `org_manager` nor `tenant_super_admin` could manage other
+  users' profiles, create/edit a brand or location, or (for `tenant_super_admin`) see across
+  the orgs in their own tenant. Fixed by routing `profiles` through the existing
+  `access_membership_readable/writable()` primitives (already correct, already used by the
+  membership tables), rebuilding `organizations` RLS on `get_auth_role()`/`get_auth_tenant()`
+  (drop-all-then-rebuild, per the rule above), and rebuilding `brands`/`locations` on the
+  existing `get_my_accessible_brand_ids/location_ids()` helpers with proper INSERT
+  parent-scope checks and UPDATE re-parenting guards (`WITH CHECK` validates the NEW row, not
+  just the OLD row via `USING`). Product decision: `branch_manager` can manage brands/locations
+  already assigned to them but cannot create a new brand (rank floor raised to `org_manager`
+  for brand INSERT). Also patched two fossils that shipped after the role model existed:
+  `create-dwolla-funding-source` edge function and the `send_due_date_reminders` cron function
+  both still checked `'org_owner'`. New acceptance test
+  `tenant_super_admin_identity_rls_acceptance.sql` exercises real RLS via role impersonation
+  (unlike the original `tenant_super_admin_org_manager_acceptance.sql`, which only checked
+  helper-function booleans as the postgres superuser and so never caught this gap).
+  **Deferred, not done here:** `organizations.enabled_modules` has zero DB-level enforcement
+  anywhere (RLS/trigger/edge function) — it's checked only in `moduleConfig.js` client-side,
+  and `org_manager`/`tenant_super_admin` bypass it by design. Tracked as its own follow-up
+  ("DB-level module enablement enforcement") — do NOT casually add a parameter to the shared
+  `tenant_scope_*`/`reference_scope_*` functions for this; see that plan's overload/dependency
+  warning before touching those functions.
+
 ---
 
 ## 8. PENDING PLAN (in dependency order)
@@ -279,7 +310,9 @@ the Phase 3 redesign.
 - [x] Step 3 — Batch 1 financial RLS (12 tables)
 - [ ] Batch 2 — operational tables (reference hybrid + location-scoped) ← NEXT
 - [ ] Batch 3 — remaining tenant tables
-- [ ] Phase 2c — profiles + dashboard special cases
+- [x] Phase 2c (partial) — `profiles` RLS fixed (see Identity/hierarchy RLS batch above);
+      `brands`/`locations`/`organizations` also fixed as part of the same batch (not originally
+      scoped under Phase 2c, but same root cause). `dashboard_*` special case still open.
 - [ ] Phase 3 — full tiered-approval redesign + insert-path scope fixes
 - [ ] Squash — clean baseline
 - [ ] Production deploy — with prod-state re-checks
