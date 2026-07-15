@@ -1,99 +1,76 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { UploadCloud, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
-import { toast } from "sonner";
+import { CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
 export default function VendorReconciliation({ vendorId }) {
-  // In a real implementation, this reads from a 3-way matching backend table or runs an RPC matching statements to invoices.
-  const [statementData, setStatementData] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const handleUploadStatement = () => {
-    setIsProcessing(true);
-    // Simulate Dockling parsing + Vertex AI matching
-    setTimeout(() => {
-      setStatementData({
-        matched: [
-          { invoice_num: 'INV-10042', statement_amount: 450.00, app_amount: 450.00, status: 'matched' },
-          { invoice_num: 'INV-10043', statement_amount: 125.50, app_amount: 125.50, status: 'matched' }
-        ],
-        unpaid: [
-          { invoice_num: 'INV-10044', statement_amount: 320.00, app_amount: 320.00, status: 'unpaid_in_app' }
-        ],
-        missing: [
-          { invoice_num: 'INV-10045', statement_amount: 85.00, app_amount: 0, status: 'missing_in_app' }
-        ],
-        mismatch: [
-          { invoice_num: 'INV-10046', statement_amount: 500.00, app_amount: 450.00, status: 'amount_mismatch' }
-        ]
-      });
-      setIsProcessing(false);
-      toast.success("Statement processed. 2 matched, 3 exceptions found.");
-    }, 2000);
-  };
-
-  const allRows = statementData ? [
-    ...statementData.matched,
-    ...statementData.unpaid,
-    ...statementData.missing,
-    ...statementData.mismatch
-  ] : [];
+  const { data: lines = [], isLoading } = useQuery({
+    queryKey: ['vendor_statement_lines_reconciliation', vendorId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vendor_statement_lines')
+        .select('*, vendor_statements!inner(vendor_id, statement_date)')
+        .eq('vendor_statements.vendor_id', vendorId)
+        .order('invoice_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!vendorId,
+  });
 
   const getStatusBadge = (status) => {
     switch (status) {
       case 'matched': return <Badge className="bg-resend-green/10 text-resend-green border-0"><CheckCircle2 className="w-3 h-3 mr-1" /> Matched</Badge>;
-      case 'unpaid_in_app': return <Badge variant="outline" className="text-amber-500 border-amber-500/50"><AlertTriangle className="w-3 h-3 mr-1" /> Unpaid in App</Badge>;
-      case 'missing_in_app': return <Badge className="bg-resend-red/10 text-resend-red border-0"><AlertTriangle className="w-3 h-3 mr-1" /> Missing Invoice</Badge>;
-      case 'amount_mismatch': return <Badge className="bg-resend-red/10 text-resend-red border-0"><AlertTriangle className="w-3 h-3 mr-1" /> Amount Mismatch</Badge>;
+      case 'unmatched': return <Badge variant="outline" className="text-amber-500 border-amber-500/50"><AlertTriangle className="w-3 h-3 mr-1" /> Unmatched</Badge>;
+      case 'disputed': return <Badge className="bg-resend-red/10 text-resend-red border-0"><AlertTriangle className="w-3 h-3 mr-1" /> Disputed</Badge>;
+      case 'missing_credit': return <Badge className="bg-resend-red/10 text-resend-red border-0"><AlertTriangle className="w-3 h-3 mr-1" /> Missing Credit</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
 
+  const counts = React.useMemo(() => ({
+    matched: lines.filter(l => l.status === 'matched').length,
+    unmatched: lines.filter(l => l.status === 'unmatched').length,
+    disputed: lines.filter(l => l.status === 'disputed').length,
+  }), [lines]);
+
   return (
     <div className="space-y-6">
       <Card className="shadow-sm border-border/40">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Statement Reconciliation</CardTitle>
-            <CardDescription>Upload a vendor statement to perform a 3-way match against RestOps invoices and payments.</CardDescription>
-          </div>
-          <Button onClick={handleUploadStatement} disabled={isProcessing} className="bg-primary">
-            {isProcessing ? <div className="animate-spin h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2" /> : <UploadCloud className="w-4 h-4 mr-2" />}
-            Upload Statement
-          </Button>
+        <CardHeader>
+          <CardTitle>Statement Reconciliation</CardTitle>
+          <CardDescription>Statement lines matched against this vendor's invoices. Upload statements from Vendors → Statements.</CardDescription>
         </CardHeader>
         <CardContent>
-          {!statementData ? (
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading...</div>
+          ) : lines.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-border/60 rounded-xl bg-secondary/10">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <FileSpreadsheet className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-1">No Active Reconciliation</h3>
+              <h3 className="text-lg font-semibold mb-1">No Statement Lines Yet</h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                Upload a PDF or CSV statement from the vendor. Our AI will automatically match it against your invoice and payment history.
+                Upload a statement for this vendor from the Vendors → Statements tab to see reconciliation status here.
               </p>
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg border border-border/40 bg-card text-center">
-                  <p className="text-2xl font-bold text-resend-green">{statementData.matched.length}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Perfect Match</p>
+                  <p className="text-2xl font-bold text-resend-green">{counts.matched}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Matched</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border/40 bg-card text-center">
-                  <p className="text-2xl font-bold text-amber-500">{statementData.unpaid.length}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Unpaid in App</p>
+                  <p className="text-2xl font-bold text-amber-500">{counts.unmatched}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Unmatched</p>
                 </div>
                 <div className="p-4 rounded-lg border border-border/40 bg-card text-center">
-                  <p className="text-2xl font-bold text-resend-red">{statementData.missing.length}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Missing Invoices</p>
-                </div>
-                <div className="p-4 rounded-lg border border-border/40 bg-card text-center">
-                  <p className="text-2xl font-bold text-resend-red">{statementData.mismatch.length}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Amount Mismatch</p>
+                  <p className="text-2xl font-bold text-resend-red">{counts.disputed}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Disputed</p>
                 </div>
               </div>
 
@@ -102,24 +79,18 @@ export default function VendorReconciliation({ vendorId }) {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Invoice #</TableHead>
-                      <TableHead className="text-right">Statement Amount</TableHead>
-                      <TableHead className="text-right">RestOps Amount</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="w-[100px]"></TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allRows.map((row, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-mono font-medium">{row.invoice_num}</TableCell>
-                        <TableCell className="text-right">${row.statement_amount.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">${row.app_amount.toFixed(2)}</TableCell>
-                        <TableCell>{getStatusBadge(row.status)}</TableCell>
-                        <TableCell>
-                          {row.status !== 'matched' && (
-                            <Button variant="outline" size="sm" className="text-xs">Resolve</Button>
-                          )}
-                        </TableCell>
+                    {lines.map((line) => (
+                      <TableRow key={line.id}>
+                        <TableCell className="font-mono font-medium">{line.invoice_number}</TableCell>
+                        <TableCell className="text-right">${Number(line.amount).toFixed(2)}</TableCell>
+                        <TableCell>{getStatusBadge(line.status)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate" title={line.notes}>{line.notes || '-'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

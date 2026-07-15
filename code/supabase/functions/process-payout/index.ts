@@ -78,13 +78,15 @@ serve(async (req) => {
     }
 
     // ponytail: fail closed before release_invoice_funds mutates payment state.
-    // Upgrade path: when Dwolla registration is real, guide users to re-onboard.
-    if (!dwollaLink?.provider_customer_ref) {
-       return new Response(JSON.stringify({ error: 'Missing Dwolla vendor provider link.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    if (!dwollaLink?.provider_funding_ref) {
+       return new Response(JSON.stringify({ error: 'Missing Dwolla vendor funding source. Vendor must submit bank details first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    if (dwollaLink.provider_status !== 'verified') {
-       return new Response(JSON.stringify({ error: 'Vendor must complete Dwolla onboarding first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    // 'unverified' funding sources can still receive real transfers at Dwolla's own
+    // (lower) transaction limits -- Dwolla's API enforces that ceiling itself, we don't
+    // need to duplicate it here. Only block statuses that mean the link is unusable.
+    if (dwollaLink.provider_status === 'suspended') {
+       return new Response(JSON.stringify({ error: 'Vendor Dwolla account is suspended.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
     // 1. Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Manager).
@@ -100,37 +102,61 @@ serve(async (req) => {
 
     const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0);
 
-    // 2. Initiate Dwolla Transfer
-    const dwollaClient = new Client({
-      key: Deno.env.get('DWOLLA_KEY') ?? '',
-      secret: Deno.env.get('DWOLLA_SECRET') ?? '',
-      environment: 'sandbox' // Change to 'production' for live
-    });
+    // release_invoice_funds already flipped invoice.status -> scheduled and
+    // payment_status -> processing, and inserted a 'processing' payments row. If the Dwolla
+    // call below fails, that state is stuck and unretryable unless we revert it here.
+    const revertOnFailure = async (reason) => {
+      await serviceSupabase
+        .from('payments')
+        .update({ status: 'failed', payout_status: 'failed', failure_reason: reason })
+        .eq('id', releaseData.payment_id)
+        .eq('organization_id', releaseData.organization_id)
+      await serviceSupabase
+        .from('invoices')
+        .update({ payment_status: 'unpaid' })
+        .eq('id', invoice_id)
+    }
 
-    const requestBody = {
-      _links: {
-        source: { href: paymentAccount.dwolla_funding_source_url },
-        destination: { href: dwollaLink.provider_customer_ref }
-      },
-      amount: { currency: "USD", value: transferAmount.toFixed(2) },
-      metadata: { invoiceId: invoice_id }
-    };
+    try {
+      // 2. Initiate Dwolla Transfer
+      const dwollaClient = new Client({
+        key: Deno.env.get('DWOLLA_KEY') ?? '',
+        secret: Deno.env.get('DWOLLA_SECRET') ?? '',
+        environment: 'sandbox' // Change to 'production' for live
+      });
 
-    const transferResponse = await dwollaClient.post('transfers', requestBody);
-    const transferUrl = transferResponse.headers.get('location');
+      const requestBody = {
+        _links: {
+          source: { href: paymentAccount.dwolla_funding_source_url },
+          destination: { href: dwollaLink.provider_funding_ref }
+        },
+        amount: { currency: "USD", value: transferAmount.toFixed(2) },
+        metadata: { invoiceId: invoice_id }
+      };
 
-    // 3. Update the payment record with the Dwolla transfer URL
-    // We use a service role client to bypass RLS for this internal system update
-    await serviceSupabase
-      .from('payments')
-      .update({ dwolla_transfer_url: transferUrl })
-      .eq('id', releaseData.payment_id)
-      .eq('organization_id', releaseData.organization_id)
+      const transferResponse = await dwollaClient.post('transfers', requestBody);
+      const transferUrl = transferResponse.headers.get('location');
 
-    return new Response(JSON.stringify({ success: true, transferUrl }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+      // 3. Update the payment record with the Dwolla transfer URL
+      // We use a service role client to bypass RLS for this internal system update
+      await serviceSupabase
+        .from('payments')
+        .update({ dwolla_transfer_url: transferUrl })
+        .eq('id', releaseData.payment_id)
+        .eq('organization_id', releaseData.organization_id)
+
+      return new Response(JSON.stringify({ success: true, transferUrl }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    } catch (transferError) {
+      console.error('Dwolla transfer failed, reverting:', transferError)
+      await revertOnFailure(transferError.message || 'Dwolla transfer failed')
+      return new Response(JSON.stringify({ error: transferError.message || 'Dwolla transfer failed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 502,
+      })
+    }
   } catch (error) {
     console.error('process-payout error:', error)
     return new Response(JSON.stringify({ error: error.message }), {

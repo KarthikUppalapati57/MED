@@ -55,11 +55,6 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
   }
 }
 
-// PayPal
-export function getPayPalClientId() {
-  return import.meta.env.VITE_PAYPAL_CLIENT_ID || null;
-}
-
 // Bank Transfer
 export const BANK_DETAILS = {
   bank_name: 'Restops Business Account',

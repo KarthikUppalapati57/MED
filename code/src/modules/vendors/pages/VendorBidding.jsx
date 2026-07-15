@@ -1,43 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
-import { Gavel, Truck, TrendingDown, CheckCircle2 } from 'lucide-react';
+import { Gavel, Truck, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 export default function VendorBidding() {
   const { currentOrganization } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [bidsResolved, setBidsResolved] = useState(false);
+  const [evaluatingItemId, setEvaluatingItemId] = useState(null);
+  const [winners, setWinners] = useState({});
+
+  const { data: pendingGroups = [], isLoading, refetch } = useQuery({
+    queryKey: ['pending-procurement-bids', currentOrganization?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('procurement_bids')
+        .select('global_item_id, vendor_id, bid_price, vendors(name), global_vendor_items(item_name)')
+        .eq('organization_id', currentOrganization.id)
+        .eq('status', 'pending');
+      if (error) throw error;
+
+      const grouped = {};
+      for (const bid of data || []) {
+        if (!grouped[bid.global_item_id]) {
+          grouped[bid.global_item_id] = {
+            global_item_id: bid.global_item_id,
+            item_name: bid.global_vendor_items?.item_name || 'Unknown item',
+            bids: [],
+          };
+        }
+        grouped[bid.global_item_id].bids.push({ vendor_name: bid.vendors?.name, bid_price: bid.bid_price });
+      }
+      return Object.values(grouped);
+    },
+    enabled: !!currentOrganization?.id,
+  });
 
   useEffect(() => {
     if (!currentOrganization) return;
-    
-    // Subscribe to realtime updates for vendor bids
+
     const channel = supabase.channel('vendor-bids-sync')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'vendor_bids' 
-      }, (payload) => {
-        // If a bid is updated or inserted, handle the status
-        console.log('Real-time bid update:', payload);
-        toast.info('Vendor bid statuses updated via real-time sync.');
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'procurement_bids'
+      }, () => {
+        refetch();
       })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Connected to vendor bids real-time channel');
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.warn('Real-time channel disconnected. Attempting to reconnect...');
-          // Implement simple polling fallback on disconnect
-          setTimeout(() => channel.subscribe(), 5000);
-        }
-      });
+      .subscribe();
 
     const handleOnline = () => {
       toast.success('Connection restored. Syncing latest bids...');
-      // Trigger a re-fetch of bids here if we had a data-fetching function
+      refetch();
     };
     window.addEventListener('online', handleOnline);
 
@@ -45,28 +61,32 @@ export default function VendorBidding() {
       supabase.removeChannel(channel);
       window.removeEventListener('online', handleOnline);
     };
-  }, [currentOrganization]);
+  }, [currentOrganization, refetch]);
 
-  const handleEvaluateBids = async () => {
+  const handleEvaluateBids = async (globalItemId) => {
     if (!currentOrganization) return;
-    setLoading(true);
+    setEvaluatingItemId(globalItemId);
     try {
       const { data, error } = await supabase.functions.invoke('evaluate-vendor-bids', {
-        body: { 
-          action: 'evaluate_bids', 
+        body: {
+          action: 'evaluate_bids',
           organization_id: currentOrganization.id,
-          // Hardcoding a demo item ID just to trigger the function
-          global_item_id: '00000000-0000-0000-0000-000000000000' 
+          global_item_id: globalItemId
         }
       });
-      
+
       if (error) throw error;
-      setBidsResolved(true);
-      toast.success('Bid evaluation complete! Lowest cost vendor selected.');
+      if (data?.winning_bid) {
+        setWinners(prev => ({ ...prev, [globalItemId]: data.winning_bid }));
+        toast.success('Bid evaluation complete! Lowest cost vendor selected.');
+      } else {
+        toast.info(data?.message || 'No pending bids to evaluate.');
+      }
+      refetch();
     } catch (err) {
       toast.error('Failed to evaluate bids: ' + err.message);
     } finally {
-      setLoading(false);
+      setEvaluatingItemId(null);
     }
   };
 
@@ -89,25 +109,40 @@ export default function VendorBidding() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-slate-600">
-              Broadcast your required inventory items to all registered vendors and let the system automatically select the lowest-cost supplier.
+              Vendors with pending bids on the same item are shown below. Evaluating selects the lowest-cost bid.
             </p>
-            
-            <div className="bg-slate-50 p-4 rounded-md border border-slate-200">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium text-slate-800">Chicken Breast (40lb Case)</span>
-                <span className="text-sm text-slate-500">3 Pending Bids</span>
-              </div>
-              {!bidsResolved ? (
-                <Button onClick={handleEvaluateBids} disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700">
-                  {loading ? 'Evaluating...' : 'Evaluate Bids'}
-                </Button>
-              ) : (
-                <div className="flex items-center text-green-600 bg-green-50 p-2 rounded justify-center font-medium">
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Winner: US Foods ($72.50)
-                </div>
-              )}
-            </div>
+
+            {isLoading ? (
+              <p className="text-sm text-slate-500 text-center py-6">Loading pending bids...</p>
+            ) : pendingGroups.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-6">No pending bids to evaluate.</p>
+            ) : (
+              pendingGroups.map(group => {
+                const winner = winners[group.global_item_id];
+                return (
+                  <div key={group.global_item_id} className="bg-slate-50 p-4 rounded-md border border-slate-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium text-slate-800">{group.item_name}</span>
+                      <span className="text-sm text-slate-500">{group.bids.length} Pending Bid{group.bids.length === 1 ? '' : 's'}</span>
+                    </div>
+                    {!winner ? (
+                      <Button
+                        onClick={() => handleEvaluateBids(group.global_item_id)}
+                        disabled={evaluatingItemId === group.global_item_id}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        {evaluatingItemId === group.global_item_id ? 'Evaluating...' : 'Evaluate Bids'}
+                      </Button>
+                    ) : (
+                      <div className="flex items-center text-green-600 bg-green-50 p-2 rounded justify-center font-medium">
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Winner: {group.bids.find(b => Number(b.bid_price) === Number(winner.bid_price))?.vendor_name || 'Vendor'} (${Number(winner.bid_price).toFixed(2)})
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </CardContent>
         </Card>
 
@@ -122,7 +157,6 @@ export default function VendorBidding() {
             <div className="text-center py-8 text-slate-500">
               <Truck className="w-12 h-12 mx-auto text-slate-300 mb-4" />
               <p>No active delivery routes today.</p>
-              <Button variant="outline" className="mt-4">Build Manifest</Button>
             </div>
           </CardContent>
         </Card>

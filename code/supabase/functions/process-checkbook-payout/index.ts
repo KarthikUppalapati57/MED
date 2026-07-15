@@ -64,72 +64,99 @@ serve(async (req) => {
 
     const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0);
 
-    // 3. Call Checkbook.io API
-    // Using standard Fetch for Checkbook API
-    const checkbookUrl = Deno.env.get('CHECKBOOK_ENV') === 'production' 
-      ? 'https://checkbook.io/v3/check/digital' 
-      : 'https://demo.checkbook.io/v3/check/digital'; // Using digital endpoint for both, but physical is specified via params
-
-    const apiKey = Deno.env.get('CHECKBOOK_API_KEY');
-    const apiSecret = Deno.env.get('CHECKBOOK_API_SECRET');
-
-    if (!apiKey || !apiSecret) {
-      throw new Error('Checkbook.io credentials not configured');
-    }
-
-    const checkPayload: any = {
-      name: invoice.vendor.name,
-      amount: Number(transferAmount.toFixed(2)),
-      description: `Payment for Invoice ${invoice.invoice_number}`,
-    };
-
-    if (payout_method === 'checkbook_physical') {
-      checkPayload.recipient_address = {
-        line_1: invoice.vendor.street_1,
-        line_2: invoice.vendor.street_2 || '',
-        city: invoice.vendor.city,
-        state: invoice.vendor.state,
-        zip: invoice.vendor.zip
-      };
-    } else {
-      checkPayload.recipient = invoice.vendor.email;
-    }
-
-    const checkbookResponse = await fetch(checkbookUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `${apiKey}:${apiSecret}`
-      },
-      body: JSON.stringify(checkPayload)
-    });
-
-    const checkData = await checkbookResponse.json();
-
-    if (!checkbookResponse.ok) {
-      console.error('Checkbook.io Error:', checkData);
-      return new Response(JSON.stringify({ error: checkData.error || 'Failed to issue check via Checkbook.io' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
-
-    const checkbookCheckId = checkData.id;
-
-    // 4. Update the payment record with the Checkbook ID
     const serviceSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    await serviceSupabase
-      .from('payments')
-      .update({ checkbook_check_id: checkbookCheckId })
-      .eq('id', releaseData.payment_id)
-      .eq('organization_id', releaseData.organization_id)
+    // release_invoice_funds already flipped invoice.status -> scheduled and
+    // payment_status -> processing, and inserted a 'processing' payments row. If the Checkbook
+    // call below fails, that state is stuck and unretryable unless we revert it here.
+    const revertOnFailure = async (reason) => {
+      await serviceSupabase
+        .from('payments')
+        .update({ status: 'failed', payout_status: 'failed', failure_reason: reason })
+        .eq('id', releaseData.payment_id)
+        .eq('organization_id', releaseData.organization_id)
+      await serviceSupabase
+        .from('invoices')
+        .update({ payment_status: 'unpaid' })
+        .eq('id', invoice_id)
+    }
 
-    return new Response(JSON.stringify({ success: true, checkbookCheckId }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    try {
+      // 3. Call Checkbook.io API
+      // Single endpoint for both digital and physical -- the payload (recipient vs.
+      // recipient_address, below) is what determines which kind of check gets issued.
+      const checkbookUrl = Deno.env.get('CHECKBOOK_ENV') === 'production'
+        ? 'https://checkbook.io/v3/check'
+        : 'https://demo.checkbook.io/v3/check';
+
+      const apiKey = Deno.env.get('CHECKBOOK_API_KEY');
+      const apiSecret = Deno.env.get('CHECKBOOK_API_SECRET');
+
+      if (!apiKey || !apiSecret) {
+        throw new Error('Checkbook.io credentials not configured');
+      }
+
+      const checkPayload: any = {
+        name: invoice.vendor.name,
+        amount: Number(transferAmount.toFixed(2)),
+        description: `Payment for Invoice ${invoice.invoice_number}`,
+      };
+
+      if (payout_method === 'checkbook_physical') {
+        checkPayload.recipient_address = {
+          line_1: invoice.vendor.street_1,
+          line_2: invoice.vendor.street_2 || '',
+          city: invoice.vendor.city,
+          state: invoice.vendor.state,
+          zip: invoice.vendor.zip
+        };
+      } else {
+        checkPayload.recipient = invoice.vendor.email;
+      }
+
+      const checkbookResponse = await fetch(checkbookUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `${apiKey}:${apiSecret}`
+        },
+        body: JSON.stringify(checkPayload)
+      });
+
+      const checkData = await checkbookResponse.json();
+
+      if (!checkbookResponse.ok) {
+        console.error('Checkbook.io Error:', checkData);
+        const reason = checkData.error || 'Failed to issue check via Checkbook.io';
+        await revertOnFailure(reason);
+        return new Response(JSON.stringify({ error: reason }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+      }
+
+      const checkbookCheckId = checkData.id;
+
+      // 4. Update the payment record with the Checkbook ID
+      await serviceSupabase
+        .from('payments')
+        .update({ checkbook_check_id: checkbookCheckId })
+        .eq('id', releaseData.payment_id)
+        .eq('organization_id', releaseData.organization_id)
+
+      return new Response(JSON.stringify({ success: true, checkbookCheckId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    } catch (checkError) {
+      console.error('Checkbook.io call failed, reverting:', checkError)
+      await revertOnFailure(checkError.message || 'Checkbook.io call failed')
+      return new Response(JSON.stringify({ error: checkError.message || 'Checkbook.io call failed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 502,
+      })
+    }
   } catch (error) {
     console.error('process-checkbook-payout error:', error)
     return new Response(JSON.stringify({ error: error.message }), {

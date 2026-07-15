@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity } from 'lucide-react';
@@ -198,10 +199,19 @@ export default function VendorDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Activity className="h-4 w-4 mr-2" /> View Health Score
-          </Button>
-          <Button>Create Order</Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">
+                <Activity className="h-4 w-4 mr-2" /> View Health Score
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Health Score</p>
+              <p className="text-3xl font-bold text-foreground">{vendor.health_score != null ? Number(vendor.health_score).toFixed(0) : '—'}</p>
+              <p className="text-xs text-muted-foreground mt-1">Out of 100. Reflects delivery reliability, price stability, and invoice accuracy.</p>
+            </PopoverContent>
+          </Popover>
+          <Button onClick={() => setActiveTab('order_guide')}>Create Order</Button>
         </div>
       </div>
 

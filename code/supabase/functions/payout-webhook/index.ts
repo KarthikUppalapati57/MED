@@ -58,7 +58,7 @@ serve(async (req) => {
         .from('invoices')
         .update({ 
           status: newInvoiceStatus,
-          payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'partial'
+          payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
         })
         .eq('id', payment.invoice_id)
         

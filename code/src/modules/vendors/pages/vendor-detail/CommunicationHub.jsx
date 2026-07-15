@@ -16,6 +16,7 @@ export default function CommunicationHub({ vendorId }) {
   const { organization, user } = useAuth();
   const queryClient = useQueryClient();
   const [newIssue, setNewIssue] = useState({ issue_type: 'late_delivery', description: '' });
+  const [messageDraft, setMessageDraft] = useState('');
 
   const { data: issues = [], isLoading: loadingIssues } = useQuery({
     queryKey: ['vendor_issues', vendorId],
@@ -33,12 +34,16 @@ export default function CommunicationHub({ vendorId }) {
   });
 
   const [notes, setNotes] = useState('');
-  React.useEffect(() => { if (vendor) setNotes(''); }, [vendor]);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  React.useEffect(() => {
+    if (vendor && !notesLoaded) {
+      setNotes(vendor.notes || '');
+      setNotesLoaded(true);
+    }
+  }, [vendor, notesLoaded]);
 
   const updateNotesMutation = useMutation({
-    mutationFn: async (newNotes) => {
-      return newNotes;
-    },
+    mutationFn: (newNotes) => api.entities.Vendor.update(vendorId, { notes: newNotes }),
     onSuccess: () => {
       queryClient.invalidateQueries(['vendor', vendorId]);
       toast.success('Notes updated');
@@ -120,10 +125,28 @@ export default function CommunicationHub({ vendorId }) {
             <CardDescription>Email or WhatsApp the vendor directly.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea rows={4} placeholder="Type your message here..." />
+            <Textarea rows={4} placeholder="Type your message here..." value={messageDraft} onChange={e => setMessageDraft(e.target.value)} />
             <div className="flex gap-2">
-              <Button className="flex-1" variant="outline"><Send className="w-4 h-4 mr-2" /> WhatsApp</Button>
-              <Button className="flex-1"><Mail className="w-4 h-4 mr-2" /> Email</Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                disabled={!(vendor?.whatsapp_number || vendor?.phone)}
+                onClick={() => {
+                  const digits = (vendor.whatsapp_number || vendor.phone).replace(/\D/g, '');
+                  window.open(`https://wa.me/${digits}${messageDraft ? `?text=${encodeURIComponent(messageDraft)}` : ''}`, '_blank');
+                }}
+              >
+                <Send className="w-4 h-4 mr-2" /> WhatsApp
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={!vendor?.email}
+                onClick={() => {
+                  window.location.href = `mailto:${vendor.email}${messageDraft ? `?body=${encodeURIComponent(messageDraft)}` : ''}`;
+                }}
+              >
+                <Mail className="w-4 h-4 mr-2" /> Email
+              </Button>
             </div>
           </CardContent>
         </Card>

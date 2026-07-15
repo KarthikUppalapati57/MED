@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,9 @@ export default function PaymentAccountsSettings() {
     name: '',
     account_type: 'checking',
     routing_number_last4: '',
-    account_number_last4: ''
+    account_number_last4: '',
+    full_routing_number: '',
+    full_account_number: ''
   });
 
   const { data: accounts = [], isLoading } = useQuery({
@@ -57,18 +60,35 @@ export default function PaymentAccountsSettings() {
   });
 
   const createAccountMutation = useMutation({
-    mutationFn: (account) => api.financial.createPaymentAccount({
-      organization_id: organization.id,
-      name: account.name,
-      account_type: account.account_type,
-      routing_number_last4: account.routing_number_last4 || null,
-      account_number_last4: account.account_number_last4 || null
-    }),
+    mutationFn: async (account) => {
+      const created = await api.financial.createPaymentAccount({
+        organization_id: organization.id,
+        name: account.name,
+        account_type: account.account_type,
+        routing_number_last4: account.routing_number_last4 || null,
+        account_number_last4: account.account_number_last4 || null
+      });
+
+      if (account.full_routing_number && account.full_account_number) {
+        const { error: dwollaError } = await supabase.functions.invoke('create-dwolla-funding-source', {
+          body: {
+            target_type: 'organization',
+            payment_account_id: created.id,
+            routing_number: account.full_routing_number,
+            account_number: account.full_account_number,
+            bank_account_type: 'checking',
+          }
+        });
+        if (dwollaError) throw new Error(`Account created, but ACH setup failed: ${dwollaError.message}`);
+      }
+
+      return created;
+    },
     onSuccess: () => {
       toast.success("Payment account created");
       queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });
       setIsAdding(false);
-      setNewAccount({ name: '', account_type: 'checking', routing_number_last4: '', account_number_last4: '' });
+      setNewAccount({ name: '', account_type: 'checking', routing_number_last4: '', account_number_last4: '', full_routing_number: '', full_account_number: '' });
     },
     onError: (err) => toast.error(err.message)
   });
@@ -198,6 +218,32 @@ export default function PaymentAccountsSettings() {
                   </div>
                 </>
               )}
+              {newAccount.account_type === 'checking' && (
+                <>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label className="text-xs">Enable real Dwolla ACH payouts from this account (optional)</Label>
+                    <p className="text-xs text-slate-500">Provide the full routing/account number to create a real Dwolla funding source. Numbers are sent directly to a secure vault, never stored in plain text.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Full Routing Number</Label>
+                    <Input
+                      value={newAccount.full_routing_number}
+                      onChange={e => setNewAccount({...newAccount, full_routing_number: e.target.value.replace(/\D/g, '').slice(0, 9)})}
+                      placeholder="9 digits"
+                      maxLength={9}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Full Account Number</Label>
+                    <Input
+                      value={newAccount.full_account_number}
+                      onChange={e => setNewAccount({...newAccount, full_account_number: e.target.value.replace(/\D/g, '').slice(0, 17)})}
+                      placeholder="Account number"
+                      maxLength={17}
+                    />
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button>
@@ -258,9 +304,9 @@ export default function PaymentAccountsSettings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="stripe">Stripe (ACH)</SelectItem>
-                        <SelectItem value="paypal">PayPal</SelectItem>
-                        <SelectItem value="check">Mailed Check</SelectItem>
+                        <SelectItem value="dwolla_ach">Dwolla (ACH)</SelectItem>
+                        <SelectItem value="checkbook_digital">Digital Check (Checkbook.io)</SelectItem>
+                        <SelectItem value="checkbook_physical">Mailed Check (Checkbook.io)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

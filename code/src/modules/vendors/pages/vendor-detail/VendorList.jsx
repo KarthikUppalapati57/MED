@@ -63,6 +63,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
+import { generateVendorSuggestions } from '@/lib/geminiService';
 import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import VendorOnboardingWizard from '../../components/VendorOnboardingWizard';
 
@@ -139,7 +140,7 @@ export default function VendorList() {
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
+      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, rating, total_orders, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
@@ -257,8 +258,18 @@ export default function VendorList() {
 
     const vendorPayload = {
       name: formData.name,
+      contact_name: formData.contact_name || null,
       email: formData.email || null,
+      phone: formData.phone || null,
+      address: formData.address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      zip_code: formData.zip_code || null,
+      country: formData.country || 'USA',
+      payment_terms: formData.payment_terms || 'net_30',
       status: formData.status || 'active',
+      notes: formData.notes || null,
+      whatsapp_number: formData.whatsapp_number || null,
       file_routing_preference: formData.file_routing_preference || 'storage',
       ap_routing_preference: normalizeApRouting(formData.ap_routing_preference),
       is_commissary_vendor: formData.is_commissary_vendor,
@@ -277,21 +288,19 @@ export default function VendorList() {
     }
   };
 
+  const [suggestionsError, setSuggestionsError] = useState(null);
+
   const fetchSuggestions = async () => {
     setLoadingSuggestions(true);
     setSuggestionsOpen(true);
+    setSuggestionsError(null);
 
     try {
-      const categories = [...new Set(vendors.map(v => v.default_expense_category).filter(Boolean))];
-
-      const localSuggestions = (categories.length ? categories : ['general']).slice(0, 3).map((cat, idx) => ({
-        name: `Suggested ${cat} vendor ${idx + 1}`,
-        specialty: `${cat} supplies`,
-        estimated_rating: 4.5,
-        reason: `Based on your existing spend in category "${cat}".`,
-      }));
-
-      setSuggestions(localSuggestions);
+      const result = await generateVendorSuggestions(vendors);
+      setSuggestions(result?.suggestions || []);
+    } catch (err) {
+      setSuggestionsError(err.message);
+      setSuggestions([]);
     } finally {
       setLoadingSuggestions(false);
     }
@@ -346,20 +355,28 @@ export default function VendorList() {
     return { totalSpent: spent, activeVendors: active, totalOrders: orders };
   }, [vendors]);
 
-  const { data: vendorItemCount = 0 } = useAuthQuery({
-    queryKey: ['vendor_items_count', organization?.id],
-    queryFn: async () => {
-      const rows = await api.entities.VendorItem.list('id', { select: 'id' });
-      return rows.length;
-    },
-    enabled: !!organization?.id,
-  });
-
   const { data: orgInvoices = [] } = useAuthQuery({
     queryKey: ['vendor_invoices_period', organization?.id],
     queryFn: () => api.entities.Invoice.list('-invoice_date', { select: 'invoice_date, total_amount' }),
     enabled: !!organization?.id,
   });
+
+  const { data: allVendorItems = [] } = useAuthQuery({
+    queryKey: ['all_vendor_items', organization?.id],
+    queryFn: () => api.entities.VendorItem.list('vendor_item_name', {
+      select: 'id, vendor_id, vendor_item_name, vendor_item_code, vendor_unit, default_price, last_price, on_order_guide',
+    }),
+    enabled: !!organization?.id,
+  });
+
+  const vendorItemsByVendor = React.useMemo(() => {
+    const map = {};
+    for (const item of allVendorItems) {
+      if (!map[item.vendor_id]) map[item.vendor_id] = [];
+      map[item.vendor_id].push(item);
+    }
+    return map;
+  }, [allVendorItems]);
 
   const periodSpent = React.useMemo(() => {
     if (periodFilter === 'all') return totalSpent;
@@ -421,7 +438,7 @@ export default function VendorList() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground"># Vendor Items</p>
-            <p className="text-2xl font-bold text-foreground">{vendorItemCount}</p>
+            <p className="text-2xl font-bold text-foreground">{allVendorItems.length}</p>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
@@ -645,35 +662,30 @@ export default function VendorList() {
                   <TableRow>
                     <TableHead>Vendor</TableHead>
                     <TableHead>Vendor Item Name</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Category</TableHead>
                     <TableHead>Item Code</TableHead>
-                    <TableHead>Last Purchase</TableHead>
-                    <TableHead>Last Amount</TableHead>
+                    <TableHead>Unit</TableHead>
+                    <TableHead>Price</TableHead>
                     <TableHead>Order Guide</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {vendors.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No vendor items available. Items will appear here once vendors have associated products.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    vendors.flatMap(vendor =>
-                      (vendor.items || []).length > 0
-                        ? (vendor.items || []).map((item, idx) => (
-                            <TableRow key={`${vendor.id}-${idx}`}>
+                    vendors.flatMap(vendor => {
+                      const items = vendorItemsByVendor[vendor.id] || [];
+                      return items.length > 0
+                        ? items.map((item) => (
+                            <TableRow key={item.id}>
                               <TableCell className="font-medium">{vendor.name}</TableCell>
-                              <TableCell>{item.vendor_item_name || item.name || '-'}</TableCell>
-                              <TableCell>{item.product_name || '-'}</TableCell>
-                              <TableCell><Badge variant="secondary">{item.category || '-'}</Badge></TableCell>
-                              <TableCell className="font-mono text-sm">{item.item_code || '-'}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {item.last_purchase_date ? new Date(item.last_purchase_date).toLocaleDateString() : '-'}
-                              </TableCell>
-                              <TableCell className="font-semibold">${Number(item.last_purchase_amount || 0).toFixed(2)}</TableCell>
+                              <TableCell>{item.vendor_item_name}</TableCell>
+                              <TableCell className="font-mono text-sm">{item.vendor_item_code || '-'}</TableCell>
+                              <TableCell>{item.vendor_unit || '-'}</TableCell>
+                              <TableCell className="font-semibold">${Number(item.last_price ?? item.default_price ?? 0).toFixed(2)}</TableCell>
                               <TableCell>
                                 <Badge className={item.on_order_guide ? 'bg-resend-green/10 text-resend-green' : 'bg-secondary text-muted-foreground'}>
                                   {item.on_order_guide ? 'Active' : 'Inactive'}
@@ -683,9 +695,9 @@ export default function VendorList() {
                           ))
                         : [<TableRow key={`${vendor.id}-empty`}>
                             <TableCell className="font-medium">{vendor.name}</TableCell>
-                            <TableCell colSpan={7} className="text-muted-foreground italic">No items cataloged</TableCell>
-                          </TableRow>]
-                    )
+                            <TableCell colSpan={5} className="text-muted-foreground italic">No items cataloged</TableCell>
+                          </TableRow>];
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -893,43 +905,25 @@ export default function VendorList() {
               <Sparkles className="h-5 w-5 text-primary" />
               Vendor Suggestions
             </DialogTitle>
+            <p className="text-xs text-muted-foreground">Analysis of your existing vendor list, powered by Gemini.</p>
           </DialogHeader>
 
           {loadingSuggestions ? (
             <div className="py-8 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
-              <p className="mt-4 text-muted-foreground">Finding vendor suggestions...</p>
+              <p className="mt-4 text-muted-foreground">Analyzing your vendor list...</p>
             </div>
+          ) : suggestionsError ? (
+            <p className="text-center text-muted-foreground py-8">{suggestionsError}</p>
           ) : (
             <div className="space-y-4 py-4">
               {suggestions.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">No suggestions available</p>
               ) : (
                 suggestions.map((s, idx) => (
-                  <div key={s.name || idx} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold">{s.name}</p>
-                        <p className="text-sm text-muted-foreground">{s.specialty}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                        <span className="font-medium">{s.estimated_rating?.toFixed(1)}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">{s.reason}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-3"
-                      onClick={() => {
-                        setFormData({ ...formData, name: s.name });
-                        setSuggestionsOpen(false);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      Add as Vendor
-                    </Button>
+                  <div key={idx} className="p-4 border rounded-lg">
+                    <p className="font-semibold">{s.title}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{s.description}</p>
                   </div>
                 ))
               )}

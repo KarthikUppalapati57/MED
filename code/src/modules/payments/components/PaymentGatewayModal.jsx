@@ -27,7 +27,6 @@ import {
 import { toast } from "sonner";
 
 import StripePaymentForm from './StripePaymentForm';
-import PayPalPaymentForm from './PayPalPaymentForm';
 import BankTransferForm from './BankTransferForm';
 
 export default function PaymentGatewayModal({
@@ -39,6 +38,8 @@ export default function PaymentGatewayModal({
   const [completed, setCompleted] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState('stripe');
   const [processing, setProcessing] = useState(false);
+  const [recordingFailed, setRecordingFailed] = useState(false);
+  const [lastPaymentData, setLastPaymentData] = useState(null);
 
   // Manual payment state
   const [manualForm, setManualForm] = useState({
@@ -52,6 +53,8 @@ export default function PaymentGatewayModal({
     setManualForm({ type: 'cheque', cheque_number: '', reference: '', notes: '' });
     setCompleted(false);
     setProcessing(false);
+    setRecordingFailed(false);
+    setLastPaymentData(null);
   };
 
   const handleClose = () => {
@@ -60,13 +63,23 @@ export default function PaymentGatewayModal({
   };
 
   const handlePaymentSuccess = async (paymentData) => {
-    setCompleted(true);
+    setLastPaymentData(paymentData);
+    setRecordingFailed(false);
+    setProcessing(true);
     try {
       await onPaymentComplete(paymentData);
+      setCompleted(true);
+      setTimeout(() => handleClose(), 2000);
     } catch (err) {
+      setRecordingFailed(true);
       toast.error('Failed to record payment: ' + err.message);
+    } finally {
+      setProcessing(false);
     }
-    setTimeout(() => handleClose(), 2000);
+  };
+
+  const handleRetryRecording = () => {
+    if (lastPaymentData) handlePaymentSuccess(lastPaymentData);
   };
 
   const handlePaymentError = (err) => {
@@ -116,6 +129,22 @@ export default function PaymentGatewayModal({
             <h3 className="text-lg font-semibold text-slate-900">Payment Successful!</h3>
             <p className="text-sm text-slate-500 mt-1">Transaction has been recorded.</p>
           </div>
+        ) : recordingFailed ? (
+          <div className="py-8 text-center">
+            <div className="h-16 w-16 rounded-full bg-resend-red/10 flex items-center justify-center mx-auto mb-4">
+              <FileCheck className="h-8 w-8 text-resend-red" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">Payment Charged, Recording Failed</h3>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+              {lastPaymentData?.payment_method === 'card'
+                ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details — just try recording again.'
+                : 'The payment could not be saved. It is safe to try recording it again.'}
+            </p>
+            <Button className="mt-4" onClick={handleRetryRecording} disabled={processing}>
+              {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Try Again
+            </Button>
+          </div>
         ) : (
           <>
             {/* Payment summary */}
@@ -141,14 +170,10 @@ export default function PaymentGatewayModal({
             </div>
 
             <Tabs value={selectedMethod} onValueChange={setSelectedMethod} className="mt-2">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="stripe" className="text-xs gap-1">
                   <CreditCard className="h-3.5 w-3.5" />
                   Card
-                </TabsTrigger>
-                <TabsTrigger value="paypal" className="text-xs gap-1">
-                  <Wallet className="h-3.5 w-3.5" />
-                  PayPal
                 </TabsTrigger>
                 <TabsTrigger value="bank_transfer" className="text-xs gap-1">
                   <Building2 className="h-3.5 w-3.5" />
@@ -165,17 +190,6 @@ export default function PaymentGatewayModal({
                 <StripePaymentForm
                   amount={payment.amount}
                   invoiceId={payment.invoice_id}
-                  vendorName={payment.vendor_name}
-                  invoiceNumber={payment.invoice_number}
-                  onSuccess={handlePaymentSuccess}
-                  onError={handlePaymentError}
-                />
-              </TabsContent>
-
-              {/* PayPal */}
-              <TabsContent value="paypal" className="mt-4">
-                <PayPalPaymentForm
-                  amount={payment.amount}
                   vendorName={payment.vendor_name}
                   invoiceNumber={payment.invoice_number}
                   onSuccess={handlePaymentSuccess}

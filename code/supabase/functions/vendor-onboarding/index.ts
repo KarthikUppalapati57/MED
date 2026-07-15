@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import crypto from "node:crypto";
+import { ensureDwollaCustomerAndFundingSource } from "../_shared/dwolla.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -327,6 +328,54 @@ serve(async (req) => {
         p_routing: bank_details.routingNumber,
       });
       if (error) throw error;
+
+      // Best-effort real Dwolla funding-source creation right after vaulting the vendor's
+      // bank details, so ACH readiness is automatic. Non-fatal: a Dwolla hiccup must never
+      // block the banking submission itself, which already succeeded above.
+      try {
+        const { data: vendor } = await supabase
+          .from("vendors")
+          .select("id, organization_id, name, contact_name, email, dwolla_customer_url")
+          .eq("id", data.vendor_id)
+          .maybeSingle();
+
+        const { data: banking } = await supabase.rpc("get_vendor_banking_for_audit", {
+          p_banking_row_id: data.banking_row_id,
+        });
+
+        if (vendor && banking?.account && banking?.routing) {
+          const holderName = vendor.contact_name || vendor.name;
+          const [firstName, ...lastNameParts] = holderName.split(/\s+/);
+
+          const { customerUrl, fundingSourceUrl } = await ensureDwollaCustomerAndFundingSource({
+            existingCustomerUrl: vendor.dwolla_customer_url,
+            firstName: firstName || "Vendor",
+            lastName: lastNameParts.join(" ") || vendor.name,
+            email: vendor.email,
+            businessName: vendor.name,
+            routingNumber: banking.routing,
+            accountNumber: banking.account,
+            bankAccountType: "checking",
+            fundingSourceName: vendor.name,
+          });
+
+          if (!vendor.dwolla_customer_url) {
+            await supabase.from("vendors").update({ dwolla_customer_url: customerUrl, dwolla_onboarding_status: "unverified" }).eq("id", vendor.id);
+          }
+
+          await supabase.from("vendor_payment_provider_links").upsert({
+            vendor_id: vendor.id,
+            organization_id: vendor.organization_id,
+            provider: "dwolla",
+            provider_customer_ref: customerUrl,
+            provider_funding_ref: fundingSourceUrl,
+            provider_status: "unverified",
+            is_active: true,
+          }, { onConflict: "vendor_id,provider" });
+        }
+      } catch (dwollaError) {
+        console.error("Non-fatal: Dwolla funding source creation failed during bank-info submit:", dwollaError);
+      }
 
       return jsonResponse({ success: true, ...data });
     }

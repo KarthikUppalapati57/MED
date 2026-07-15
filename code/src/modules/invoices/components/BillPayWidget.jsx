@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
-import { Calendar as CalendarIcon, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export function BillPayWidget({ invoice }) {
   const { organization, profile } = useAuth();
@@ -50,6 +50,22 @@ export function BillPayWidget({ invoice }) {
       { orderBy: 'name' }
     ),
     enabled: !!organization?.id
+  });
+
+  const { data: latestPayment } = useQuery({
+    queryKey: ['invoice-latest-payment', invoice?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('id, status, payout_status, failure_reason, created_at')
+        .eq('invoice_id', invoice.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!invoice?.id
   });
 
   const scheduleMutation = useMutation({
@@ -107,8 +123,14 @@ export function BillPayWidget({ invoice }) {
       toast.success("Funds released via Dwolla successfully");
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
     },
-    onError: (err) => toast.error(err.message || "Failed to release funds via Dwolla")
+    onError: (err) => {
+      toast.error(err.message || "Failed to release funds via Dwolla");
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
+    }
   });
 
   const releaseCheckbookMutation = useMutation({
@@ -129,8 +151,14 @@ export function BillPayWidget({ invoice }) {
       toast.success("Check issued via Checkbook.io successfully");
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
     },
-    onError: (err) => toast.error(err.message || "Failed to issue check via Checkbook.io")
+    onError: (err) => {
+      toast.error(err.message || "Failed to issue check via Checkbook.io");
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
+    }
   });
 
   const handleSchedule = () => {
@@ -188,8 +216,8 @@ export function BillPayWidget({ invoice }) {
                 Schedule
               </Button>
             )}
-            {!isFullyPaid && ['approved', 'scheduled'].includes(invoice.status) && 
-             ['location_manager', 'brand_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'owner', 'admin', 'platform_admin'].includes(profile?.role) && (
+            {!isFullyPaid && ['approved', 'scheduled'].includes(invoice.status) &&
+             ['location_manager', 'branch_manager', 'org_owner', 'platform_admin'].includes(profile?.role) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -246,6 +274,15 @@ export function BillPayWidget({ invoice }) {
             </div>
           </div>
         </div>
+
+        {latestPayment?.payout_status === 'failed' && !isFullyPaid && (
+          <div className="flex items-center gap-3 p-3 mb-4 bg-resend-red/5 text-resend-red rounded-lg border border-resend-red/20">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <div className="text-sm">
+              <span className="font-medium">Last payout attempt failed:</span> {latestPayment.failure_reason || 'Unknown error'}. It's safe to retry with Release Funds above.
+            </div>
+          </div>
+        )}
 
         {invoice.status === 'scheduled' && !isFullyPaid && (
           <div className="flex items-center gap-3 p-3 bg-amber-50 text-amber-900 rounded-lg border border-amber-200">

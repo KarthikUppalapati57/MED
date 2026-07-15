@@ -33,11 +33,11 @@ export default function VendorStatementsTab({ vendors }) {
   const [selectedStatement, setSelectedStatement] = useState(null);
   const [disputeNotes, setDisputeNotes] = useState('');
   
-  // File upload state mockup
   const [isUploading, setIsUploading] = useState(false);
   const [uploadVendorId, setUploadVendorId] = useState('');
   const [uploadDate, setUploadDate] = useState('');
   const [uploadAmount, setUploadAmount] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
 
   // Fetch statements
   const { data: statements = [], isLoading } = useAuthQuery({
@@ -82,37 +82,49 @@ export default function VendorStatementsTab({ vendors }) {
     onError: (e) => toast.error(`Routing update failed: ${e.message}`),
   });
 
-  const mockUploadMutation = useMutation({
+  const uploadStatementMutation = useMutation({
     mutationFn: async () => {
       setIsUploading(true);
-      // Simulate OCR delay
-      await new Promise(res => setTimeout(res, 2000));
-      
+
+      let filePath = null;
+      if (uploadFile) {
+        filePath = `vendor-statements/${uploadVendorId}/${Date.now()}-${uploadFile.name}`;
+        const { error: storageErr } = await supabase.storage
+          .from('vendor_documents')
+          .upload(filePath, uploadFile, { upsert: false });
+        if (storageErr) throw storageErr;
+      }
+
       const st = await api.entities.VendorStatement.create({
         organization_id: organization.id,
         vendor_id: uploadVendorId,
         statement_date: uploadDate,
-        total_amount: Number(uploadAmount)
+        total_amount: Number(uploadAmount),
+        file_url: filePath,
       });
 
-      // Mock creating 3 statement lines, one matched, one unmatched, one missing credit
+      // No OCR is available, so we don't fabricate per-invoice line items. We record the
+      // statement total as a single unmatched line and let the real auto-match RPC try to
+      // reconcile it against actual invoices for this vendor.
       const { error: lineErr } = await supabase.from('vendor_statement_lines').insert([
-        { statement_id: st.id, invoice_number: 'INV-101', amount: Number(uploadAmount) * 0.5, status: 'unmatched' },
-        { statement_id: st.id, invoice_number: 'INV-102', amount: Number(uploadAmount) * 0.6, status: 'unmatched' },
-        { statement_id: st.id, invoice_number: 'CR-99', amount: -Number(uploadAmount) * 0.1, status: 'unmatched' }
+        { statement_id: st.id, invoice_number: `Statement total (${uploadDate})`, amount: Number(uploadAmount), status: 'unmatched' },
       ]);
       if (lineErr) throw lineErr;
-      
+
+      const { error: matchErr } = await supabase.rpc('auto_match_statement_lines', { p_statement_id: st.id });
+      if (matchErr) throw matchErr;
+
       return st;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendor-statements'] });
-      toast.success('Statement uploaded and parsed');
+      toast.success('Statement uploaded and checked against your invoices');
       setUploadDialogOpen(false);
       setIsUploading(false);
       setUploadVendorId('');
       setUploadAmount('');
       setUploadDate('');
+      setUploadFile(null);
     },
     onError: (e) => {
       setIsUploading(false);
@@ -126,14 +138,22 @@ export default function VendorStatementsTab({ vendors }) {
         organization_id: organization.id,
         status: 'disputed'
       });
-      // Ideally send email or log
-      toast.success('Dispute sent to vendor');
+      const { error: lineErr } = await supabase
+        .from('vendor_statement_lines')
+        .update({ status: 'disputed', notes: disputeNotes })
+        .eq('statement_id', selectedStatement.id);
+      if (lineErr) throw lineErr;
+
+      toast.success('Dispute logged');
       queryClient.invalidateQueries({ queryKey: ['vendor-statements'] });
       setDisputeDialogOpen(false);
+      setDisputeNotes('');
     } catch (e) {
-      toast.error('Failed to dispute: ' + e.message);
+      toast.error('Failed to log dispute: ' + e.message);
     }
   };
+
+  const disputeVendor = selectedStatement ? (vendors.find(v => v.id === selectedStatement.vendor_id) || {}) : {};
 
   return (
     <div className="space-y-6">
@@ -311,7 +331,7 @@ export default function VendorStatementsTab({ vendors }) {
           <DialogHeader>
             <DialogTitle>Upload Vendor Statement</DialogTitle>
             <DialogDescription>
-              Upload a PDF statement. Our OCR will extract the line items and auto-reconcile them with your RestOps invoices.
+              Enter the statement total — we'll check it against this vendor's invoice history. Attaching the file keeps a record but line items aren't extracted automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -336,20 +356,30 @@ export default function VendorStatementsTab({ vendors }) {
               <label className="text-sm font-medium">Total Amount</label>
               <Input type="number" step="0.01" value={uploadAmount} onChange={e => setUploadAmount(e.target.value)} placeholder="0.00" />
             </div>
-            <div className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center bg-muted/20 mt-4 cursor-pointer hover:bg-muted/50 transition-colors">
+            <label
+              htmlFor="statement-file-input"
+              className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center bg-muted/20 mt-4 cursor-pointer hover:bg-muted/50 transition-colors"
+            >
               <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">Click to upload or drag and drop</p>
-              <p className="text-xs text-muted-foreground">PDF statements only</p>
-            </div>
+              <p className="text-sm font-medium">{uploadFile ? uploadFile.name : 'Click to upload or drag and drop'}</p>
+              <p className="text-xs text-muted-foreground">PDF statements only (optional)</p>
+              <input
+                id="statement-file-input"
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={e => setUploadFile(e.target.files?.[0] || null)}
+              />
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={() => mockUploadMutation.mutate()} 
+            <Button
+              onClick={() => uploadStatementMutation.mutate()}
               disabled={isUploading || !uploadVendorId || !uploadDate || !uploadAmount}
               className="bg-primary hover:bg-primary"
             >
-              {isUploading ? 'Processing OCR...' : 'Upload & Reconcile'}
+              {isUploading ? 'Uploading...' : 'Upload & Reconcile'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -361,7 +391,7 @@ export default function VendorStatementsTab({ vendors }) {
           <DialogHeader>
             <DialogTitle>Dispute Statement</DialogTitle>
             <DialogDescription>
-              Send an email to the vendor identifying missing invoices or credits that were not on the statement.
+              Log a dispute against this statement, and optionally email the vendor directly with the same notes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -377,8 +407,17 @@ export default function VendorStatementsTab({ vendors }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDisputeDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              disabled={!disputeVendor.email}
+              onClick={() => {
+                window.location.href = `mailto:${disputeVendor.email}?subject=${encodeURIComponent('Statement Dispute')}&body=${encodeURIComponent(disputeNotes)}`;
+              }}
+            >
+              Email Vendor
+            </Button>
             <Button onClick={handleDispute} variant="destructive">
-              Send Dispute Email
+              Log Dispute
             </Button>
           </DialogFooter>
         </DialogContent>

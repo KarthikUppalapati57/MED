@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/apiClient';
+import { generateVendorInsights, chatAboutVendor } from '@/lib/geminiService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,14 +11,54 @@ import { Sparkles, Send, Bot, User } from 'lucide-react';
 
 export default function AIVendorAnalyst({ vendorId }) {
   const { organization } = useAuth();
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Hello! I'm your AI Vendor Analyst. I can help you analyze pricing trends, find missing invoices, or suggest negotiation strategies. What would you like to know?" }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  // Auto-scroll to bottom of chat
+  const { data: vendor } = useQuery({
+    queryKey: ['vendor', vendorId],
+    queryFn: () => api.entities.Vendor.get(vendorId),
+    enabled: !!vendorId,
+  });
+
+  const { data: vendorItems = [] } = useQuery({
+    queryKey: ['vendor_items_insights', vendorId, vendor?.organization_id],
+    queryFn: () => api.entities.VendorItem.filter({ vendor_id: vendorId, organization_id: vendor?.organization_id }),
+    enabled: !!vendorId && !!vendor?.organization_id,
+  });
+
+  const { data: recentInvoices = [] } = useQuery({
+    queryKey: ['vendor_invoices_insights', vendorId, vendor?.organization_id],
+    queryFn: () => api.entities.Invoice.filter(
+      { vendor_id: vendorId, organization_id: vendor?.organization_id },
+      { select: 'invoice_date, total_amount, payment_status', orderBy: '-invoice_date', limit: 20 }
+    ),
+    enabled: !!vendorId && !!vendor?.organization_id,
+  });
+
+  const dataReady = !!vendor;
+
+  // Load real opening insights once the vendor's data has arrived.
+  useEffect(() => {
+    if (!dataReady || messages.length > 0) return;
+    setIsLoading(true);
+    generateVendorInsights(vendor, vendorItems, recentInvoices)
+      .then((result) => {
+        const insights = result?.insights || [];
+        if (insights.length === 0) {
+          setMessages([{ role: 'assistant', content: "I don't have enough data on this vendor yet to generate insights." }]);
+        } else {
+          setMessages(insights.map(i => ({ role: 'assistant', content: `${i.title}: ${i.description}` })));
+        }
+      })
+      .catch((err) => {
+        setMessages([{ role: 'assistant', content: err.message === 'Gemini API key is not configured.' ? err.message : `I couldn't analyze this vendor: ${err.message}` }]);
+      })
+      .finally(() => setIsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataReady]);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -23,33 +66,19 @@ export default function AIVendorAnalyst({ vendorId }) {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-    
+    if (!input.trim() || isLoading || !dataReady) return;
+
     const userMessage = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // In a real implementation, this would call the new API endpoint you are setting up.
-      // e.g. await api.post('/ai/vendor-analyst', { vendorId, query: userMessage.content })
-      
-      // Simulating API delay and mock response since we are stubbing the Dockling/Vertex layer.
-      setTimeout(() => {
-        const mockResponses = [
-          "Based on the last 3 invoices parsed via Dockling, prices on Atlantic Salmon have increased by 8.4%. You may want to renegotiate or look for an alternative supplier.",
-          "I've cross-referenced the order guide with receiving logs. Delivery consistency is at 92%, but there was a significant short-shipment last Tuesday.",
-          "There are currently 2 invoices marked as unpaid for this vendor totaling $1,450.20.",
-          "I'm analyzing the mapped items. 5 items on your order guide haven't been ordered in 6 months. I recommend removing them to clean up the guide."
-        ];
-        const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-        
-        setMessages(prev => [...prev, { role: 'assistant', content: randomResponse }]);
-        setIsLoading(false);
-      }, 1500);
-
+      const reply = await chatAboutVendor(vendor, vendorItems, recentInvoices, userMessage.content);
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "I'm sorry, I encountered an error analyzing that request. Please try again." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `I'm sorry, I encountered an error: ${error.message}` }]);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -70,9 +99,9 @@ export default function AIVendorAnalyst({ vendorId }) {
           </div>
           AI Vendor Analyst
         </CardTitle>
-        <CardDescription>Powered by Vertex AI & Dockling Document Intelligence</CardDescription>
+        <CardDescription>Powered by Gemini</CardDescription>
       </CardHeader>
-      
+
       <CardContent className="flex-1 p-0 overflow-hidden flex flex-col">
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <div className="space-y-4">
@@ -82,8 +111,8 @@ export default function AIVendorAnalyst({ vendorId }) {
                   {msg.role === 'assistant' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
                 </div>
                 <div className={`px-4 py-3 rounded-2xl max-w-[80%] text-sm ${
-                  msg.role === 'assistant' 
-                    ? 'bg-secondary/40 text-foreground rounded-tl-sm' 
+                  msg.role === 'assistant'
+                    ? 'bg-secondary/40 text-foreground rounded-tl-sm'
                     : 'bg-primary text-primary-foreground rounded-tr-sm'
                 }`}>
                   {msg.content}
@@ -104,11 +133,11 @@ export default function AIVendorAnalyst({ vendorId }) {
             )}
           </div>
         </ScrollArea>
-        
+
         {/* Suggested Queries */}
         <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-hide border-t border-border/40">
           {predefinedQueries.map((q, idx) => (
-            <button 
+            <button
               key={idx}
               onClick={() => setInput(q)}
               className="whitespace-nowrap px-3 py-1.5 rounded-full bg-secondary text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
@@ -120,12 +149,12 @@ export default function AIVendorAnalyst({ vendorId }) {
       </CardContent>
 
       <CardFooter className="p-4 border-t border-border/40 bg-background">
-        <form 
+        <form
           className="flex w-full gap-2"
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
         >
-          <Input 
-            placeholder="Ask anything about this vendor..." 
+          <Input
+            placeholder="Ask anything about this vendor..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isLoading}

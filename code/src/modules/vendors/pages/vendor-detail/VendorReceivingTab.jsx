@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import ThreeWayMatchViewer from '@/modules/inventory/components/ThreeWayMatchVie
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function VendorReceivingTab({ vendorId }) {
+  const navigate = useNavigate();
   const [selectedPo, setSelectedPo] = useState(null);
 
   const { data: pos, isLoading } = useQuery({
@@ -30,7 +32,7 @@ export default function VendorReceivingTab({ vendorId }) {
           <h2 className="text-xl font-bold tracking-tight">Receiving & POs</h2>
           <p className="text-sm text-muted-foreground">Manage purchase orders and view three-way match reports.</p>
         </div>
-        <Button>
+        <Button onClick={() => navigate('/Orders')}>
           <Plus className="h-4 w-4 mr-2" />
           Create PO
         </Button>
@@ -91,7 +93,7 @@ export default function VendorReceivingTab({ vendorId }) {
                   <p className="text-sm text-muted-foreground max-w-sm">
                     Did a truck just arrive? Log the delivery quantities and any damaged items against this Purchase Order.
                   </p>
-                  <Button variant="outline" className="mt-2">Start Receiving Flow</Button>
+                  <Button variant="outline" className="mt-2" onClick={() => navigate('/Inventory/receiving')}>Start Receiving Flow</Button>
                 </CardContent>
               </Card>
             </div>

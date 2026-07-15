@@ -18,7 +18,7 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
   const [formData, setFormData] = useState({
     vendor_id: '',
     amount: '',
-    payment_method: 'stripe',
+    payment_method: 'check',
     memo: ''
   });
 
@@ -36,9 +36,11 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
 
     setIsProcessing(true);
     try {
-      // Simulate Payment API (Stripe/PayPal/Lob)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      // This records a payment already made outside the app (a check you already mailed, a
+      // wire you already sent) -- it does not move money itself. There is no in-app rail here
+      // for arbitrary vendor payments with no invoice; process-payout/process-checkbook-payout
+      // both require a real invoice_id. Use "Bulk Vendor Payouts" or an invoice's "Release
+      // Funds" button for an actual Dwolla/Checkbook.io transfer.
       await api.financial.recordAdHocVendorPayment({
         vendorId: formData.vendor_id,
         amount: parseFloat(formData.amount),
@@ -47,15 +49,15 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
         idempotencyKey: `AD-HOC-${organization?.id}-${formData.vendor_id}-${formData.amount}-${Date.now()}`,
       });
 
-      toast.success(`Successfully sent $${formData.amount} to vendor via ${formData.payment_method}.`);
+      toast.success(`Recorded a $${formData.amount} payment to this vendor.`);
       onOpenChange(false);
-      
+
       // Reset form
-      setFormData({ vendor_id: '', amount: '', payment_method: 'stripe', memo: '' });
+      setFormData({ vendor_id: '', amount: '', payment_method: 'check', memo: '' });
       queryClient.invalidateQueries({ queryKey: ['accounting-payments'] });
-      
+
     } catch (e) {
-      toast.error("Failed to process ad-hoc payment.");
+      toast.error("Failed to record payment: " + e.message);
     } finally {
       setIsProcessing(false);
     }
@@ -67,10 +69,10 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-resend-yellow" />
-            Just Pay a Vendor
+            Record Manual Payment
           </DialogTitle>
           <DialogDescription>
-            Send funds to a vendor immediately without needing an approved invoice in the system.
+            Log a payment you already sent to this vendor outside the app. This does not send money -- for a real Dwolla/Checkbook.io transfer, use Bulk Vendor Payouts or an invoice's Release Funds button.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -105,9 +107,10 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="stripe">Stripe Connect (ACH/Wire)</SelectItem>
-                <SelectItem value="paypal">PayPal Payouts (Wallet)</SelectItem>
-                <SelectItem value="check">Mailed Check (Lob API)</SelectItem>
+                <SelectItem value="check">Check</SelectItem>
+                <SelectItem value="wire">Wire</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -127,7 +130,7 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
             onClick={handleSubmit}
             disabled={isProcessing || !formData.vendor_id || !formData.amount}
           >
-            {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</> : 'Send Payment Now'}
+            {isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recording...</> : 'Record Payment'}
           </Button>
         </DialogFooter>
       </DialogContent>

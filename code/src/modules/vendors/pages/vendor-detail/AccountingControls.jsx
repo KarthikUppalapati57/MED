@@ -46,6 +46,7 @@ export default function AccountingControls({ vendorId }) {
       setFormData({
         default_expense_category: vendor.default_expense_category || 'food',
         default_payment_account_id: vendor.default_payment_account_id || 'none',
+        payment_terms: vendor.payment_terms || 'net_30',
         file_routing_preference: vendor.file_routing_preference || 'storage',
         ap_routing_preference: normalizeApRouting(vendor.ap_routing_preference),
         use_org_accounting_defaults: vendor.use_org_accounting_defaults !== false,
@@ -71,6 +72,7 @@ export default function AccountingControls({ vendorId }) {
     updateMutation.mutate({
       default_expense_category: formData.default_expense_category,
       default_payment_account_id: formData.default_payment_account_id === 'none' ? null : formData.default_payment_account_id,
+      payment_terms: formData.payment_terms,
       file_routing_preference: formData.file_routing_preference,
       ap_routing_preference: normalizeApRouting(formData.ap_routing_preference),
       use_org_accounting_defaults: formData.use_org_accounting_defaults,

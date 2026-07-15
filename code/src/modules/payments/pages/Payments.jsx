@@ -526,6 +526,29 @@ export default function Payments() {
     }
   };
 
+  const [retryingPaymentId, setRetryingPaymentId] = useState(null);
+
+  const handleRetryPayment = async (payment) => {
+    if (!payment.invoice_id) return toast.error('No invoice linked to this payment.');
+    setRetryingPaymentId(payment.id);
+    try {
+      const functionName = payment.payment_method === 'check' ? 'process-checkbook-payout' : 'process-payout';
+      const body = payment.payment_method === 'check'
+        ? { invoice_id: payment.invoice_id, payout_method: 'checkbook_digital' }
+        : { invoice_id: payment.invoice_id };
+      const { data, error } = await supabase.functions.invoke(functionName, { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Payment retried successfully');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    } catch (err) {
+      toast.error('Retry failed: ' + err.message);
+    } finally {
+      setRetryingPaymentId(null);
+    }
+  };
+
   const filteredInvoices = React.useMemo(() => {
     return invoices.filter(inv => {
       if (statusFilter === 'all') {
@@ -1150,6 +1173,17 @@ export default function Payments() {
                                   <ArrowRightLeft className="h-3 w-3 mr-1" /> Confirm
                                 </Button>
                               )}
+                              {p.status === 'failed' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRetryPayment(p)}
+                                  disabled={retryingPaymentId === p.id}
+                                  className="h-8 px-2"
+                                >
+                                  {retryingPaymentId === p.id ? 'Retrying...' : 'Retry'}
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -1304,7 +1338,6 @@ export default function Payments() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="stripe">Stripe</SelectItem>
-                      <SelectItem value="paypal">PayPal</SelectItem>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                       <SelectItem value="cheque">Cheque</SelectItem>
                     </SelectContent>

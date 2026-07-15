@@ -17,12 +17,9 @@ serve(async (req) => {
     // Checkbook signature is standard HMAC SHA256 of the body
     // The exact header format may vary, e.g., 'Signature ...'
     // For simplicity we will assume it matches the HMAC hex digest
-    if (signature) {
-      const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-      if (signature !== hash && signature !== `Signature ${hash}`) {
-        // In a real environment, uncomment to enforce security
-        // return new Response('Invalid signature', { status: 401 })
-      }
+    const hash = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+    if (!signature || (signature !== hash && signature !== `Signature ${hash}`)) {
+      return new Response('Invalid signature', { status: 401 })
     }
 
     const payload = JSON.parse(rawBody)
@@ -69,7 +66,7 @@ serve(async (req) => {
       .from('invoices')
       .update({ 
         status: newInvoiceStatus,
-        payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'partial'
+        payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
       })
       .eq('id', payment.invoice_id)
 

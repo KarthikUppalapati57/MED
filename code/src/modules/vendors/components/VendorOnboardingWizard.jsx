@@ -319,10 +319,9 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                             <SelectValue placeholder="Select a payment method" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="stripe">Stripe (ACH)</SelectItem>
-                            <SelectItem value="paypal">PayPal</SelectItem>
-                            <SelectItem value="dwolla">Dwolla</SelectItem>
-                            <SelectItem value="check">Check</SelectItem>
+                            <SelectItem value="stripe">Stripe (Card)</SelectItem>
+                            <SelectItem value="dwolla">Dwolla (ACH)</SelectItem>
+                            <SelectItem value="check">Check (Checkbook.io)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
