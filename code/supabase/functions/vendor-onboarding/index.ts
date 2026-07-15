@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import crypto from "node:crypto";
 import { ensureDwollaCustomerAndFundingSource } from "../_shared/dwolla.ts";
+import { sendTransactionalEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,32 +23,6 @@ function generateOtp() {
 
 function isProduction() {
   return ["production", "prod"].includes((Deno.env.get("APP_ENV") || Deno.env.get("ENVIRONMENT") || "").toLowerCase());
-}
-
-async function sendTransactionalEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("VENDOR_ONBOARDING_FROM_EMAIL") || Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
-
-  if (!apiKey) {
-    console.log(`[EMAIL SKIPPED] ${subject} -> ${to}\n${text}`);
-    return { sent: false, skipped: true };
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to, subject, text }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Email delivery failed: ${body}`);
-  }
-
-  return { sent: true, skipped: false };
 }
 
 serve(async (req) => {

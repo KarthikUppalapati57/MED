@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import crypto from 'node:crypto'
+import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method !== 'POST') {
@@ -29,23 +30,30 @@ serve(async (req) => {
 
     // 2. Handle relevant Dwolla Topics
     if (topic === 'transfer_completed' || topic === 'transfer_failed' || topic === 'transfer_cancelled') {
+      const isFailure = topic === 'transfer_failed' || topic === 'transfer_cancelled'
       let newPayoutStatus = 'in_transit'
       let newInvoiceStatus = 'processing'
-      
+
       if (topic === 'transfer_completed') {
         newPayoutStatus = 'cleared'
         newInvoiceStatus = 'paid'
-      } else if (topic === 'transfer_failed' || topic === 'transfer_cancelled') {
+      } else if (isFailure) {
         newPayoutStatus = 'failed'
         newInvoiceStatus = 'scheduled' // Revert invoice status so it can be retried
       }
 
-      // Update the payment record
+      // Update the payment record. Async failures used to only touch payout_status, leaving
+      // payments.status stuck at 'pending' -- now set both so Payment History's Retry button
+      // and status badge actually reflect a failure that happens days after release.
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
-        .update({ payout_status: newPayoutStatus, updated_at: new Date().toISOString() })
+        .update({
+          payout_status: newPayoutStatus,
+          ...(isFailure ? { status: 'failed', failure_reason: `Dwolla: ${topic}` } : {}),
+          updated_at: new Date().toISOString(),
+        })
         .eq('dwolla_transfer_url', resourceUrl)
-        .select('invoice_id')
+        .select('id, invoice_id')
         .single()
 
       if (paymentError || !payment) {
@@ -56,12 +64,16 @@ serve(async (req) => {
       // Update the invoice status
       await supabase
         .from('invoices')
-        .update({ 
+        .update({
           status: newInvoiceStatus,
           payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
         })
         .eq('id', payment.invoice_id)
-        
+
+      if (isFailure) {
+        await notifyPaymentFailure(supabase, { paymentId: payment.id, invoiceId: payment.invoice_id, reason: `Dwolla reported: ${topic}` })
+      }
+
     } else if (topic === 'customer_verified' || topic === 'customer_suspended') {
       // Vendor Onboarding status updates
       const newStatus = topic === 'customer_verified' ? 'verified' : 'suspended'

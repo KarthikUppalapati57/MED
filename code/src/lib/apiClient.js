@@ -284,6 +284,7 @@ export const api = {
     Product: createEntityClient('products', true),
     Payment: createEntityClient('payments', true),
     PaymentAccount: createEntityClient('payment_accounts'),
+    InvoiceReminderSettings: createEntityClient('invoice_reminder_settings'),
     Invoice: createEntityClient('invoices', true),
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     InvoiceAllocation: createEntityClient('invoice_allocations'),

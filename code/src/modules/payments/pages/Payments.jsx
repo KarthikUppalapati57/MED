@@ -28,7 +28,9 @@ import {
   Mail,
   Sparkles,
   ExternalLink,
-  Loader2
+  Loader2,
+  Bell,
+  Plus
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,6 +111,9 @@ export default function Payments() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [sortBy, setSortBy] = useState('-created_at');
+  // Separate from `sortBy` (Payment History, which has no due_date column) -- Invoices tab
+  // defaults to soonest/most-overdue-first so invoices close to their due date surface first.
+  const [invoiceSortBy, setInvoiceSortBy] = useState('due_date');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -136,6 +141,7 @@ export default function Payments() {
     overdueAlerts: true,
     weeklySummary: false,
   });
+  const [newReminderDay, setNewReminderDay] = useState('');
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
@@ -161,7 +167,7 @@ export default function Payments() {
     hasNextPage: hasNextInvoicesPage,
     isFetchingNextPage: isFetchingNextInvoicesPage
   } = useAuthInfiniteQuery({
-    queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, sortBy],
+    queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, invoiceSortBy],
     queryFn: async ({ pageParam = 0 }) => {
       const filters = {};
       if (statusFilter !== 'all') {
@@ -181,7 +187,7 @@ export default function Payments() {
         select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination',
         search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
         searchColumn: 'invoice_number',
-        orderBy: sortBy
+        orderBy: invoiceSortBy
       });
     },
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
@@ -327,6 +333,55 @@ export default function Payments() {
     },
     onError: (error) => toast.error(error.message || 'Failed to save payment settings'),
   });
+
+  const { data: reminderSettings } = useAuthQuery({
+    queryKey: ['invoice-reminder-settings', userProfile?.id],
+    queryFn: async () => {
+      const rows = await api.entities.InvoiceReminderSettings.filter({ user_id: userProfile.id });
+      return rows?.[0] || null;
+    },
+    enabled: !!userProfile?.id && activeTab === 'setup',
+  });
+
+  const reminderDays = reminderSettings?.reminder_days || [7, 3, 1];
+  const reminderEnabled = reminderSettings?.enabled !== false;
+
+  const saveReminderSettings = useMutation({
+    mutationFn: async ({ reminder_days, enabled }) => {
+      // invoice_reminder_settings is keyed by user_id (not id), so the generic entity
+      // client's update() -- which always does .eq('id', ...) -- doesn't fit; upsert directly.
+      const { data, error } = await supabase
+        .from('invoice_reminder_settings')
+        .upsert({
+          user_id: userProfile.id,
+          organization_id: organization?.id,
+          reminder_days,
+          enabled,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoice-reminder-settings', userProfile?.id] });
+      toast.success('Reminder settings saved');
+    },
+    onError: (error) => toast.error(error.message || 'Failed to save reminder settings'),
+  });
+
+  const handleAddReminderDay = () => {
+    const day = parseInt(newReminderDay, 10);
+    if (!Number.isFinite(day) || day < 0 || reminderDays.includes(day)) return;
+    const next = [...reminderDays, day].sort((a, b) => b - a);
+    saveReminderSettings.mutate({ reminder_days: next, enabled: reminderEnabled });
+    setNewReminderDay('');
+  };
+
+  const handleRemoveReminderDay = (day) => {
+    saveReminderSettings.mutate({ reminder_days: reminderDays.filter(d => d !== day), enabled: reminderEnabled });
+  };
 
   const schedulePayment = useMutation({
     mutationFn: async ({ invoice, paymentAccountId, date }) => {
@@ -565,7 +620,7 @@ export default function Payments() {
   useEffect(() => {
     setInvoiceTableScrollTop(0);
     if (invoiceTableRef.current) invoiceTableRef.current.scrollTop = 0;
-  }, [debouncedSearch, statusFilter, sortBy, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
+  }, [debouncedSearch, statusFilter, invoiceSortBy, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   useEffect(() => {
     setPaymentHistoryTableScrollTop(0);
@@ -811,45 +866,45 @@ export default function Payments() {
                       </TableHead>
                       <TableHead
                         className="cursor-pointer hover:text-foreground group"
-                        onClick={() => setSortBy(sortBy === 'vendor_name' ? '-vendor_name' : 'vendor_name')}
+                        onClick={() => setInvoiceSortBy(invoiceSortBy === 'vendor_name' ? '-vendor_name' : 'vendor_name')}
                       >
                         <div className="flex items-center gap-1">
                           Vendor
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'vendor_name' ? '^' : sortBy === '-vendor_name' ? 'v' : '-'}
+                            {invoiceSortBy === 'vendor_name' ? '^' : invoiceSortBy === '-vendor_name' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer hover:text-foreground group"
-                        onClick={() => setSortBy(sortBy === 'invoice_number' ? '-invoice_number' : 'invoice_number')}
+                        onClick={() => setInvoiceSortBy(invoiceSortBy === 'invoice_number' ? '-invoice_number' : 'invoice_number')}
                       >
                         <div className="flex items-center gap-1">
                           Invoice #
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'invoice_number' ? '^' : sortBy === '-invoice_number' ? 'v' : '-'}
+                            {invoiceSortBy === 'invoice_number' ? '^' : invoiceSortBy === '-invoice_number' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer hover:text-foreground group"
-                        onClick={() => setSortBy(sortBy === 'due_date' ? '-due_date' : 'due_date')}
+                        onClick={() => setInvoiceSortBy(invoiceSortBy === 'due_date' ? '-due_date' : 'due_date')}
                       >
                         <div className="flex items-center gap-1">
                           Due Date
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'due_date' ? '^' : sortBy === '-due_date' ? 'v' : '-'}
+                            {invoiceSortBy === 'due_date' ? '^' : invoiceSortBy === '-due_date' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
                       <TableHead
                         className="cursor-pointer hover:text-foreground group"
-                        onClick={() => setSortBy(sortBy === 'total_amount' ? '-total_amount' : 'total_amount')}
+                        onClick={() => setInvoiceSortBy(invoiceSortBy === 'total_amount' ? '-total_amount' : 'total_amount')}
                       >
                         <div className="flex items-center gap-1">
                           Amount
                           <span className="opacity-0 group-hover:opacity-100 text-xs">
-                            {sortBy === 'total_amount' ? '^' : sortBy === '-total_amount' ? 'v' : '-'}
+                            {invoiceSortBy === 'total_amount' ? '^' : invoiceSortBy === '-total_amount' ? 'v' : '-'}
                           </span>
                         </div>
                       </TableHead>
@@ -1399,6 +1454,58 @@ export default function Payments() {
                     checked={paymentSettings.weeklySummary}
                     onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, weeklySummary: checked })}
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-sm lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell className="h-4 w-4" /> Due-Date Reminders
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Remind me before invoices are due</p>
+                    <p className="text-sm text-muted-foreground">Get notified in-app and by email when an unpaid invoice you can see crosses one of these day thresholds.</p>
+                  </div>
+                  <Switch
+                    checked={reminderEnabled}
+                    onCheckedChange={(checked) => saveReminderSettings.mutate({ reminder_days: reminderDays, enabled: checked })}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {reminderDays.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No reminder days set.</p>
+                  )}
+                  {reminderDays.map(day => (
+                    <Badge key={day} variant="outline" className="gap-1.5 py-1.5 pl-3 pr-2">
+                      {day === 0 ? 'Due day' : `${day} day${day === 1 ? '' : 's'} before`}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveReminderDay(day)}
+                        className="hover:text-destructive"
+                        aria-label={`Remove ${day}-day reminder`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Days"
+                      className="w-20 h-8"
+                      value={newReminderDay}
+                      onChange={(e) => setNewReminderDay(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddReminderDay()}
+                    />
+                    <Button size="sm" variant="outline" className="h-8" onClick={handleAddReminderDay} disabled={!newReminderDay}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

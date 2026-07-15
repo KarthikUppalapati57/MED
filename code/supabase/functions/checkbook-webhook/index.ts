@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import crypto from 'node:crypto'
+import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method !== 'POST') {
@@ -35,25 +36,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    const isFailure = status === 'VOID' || status === 'FAILED' || status === 'EXPIRED'
     let newPayoutStatus = 'in_transit'
     let newInvoiceStatus = 'processing'
-    
+
     if (status === 'PAID') {
       newPayoutStatus = 'cleared'
       newInvoiceStatus = 'paid'
-    } else if (status === 'VOID' || status === 'FAILED' || status === 'EXPIRED') {
+    } else if (isFailure) {
       newPayoutStatus = 'failed'
       newInvoiceStatus = 'scheduled' // Revert to allow retry
     } else if (status === 'PRINTED' || status === 'MAILED') {
       newPayoutStatus = 'in_transit'
     }
 
-    // Update the payment record
+    // Update the payment record. Async failures used to only touch payout_status, leaving
+    // payments.status stuck at 'pending' -- now set both so Payment History's Retry button
+    // and status badge actually reflect a failure that happens days after release.
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .update({ payout_status: newPayoutStatus, updated_at: new Date().toISOString() })
+      .update({
+        payout_status: newPayoutStatus,
+        ...(isFailure ? { status: 'failed', failure_reason: `Checkbook.io: ${status}` } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq('checkbook_check_id', checkId)
-      .select('invoice_id')
+      .select('id, invoice_id')
       .single()
 
     if (paymentError || !payment) {
@@ -64,11 +72,15 @@ serve(async (req) => {
     // Update the invoice status
     await supabase
       .from('invoices')
-      .update({ 
+      .update({
         status: newInvoiceStatus,
         payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
       })
       .eq('id', payment.invoice_id)
+
+    if (isFailure) {
+      await notifyPaymentFailure(supabase, { paymentId: payment.id, invoiceId: payment.invoice_id, reason: `Checkbook.io reported: ${status}` })
+    }
 
     return new Response(JSON.stringify({ received: true }), {
       headers: { 'Content-Type': 'application/json' },

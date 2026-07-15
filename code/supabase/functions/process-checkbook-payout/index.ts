@@ -1,6 +1,7 @@
 ﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
+import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -133,6 +134,7 @@ serve(async (req) => {
         console.error('Checkbook.io Error:', checkData);
         const reason = checkData.error || 'Failed to issue check via Checkbook.io';
         await revertOnFailure(reason);
+        await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason });
         return new Response(JSON.stringify({ error: reason }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
       }
 
@@ -151,8 +153,10 @@ serve(async (req) => {
       })
     } catch (checkError) {
       console.error('Checkbook.io call failed, reverting:', checkError)
-      await revertOnFailure(checkError.message || 'Checkbook.io call failed')
-      return new Response(JSON.stringify({ error: checkError.message || 'Checkbook.io call failed' }), {
+      const reason = checkError.message || 'Checkbook.io call failed'
+      await revertOnFailure(reason)
+      await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason })
+      return new Response(JSON.stringify({ error: reason }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 502,
       })

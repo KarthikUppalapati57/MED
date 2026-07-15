@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
 import { Client } from 'npm:dwolla-v2'
+import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -151,8 +152,10 @@ serve(async (req) => {
       })
     } catch (transferError) {
       console.error('Dwolla transfer failed, reverting:', transferError)
-      await revertOnFailure(transferError.message || 'Dwolla transfer failed')
-      return new Response(JSON.stringify({ error: transferError.message || 'Dwolla transfer failed' }), {
+      const reason = transferError.message || 'Dwolla transfer failed'
+      await revertOnFailure(reason)
+      await notifyPaymentFailure(serviceSupabase, { paymentId: releaseData.payment_id, invoiceId: invoice_id, reason })
+      return new Response(JSON.stringify({ error: reason }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 502,
       })
