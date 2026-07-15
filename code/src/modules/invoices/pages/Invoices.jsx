@@ -33,6 +33,7 @@ import {
   RefreshCcw,
   Minimize2,
   Maximize2,
+  Plus,
   ArrowUpDown,
   ArrowUp,
   ArrowDown
@@ -124,6 +125,7 @@ const apStatusColors = {
 };
 
 const intakeMethods = [
+  { label: 'Manual', detail: 'Create bill', icon: Plus },
   { label: 'Upload', detail: 'PDF, image, CSV', icon: Upload },
   { label: 'Photo', detail: 'Mobile capture', icon: Camera },
   { label: 'Email', detail: 'Inbox routing', icon: Inbox },
@@ -192,6 +194,56 @@ export default function Invoices() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isHigherRole = ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+
+  const createBlankManualInvoice = useCallback(() => ({
+    vendor_name: '',
+    invoice_number: '',
+    account_number: '',
+    invoice_date: new Date().toISOString().slice(0, 10),
+    due_date: '',
+    payment_terms: '',
+    subtotal: '',
+    tax_amount: '',
+    fuel_surcharge: '',
+    delivery_fee: '',
+    other_charges: '',
+    total_amount: '',
+    payment_status: 'unpaid',
+    status: 'pending_review',
+    ap_status: 'processing',
+    source: 'manual_entry',
+    organization_id: organization?.id,
+    brand_id: brand?.id,
+    location_id: location?.id,
+    created_by: userProfile?.id,
+    line_items: [],
+    validation_results: {
+      entry_method: 'manual',
+    },
+  }), [brand?.id, location?.id, organization?.id, userProfile?.id]);
+
+  const validateManualInvoice = useCallback((invoice) => {
+    if (invoice?.source !== 'manual_entry') return true;
+    if (!invoice.vendor_name?.trim()) {
+      toast.error('Vendor name is required for a manual invoice.');
+      return false;
+    }
+    if (!invoice.invoice_number?.trim()) {
+      toast.error('Invoice number is required for a manual invoice.');
+      return false;
+    }
+    if (Number.isNaN(Number(invoice.total_amount)) || Number(invoice.total_amount) < 0) {
+      toast.error('Invoice total must be zero or greater.');
+      return false;
+    }
+    return true;
+  }, []);
+
+  const handleCreateManualInvoice = useCallback(() => {
+    setEditingInvoice(createBlankManualInvoice());
+    setIsMinimized(false);
+    setEditorOpen(true);
+  }, [createBlankManualInvoice]);
 
   // Resizing state
   const [sheetWidth, setSheetWidth] = useState(() => {
@@ -775,6 +827,8 @@ export default function Invoices() {
 
   const handleSaveValidated = async (validatedInvoice) => {
     try {
+      if (!validateManualInvoice(validatedInvoice)) return;
+
       let savedInvoice = validatedInvoice;
       if (editingInvoice.id) {
         savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data: validatedInvoice });
@@ -878,6 +932,8 @@ export default function Invoices() {
     try {
       // Ground staff: force status to pending_review so RLS allows the operation
       const invoiceData = { ...editingInvoice };
+      if (!validateManualInvoice(invoiceData)) return;
+
       if (role === 'ground_staff') {
         invoiceData.status = 'pending_review';
       }
@@ -889,8 +945,8 @@ export default function Invoices() {
         savedInvoice = await createMutation.mutateAsync(invoiceData);
         setEditingInvoice(savedInvoice);
       }
-      posthog.capture('invoice_uploaded', { invoiceId: savedInvoice.id });
-      toast.success('Invoice saved for later');
+      posthog.capture(invoiceData.source === 'manual_entry' ? 'invoice_created_manually' : 'invoice_uploaded', { invoiceId: savedInvoice.id });
+      toast.success(invoiceData.source === 'manual_entry' ? 'Manual invoice saved' : 'Invoice saved for later');
 
  // Notify managers (in-app + email) 
       const orgId = savedInvoice?.organization_id || userProfile?.organization_id;
@@ -1164,6 +1220,10 @@ export default function Invoices() {
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt
           </Button>
+          <Button variant="outline" onClick={handleCreateManualInvoice} className="flex-1 sm:flex-none">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Invoice
+          </Button>
           <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary hidden sm:flex">
             <Upload className="h-4 w-4 mr-2" />
             Upload Invoice
@@ -1180,12 +1240,12 @@ export default function Invoices() {
                 Capture, review, and approve every vendor bill before payment execution.
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
               {intakeMethods.map(({ label, detail, icon: Icon }) => (
                 <button
                   key={label}
                   type="button"
-                  onClick={label === 'Email' ? () => setEmailConfigOpen(true) : () => setUploadOpen(true)}
+                  onClick={label === 'Email' ? () => setEmailConfigOpen(true) : label === 'Manual' ? handleCreateManualInvoice : () => setUploadOpen(true)}
                   className="text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors"
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
@@ -1683,7 +1743,7 @@ export default function Invoices() {
           <div className={cn("flex-1 h-full", isMinimized ? "p-4" : "p-6 overflow-y-auto")}>
             <SheetHeader className={isMinimized ? "flex flex-row items-center justify-between pb-2" : ""}>
               <SheetTitle className={isMinimized ? "text-left mt-0 text-base" : ""}>
-                {editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
+                {editingInvoice?.source === 'manual_entry' && !editingInvoice?.id ? 'Create Invoice' : editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
               </SheetTitle>
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" onClick={() => setIsMinimized(!isMinimized)} className="h-8 w-8 text-slate-500 hover:text-slate-800">
