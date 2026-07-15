@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
 import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
@@ -89,9 +89,14 @@ serve(async (req) => {
       // 3. Call Checkbook.io API
       // Single endpoint for both digital and physical -- the payload (recipient vs.
       // recipient_address, below) is what determines which kind of check gets issued.
-      const checkbookUrl = Deno.env.get('CHECKBOOK_ENV') === 'production'
-        ? 'https://checkbook.io/v3/check'
-        : 'https://demo.checkbook.io/v3/check';
+      const checkbookEnv = (Deno.env.get('CHECKBOOK_ENV') || 'sandbox').toLowerCase();
+      const checkbookBaseUrl = Deno.env.get('CHECKBOOK_BASE_URL')
+        || (checkbookEnv === 'production'
+          ? 'https://api.checkbook.io'
+          : checkbookEnv === 'demo'
+            ? 'https://demo.checkbook.io'
+            : 'https://api.sandbox.checkbook.io');
+      const checkbookUrl = `${checkbookBaseUrl.replace(/\/$/, '')}/v3/check`;
 
       const apiKey = Deno.env.get('CHECKBOOK_API_KEY');
       const apiSecret = Deno.env.get('CHECKBOOK_API_SECRET');
