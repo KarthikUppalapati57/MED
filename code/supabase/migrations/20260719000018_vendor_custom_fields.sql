@@ -6,3 +6,6 @@
 
 ALTER TABLE public.vendors
   ADD COLUMN IF NOT EXISTS custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- Remove legacy overly-permissive policy that bypasses reference_scope_writable
+DROP POLICY IF EXISTS "Tenant_Isolation_vendors" ON public.vendors;

@@ -8,6 +8,8 @@
 
 BEGIN;
 
+SELECT plan(4);
+
 CREATE TEMP TABLE vcf_ids (
   key text PRIMARY KEY,
   value uuid NOT NULL
@@ -112,13 +114,8 @@ FROM public.vendors WHERE id = (SELECT value FROM vcf_ids WHERE key = 'vendor_br
 
 -- ===================== verdict =====================
 
-SELECT * FROM vcf_results ORDER BY test_name;
+SELECT ok(passed, test_name) FROM vcf_results ORDER BY test_name;
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM vcf_results WHERE NOT passed) THEN
-    RAISE EXCEPTION 'vendor_custom_fields_acceptance failed';
-  END IF;
-END $$;
+SELECT * FROM finish();
 
 ROLLBACK;

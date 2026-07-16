@@ -9,6 +9,13 @@
 
 BEGIN;
 
+SELECT plan(2);
+
+CREATE TEMP TABLE pcpvc_results (
+  test_name text,
+  passed boolean
+) ON COMMIT DROP;
+
 INSERT INTO private.workflow_runtime_settings (setting_name, setting_value, updated_at)
 VALUES ('service_role_key', 'rollback-test-service-role-key', now())
 ON CONFLICT (setting_name) DO UPDATE
@@ -39,23 +46,27 @@ BEGIN
   JOIN public.vendors v ON v.id = i.vendor_id
   WHERE i.id = v_invoice;
 
-  IF v_selected_address IS DISTINCT FROM '123 Main St' OR v_selected_zip IS DISTINCT FROM '37916' THEN
-    RAISE EXCEPTION 'process_checkbook_payout_vendor_columns_acceptance failed: address=% zip=%', v_selected_address, v_selected_zip;
-  END IF;
+  INSERT INTO pcpvc_results VALUES (
+    'process_checkbook_payout_vendor_columns_acceptance: address and zip retrieved correctly',
+    v_selected_address = '123 Main St' AND v_selected_zip = '37916'
+  );
 END $$;
 
 -- the specific columns the (previously broken) select referenced must not exist -- confirms
 -- the bug was real, not a false alarm
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'vendors' AND column_name IN ('street_1', 'street_2', 'zip')
-  ) THEN
-    RAISE EXCEPTION 'process_checkbook_payout_vendor_columns_acceptance failed: street_1/street_2/zip unexpectedly exist -- re-check the fix is still needed';
-  END IF;
+  INSERT INTO pcpvc_results VALUES (
+    'process_checkbook_payout_vendor_columns_acceptance: old column names are correctly absent',
+    NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'vendors' AND column_name IN ('street_1', 'street_2', 'zip')
+    )
+  );
 END $$;
 
-SELECT 'process_checkbook_payout_vendor_columns_acceptance' AS test_name, true AS passed;
+SELECT ok(passed, test_name) FROM pcpvc_results;
+
+SELECT * FROM finish();
 
 ROLLBACK;
