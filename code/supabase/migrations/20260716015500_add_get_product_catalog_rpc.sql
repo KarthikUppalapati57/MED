@@ -2,6 +2,8 @@
 -- Keeps pagination/search/sort in Postgres and returns a couple of computed
 -- fields the UI expects: item_count/vendor_item_count and last_purchased_at.
 
+DROP FUNCTION IF EXISTS public.get_product_catalog(uuid, uuid, uuid, text, text, integer, integer);
+
 CREATE OR REPLACE FUNCTION public.get_product_catalog(
   p_organization_id uuid,
   p_brand_id uuid DEFAULT NULL,

@@ -1,5 +1,15 @@
 -- Minimal Products page RPCs for product catalog workflows.
 
+DROP FUNCTION IF EXISTS public.get_product_dashboard_summary(uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.get_product_purchase_report(uuid, uuid, uuid, date, date, text, text, text);
+DROP FUNCTION IF EXISTS public.get_product_verification_queue(uuid, uuid, uuid, text, text);
+DROP FUNCTION IF EXISTS public.create_product_details(text, text, text, text, text, boolean, boolean, text, text, numeric, boolean, uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.update_product_details(uuid, text, text, text, text, text, boolean, boolean, text, text, numeric, boolean);
+DROP FUNCTION IF EXISTS public.set_product_inventory_tracking(uuid, boolean);
+DROP FUNCTION IF EXISTS public.soft_delete_product_safe(uuid);
+DROP FUNCTION IF EXISTS public.apply_product_category_suggestion(uuid);
+DROP FUNCTION IF EXISTS public.reject_product_category_suggestion(uuid);
+
 CREATE OR REPLACE FUNCTION public.get_product_dashboard_summary(
   p_organization_id uuid,
   p_brand_id uuid DEFAULT NULL,
