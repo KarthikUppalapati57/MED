@@ -7,7 +7,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
-import { format } from 'date-fns';
+import { format, subDays, subMonths } from 'date-fns';
 import {
   Search,
   CreditCard,
@@ -67,6 +67,128 @@ import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayMod
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
+
+function CreateCheckDialog({ open, onClose, organization, brand, location }) {
+  const queryClient = useQueryClient();
+  const [vendorId, setVendorId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [memo, setMemo] = useState('');
+  const [paymentAccountId, setPaymentAccountId] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState('checkbook_digital');
+
+  const { data: vendors = [] } = useAuthQuery({
+    queryKey: ['vendors-for-check', organization?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vendors').select('id, name, email, address, city, state, zip_code')
+        .eq('organization_id', organization?.id).order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!organization?.id,
+  });
+
+  const { data: paymentAccounts = [] } = useAuthQuery({
+    queryKey: ['payment-accounts-for-check', organization?.id],
+    queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id, is_active: true }, { orderBy: 'name' }),
+    enabled: open && !!organization?.id,
+  });
+
+  const reset = () => { setVendorId(''); setAmount(''); setMemo(''); setPaymentAccountId(''); setPayoutMethod('checkbook_digital'); };
+
+  const createCheckMutation = useMutation({
+    mutationFn: async () => {
+      const vendor = vendors.find(v => v.id === vendorId);
+      if (!vendor) throw new Error('Select a vendor');
+      const numericAmount = parseFloat(amount);
+      if (!(numericAmount > 0)) throw new Error('Enter a valid amount');
+      if (!paymentAccountId) throw new Error('Select a payment account');
+
+      const { data: invoice, error: invoiceError } = await supabase.from('invoices').insert({
+        organization_id: organization?.id,
+        brand_id: brand?.brand_id || brand?.id || null,
+        location_id: location?.id || null,
+        vendor_id: vendor.id,
+        vendor_name: vendor.name,
+        invoice_number: memo.trim() || `Manual Check ${format(new Date(), 'MMM d, yyyy h:mm a')}`,
+        total_amount: numericAmount,
+        status: 'approved',
+        ap_routing_destination: 'payments',
+      }).select('id').single();
+      if (invoiceError) throw invoiceError;
+
+      const { data, error } = await supabase.functions.invoke('process-checkbook-payout', {
+        body: { invoice_id: invoice.id, payout_method: payoutMethod, payment_account_id: paymentAccountId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Check issued via Checkbook.io');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      reset();
+      onClose();
+    },
+    onError: (err) => toast.error(err.message || 'Failed to issue check'),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Write a Check</DialogTitle>
+          <DialogDescription>Issue a one-off check via Checkbook.io, outside the normal invoice-approval queue.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Vendor</Label>
+            <Select value={vendorId} onValueChange={setVendorId}>
+              <SelectTrigger><SelectValue placeholder="Select a vendor" /></SelectTrigger>
+              <SelectContent>
+                {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Amount</Label>
+            <Input type="number" step="0.01" min="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+          </div>
+          <div>
+            <Label>Memo (appears as the check's reference)</Label>
+            <Input value={memo} onChange={e => setMemo(e.target.value)} placeholder="e.g. Equipment deposit refund" />
+          </div>
+          <div>
+            <Label>Payment Account (signs the check)</Label>
+            <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+              <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+              <SelectContent>
+                {paymentAccounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}{acc.last4 ? ` (...${acc.last4})` : ''}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Delivery Method</Label>
+            <Select value={payoutMethod} onValueChange={setPayoutMethod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="checkbook_digital">Digital Check (email)</SelectItem>
+                <SelectItem value="checkbook_physical">Mailed Physical Check</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
+          <Button onClick={() => createCheckMutation.mutate()} disabled={createCheckMutation.isPending}>
+            {createCheckMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+            Issue Check
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const paymentMethodIcons = {
   stripe: CreditCard,
@@ -142,6 +264,8 @@ export default function Payments() {
     weeklySummary: false,
   });
   const [newReminderDay, setNewReminderDay] = useState('');
+  const [paymentDateFilter, setPaymentDateFilter] = useState('all');
+  const [showCreateCheck, setShowCreateCheck] = useState(false);
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
@@ -614,8 +738,10 @@ export default function Payments() {
   }, [invoices, statusFilter]);
 
   const filteredPayments = React.useMemo(() => {
-    return payments;
-  }, [payments]);
+    if (paymentDateFilter === 'all') return payments;
+    const cutoff = paymentDateFilter === '7d' ? subDays(new Date(), 7) : subMonths(new Date(), 1);
+    return payments.filter((p) => p.payment_date && new Date(p.payment_date) >= cutoff);
+  }, [payments, paymentDateFilter]);
 
   useEffect(() => {
     setInvoiceTableScrollTop(0);
@@ -625,7 +751,7 @@ export default function Payments() {
   useEffect(() => {
     setPaymentHistoryTableScrollTop(0);
     if (paymentHistoryTableRef.current) paymentHistoryTableRef.current.scrollTop = 0;
-  }, [debouncedSearch, sortBy, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
+  }, [debouncedSearch, sortBy, paymentDateFilter, organization?.id, (brand?.brand_id || brand?.id), location?.id]);
 
   const invoiceWindow = React.useMemo(() => {
     const total = filteredInvoices.length;
@@ -680,10 +806,23 @@ export default function Payments() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Payments</h1>
-        <p className="text-muted-foreground mt-1">Execute, schedule, and record vendor payments</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Payments</h1>
+          <p className="text-muted-foreground mt-1">Execute, schedule, and record vendor payments</p>
+        </div>
+        <Button variant="outline" onClick={() => setShowCreateCheck(true)}>
+          <Plus className="h-4 w-4 mr-1.5" /> Write a Check
+        </Button>
       </div>
+
+      <CreateCheckDialog
+        open={showCreateCheck}
+        onClose={() => setShowCreateCheck(false)}
+        organization={organization}
+        brand={brand}
+        location={location}
+      />
 
       <Card className="border-0 shadow-sm">
         <CardContent className="p-4">
@@ -1151,11 +1290,21 @@ export default function Payments() {
         {/* Payment History Tab */}
         <TabsContent value="history" className="mt-4">
           <Card className="border-0 shadow-sm">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-primary" />
                 Payment History
               </CardTitle>
+              <Select value={paymentDateFilter} onValueChange={setPaymentDateFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="7d">Last 7 Days</SelectItem>
+                  <SelectItem value="1m">Last Month</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">

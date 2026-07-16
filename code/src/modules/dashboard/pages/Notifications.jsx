@@ -11,11 +11,24 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { getNotificationAction } from '@/lib/notificationActions';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Groups the notifications.type check-constraint values (see 106_schema_hardening) into the
+// app's actual modules, so the Notifications page can offer per-module tabs alongside "All".
+const NOTIFICATION_MODULES = [
+  { key: 'invoices', label: 'Invoices', types: ['invoice', 'approval', 'invoice_approved'] },
+  { key: 'payments', label: 'Payments', types: ['payment', 'payment_failed'] },
+  { key: 'inventory', label: 'Inventory', types: ['inventory', 'low_inventory', 'order'] },
+  { key: 'vendors', label: 'Vendors', types: ['vendor_update'] },
+  { key: 'labor', label: 'Labor', types: ['labor_alert'] },
+  { key: 'system', label: 'System', types: ['system', 'alert', 'warning', 'error', 'AI_alert'] },
+];
 
 export default function Notifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [activeModule, setActiveModule] = React.useState('all');
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications_page', user?.id],
@@ -103,6 +116,16 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  const moduleOf = (notif) => NOTIFICATION_MODULES.find(m => m.types.includes(notif.type))?.key || 'system';
+
+  const notificationsByModule = React.useMemo(() => {
+    const map = new Map(NOTIFICATION_MODULES.map(m => [m.key, []]));
+    notifications.forEach(n => map.get(moduleOf(n)).push(n));
+    return map;
+  }, [notifications]);
+
+  const visibleNotifications = activeModule === 'all' ? notifications : (notificationsByModule.get(activeModule) || []);
+
   const handleOpenAction = async (notif) => {
     const action = getNotificationAction(notif);
     if (!action) return;
@@ -140,6 +163,17 @@ export default function Notifications() {
         )}
       </div>
 
+      <Tabs value={activeModule} onValueChange={setActiveModule}>
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="all">All {notifications.length > 0 && `(${notifications.length})`}</TabsTrigger>
+          {NOTIFICATION_MODULES.map(m => {
+            const count = notificationsByModule.get(m.key)?.length || 0;
+            if (count === 0) return null;
+            return <TabsTrigger key={m.key} value={m.key}>{m.label} ({count})</TabsTrigger>;
+          })}
+        </TabsList>
+      </Tabs>
+
       <Card className="border-0 shadow-sm glass-card">
         <CardContent className="p-0">
           {isLoading ? (
@@ -147,17 +181,23 @@ export default function Notifications() {
               <div className="w-8 h-8 border-4 border-border border-t-brand rounded-full animate-spin mb-4" />
               Loading your inbox...
             </div>
-          ) : notifications.length === 0 ? (
+          ) : visibleNotifications.length === 0 ? (
             <div className="p-24 text-center">
               <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4 border border-border">
                 <Bell className="w-8 h-8 text-muted-foreground/50" />
               </div>
-              <h3 className="text-lg font-bold text-foreground">You're all caught up!</h3>
-              <p className="text-muted-foreground mt-2 max-w-sm mx-auto">There are no notifications or pending approvals at this time.</p>
+              <h3 className="text-lg font-bold text-foreground">
+                {activeModule === 'all' ? "You're all caught up!" : 'Nothing here'}
+              </h3>
+              <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
+                {activeModule === 'all'
+                  ? 'There are no notifications or pending approvals at this time.'
+                  : 'No notifications in this module right now.'}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {notifications.map((notif) => (
+              {visibleNotifications.map((notif) => (
                 <div 
                   key={notif.id} 
                   className={cn(

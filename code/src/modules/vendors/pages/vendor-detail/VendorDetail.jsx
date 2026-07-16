@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,8 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity } from 'lucide-react';
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Building2, MapPin, Mail, Phone, Sparkles, FileText, Activity, Plus, Trash2, Save, Loader2 } from 'lucide-react';
 import { startOfMonth, endOfMonth, subMonths, isWithinInterval, differenceInDays } from 'date-fns';
+import { toast } from 'sonner';
 
 const VendorItemsTab = React.lazy(() => import('./VendorItemsTab'));
 const OrderGuideTab = React.lazy(() => import('./OrderGuideTab'));
@@ -38,10 +41,65 @@ const LinkedTabPlaceholder = ({ title, description, linkText, linkPath }) => {
   );
 };
 
-const OverviewTab = () => (
-  <div className="py-12 text-center text-muted-foreground">
-    <Activity className="h-8 w-8 mx-auto mb-3 opacity-20" />
-    <p>Comprehensive vendor overview dashboard is under construction.</p>
+function CustomFieldsCard({ vendor }) {
+  const queryClient = useQueryClient();
+  const [rows, setRows] = useState(() => Object.entries(vendor.custom_fields || {}));
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const custom_fields = Object.fromEntries(rows.filter(([k]) => k.trim()));
+      return api.entities.Vendor.update(vendor.id, { custom_fields });
+    },
+    onSuccess: () => {
+      toast.success('Custom fields updated');
+      queryClient.invalidateQueries({ queryKey: ['vendor', vendor.id] });
+    },
+    onError: (err) => toast.error(err.message || 'Failed to update custom fields'),
+  });
+
+  const updateRow = (i, patch) => setRows(prev => prev.map((r, idx) => idx === i ? [patch.key ?? r[0], patch.value ?? r[1]] : r));
+  const removeRow = (i) => setRows(prev => prev.filter((_, idx) => idx !== i));
+  const addRow = () => setRows(prev => [...prev, ['', '']]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Custom Fields</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">No custom fields yet. Add vendor-specific metrics or notes below.</p>
+        )}
+        {rows.map(([key, value], i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input placeholder="Field name" value={key} onChange={e => updateRow(i, { key: e.target.value })} className="w-48" />
+            <Input placeholder="Value" value={value} onChange={e => updateRow(i, { value: e.target.value })} />
+            <Button variant="ghost" size="icon" onClick={() => removeRow(i)} className="shrink-0 text-muted-foreground hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between pt-2">
+          <Button variant="outline" size="sm" onClick={addRow}>
+            <Plus className="h-4 w-4 mr-1.5" /> Add Field
+          </Button>
+          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+            Save
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const OverviewTab = ({ vendor }) => (
+  <div className="space-y-6">
+    <div className="py-12 text-center text-muted-foreground">
+      <Activity className="h-8 w-8 mx-auto mb-3 opacity-20" />
+      <p>Comprehensive vendor overview dashboard is under construction.</p>
+    </div>
+    <CustomFieldsCard vendor={vendor} />
   </div>
 );
 
@@ -328,7 +386,7 @@ export default function VendorDetail() {
               </TabsList>
             </div>
 
-            <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab /></TabsContent>
+            <TabsContent value="overview" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><OverviewTab vendor={vendor} /></TabsContent>
             {isElevatedUser && <TabsContent value="onboarding" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorOnboardingPanel vendorId={id} /></LazyVendorTab></TabsContent>}
             <TabsContent value="items" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><VendorItemsTab vendorId={id} /></LazyVendorTab></TabsContent>
             <TabsContent value="order_guide" className="mt-0 focus-visible:outline-none focus-visible:ring-0"><LazyVendorTab><OrderGuideTab vendorId={id} vendorName={vendor.name} /></LazyVendorTab></TabsContent>

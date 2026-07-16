@@ -46,7 +46,7 @@ serve(async (req) => {
       .from('invoices')
       .select(`
         id, invoice_number, total_amount, paid_amount,
-        vendor:vendor_id ( name, email, phone, street_1, street_2, city, state, zip )
+        vendor:vendor_id ( name, email, phone, address, city, state, zip_code )
       `)
       .eq('id', invoice_id)
       .single()
@@ -59,7 +59,7 @@ serve(async (req) => {
        return new Response(JSON.stringify({ error: 'Vendor email is required for Digital Checks.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    if (payout_method === 'checkbook_physical' && (!invoice.vendor.street_1 || !invoice.vendor.city || !invoice.vendor.state || !invoice.vendor.zip)) {
+    if (payout_method === 'checkbook_physical' && (!invoice.vendor.address || !invoice.vendor.city || !invoice.vendor.state || !invoice.vendor.zip_code)) {
        return new Response(JSON.stringify({ error: 'Vendor mailing address is required for Physical Checks.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
@@ -98,11 +98,11 @@ serve(async (req) => {
 
       if (payout_method === 'checkbook_physical') {
         checkPayload.recipient_address = {
-          line_1: invoice.vendor.street_1,
-          line_2: invoice.vendor.street_2 || '',
+          line_1: invoice.vendor.address,
+          line_2: '',
           city: invoice.vendor.city,
           state: invoice.vendor.state,
-          zip: invoice.vendor.zip
+          zip: invoice.vendor.zip_code
         };
       } else {
         checkPayload.recipient = invoice.vendor.email;

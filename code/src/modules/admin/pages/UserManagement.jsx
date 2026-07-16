@@ -760,6 +760,30 @@ export default function UserManagement() {
     enabled: !!activeOrgId,
   });
 
+  // Fetch brands/locations for the org, to resolve hierarchy names on each member row
+  const { data: orgBrands = [] } = useAuthQuery({
+    queryKey: ['org-brands-for-users', activeOrgId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('brands').select('brand_id, name').eq('organization_id', activeOrgId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeOrgId,
+  });
+
+  const { data: orgLocations = [] } = useAuthQuery({
+    queryKey: ['org-locations-for-users', activeOrgId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('locations').select('id, name, brand_id').eq('organization_id', activeOrgId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeOrgId,
+  });
+
+  const brandNameById = useMemo(() => new Map(orgBrands.map(b => [b.brand_id, b.name])), [orgBrands]);
+  const locationNameById = useMemo(() => new Map(orgLocations.map(l => [l.id, l.name])), [orgLocations]);
+
   // Merge Restops_ROLES and customRoles
   const ALL_ROLES = useMemo(() => {
     const merged = { ...Restops_ROLES };
@@ -982,6 +1006,7 @@ export default function UserManagement() {
                 <TableRow className="hover:bg-transparent border-0 h-14">
                   <TableHead className="pl-8 text-xs font-bold text-muted-foreground uppercase">Identity</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground uppercase">Role</TableHead>
+                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Scope</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground uppercase">Status</TableHead>
                   <TableHead className="text-xs font-bold text-muted-foreground uppercase">Last Active</TableHead>
                   <TableHead className="w-20 pr-8"></TableHead>
@@ -990,7 +1015,7 @@ export default function UserManagement() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-64 text-center">
+                    <TableCell colSpan={6} className="h-64 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="w-12 h-12 border-4 border-teal-50 border-t-teal-600 rounded-full animate-spin"></div>
                         <p className="text-sm font-bold text-muted-foreground">Syncing user database...</p>
@@ -999,7 +1024,7 @@ export default function UserManagement() {
                   </TableRow>
                 ) : filteredMembers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-64 text-center">
+                    <TableCell colSpan={6} className="h-64 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-secondary rounded-full">
                           <UserX className="w-8 h-8 text-muted-foreground" />
@@ -1038,6 +1063,26 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell>
                           <RoleBadges member={member} />
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const locId = member.location_id || member.profiles?.location_id;
+                            const brandId = member.brand_id || member.profiles?.brand_id;
+                            const locationName = locId && locationNameById.get(locId);
+                            const brandName = brandId && brandNameById.get(brandId);
+                            if (locationName) {
+                              return (
+                                <div className="flex flex-col leading-tight">
+                                  <span className="text-xs font-semibold text-foreground">{locationName}</span>
+                                  {brandName && <span className="text-[10px] text-muted-foreground">{brandName}</span>}
+                                </div>
+                              );
+                            }
+                            if (brandName) {
+                              return <span className="text-xs font-semibold text-foreground">{brandName} (all locations)</span>;
+                            }
+                            return <span className="text-xs text-muted-foreground italic">Organization-wide</span>;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${statusCfg.badgeClass}`}>
