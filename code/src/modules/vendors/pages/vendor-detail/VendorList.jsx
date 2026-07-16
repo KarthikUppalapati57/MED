@@ -6,6 +6,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
+import { useConfirm } from '@/hooks/useConfirm';
 import {
   Plus,
   Search,
@@ -18,11 +19,13 @@ import {
   Star,
   Sparkles,
   MoreVertical,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tabs,
@@ -91,6 +94,7 @@ function VendorTabFallback() {
 }
 
 export default function VendorList() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
@@ -202,6 +206,29 @@ export default function VendorList() {
       toast.success('Vendor deleted');
     },
   });
+
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const handleBulkDelete = async () => {
+    if (!(await confirm({
+      title: 'Delete selected vendors?',
+      description: `This will delete ${selectedIds.size} vendor(s). This cannot be undone.`,
+    }))) return;
+    try {
+      await Promise.all([...selectedIds].map(id => api.entities.Vendor.delete(id)));
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success(`${selectedIds.size} vendor(s) deleted`);
+      setSelectedIds(new Set());
+    } catch (err) {
+      toast.error('Failed to delete some vendors: ' + err.message);
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -525,6 +552,12 @@ export default function VendorList() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={filteredVendors.length > 0 && selectedIds.size === filteredVendors.length}
+                      onCheckedChange={(checked) => setSelectedIds(checked ? new Set(filteredVendors.map(v => v.id)) : new Set())}
+                    />
+                  </TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Location</TableHead>
@@ -537,13 +570,13 @@ export default function VendorList() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No vendors found
                     </TableCell>
                   </TableRow>
@@ -551,15 +584,21 @@ export default function VendorList() {
                   <>
                   {vendorWindow.paddingTop > 0 && (
                     <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                      <TableCell colSpan={7} className="p-0" style={{ height: `${vendorWindow.paddingTop}px` }} />
+                      <TableCell colSpan={8} className="p-0" style={{ height: `${vendorWindow.paddingTop}px` }} />
                     </TableRow>
                   )}
                   {vendorWindow.visibleVendors.map((vendor) => (
                     <TableRow 
-                      key={vendor.id} 
-                      className="cursor-pointer hover:bg-muted/50"
+                      key={vendor.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${selectedIds.has(vendor.id) ? 'bg-primary/5' : ''}`}
                       onClick={() => navigate(`/Vendors/${vendor.id}`)}
                     >
+                      <TableCell onClick={(event) => event.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(vendor.id)}
+                          onCheckedChange={() => toggleSelect(vendor.id)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -616,8 +655,15 @@ export default function VendorList() {
                             <DropdownMenuItem onClick={() => handleEdit(vendor)}>
                               <Edit2 className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => deleteMutation.mutate(vendor.id)}
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                if (await confirm({
+                                  title: 'Delete vendor?',
+                                  description: `This will permanently remove "${vendor.name}". This action cannot be undone.`,
+                                })) {
+                                  deleteMutation.mutate(vendor.id);
+                                }
+                              }}
                               className="text-resend-red"
                             >
                               <Trash2 className="h-4 w-4 mr-2" /> Delete
@@ -629,7 +675,7 @@ export default function VendorList() {
                   ))}
                   {vendorWindow.paddingBottom > 0 && (
                     <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                      <TableCell colSpan={7} className="p-0" style={{ height: `${vendorWindow.paddingBottom}px` }} />
+                      <TableCell colSpan={8} className="p-0" style={{ height: `${vendorWindow.paddingBottom}px` }} />
                     </TableRow>
                   )}
                   </>
@@ -645,6 +691,20 @@ export default function VendorList() {
           </div>
         </CardContent>
       </Card>
+
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <span className="text-sm font-medium text-teal-800">{selectedIds.size} item(s) selected</span>
+          <div className="flex gap-2 ml-auto">
+            <Button size="sm" variant="outline" onClick={handleBulkDelete} className="text-resend-red border-red-300 hover:bg-resend-red/5">
+              <Trash2 className="h-4 w-4 mr-1" /> Delete
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
         </TabsContent>
 
  {/* Vendor Items Tab */}
@@ -724,6 +784,8 @@ export default function VendorList() {
 
       {/* Vendor Onboarding Wizard */}
       <VendorOnboardingWizard open={onboardingOpen} onOpenChange={setOnboardingOpen} />
+
+      <ConfirmDialog />
 
       {/* Vendor Form Dialog (Edit Only) */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

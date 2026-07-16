@@ -135,7 +135,7 @@ export default function Payments() {
   });
   const [paymentSettings, setPaymentSettings] = useState({
     autoPayApprovedInvoices: false,
-    defaultPaymentMethod: 'stripe',
+    defaultPaymentMethod: 'cheque',
     approvalThreshold: 1000,
     confirmationEmail: true,
     overdueAlerts: true,

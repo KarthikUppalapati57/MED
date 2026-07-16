@@ -14,6 +14,43 @@
 
 BEGIN;
 
+-- Found while testing this change: trg_protect_profile_security_columns (a BEFORE UPDATE
+-- trigger on profiles) unconditionally blocks any change to role/organization_id/brand_id/
+-- location_id whenever current_setting('role') = 'authenticated' or 'anon'. That GUC reflects
+-- the connection-level Postgres role PostgREST sets for the whole request -- it does NOT
+-- change when execution enters a SECURITY DEFINER function, so this trigger cannot tell "a
+-- client updating its own row" apart from "an already-authorized admin RPC updating someone
+-- else's row". In practice this means org_remove_member's own detach-and-reset UPDATE has
+-- never actually succeeded when called by a real authenticated user -- not just missing an
+-- audit log, its core job has been broken. (Grepping prosrc turned up 7 other functions
+-- touching these same columns -- setup_organization_full, admin_update_user_role,
+-- complete_onboarding, accept_invitation, setup_onboarding_hierarchy, switch_user_context,
+-- and this one -- flagged separately for the user to check; only org_remove_member is fixed
+-- here, in scope for this change.)
+--
+-- Fix: a transaction-local trusted-context flag a SECURITY DEFINER function can set right
+-- before its own already-authorized write, instead of loosening the trigger's blanket rule.
+CREATE OR REPLACE FUNCTION public.protect_profile_security_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO ''
+AS $$
+BEGIN
+  IF NEW.role IS DISTINCT FROM OLD.role OR
+     NEW.organization_id IS DISTINCT FROM OLD.organization_id OR
+     NEW.brand_id IS DISTINCT FROM OLD.brand_id OR
+     NEW.location_id IS DISTINCT FROM OLD.location_id THEN
+
+    IF current_setting('role') IN ('authenticated', 'anon')
+       AND current_setting('app.trusted_profile_write', true) IS DISTINCT FROM 'on' THEN
+       RAISE EXCEPTION '42501: Privilege escalation attempt detected. You cannot modify your own role or organization bindings.';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.org_remove_member(
   target_user_id uuid,
   target_org_id uuid DEFAULT NULL
@@ -50,6 +87,7 @@ BEGIN
     AND location_id IN (SELECT id FROM public.locations WHERE organization_id = caller_org);
 
   -- Update profiles if this was their active org
+  PERFORM set_config('app.trusted_profile_write', 'on', true);
   UPDATE public.profiles
   SET organization_id = NULL, brand_id = NULL, location_id = NULL, role = 'ground_staff'
   WHERE id = target_user_id AND organization_id = caller_org;
@@ -75,5 +113,15 @@ BEGIN
   RETURN jsonb_build_object('success', true);
 END;
 $$;
+
+-- Found while testing this change: org_remove_member had NO execute grant for any
+-- non-superuser role at all (not authenticated, not service_role) -- Postgres silently drops
+-- the implicit PUBLIC default the moment any explicit GRANT/REVOKE ever touches a function,
+-- and nothing in this function's migration history (042_org_member_management_rpcs.sql,
+-- 128_fix_lint_errors.sql, 20260709000002_fix_legacy_roles_in_access_functions.sql) ever
+-- re-granted it. This was a pre-existing bug -- nobody could actually call this RPC before
+-- now. Matches CLAUDE.md's own "Prod != local on grants" warning.
+REVOKE ALL ON FUNCTION public.org_remove_member(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.org_remove_member(uuid, uuid) TO authenticated;
 
 COMMIT;

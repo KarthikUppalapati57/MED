@@ -1097,6 +1097,36 @@ export const api = {
       });
       if (error) throw error;
       return data;
+    },
+    getApprovalSetting: async (organizationId) => {
+      const { data, error } = await supabase.rpc('get_product_approval_setting', {
+        p_organization_id: organizationId
+      });
+      if (error) throw error;
+      return data;
+    },
+    setApprovalSetting: async (organizationId, enabled) => {
+      const { data, error } = await supabase.rpc('set_product_approval_setting', {
+        p_organization_id: organizationId,
+        p_enabled: enabled
+      });
+      if (error) throw error;
+      return data;
+    },
+    approveChange: async (productId) => {
+      const { data, error } = await supabase.rpc('approve_product_change', {
+        p_product_id: productId
+      });
+      if (error) throw error;
+      return data;
+    },
+    rejectChange: async (productId, reason) => {
+      const { data, error } = await supabase.rpc('reject_product_change', {
+        p_product_id: productId,
+        p_reason: reason || null
+      });
+      if (error) throw error;
+      return data;
     }
   }
 };

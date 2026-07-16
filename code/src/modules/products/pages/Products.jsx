@@ -6,6 +6,7 @@ import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useConfirm } from '@/hooks/useConfirm';
 import { api } from '@/lib/apiClient';
 import {
   Plus,
@@ -513,7 +514,8 @@ export default function Products() {
   const setActiveTab = (tab) => {
     navigate(`/Products/${tab}${routerLocation.search}`);
   };
-  const { isGroundStaff } = usePermissions();
+  const { isGroundStaff, isBranchManagerOrAbove, isOrgManagerOrAbove } = usePermissions();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [sortBy, setSortBy] = useState('name');
@@ -539,7 +541,10 @@ export default function Products() {
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selectedIds.size} product(s)? This cannot be undone.`)) return;
+    if (!(await confirm({
+      title: 'Delete selected products?',
+      description: `This will delete ${selectedIds.size} product(s). This cannot be undone.`,
+    }))) return;
     try {
       await Promise.all([...selectedIds].map(id => api.products.deleteProduct(id)));
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -585,6 +590,8 @@ export default function Products() {
     base_unit: 'ea',
     latest_price: 0,
     location_specific: false,
+    vendor_id: '',
+    vendor_quantity: '',
   });
 
   const queryClient = useQueryClient();
@@ -665,6 +672,12 @@ export default function Products() {
     enabled: !!organizationId && (activeTab === 'price-variances' || activeTab === 'all-products'),
   });
 
+  const { data: vendorsForProductForm = [] } = useAuthQuery({
+    queryKey: ['vendors-for-product-form', organizationId],
+    queryFn: () => api.entities.Vendor.filter({ organization_id: organizationId }, { orderBy: 'name' }),
+    enabled: !!organizationId && dialogOpen,
+  });
+
   const resolveVarianceMutation = useMutation({
     mutationFn: ({ vendorItemId, updateProduct }) => api.vendors.resolvePriceVariance(vendorItemId, updateProduct),
     onSuccess: () => {
@@ -733,11 +746,34 @@ export default function Products() {
   }, [queryClient]);
 
   const createMutation = useMutation({
-    mutationFn: (data) => api.products.createProductDetails(data, {
-      organizationId,
-      brandId,
-      locationId,
-    }),
+    mutationFn: async (data) => {
+      const product = await api.products.createProductDetails(data, {
+        organizationId,
+        brandId,
+        locationId,
+      });
+
+      // Capture quantity from vendor at onboarding time, if given, as a vendor_items row
+      // mapped to the new product -- same create-then-map pattern VendorItemsTab.jsx already
+      // uses, just triggered from the product side instead of the vendor side.
+      if (data.vendor_id && data.vendor_quantity) {
+        const vendorItem = await api.entities.VendorItem.create({
+          organization_id: organizationId,
+          vendor_id: data.vendor_id,
+          vendor_item_name: data.name,
+          vendor_unit: data.vendor_quantity,
+        });
+        await api.entities.VendorItemMapping.create({
+          organization_id: organizationId,
+          vendor_item_id: vendorItem.id,
+          internal_product_id: product.id,
+          conversion_multiplier: 1,
+          is_verified: true,
+        });
+      }
+
+      return product;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
@@ -764,6 +800,39 @@ export default function Products() {
       resetForm();
     },
     onError: (error) => toast.error(error?.message || 'Failed to update product'),
+  });
+
+  const { data: requireLocationManagerApproval = false } = useAuthQuery({
+    queryKey: ['product_approval_setting', organizationId],
+    queryFn: () => api.products.getApprovalSetting(organizationId),
+    enabled: !!organizationId && isOrgManagerOrAbove,
+  });
+
+  const approvalSettingMutation = useMutation({
+    mutationFn: (enabled) => api.products.setApprovalSetting(organizationId, enabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product_approval_setting', organizationId] });
+      toast.success('Product approval setting updated');
+    },
+    onError: (error) => toast.error(error?.message || 'Failed to update setting'),
+  });
+
+  const approveChangeMutation = useMutation({
+    mutationFn: (productId) => api.products.approveChange(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product change approved');
+    },
+    onError: (error) => toast.error(error?.message || 'Failed to approve change'),
+  });
+
+  const rejectChangeMutation = useMutation({
+    mutationFn: (productId) => api.products.rejectChange(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product change rejected');
+    },
+    onError: (error) => toast.error(error?.message || 'Failed to reject change'),
   });
 
   const inventoryTrackingMutation = useMutation({
@@ -807,6 +876,8 @@ export default function Products() {
       base_unit: 'ea',
       latest_price: 0,
       location_specific: false,
+      vendor_id: '',
+      vendor_quantity: '',
     });
     setEditingProduct(null);
   };
@@ -829,10 +900,13 @@ export default function Products() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (product) => {
+  const handleDelete = async (product) => {
     if (!product?.id) return;
     const label = product.product_id ? `${product.product_id} - ${product.name}` : product.name;
-    if (!confirm(`Delete ${label}? This will remove it from active product lists.`)) return;
+    if (!(await confirm({
+      title: 'Delete product?',
+      description: `Delete ${label}? This will remove it from active product lists.`,
+    }))) return;
     deleteMutation.mutate(product.id);
   };
 
@@ -1062,15 +1136,29 @@ export default function Products() {
           <p className="text-muted-foreground mt-1">Manage your product catalog</p>
         </div>
         {!isGroundStaff && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={exportToCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
+          <div className="flex items-center gap-4">
+            {isOrgManagerOrAbove && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                  Require approval for location manager changes
+                </Label>
+                <Switch
+                  checked={requireLocationManagerApproval}
+                  onCheckedChange={(v) => approvalSettingMutation.mutate(v)}
+                  disabled={approvalSettingMutation.isPending}
+                />
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -1405,6 +1493,11 @@ export default function Products() {
                             <Package className="h-4 w-4 text-muted-foreground" />
                           </div>
                           <span className="font-medium">{product.description || product.name}</span>
+                          {product.pending_approval && (
+                            <Badge className="bg-amber-500/10 text-amber-600">
+                              Pending {product.pending_action === 'delete' ? 'Deletion' : product.pending_action === 'create' ? 'Approval' : 'Change'}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1427,6 +1520,19 @@ export default function Products() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              {product.pending_approval && isBranchManagerOrAbove && (
+                                <>
+                                  <DropdownMenuItem onClick={() => approveChangeMutation.mutate(product.id)}>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" /> Approve Change
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => rejectChangeMutation.mutate(product.id)}
+                                    className="text-resend-red"
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" /> Reject Change
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuItem onClick={() => handleEdit(product)}>
                                 <Edit2 className="h-4 w-4 mr-2" /> Edit
                               </DropdownMenuItem>
@@ -2063,6 +2169,36 @@ export default function Products() {
                 onCheckedChange={(v) => setFormData({ ...formData, location_specific: v })}
               />
             </div>
+
+            {!editingProduct && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Vendor (optional)</Label>
+                  <Select
+                    value={formData.vendor_id}
+                    onValueChange={(v) => setFormData({ ...formData, vendor_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vendorsForProductForm.map(vendor => (
+                        <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantity from Vendor</Label>
+                  <Input
+                    placeholder="e.g. 10lb Case"
+                    value={formData.vendor_quantity}
+                    onChange={(e) => setFormData({ ...formData, vendor_quantity: e.target.value })}
+                    disabled={!formData.vendor_id}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -2078,6 +2214,7 @@ export default function Products() {
         </DialogContent>
       </Dialog>
 
+      <ConfirmDialog />
     </div>
   );
 }

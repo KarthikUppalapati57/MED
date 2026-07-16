@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCw, Image as ImageIcon } from 'lucide-react';
+import { Download, ZoomIn, ZoomOut, RotateCw, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { supabase } from '@/lib/supabaseClient';
+import { downloadBlob } from '@/lib/exportUtils';
 
 export default function DocumentViewer({ fileUrl, fileType }) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [signedUrl, setSignedUrl] = useState(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     async function fetchSignedUrl() {
@@ -36,6 +38,21 @@ export default function DocumentViewer({ fileUrl, fileType }) {
   const handleZoomOut = () => setZoom(z => Math.max(z - 0.25, 0.5));
   const handleRotate = () => setRotation(r => (r + 90) % 360);
 
+  const handleDownload = async () => {
+    if (!signedUrl || downloading) return;
+    setDownloading(true);
+    try {
+      const response = await fetch(signedUrl);
+      const blob = await response.blob();
+      const filename = fileUrl?.split('/').pop()?.split('?')[0] || 'document';
+      downloadBlob(blob, filename);
+    } catch (err) {
+      console.error('Failed to download document:', err);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (!signedUrl) {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-slate-50 text-slate-400 rounded-lg border border-dashed">
@@ -55,6 +72,10 @@ export default function DocumentViewer({ fileUrl, fileType }) {
         <Button variant="outline" size="icon" onClick={handleZoomIn} className="h-8 w-8"><ZoomIn className="h-4 w-4" /></Button>
         <div className="w-px h-4 bg-slate-200 mx-1" />
         <Button variant="outline" size="icon" onClick={handleRotate} className="h-8 w-8"><RotateCw className="h-4 w-4" /></Button>
+        <div className="w-px h-4 bg-slate-200 mx-1" />
+        <Button variant="outline" size="icon" onClick={handleDownload} disabled={downloading} className="h-8 w-8" title="Download document">
+          {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        </Button>
       </div>
       
       <div className="flex-1 overflow-auto relative flex items-center justify-center bg-slate-200/50 p-4">

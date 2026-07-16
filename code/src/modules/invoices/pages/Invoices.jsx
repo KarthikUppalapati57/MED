@@ -5,6 +5,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
+import { useConfirm } from '@/hooks/useConfirm';
 import { supabase } from '@/lib/supabaseClient';
 import { getApRoutingLabel, isPaymentQueueRouted, normalizeApRouting } from '@/lib/apRouting';
 import { notifyManagers } from '@/lib/notificationService';
@@ -175,6 +176,7 @@ const formatMoney = (value) => `$${Number(value || 0).toLocaleString(undefined, 
 })}`;
 
 export default function Invoices() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [mobileCaptureOpen, setMobileCaptureOpen] = useState(false);
   const [emailConfigOpen, setEmailConfigOpen] = useState(false);
@@ -702,9 +704,27 @@ export default function Invoices() {
     },
   });
 
-  const handleDelete = (invoice) => {
-    if (confirm(`Delete invoice ${invoice.invoice_number}? This cannot be undone.`)) {
+  const handleDelete = async (invoice) => {
+    if (await confirm({
+      title: 'Delete invoice?',
+      description: `Delete invoice ${invoice.invoice_number}? This cannot be undone.`,
+    })) {
       deleteMutation.mutate(invoice.id);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!(await confirm({
+      title: 'Delete selected invoices?',
+      description: `This will delete ${selectedInvoiceIds.length} invoice(s). This cannot be undone.`,
+    }))) return;
+    try {
+      await Promise.all(selectedInvoiceIds.map(id => api.financial.softDeleteInvoice(id)));
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
+      toast.success(`${selectedInvoiceIds.length} invoice(s) deleted`);
+      setSelectedInvoiceIds([]);
+    } catch (err) {
+      toast.error('Failed to delete some invoices: ' + err.message);
     }
   };
 
@@ -1512,9 +1532,18 @@ export default function Invoices() {
                 >
                   Reject Batch
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-resend-red border-red-300 hover:bg-resend-red/5 whitespace-nowrap"
+                  disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete Batch
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => {
                     setSelectedInvoiceIds([]);
                     setBatchPaymentAccountId('');
@@ -1902,6 +1931,8 @@ export default function Invoices() {
           />
         </React.Suspense>
       )}
+
+      <ConfirmDialog />
     </div>
   );
 }

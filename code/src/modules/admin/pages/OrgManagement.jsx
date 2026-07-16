@@ -21,6 +21,14 @@ import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
 import ApprovalPolicySettings from '@/modules/invoices/components/ApprovalPolicySettings';
 import CustomRolesTab from '@/modules/admin/components/CustomRolesTab';
 
+function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
   const queryClient = useQueryClient();
@@ -63,13 +71,17 @@ export default function OrgManagement() {
   const [editLocationAddress, setEditLocationAddress] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Org profile details tab state
+  const [profileDrafts, setProfileDrafts] = useState({});
+  const [savingProfile, setSavingProfile] = useState(null); // org id currently saving
+
   // Fetch organizations the user can access
   const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
     queryKey: ['my-organizations'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, slug, subscription_status, plan_id, admin_email:primary_contact_email, created_at, stripe_customer_id')
+        .select('id, name, slug, subscription_status, plan_id, created_at, stripe_customer_id, address, city, state, zip_code, country, tax_id, primary_contact_name, primary_contact_email, primary_contact_phone')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -117,6 +129,17 @@ export default function OrgManagement() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, organization_id, brand_id, location_id, role, full_name, email');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch per-org document storage stats (file count / total bytes)
+  const { data: docStats = [] } = useAuthQuery({
+    queryKey: ['org-document-stats'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_org_document_stats');
       if (error) throw error;
       return data || [];
     },
@@ -287,6 +310,33 @@ export default function OrgManagement() {
     }
   };
 
+  const PROFILE_FIELDS = ['address', 'city', 'state', 'zip_code', 'country', 'tax_id', 'primary_contact_name', 'primary_contact_email', 'primary_contact_phone'];
+
+  const getProfileDraft = (org) => profileDrafts[org.id] || Object.fromEntries(PROFILE_FIELDS.map(f => [f, org[f] || '']));
+
+  const setProfileField = (orgId, field, value) => {
+    setProfileDrafts(prev => ({
+      ...prev,
+      [orgId]: { ...(prev[orgId] || Object.fromEntries(PROFILE_FIELDS.map(f => [f, '']))), [field]: value },
+    }));
+  };
+
+  const handleSaveProfile = async (org) => {
+    const draft = getProfileDraft(org);
+    setSavingProfile(org.id);
+    try {
+      const { error } = await supabase.from('organizations').update(draft).eq('id', org.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['my-organizations'] });
+      const { toast } = await import('sonner');
+      toast.success('Organization profile updated');
+    } catch (e) {
+      const { toast } = await import('sonner');
+      toast.error(e.message || 'Failed to update organization profile');
+    }
+    setSavingProfile(null);
+  };
+
   const handleSaveEditBrand = async () => {
     if (!editBrandName.trim() || !editBrand) return;
     setSaving(true);
@@ -388,9 +438,16 @@ export default function OrgManagement() {
     return map;
   }, [profiles]);
 
+  const docStatsByOrgMap = React.useMemo(() => {
+    const map = new Map();
+    docStats.forEach(s => map.set(s.organization_id, s));
+    return map;
+  }, [docStats]);
+
   const getOrgBrands = React.useCallback((orgId) => orgBrandsMap.get(orgId) || [], [orgBrandsMap]);
   const getBrandLocations = React.useCallback((brandId) => brandLocationsMap.get(brandId) || [], [brandLocationsMap]);
   const getOrgStaffCount = React.useCallback((orgId) => staffByOrgMap.get(orgId) || 0, [staffByOrgMap]);
+  const getOrgDocStats = React.useCallback((orgId) => docStatsByOrgMap.get(orgId) || { file_count: 0, total_bytes: 0 }, [docStatsByOrgMap]);
   const getBrandStaffCount = React.useCallback((brandId) => staffByBrandMap.get(brandId) || 0, [staffByBrandMap]);
   const getLocationStaffCount = React.useCallback((locationId) => staffByLocationMap.get(locationId) || 0, [staffByLocationMap]);
 
@@ -412,6 +469,7 @@ export default function OrgManagement() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="groups">Location Groups</TabsTrigger>
           <TabsTrigger value="roles">Custom Roles</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -438,6 +496,7 @@ export default function OrgManagement() {
                 const orgBrands = getOrgBrands(org.id);
                 const isExpanded = expandedOrgs.has(org.id);
                 const staffCount = getOrgStaffCount(org.id);
+                const docStats = getOrgDocStats(org.id);
 
                 return (
                   <Card key={org.id} className="overflow-hidden border-border shadow-sm">
@@ -458,7 +517,7 @@ export default function OrgManagement() {
                           <Badge className="bg-resend-green/10 text-resend-green border-none text-[9px]">{org.status || 'active'}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} / {staffCount} staff / Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}
+                          {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} / {staffCount} staff / {docStats.file_count} file{docStats.file_count !== 1 ? 's' : ''} ({formatBytes(docStats.total_bytes)}) / Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}
                         </p>
                       </div>
                       {canManage && (
@@ -567,6 +626,80 @@ export default function OrgManagement() {
                 );
               })}
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="profile" className="space-y-6 mt-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : orgs.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                <p className="text-muted-foreground">No organizations yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            orgs.map(org => {
+              const draft = getProfileDraft(org);
+              return (
+                <Card key={org.id} className="border-border shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-base">{org.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Address</Label>
+                        <Input disabled={!canManage} value={draft.address} onChange={e => setProfileField(org.id, 'address', e.target.value)} placeholder="123 Main St" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">City</Label>
+                        <Input disabled={!canManage} value={draft.city} onChange={e => setProfileField(org.id, 'city', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">State</Label>
+                        <Input disabled={!canManage} value={draft.state} onChange={e => setProfileField(org.id, 'state', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Zip Code</Label>
+                        <Input disabled={!canManage} value={draft.zip_code} onChange={e => setProfileField(org.id, 'zip_code', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Country</Label>
+                        <Input disabled={!canManage} value={draft.country} onChange={e => setProfileField(org.id, 'country', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Tax ID</Label>
+                        <Input disabled={!canManage} value={draft.tax_id} onChange={e => setProfileField(org.id, 'tax_id', e.target.value)} placeholder="12-3456789" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Contact Name</Label>
+                        <Input disabled={!canManage} value={draft.primary_contact_name} onChange={e => setProfileField(org.id, 'primary_contact_name', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Contact Email</Label>
+                        <Input disabled={!canManage} type="email" value={draft.primary_contact_email} onChange={e => setProfileField(org.id, 'primary_contact_email', e.target.value)} />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Contact Phone</Label>
+                        <Input disabled={!canManage} value={draft.primary_contact_phone} onChange={e => setProfileField(org.id, 'primary_contact_phone', e.target.value)} />
+                      </div>
+                    </div>
+                    {canManage && (
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={() => handleSaveProfile(org)} disabled={savingProfile === org.id}>
+                          {savingProfile === org.id ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                          Save
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
 

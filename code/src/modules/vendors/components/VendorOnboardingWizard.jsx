@@ -38,7 +38,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const [otpInput, setOtpInput] = useState('');
   
   const [paymentSettings, setPaymentSettings] = useState({
-    default_payment_method: 'stripe',
+    default_payment_method: 'check',
     autopay_enabled: false
   });
 

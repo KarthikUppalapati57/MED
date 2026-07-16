@@ -297,7 +297,7 @@ export default function PaymentAccountsSettings() {
                   <div className="space-y-1 text-right">
                     <Label className="text-xs text-muted-foreground">Default Method</Label>
                     <Select 
-                      value={vendor.default_payment_method || 'stripe'} 
+                      value={vendor.default_payment_method || 'checkbook_physical'}
                       onValueChange={(v) => updateVendorMutation.mutate({ id: vendor.id, updates: { default_payment_method: v }})}
                     >
                       <SelectTrigger className="w-[140px] h-8 text-xs bg-white">
