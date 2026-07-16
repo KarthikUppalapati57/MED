@@ -1,14 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/geminiService';
+import { calculateIngredientCost, calculateRecipeCost } from '@/modules/recipes/lib/recipeCosting';
 import ProductsLiveDashboard from '@/modules/products/components/ProductsLiveDashboard';
+import MenuItemsOperations from '@/modules/recipes/components/MenuItemsOperations';
+import MenuItemAuthoringPage from '@/modules/recipes/components/MenuItemAuthoringPage';
+import MenuItemDetailPage from '@/modules/recipes/components/MenuItemDetailPage';
+import PreparedItemsOperations from '@/modules/recipes/components/PreparedItemsOperations';
+import PreparedItemAuthoringPage from '@/modules/recipes/components/PreparedItemAuthoringPage';
+import PreparedItemDetailPage from '@/modules/recipes/components/PreparedItemDetailPage';
+import BarItemsOperations from '@/modules/recipes/components/BarItemsOperations';
+import BarItemAuthoringPage from '@/modules/recipes/components/BarItemAuthoringPage';
+import BarItemDetailPage from '@/modules/recipes/components/BarItemDetailPage';
 import {
   Plus,
   Search,
@@ -126,7 +138,10 @@ export default function Recipes() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location } = useAuth();
-  const needsProducts = ['recipes', 'prepared-items', 'menu-analysis', 'recipe-viewer'].includes(activeTab) || dialogOpen;
+  const { confirm } = useConfirmation();
+  const confirmLockRef = useRef(false);
+  const formBaselineRef = useRef(null);
+  const needsProducts = ['recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer'].includes(activeTab) || dialogOpen;
 
   const [sortRecipes, setSortRecipes] = useState('-created_at');
   const debouncedSearch = useDebounce(search, 500);
@@ -139,13 +154,33 @@ export default function Recipes() {
     isFetchingNextPage: isFetchingNextRecipesPage
   } = useAuthInfiniteQuery({
     queryKey: ['recipes', organization?.id, debouncedSearch, sortRecipes],
-    queryFn: ({ pageParam = 0 }) => api.entities.Recipe.list(sortRecipes, {
-      page: pageParam,
-      pageSize: 50,
-      search: debouncedSearch,
-      searchColumn: 'name',
-      select: 'id, organization_id, brand_id, location_id, name, category, status, yield_quantity, yield_unit, cost_per_serving, selling_price, target_margin_percent, ingredients, labor_rate_per_hour, labor_time_minutes, created_at, total_cost',
-    }),
+    queryFn: async ({ pageParam = 0 }) => {
+      const options = {
+        page: pageParam,
+        pageSize: 50,
+        search: debouncedSearch,
+        searchColumn: 'name',
+      };
+      const legacySelect = 'id, organization_id, brand_id, location_id, name, description, category, status, yield_quantity, yield_unit, yield_percentage, cost_per_serving, selling_price, target_margin_percent, margin_alert_enabled, ingredients, packaging_items, instructions, prep_time_minutes, cook_time_minutes, labor_rate_per_hour, labor_time_minutes, total_ingredient_cost, total_packaging_cost, labor_cost, created_at, total_cost, is_batch';
+      const baseSelect = `${legacySelect}, recipe_type_id, shelf_life_quantity, shelf_life_unit, costing_version, last_costed_at`;
+      try {
+        return await api.entities.Recipe.list(sortRecipes, { ...options, select: `${baseSelect}, margin_alert_status` });
+      } catch (error) {
+        const message = String(error?.message || '');
+        const missingAlertStatus = error?.code === 'PGRST204' || message.includes('margin_alert_status');
+        const missingRecipeAuthoring = message.includes('recipe_type_id') || message.includes('shelf_life_quantity') || message.includes('costing_version');
+        if (missingRecipeAuthoring) return api.entities.Recipe.list(sortRecipes, { ...options, select: legacySelect });
+        if (!missingAlertStatus) throw error;
+        try { return await api.entities.Recipe.list(sortRecipes, { ...options, select: baseSelect }); }
+        catch (fallbackError) {
+          const fallbackMessage = String(fallbackError?.message || '');
+          if (fallbackMessage.includes('recipe_type_id') || fallbackMessage.includes('shelf_life_quantity') || fallbackMessage.includes('costing_version')) {
+            return api.entities.Recipe.list(sortRecipes, { ...options, select: legacySelect });
+          }
+          throw fallbackError;
+        }
+      }
+    },
     select: React.useCallback((data) => ({
       pages: data.pages.map(page => filterByContext(page.data || page, { organization, brand, location })),
       pageParams: data.pageParams,
@@ -169,6 +204,67 @@ export default function Recipes() {
     enabled: !!organization?.id && needsProducts,
   });
 
+  const { data: recipeVisibility = { supported: true, rows: [] } } = useAuthQuery({
+    queryKey: ['recipe-location-visibility', organization?.id],
+    queryFn: async () => {
+      try {
+        const rows = await api.entities.RecipeLocationVisibility.filter({ organization_id: organization?.id }, { limit: 5000 });
+        return { supported: true, rows };
+      } catch (error) {
+        const missingTable = error?.code === 'PGRST205' || String(error?.message || '').includes('recipe_location_visibility');
+        if (!missingTable) throw error;
+        return { supported: false, rows: [] };
+      }
+    },
+    enabled: !!organization?.id && ['menu-items', 'bar-items'].includes(activeTab),
+  });
+
+  const { data: recipeAlertHistory = { supported: true, rows: [] } } = useAuthQuery({
+    queryKey: ['recipe-margin-alert-events', organization?.id],
+    queryFn: async () => {
+      try {
+        const rows = await api.entities.RecipeMarginAlertEvent.filter(
+          { organization_id: organization?.id },
+          { orderBy: '-created_at', limit: 5000 },
+        );
+        return { supported: true, rows };
+      } catch (error) {
+        const missingTable = error?.code === 'PGRST205' || String(error?.message || '').includes('recipe_margin_alert_events');
+        if (!missingTable) throw error;
+        return { supported: false, rows: [] };
+      }
+    },
+    enabled: !!organization?.id && ['menu-items', 'bar-items'].includes(activeTab),
+  });
+
+  const { data: recipeLocations = [] } = useAuthQuery({
+    queryKey: ['recipe-menu-locations', organization?.id],
+    queryFn: () => api.entities.Location.filter({ organization_id: organization?.id }, { orderBy: 'name', limit: 1000, select: 'id, name, organization_id' }),
+    enabled: !!organization?.id && ['menu-items', 'prepared-items', 'bar-items'].includes(activeTab),
+  });
+
+  const { data: recipeTypes = [] } = useAuthQuery({
+    queryKey: ['recipe-types', organization?.id],
+    queryFn: async () => {
+      try { return await api.entities.RecipeType.list('sort_order', { limit: 1000 }); }
+      catch (error) { return String(error?.message || '').includes('recipe_types') ? [] : Promise.reject(error); }
+    },
+    enabled: !!organization?.id && ['menu-items', 'prepared-items', 'bar-items'].includes(activeTab),
+  });
+
+  const { data: menuPosItems = [] } = useAuthQuery({
+    queryKey: ['menu-items-pos-items', organization?.id],
+    queryFn: () => api.entities.PosItem.list('item_name', { limit: 5000, select: 'id, organization_id, location_id, pos_item_id, item_name, pos_provider, price' }),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id && activeTab === 'menu-items',
+  });
+
+  const { data: menuPosMappings = [] } = useAuthQuery({
+    queryKey: ['pos_menu_mapping', organization?.id],
+    queryFn: () => api.entities.PosMenuMapping.list(null, { limit: 5000, select: 'id, organization_id, pos_item_id, recipe_id' }),
+    enabled: !!organization?.id && activeTab === 'menu-items',
+  });
+
   const productsMap = React.useMemo(() => {
     const map = new Map();
     for (let i = 0; i < products.length; i++) {
@@ -176,6 +272,21 @@ export default function Recipes() {
     }
     return map;
   }, [products]);
+
+  const { data: unitConversions = [] } = useAuthQuery({
+    queryKey: ['recipe-unit-conversions', organization?.id],
+    queryFn: async () => {
+      try {
+        return await api.entities.RecipeUnitConversion.list('from_unit', { limit: 1000 });
+      } catch (error) {
+        const migrationPending = error?.code === 'PGRST205'
+          || String(error?.message || '').includes('recipe_unit_conversions');
+        if (migrationPending) return [];
+        throw error;
+      }
+    },
+    enabled: !!organization?.id && needsProducts,
+  });
 
   const recipesMap = React.useMemo(() => {
     const map = new Map();
@@ -247,27 +358,25 @@ export default function Recipes() {
   }, [recipes]);
 
   const costs = React.useMemo(() => {
-    const ingredientCost = formData.ingredients.reduce((sum, i) => sum + (i.total_cost || 0), 0);
-    const packagingCost = formData.packaging_items.reduce((sum, p) => sum + (p.total_cost || 0), 0);
-    const laborCost = (formData.labor_time_minutes / 60) * formData.labor_rate_per_hour;
-    const totalCost = ingredientCost + packagingCost + laborCost;
-    const effectiveYield = formData.yield_quantity * ((formData.yield_percentage || 100) / 100);
-    const costPerServing = effectiveYield > 0 ? totalCost / effectiveYield : totalCost;
+    const result = calculateRecipeCost({
+      ingredients: formData.ingredients,
+      packagingItems: formData.packaging_items,
+      laborMinutes: formData.labor_time_minutes,
+      laborRatePerHour: formData.labor_rate_per_hour,
+      yieldQuantity: formData.yield_quantity,
+      yieldPercentage: formData.yield_percentage,
+      conversions: unitConversions,
+    });
 
-    return {
-      ingredientCost,
-      packagingCost,
-      laborCost,
-      totalCost,
-      costPerServing
-    };
-  }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity, formData.yield_percentage]);
+    return { ...result, costPerServing: result.costPerYieldUnit };
+  }, [formData.ingredients, formData.packaging_items, formData.labor_time_minutes, formData.labor_rate_per_hour, formData.yield_quantity, formData.yield_percentage, unitConversions]);
 
   // Realtime subscription
   useEffect(() => {
     const channel = supabase.channel('recipes-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'recipes' }, () => {
         queryClient.invalidateQueries({ queryKey: ['recipes'] });
+        queryClient.invalidateQueries({ queryKey: ['recipe-margin-alert-events'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -283,6 +392,7 @@ export default function Recipes() {
     mutationFn: (data) => api.entities.Recipe.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe-margin-alert-events'] });
       toast.success('Recipe created');
       setDialogOpen(false);
       resetForm();
@@ -293,6 +403,7 @@ export default function Recipes() {
     mutationFn: ({ id, data }) => api.entities.Recipe.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe-margin-alert-events'] });
       toast.success('Recipe updated');
       setDialogOpen(false);
       resetForm();
@@ -346,6 +457,38 @@ export default function Recipes() {
     setEditingRecipe(null);
   };
 
+  useEffect(() => {
+    if (dialogOpen && formBaselineRef.current === null) {
+      formBaselineRef.current = JSON.stringify(formData);
+    }
+    if (!dialogOpen) {
+      formBaselineRef.current = null;
+    }
+  }, [dialogOpen, formData]);
+
+  const handleDialogOpenChange = async (open) => {
+    if (open) {
+      setDialogOpen(true);
+      return;
+    }
+    const isDirty =
+      formBaselineRef.current != null &&
+      JSON.stringify(formData) !== formBaselineRef.current;
+    if (isDirty) {
+      if (confirmLockRef.current) return;
+      confirmLockRef.current = true;
+      try {
+        const confirmed = await confirm(getConfirmationMessage('discardRecipeChanges'));
+        if (!confirmed) return;
+      } finally {
+        confirmLockRef.current = false;
+      }
+    }
+    formBaselineRef.current = null;
+    resetForm();
+    setDialogOpen(false);
+  };
+
   const handleEdit = (recipe) => {
     setEditingRecipe(recipe);
     setFormData({
@@ -379,8 +522,10 @@ export default function Recipes() {
         product_name: '',
         quantity: 0,
         unit: 'ea',
+        cost_unit: 'ea',
         unit_cost: 0,
-        total_cost: 0
+        total_cost: 0,
+        yield_percentage: 100
       }]
     });
   };
@@ -397,7 +542,7 @@ export default function Recipes() {
           newIngredients[index].sub_recipe_id = null;
           newIngredients[index].product_name = p.name;
           newIngredients[index].unit_cost = p.latest_price || 0;
-          newIngredients[index].total_cost = newIngredients[index].quantity * (p.latest_price || 0);
+          newIngredients[index].cost_unit = p.base_unit || p.report_by_unit || newIngredients[index].unit;
         }
       } else if (value.startsWith('recipe_')) {
         const id = value.replace('recipe_', '');
@@ -407,17 +552,16 @@ export default function Recipes() {
           newIngredients[index].product_id = null;
           newIngredients[index].product_name = r.name;
           newIngredients[index].unit_cost = r.cost_per_serving || 0;
-          newIngredients[index].total_cost = newIngredients[index].quantity * (r.cost_per_serving || 0);
+          newIngredients[index].cost_unit = r.yield_unit || newIngredients[index].unit;
         }
       }
     } else {
       newIngredients[index][field] = value;
-      // Update total cost
-      if (field === 'quantity' || field === 'unit_cost') {
-        newIngredients[index].total_cost =
-          (newIngredients[index].quantity || 0) * (newIngredients[index].unit_cost || 0);
-      }
     }
+
+    const ingredientCost = calculateIngredientCost(newIngredients[index], unitConversions);
+    newIngredients[index].total_cost = ingredientCost.cost;
+    newIngredients[index].missing_conversion = ingredientCost.missingConversion;
 
     setFormData({ ...formData, ingredients: newIngredients });
   };
@@ -461,26 +605,24 @@ export default function Recipes() {
     setCalculatingCost(true);
 
     try {
-      const ingredientCost = (recipe.ingredients || []).reduce(
-        (sum, i) => sum + (i.total_cost || 0),
-        0
-      );
-      const packagingCost = (recipe.packaging_items || []).reduce(
-        (sum, p) => sum + (p.total_cost || 0),
-        0
-      );
-      const laborCost = ((recipe.labor_time_minutes || 0) / 60) * (recipe.labor_rate_per_hour || 0);
-      const totalCost = ingredientCost + packagingCost + laborCost;
-      const effectiveYield = (recipe.yield_quantity || 1) * ((recipe.yield_percentage || 100) / 100);
-      const costPerServing = effectiveYield > 0
-        ? totalCost / effectiveYield
-        : totalCost;
+      const result = calculateRecipeCost({
+        ingredients: recipe.ingredients || [],
+        packagingItems: recipe.packaging_items || [],
+        laborMinutes: recipe.labor_time_minutes,
+        laborRatePerHour: recipe.labor_rate_per_hour,
+        yieldQuantity: recipe.yield_quantity,
+        yieldPercentage: recipe.yield_percentage,
+        conversions: unitConversions,
+      });
 
       await updateMutation.mutateAsync({
         id: recipe.id,
         data: {
-          total_cost: totalCost,
-          cost_per_serving: costPerServing,
+          total_ingredient_cost: result.ingredientCost,
+          total_packaging_cost: result.packagingCost,
+          labor_cost: result.laborCost,
+          total_cost: result.totalCost,
+          cost_per_serving: result.costPerYieldUnit,
         },
       });
     } catch (error) {
@@ -511,7 +653,7 @@ export default function Recipes() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name) {
       toast.error('Recipe name is required');
       return;
@@ -538,6 +680,14 @@ export default function Recipes() {
         toast.error('Circular dependency detected! A recipe cannot contain itself as an ingredient.');
         return;
       }
+    }
+
+    // Show confirmation only for create, not for update
+    if (!editingRecipe) {
+      const confirmed = await confirm(
+        getConfirmationMessage('createRecipe', formData.name)
+      );
+      if (!confirmed) return;
     }
 
     const data = {
@@ -568,8 +718,46 @@ export default function Recipes() {
     });
   }, [recipes, search, categoryFilter]);
 
+  const menuItemRouteValue = currentSubPath === 'menu-items' ? pathParts[2] : null;
+  if (menuItemRouteValue === 'new') {
+    return <MenuItemAuthoringPage
+      products={products}
+      preparedItems={recipes.filter((recipe) => recipe.is_batch || recipe.category === 'prepared_item')}
+      locations={recipeLocations}
+      conversions={unitConversions}
+    />;
+  }
+  if (menuItemRouteValue) {
+    return <MenuItemDetailPage recipeId={menuItemRouteValue} locations={recipeLocations} />;
+  }
+
+  const preparedItemRouteValue = currentSubPath === 'prepared-items' ? pathParts[2] : null;
+  const preparedItemEdit = currentSubPath === 'prepared-items' && pathParts[3] === 'edit';
+  const preparedRecipes = recipes.filter((recipe) => recipe.is_batch || recipe.category === 'prepared_item');
+  if (preparedItemRouteValue === 'new' || preparedItemEdit) {
+    const editingPreparedItem = preparedItemEdit ? preparedRecipes.find((recipe) => recipe.id === preparedItemRouteValue) : null;
+    return <PreparedItemAuthoringPage recipe={editingPreparedItem} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
+  }
+  if (preparedItemRouteValue) {
+    return <PreparedItemDetailPage recipeId={preparedItemRouteValue} onEdit={(item) => navigate(`/Recipes/prepared-items/${item.id}/edit${routerLocation.search}`)} />;
+  }
+
+  const barItemRouteValue = currentSubPath === 'bar-items' ? pathParts[2] : null;
+  const barItemEdit = currentSubPath === 'bar-items' && pathParts[3] === 'edit';
+  const beverageTypeIds = recipeTypes.filter((row) => row.kind === 'beverage').map((row) => row.id);
+  const barRecipes = recipes.filter((row) => !row.is_batch && (row.category === 'beverage' || beverageTypeIds.includes(row.recipe_type_id)));
+  if (barItemRouteValue === 'new' || barItemEdit) {
+    const editingBarItem = barItemEdit ? barRecipes.find((row) => row.id === barItemRouteValue) : null;
+    return <BarItemAuthoringPage recipe={editingBarItem} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
+  }
+  if (barItemRouteValue) {
+    return <BarItemDetailPage recipeId={barItemRouteValue} locations={recipeLocations} onEdit={(item) => navigate(`/Recipes/bar-items/${item.id}/edit${routerLocation.search}`)} />;
+  }
+
   return (
     <div className="space-y-6">
+      {!['menu-items', 'prepared-items', 'bar-items'].includes(activeTab) && (
+        <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -618,8 +806,29 @@ export default function Recipes() {
 
       {/* Live Margins Ticker */}
       <ProductsLiveDashboard targetCogs={30} />
+        </>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+
+        <TabsContent value="menu-items" className="mt-0">
+          <MenuItemsOperations
+            recipes={recipes}
+            visibilityRows={recipeVisibility.rows}
+            visibilitySupported={recipeVisibility.supported}
+            locations={recipeLocations}
+            posItems={menuPosItems}
+            posMappings={menuPosMappings}
+            alertHistoryRows={recipeAlertHistory.rows}
+            alertHistorySupported={recipeAlertHistory.supported}
+            organizationId={organization?.id}
+            brandId={(brand?.brand_id || brand?.id) || null}
+            locationId={location?.id || null}
+            onAdd={() => navigate(`/Recipes/menu-items/new${routerLocation.search}`)}
+            onView={(item) => navigate(`/Recipes/menu-items/${item.id}${routerLocation.search}`)}
+            onEdit={handleEdit}
+          />
+        </TabsContent>
 
 
         <TabsContent value="recipes" className="space-y-4">
@@ -748,71 +957,12 @@ export default function Recipes() {
         </TabsContent>
 
  {/* Prepared Items Tab */}
-        <TabsContent value="prepared-items">
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Prepared Items</CardTitle>
-                <p className="text-xs text-muted-foreground">Items that are prepared from recipes (batch-cooked/prepped items)</p>
-              </div>
-              <Button
-                className="bg-primary hover:bg-primary"
-                size="sm"
-                onClick={() => {
-                  resetForm();
-                  setFormData((prev) => ({ ...prev, category: 'prepared_item' }));
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Prepared Item
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Batch Yield</TableHead>
-                    <TableHead>Batch Cost</TableHead>
-                    <TableHead>Plate Cost</TableHead>
-                    <TableHead>Selling Price</TableHead>
-                    <TableHead>Margin</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recipes.filter(r => r.category === 'prepared_item').length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        No prepared items yet. Add a prepared item to start tracking batch costs.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    recipes.filter(r => r.category === 'prepared_item').map((recipe) => {
-                      const margin = recipe.selling_price
-                        ? ((recipe.selling_price - (recipe.cost_per_serving || 0)) / recipe.selling_price) * 100
-                        : 0;
-                      return (
-                        <TableRow key={recipe.id}>
-                          <TableCell className="font-medium">{recipe.name}</TableCell>
-                          <TableCell><Badge variant="secondary">{recipe.category?.replace('_', ' ')}</Badge></TableCell>
-                          <TableCell>{recipe.yield_quantity || 0} {recipe.yield_unit || 'servings'}</TableCell>
-                          <TableCell>${(recipe.total_cost || 0).toFixed(2)}</TableCell>
-                          <TableCell>${(recipe.cost_per_serving || 0).toFixed(2)}</TableCell>
-                          <TableCell>${(recipe.selling_price || 0).toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge className={margin >= 70 ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/10 text-resend-yellow'}>
-                              {margin.toFixed(0)}%
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="prepared-items" className="mt-0">
+          <PreparedItemsOperations recipes={recipes} recipeTypes={recipeTypes} onAdd={() => navigate(`/Recipes/prepared-items/new${routerLocation.search}`)} onView={(item) => navigate(`/Recipes/prepared-items/${item.id}${routerLocation.search}`)} onEdit={(item) => navigate(`/Recipes/prepared-items/${item.id}/edit${routerLocation.search}`)} onChanged={() => queryClient.invalidateQueries({ queryKey: ['recipes'] })} />
+        </TabsContent>
+
+        <TabsContent value="bar-items" className="mt-0">
+          <BarItemsOperations recipes={recipes} recipeTypes={recipeTypes} onAdd={() => navigate(`/Recipes/bar-items/new${routerLocation.search}`)} onView={(item) => navigate(`/Recipes/bar-items/${item.id}${routerLocation.search}`)} onEdit={(item) => navigate(`/Recipes/bar-items/${item.id}/edit${routerLocation.search}`)} onChanged={() => queryClient.invalidateQueries({ queryKey: ['recipes'] })} />
         </TabsContent>
 
  {/* Menu Analysis Tab (AI/ML + Analytics Dashboard) */}
@@ -1092,7 +1242,7 @@ export default function Recipes() {
       </Tabs>
 
       {/* Recipe Form Sheet */}
-      <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Sheet open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editingRecipe ? 'Edit Recipe' : 'Add Recipe'}</SheetTitle>
@@ -1248,6 +1398,16 @@ export default function Recipes() {
                     placeholder="Unit"
                     className="w-20"
                   />
+                  <Input
+                    type="number"
+                    min="0.01"
+                    max="100"
+                    step="0.01"
+                    value={ing.yield_percentage ?? 100}
+                    onChange={(e) => updateIngredient(idx, 'yield_percentage', parseFloat(e.target.value) || 100)}
+                    title="Usable ingredient yield percentage"
+                    className="w-20"
+                  />
                   <span className="text-sm text-muted-foreground w-16">${ing.total_cost?.toFixed(2)}</span>
                   <Button variant="ghost" size="icon" onClick={() => removeIngredient(idx)}>
                     <Trash2 className="h-4 w-4 text-resend-red" />
@@ -1383,11 +1543,16 @@ export default function Recipes() {
                 <span className="font-semibold text-primary">Cost/Serving:</span>
                 <span className="font-bold text-primary text-right">${costs.costPerServing.toFixed(2)}</span>
               </div>
+              {costs.missingConversions.length > 0 && (
+                <div className="rounded-md border border-resend-yellow/30 bg-resend-yellow/10 p-3 text-xs text-resend-yellow">
+                  Add conversion rules for {costs.missingConversions.map((item) => item.product_name).join(', ')} before publishing this cost.
+                </div>
+              )}
             </div>
 
             {/* Actions */}
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">
+              <Button variant="outline" onClick={() => handleDialogOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
               <Button onClick={handleSubmit} className="flex-1 bg-primary hover:bg-primary">

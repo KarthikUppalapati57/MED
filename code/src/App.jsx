@@ -3,6 +3,9 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { ConfirmationProvider } from '@/contexts/ConfirmationContext';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { hasSupabaseEnv, supabase } from '@/lib/supabaseClient';
 import { initGlobalErrorHandlers } from '@/lib/errorMonitor';
@@ -1229,6 +1232,12 @@ const AuthenticatedApp = () => {
 
 import { OfflineBanner } from '@/components/OfflineBanner';
 
+// Component to render the confirmation dialog
+function ConfirmationDialogRenderer() {
+  const { isOpen, config } = useConfirmation();
+  return <ConfirmationDialog isOpen={isOpen} config={config} />;
+}
+
 function App() {
   if (!hasSupabaseEnv) {
     return (
@@ -1256,11 +1265,14 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-          <DeferredAppSonnerToaster />
-          <OfflineBanner />
+          <ConfirmationProvider>
+            <Router>
+              <AuthenticatedApp />
+            </Router>
+            <ConfirmationDialogRenderer />
+            <DeferredAppSonnerToaster />
+            <OfflineBanner />
+          </ConfirmationProvider>
         </QueryClientProvider>
       </AuthProvider>
     </ErrorBoundary>

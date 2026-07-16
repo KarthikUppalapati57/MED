@@ -38,7 +38,8 @@ import {
   Code,
   BookOpen,
   RefreshCcw,
-  Calculator
+  Calculator,
+  Wine
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -154,8 +155,10 @@ const navigation = [
     icon: ChefHat, 
     minRole: 'location_manager',
     subItems: [
+      { name: 'Menu Items', href: 'Recipes/menu-items', icon: BookOpen },
       { name: 'Recipes List', href: 'Recipes/recipes-list', icon: ChefHat },
       { name: 'Prepared Items', href: 'Recipes/prepared-items', icon: Plus },
+      { name: 'Bar Items', href: 'Recipes/bar-items', icon: Wine },
       { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
       { name: 'Delivery Menus', href: 'DeliveryAggregator', icon: Package },
       { name: 'Setup', href: 'Recipes/setup', icon: Settings }

@@ -54,6 +54,15 @@ const TABLE_SCOPE_COLUMNS = {
   receiving_items: ['organization_id'],
   recipes: ['organization_id', 'brand_id', 'location_id'],
   recipe_ingredients: ['organization_id'],
+  recipe_types: ['organization_id', 'location_id'],
+  recipe_yields: ['organization_id'],
+  recipe_unit_conversions: ['organization_id'],
+  recipe_location_visibility: ['organization_id'],
+  recipe_margin_alert_events: ['organization_id'],
+  recipe_equipment_catalog: ['organization_id'],
+  recipe_equipment_assignments: ['organization_id'],
+  recipe_preparation_steps: ['organization_id'],
+  recipe_location_prices: ['organization_id'],
   smart_prep_plans: ['organization_id', 'brand_id', 'location_id'],
   transfers: ['organization_id'],
   vendors: ['organization_id', 'brand_id', 'location_id'],
@@ -304,6 +313,16 @@ export const api = {
     AccountingSyncLog: createEntityClient('accounting_sync_logs'),
     OnboardingProgress: createEntityClient('onboarding_progress'),
     RecipeIngredient: createEntityClient('recipe_ingredients'),
+    RecipeType: createEntityClient('recipe_types'),
+    RecipeYield: createEntityClient('recipe_yields'),
+    RecipeUnitConversion: createEntityClient('recipe_unit_conversions'),
+    RecipeLocationVisibility: createEntityClient('recipe_location_visibility'),
+    RecipeMarginAlertEvent: createEntityClient('recipe_margin_alert_events'),
+    RecipeEquipmentCatalog: createEntityClient('recipe_equipment_catalog'),
+    RecipeEquipmentAssignment: createEntityClient('recipe_equipment_assignments'),
+    RecipePreparationStep: createEntityClient('recipe_preparation_steps'),
+    RecipeLocationPrice: createEntityClient('recipe_location_prices'),
+    RecipeCostSnapshot: createEntityClient('recipe_cost_snapshots'),
     InventoryMovement: createEntityClient('inventory_movements'),
     PurchaseOrder: createEntityClient('purchase_orders'),
     PurchaseOrderItem: createEntityClient('purchase_order_items'),
@@ -1001,6 +1020,59 @@ export const api = {
       if (error) throw error;
       return data;
     }
+  },
+  recipes: {
+    saveMenuItemPhase1: async ({ recipe, yields, visibility, equipmentNames, steps, locationPrices }) => {
+      const { data, error } = await supabase.rpc('save_menu_item_phase1', {
+        p_recipe: recipe,
+        p_yields: yields,
+        p_visibility: visibility,
+        p_equipment_names: equipmentNames,
+        p_steps: steps,
+        p_location_prices: locationPrices,
+      });
+      if (error) throw error;
+      return data;
+    },
+    savePreparedItemRelease1: async ({ recipe, yields, visibility, equipmentNames, steps, ingredients }) => {
+      const { data, error } = await supabase.rpc('save_prepared_item_release1', {
+        p_recipe: recipe, p_yields: yields, p_visibility: visibility,
+        p_equipment_names: equipmentNames, p_steps: steps, p_ingredients: ingredients,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getPreparedItemDependencies: async (recipeId) => {
+      const { data, error } = await supabase.rpc('get_prepared_item_dependencies', { p_recipe_id: recipeId });
+      if (error) throw error;
+      return data || [];
+    },
+    deactivatePreparedItem: async (recipeId) => {
+      const { data, error } = await supabase.rpc('deactivate_prepared_item', { p_recipe_id: recipeId });
+      if (error) throw error;
+      return data;
+    },
+    deletePreparedItem: async (recipeId) => {
+      const { error } = await supabase.rpc('delete_prepared_item', { p_recipe_id: recipeId });
+      if (error) throw error;
+    },
+    saveBarItemRelease1: async ({ recipe, yields, visibility, equipmentNames, steps, locationPrices }) => {
+      const { data, error } = await supabase.rpc('save_bar_item_release1', {
+        p_recipe: recipe, p_yields: yields, p_visibility: visibility,
+        p_equipment_names: equipmentNames, p_steps: steps, p_location_prices: locationPrices,
+      });
+      if (error) throw error;
+      return data;
+    },
+    setBarItemStatus: async (recipeId, status) => {
+      const { data, error } = await supabase.rpc('set_bar_item_status', { p_recipe_id: recipeId, p_status: status });
+      if (error) throw error;
+      return data;
+    },
+    deleteBarItem: async (recipeId) => {
+      const { error } = await supabase.rpc('delete_bar_item', { p_recipe_id: recipeId });
+      if (error) throw error;
+    },
   },
   vendors: {
     getFlaggedVendorItems: async (orgId) => {
