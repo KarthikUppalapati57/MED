@@ -627,6 +627,11 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    revealTaxIdentifier: async () => {
+      const { data, error } = await supabase.rpc('reveal_my_tax_identifier');
+      if (error) throw error;
+      return data;
+    },
     verifyPaymentMethod: async ({
       methodType,
       provider = 'stripe',
@@ -716,6 +721,14 @@ export const api = {
       const { data, error } = await supabase.rpc('request_onboarding_more_info', {
         p_user_id: userId,
         p_reason: reason,
+      });
+      if (error) throw error;
+      return data;
+    },
+    confirmCheckPayment: async ({ userId, note = null }) => {
+      const { data, error } = await supabase.rpc('confirm_check_payment_received', {
+        p_user_id: userId,
+        p_note: note,
       });
       if (error) throw error;
       return data;

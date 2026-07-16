@@ -181,13 +181,28 @@ function SignupPage() {
   const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
   const token = normalizeInviteToken(routeToken || queryParams.get('token') || hashParams.get('token'));
   const { signUp, user, loginWithSSO } = useAuth();
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '', username: '' });
   const [error, setError] = useState('');
   const [inviteInfo, setInviteInfo] = useState(null);
   const [inviteLoading, setInviteLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [ssoProvider, setSsoProvider] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | available | taken | invalid
+
+  useEffect(() => {
+    const value = form.username;
+    if (!value) { setUsernameStatus('idle'); return; }
+    if (!/^[a-z0-9_]{3,24}$/.test(value)) { setUsernameStatus('invalid'); return; }
+    setUsernameStatus('checking');
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const { data, error: rpcError } = await supabase.rpc('is_username_available', { p_username: value });
+      if (cancelled) return;
+      setUsernameStatus(rpcError ? 'invalid' : data ? 'available' : 'taken');
+    }, 400);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [form.username]);
 
   // Fetch invitation details
   React.useEffect(() => {
@@ -288,6 +303,10 @@ function SignupPage() {
       setError('Please wait for invitation details to load.');
       return;
     }
+    if (usernameStatus !== 'available') {
+      setError(usernameStatus === 'checking' ? 'Please wait for the username check to finish.' : 'Choose an available username before continuing.');
+      return;
+    }
     setLoading(true);
 
     // Map deprecated role names to new role names to satisfy database constraints
@@ -302,6 +321,7 @@ function SignupPage() {
 
     const { data, error: signUpError } = await signUp(form.email, password, {
       full_name: form.full_name,
+      username: form.username,
       role: mappedRole, // Use the mapped role instead of the deprecated one
       invite_token: cleanToken,
     });
@@ -405,6 +425,26 @@ function SignupPage() {
               {!!inviteInfo?.email && <p className="text-xs text-muted-foreground">This invite is assigned to {inviteInfo.email}.</p>}
             </div>
             <div className="space-y-1">
+              <label className="block text-sm font-medium text-foreground">Username</label>
+              <input
+                type="text"
+                value={form.username}
+                onChange={(e) => setForm((current) => ({ ...current, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) }))}
+                className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
+                placeholder="chefkarthik"
+                autoComplete="username"
+                required
+                disabled={inviteLoading || !inviteInfo}
+              />
+              <p className={`text-xs ${usernameStatus === 'available' ? 'text-resend-green' : usernameStatus === 'taken' ? 'text-resend-red' : usernameStatus === 'invalid' ? 'text-resend-red' : 'text-muted-foreground'}`}>
+                {usernameStatus === 'idle' && 'You can sign in with either your email or this username.'}
+                {usernameStatus === 'checking' && 'Checking availability...'}
+                {usernameStatus === 'available' && 'Username is available.'}
+                {usernameStatus === 'taken' && 'That username is already taken.'}
+                {usernameStatus === 'invalid' && '3-24 characters: lowercase letters, numbers, and underscores only.'}
+              </p>
+            </div>
+            <div className="space-y-1">
               <label className="block text-sm font-medium text-foreground">Password</label>
               <input
                 type="password"
@@ -434,7 +474,7 @@ function SignupPage() {
             )}
             <button
               type="submit"
-              disabled={loading || inviteLoading || !inviteInfo}
+              disabled={loading || inviteLoading || !inviteInfo || usernameStatus !== 'available'}
               className="w-full inline-flex items-center justify-center rounded-lg bg-brand text-primary-foreground hover:opacity-95 shadow-glow-brand font-bold px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shimmer-sweep"
             >
               {loading ? (
@@ -507,7 +547,18 @@ function LoginPage() {
     e.preventDefault();
     setLocalError('');
     setIsSubmitting(true);
-    await loginWithEmail(email, password);
+    const identifier = email.trim();
+    let loginEmail = identifier;
+    if (identifier && !identifier.includes('@')) {
+      const { data: resolvedEmail, error: resolveError } = await supabase.rpc('resolve_username_email', { p_username: identifier });
+      if (resolveError || !resolvedEmail) {
+        setLocalError('No account found for that username.');
+        setIsSubmitting(false);
+        return;
+      }
+      loginEmail = resolvedEmail;
+    }
+    await loginWithEmail(loginEmail, password);
     setIsSubmitting(false);
   };
 
@@ -627,13 +678,14 @@ function LoginPage() {
 
         <form className="space-y-4" onSubmit={handleLogin}>
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-foreground">Email</label>
+            <label className="block text-sm font-medium text-foreground">Email or Username</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-border/60 bg-secondary/40 px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-muted-foreground transition-all duration-200"
-              placeholder="you@restaurant.com"
+              placeholder="you@restaurant.com or username"
+              autoComplete="username"
               required
             />
           </div>

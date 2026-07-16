@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, ClipboardCheck, XCircle, AlertTriangle } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, ClipboardCheck, XCircle, AlertTriangle, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,19 @@ import posthog from '@/lib/posthog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { sendBusinessVerificationDecisionEmail } from '@/lib/emailService';
+
+function verificationStatusTone(status) {
+  if (status === 'verified') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  if (status === 'rejected') return 'bg-red-50 text-red-700 border-red-100';
+  return 'bg-amber-50 text-amber-700 border-amber-100';
+}
+
+function verificationStatusLabel(status) {
+  if (status === 'verified') return 'Approved';
+  if (status === 'rejected') return 'Rejected';
+  if (status === 'failed') return 'Changes requested';
+  return 'Pending';
+}
 
 export default function PlatformOrganizations() {
   const queryClient = useQueryClient();
@@ -128,7 +141,7 @@ export default function PlatformOrganizations() {
     queryFn: async () => {
       const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult] = await Promise.all([
         supabase.rpc('platform_business_verification_reviews'),
-        supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified').in('business_verification_status', ['pending_review', 'failed', 'verified']),
+        supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified, payment_method_type').in('business_verification_status', ['pending_review', 'failed', 'rejected', 'verified']),
         supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, metadata, created_at').order('created_at', { ascending: false }).limit(200),
         supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_manager', 'tenant_super_admin']).order('created_at', { ascending: false }).limit(100),
@@ -535,6 +548,16 @@ export default function PlatformOrganizations() {
     }
   };
 
+  const handleConfirmCheckPayment = async (userId) => {
+    try {
+      await api.onboarding.confirmCheckPayment({ userId });
+      toast.success('Check payment confirmed');
+      refreshOnboardingReview();
+    } catch (err) {
+      toast.error(err.message || 'Could not confirm check payment');
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden bg-secondary/20 rounded-xl border border-border">
       
@@ -896,7 +919,7 @@ export default function PlatformOrganizations() {
                     </Card>
                   ) : selectedOrgReviewItems.map((item) => {
                     const verification = item.verification;
-                    const statusTone = verification.verification_status === 'failed' ? 'bg-red-50 text-red-700 border-red-100' : verification.verification_status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100';
+                    const statusTone = verificationStatusTone(verification.verification_status);
                     return (
                       <Card key={verification.id} className="border-0 shadow-sm bg-card overflow-hidden">
                         <CardHeader className="border-b border-border/50 bg-secondary/20">
@@ -916,7 +939,7 @@ export default function PlatformOrganizations() {
                             </div>
                             <div className="rounded-xl border border-border bg-secondary/30 p-3">
                               <p className="text-[10px] font-bold uppercase text-muted-foreground">Business verification</p>
-                              <p className="mt-1 text-sm font-bold text-foreground">{verification.verification_status === 'verified' ? 'Approved' : verification.verification_status === 'failed' ? 'Needs review' : 'Pending'}</p>
+                              <p className="mt-1 text-sm font-bold text-foreground">{verificationStatusLabel(verification.verification_status)}</p>
                             </div>
                             <div className="rounded-xl border border-border bg-secondary/30 p-3">
                               <p className="text-[10px] font-bold uppercase text-muted-foreground">Hierarchy</p>
@@ -969,6 +992,13 @@ export default function PlatformOrganizations() {
                               </div>
                             </div>
                           </div>
+
+                          {item.profile?.payment_method_type === 'check' && !item.profile?.payment_verified && (
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                              <p className="text-sm text-amber-800"><Banknote className="mr-2 inline h-4 w-4" /> Awaiting check payment for this tenant's subscription.</p>
+                              <Button size="sm" onClick={() => handleConfirmCheckPayment(item.profile.id)}>Confirm Check Received</Button>
+                            </div>
+                          )}
 
                           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                             <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
@@ -1275,7 +1305,7 @@ export default function PlatformOrganizations() {
                   <div className="grid gap-4">
                     {selectedOrgReviewItems.map((item) => {
                       const verification = item.verification;
-                      const statusTone = verification.verification_status === 'failed' ? 'bg-red-50 text-red-700 border-red-100' : verification.verification_status === 'verified' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100';
+                      const statusTone = verificationStatusTone(verification.verification_status);
                       return (
                         <Card key={verification.id} className="border-0 bg-card shadow-sm">
                           <CardHeader className="border-b border-border/50 bg-secondary/20">

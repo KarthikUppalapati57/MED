@@ -192,12 +192,16 @@ export async function sendBusinessVerificationDecisionEmail({ to_email, to_name,
     ? 'Your Restops business verification was approved'
     : decision === 'more_info'
     ? 'Restops needs more information to verify your business'
+    : decision === 'rejected'
+    ? 'Your Restops business verification was rejected'
     : 'Your Restops business verification needs changes';
 
   const body = decision === 'approved'
     ? `Your business verification has been approved. Log in to continue setting up your organization.`
     : decision === 'more_info'
     ? `A platform admin needs more information before your business can be verified:\n\n"${reason || 'Please review your submission.'}"\n\nLog in and update your business verification to resubmit.`
+    : decision === 'rejected'
+    ? `Your business verification was not approved:\n\n"${reason || 'Please review the details you submitted.'}"\n\nThis decision is final and this application cannot be resubmitted.`
     : `Your business verification could not be approved:\n\n"${reason || 'Please review your submission.'}"\n\nLog in and update your business verification to resubmit.`;
 
   return sendEmail({

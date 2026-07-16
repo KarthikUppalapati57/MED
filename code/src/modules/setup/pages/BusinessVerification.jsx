@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3 } from 'lucide-react';
+import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
@@ -26,8 +26,8 @@ function identifierTypeForBusinessType(businessType) {
   return INDIVIDUAL_OWNER_TYPES.has(businessType) ? 'ssn' : 'ein';
 }
 const BUSINESS_STEPS = [
-  { key: 'business_information', label: 'Business' },
   { key: 'contact_verification', label: 'Contact' },
+  { key: 'business_information', label: 'Business' },
   { key: 'business_review', label: 'Review' },
 ];
 
@@ -84,6 +84,8 @@ export default function BusinessVerification() {
   const [stepError, setStepError] = useState('');
   const [stepKey, setStepKey] = useState('business_information');
   const [reviewFeedback, setReviewFeedback] = useState(null);
+  const [revealedTaxId, setRevealedTaxId] = useState(null);
+  const [revealingTaxId, setRevealingTaxId] = useState(false);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
   const [contactOtp, setContactOtp] = useState({
     email: {
@@ -116,7 +118,7 @@ export default function BusinessVerification() {
   const requiredIdentifierType = identifierTypeForBusinessType(form.businessType);
   const isTaxVerificationEnabled = requiredIdentifierType === 'ein' ? verificationSettings.ein_verification_enabled : verificationSettings.ssn_verification_enabled;
   const isIndividualOwner = requiredIdentifierType === 'ssn';
-  const contactEmailLabel = isIndividualOwner ? 'Contact Email' : 'Business Email';
+  const contactEmailLabel = 'Email';
   const emailVerified = Boolean(contactOtp.email.verifiedAt && contactOtp.email.verifiedTarget === normalizeEmail(form.email));
   const phoneVerified = Boolean(contactOtp.phone.verifiedAt && contactOtp.phone.verifiedTarget === normalizePhone(form.phone));
 
@@ -151,7 +153,7 @@ export default function BusinessVerification() {
         if (draftState?.current_step && BUSINESS_STEPS.some((step) => step.key === draftState.current_step)) {
           setStepKey(draftState.current_step);
         }
-        if (draftState?.business_verification_status === 'failed' && (draftState?.rejection_reason || draftState?.more_info_reason)) {
+        if ((draftState?.business_verification_status === 'failed' || draftState?.business_verification_status === 'rejected') && (draftState?.rejection_reason || draftState?.more_info_reason)) {
           setReviewFeedback({
             reason: draftState.rejection_reason || draftState.more_info_reason,
             isMoreInfo: Boolean(draftState.more_info_reason),
@@ -193,18 +195,16 @@ export default function BusinessVerification() {
   };
 
   const validateContact = () => {
-    const businessInfoMessage = validateBusinessInfo();
-    if (businessInfoMessage) return businessInfoMessage;
-    if (!form.email.includes('@')) return 'A valid business email is required.';
-    if (form.phone.replace(/\D/g, '').length < 10) return 'A valid business phone number is required.';
+    if (!form.email.includes('@')) return 'A valid email is required.';
+    if (form.phone.replace(/\D/g, '').length < 10) return 'A valid phone number is required.';
     if (!emailVerified) return `Verify the ${contactEmailLabel.toLowerCase()} with OTP before continuing.`;
-    if (!phoneVerified) return 'Verify the business phone with OTP before continuing.';
+    if (!phoneVerified) return 'Verify the phone with OTP before continuing.';
     return null;
   };
 
   const validateCurrentStep = () => {
-    if (stepKey === 'business_information') return validateBusinessInfo();
     if (stepKey === 'contact_verification') return validateContact();
+    if (stepKey === 'business_information') return validateBusinessInfo();
     return validate();
   };
 
@@ -242,6 +242,45 @@ export default function BusinessVerification() {
 
   if (userProfile?.business_verification_status === 'verified') {
     return <Navigate to="/onboarding" replace />;
+  }
+
+  if (userProfile?.business_verification_status === 'rejected') {
+    const goToLanding = async () => {
+      try {
+        await logout();
+      } finally {
+        navigate('/landing', { replace: true });
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-background via-background to-white">
+        <Card className="w-full max-w-lg border-none bg-card/90 text-center shadow-2xl ring-1 ring-border/60 backdrop-blur-xl">
+          <CardHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
+              <XCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-black tracking-tight">Business Verification Rejected</CardTitle>
+              <CardDescription className="text-base">
+                Your platform admin has rejected this application. This decision is final and this application cannot be resubmitted.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {reviewFeedback?.reason && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left text-sm">
+                <p className="font-bold text-foreground">Reason</p>
+                <p className="mt-1 text-muted-foreground">{reviewFeedback.reason}</p>
+              </div>
+            )}
+            <Button type="button" onClick={goToLanding} className="w-full">
+              Go to Landing Page
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (submittedForReview || userProfile?.business_verification_status === 'pending_review') {
@@ -363,6 +402,22 @@ export default function BusinessVerification() {
       console.error('OTP verification failed:', err);
       toast.error(err.message || 'Invalid OTP code.');
       setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], verifying: false } }));
+    }
+  };
+
+  const handleToggleRevealTaxId = async () => {
+    if (revealedTaxId) {
+      setRevealedTaxId(null);
+      return;
+    }
+    setRevealingTaxId(true);
+    try {
+      const result = await api.onboarding.revealTaxIdentifier();
+      setRevealedTaxId(result?.full_identifier || null);
+    } catch (err) {
+      toast.error(err.message || 'Could not reveal the stored tax identifier.');
+    } finally {
+      setRevealingTaxId(false);
     }
   };
 
@@ -569,6 +624,15 @@ export default function BusinessVerification() {
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Contact:</b> {form.email || 'No email'}<br /><span className="text-muted-foreground">{form.phone || 'No phone'}</span></div>
 
                     </div>
+                    {userProfile?.tax_identifier_last4 && (
+                      <div className="rounded-lg border bg-secondary/30 p-4 text-sm">
+                        <b>{(userProfile?.tax_identifier_type || requiredIdentifierType).toUpperCase()} on file:</b>{' '}
+                        <span className="font-mono">{revealedTaxId || `•••••${userProfile.tax_identifier_last4}`}</span>
+                        <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={handleToggleRevealTaxId} disabled={revealingTaxId}>
+                          {revealingTaxId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : revealedTaxId ? 'Hide' : 'Show'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 {stepError && (
