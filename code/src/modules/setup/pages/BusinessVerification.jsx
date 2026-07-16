@@ -167,8 +167,10 @@ export default function BusinessVerification() {
     return () => { cancelled = true; };
   }, []);
 
-  const buildDraftPayload = () => ({ form: { ...form, identifierType: requiredIdentifierType } });
-
+  const buildDraftPayload = () => {
+    const { taxIdentifier, ...formWithoutTaxId } = form;
+    return { form: { ...formWithoutTaxId, identifierType: requiredIdentifierType } };
+  };
   const saveDraft = async (targetStep = stepKey, options = {}) => {
     if (!user?.id) return false;
     setSavingDraft(true);
