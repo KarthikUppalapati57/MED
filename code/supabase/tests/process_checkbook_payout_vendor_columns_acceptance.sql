@@ -1,8 +1,8 @@
 -- Acceptance test for the process-checkbook-payout/index.ts column-name fix (13.4 pass).
 --
 -- process-checkbook-payout previously selected vendor:vendor_id ( ..., street_1, street_2,
--- city, state, zip ) -- none of street_1/street_2/zip exist on public.vendors (the real
--- columns are address/city/state/zip_code), so EVERY call to this function failed at the
+-- none of street_1/street_2/zip exist on public.vendors (the real
+-- columns are mailing_address_line1/mailing_city/mailing_state/mailing_zip_code), so EVERY call to this function failed at the
 -- select step, for both digital and physical checks. This test mirrors the edge function's
 -- exact select shape against a seeded invoice+vendor and proves it now succeeds and returns
 -- the expected address fields.
@@ -25,7 +25,7 @@ DECLARE
 BEGIN
   INSERT INTO public.organizations (id, name, slug) VALUES (v_org, 'PCPVC Org', 'pcpvc-org-' || v_org);
 
-  INSERT INTO public.vendors (organization_id, name, email, address, city, state, zip_code)
+  INSERT INTO public.vendors (organization_id, name, email, mailing_address_line1, mailing_city, mailing_state, mailing_zip_code)
   VALUES (v_org, 'PCPVC Vendor', 'pcpvc-vendor@example.test', '123 Main St', 'Knoxville', 'TN', '37916')
   RETURNING id INTO v_vendor;
 
@@ -34,7 +34,7 @@ BEGIN
   RETURNING id INTO v_invoice;
 
   -- Mirrors process-checkbook-payout/index.ts's exact select shape (vendor:vendor_id (...))
-  SELECT v.address, v.zip_code INTO v_selected_address, v_selected_zip
+  SELECT v.mailing_address_line1, v.mailing_zip_code INTO v_selected_address, v_selected_zip
   FROM public.invoices i
   JOIN public.vendors v ON v.id = i.vendor_id
   WHERE i.id = v_invoice;
