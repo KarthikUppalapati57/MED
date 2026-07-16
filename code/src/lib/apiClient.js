@@ -289,7 +289,7 @@ export const api = {
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     InvoiceAllocation: createEntityClient('invoice_allocations'),
     CreditRequest: createEntityClient('credit_requests'),
-    WastageLog: createEntityClient('wastage_logs'),
+    WastageLog: createEntityClient('wastage_logs', true),
     User: createEntityClient('profiles'),
     Notification: createEntityClient('notifications'),
     Invitation: createEntityClient('invitations'),
@@ -328,7 +328,7 @@ export const api = {
     ReconciliationVariance: createEntityClient('reconciliation_variances'),
     ReceivingItem: createEntityClient('receiving_items'),
     CountSheet: createEntityClient('count_sheets'),
-    CountSession: createEntityClient('count_sessions'),
+    CountSession: createEntityClient('count_sessions', true),
     ClosedPeriod: createEntityClient('closed_periods'),
     LocationGroup: createEntityClient('location_groups'),
     GlMapping: createEntityClient('gl_mappings'),
@@ -823,6 +823,96 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    saveInventoryCountSession: async ({
+      orgId,
+      locationId = null,
+      brandId = null,
+      scopeKey = 'all',
+      type = 'Inventory',
+      countDate,
+      items = [],
+      userId,
+      sessionId = null
+    }) => {
+      const { data, error } = await supabase.rpc('save_inventory_count_session', {
+        p_organization_id: orgId,
+        p_location_id: locationId,
+        p_brand_id: brandId,
+        p_scope_key: scopeKey,
+        p_type: type,
+        p_count_date: countDate,
+        p_items: items,
+        p_user_id: userId,
+        p_session_id: sessionId
+      });
+      if (error) throw error;
+      return data;
+    },
+    closeInventoryCountSession: async (orgId, sessionId, userId) => {
+      const { data, error } = await supabase.rpc('close_inventory_count_session', {
+        p_organization_id: orgId,
+        p_session_id: sessionId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    reopenInventoryCountSession: async (orgId, sessionId, userId) => {
+      const { data, error } = await supabase.rpc('reopen_inventory_count_session', {
+        p_organization_id: orgId,
+        p_session_id: sessionId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    deleteInventoryCountSession: async (orgId, sessionId, userId) => {
+      const { data, error } = await supabase.rpc('delete_inventory_count_session', {
+        p_organization_id: orgId,
+        p_session_id: sessionId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    logInventoryWaste: async ({
+      orgId,
+      brandId = null,
+      locationId = null,
+      inventoryId,
+      productId = null,
+      productName,
+      quantity,
+      unit,
+      reason,
+      notes = null,
+      userId
+    }) => {
+      const { data, error } = await supabase.rpc('log_inventory_waste', {
+        p_organization_id: orgId,
+        p_brand_id: brandId,
+        p_location_id: locationId,
+        p_inventory_id: inventoryId,
+        p_product_id: productId,
+        p_product_name: productName,
+        p_quantity: quantity,
+        p_unit: unit,
+        p_reason: reason,
+        p_notes: notes,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    deleteInventoryWaste: async (orgId, wastageLogId, userId) => {
+      const { data, error } = await supabase.rpc('delete_inventory_waste', {
+        p_organization_id: orgId,
+        p_wastage_log_id: wastageLogId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
   },
   admin: {
     /** Securely update a user's role via server-side RPC (prevents privilege escalation) */
@@ -1130,9 +1220,5 @@ export const api = {
     }
   }
 };
-
-
-
-
 
 
