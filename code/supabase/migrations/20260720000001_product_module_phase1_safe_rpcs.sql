@@ -519,7 +519,6 @@ BEGIN
           base_unit,
           latest_price,
           is_inventoried,
-          created_by,
           created_from_invoice_id
         ) VALUES (
           v_invoice.organization_id,
@@ -536,7 +535,6 @@ BEGIN
           COALESCE(NULLIF(v_item.vendor_unit, ''), 'ea'),
           COALESCE(v_item.unit_price, 0),
           false,
-          COALESCE(p_user_id, v_invoice.created_by),
           p_invoice_id
         )
         RETURNING id INTO v_product_id;

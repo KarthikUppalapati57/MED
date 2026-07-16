@@ -79,6 +79,8 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.update_product_details;
+
 CREATE OR REPLACE FUNCTION public.update_product_details(
   p_product_id uuid,
   p_name text,

@@ -1,5 +1,7 @@
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.create_product_details;
+
 CREATE OR REPLACE FUNCTION public.create_product_details(
   p_name text,
   p_restops_product_id text DEFAULT NULL,
@@ -79,7 +81,6 @@ BEGIN
     base_unit,
     latest_price,
     location_specific,
-    created_by,
     updated_at
   ) VALUES (
     v_org_id,
@@ -96,7 +97,6 @@ BEGIN
     NULLIF(trim(COALESCE(p_base_unit, '')), ''),
     COALESCE(p_latest_price, 0),
     COALESCE(p_location_specific, false),
-    auth.uid(),
     now()
   )
   RETURNING * INTO v_created;
@@ -113,6 +113,8 @@ BEGIN
   RETURN v_created;
 END;
 $$;
+
+DROP FUNCTION IF EXISTS public.update_product_details;
 
 CREATE OR REPLACE FUNCTION public.update_product_details(
   p_product_id uuid,
