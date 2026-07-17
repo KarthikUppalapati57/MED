@@ -755,6 +755,7 @@ export default function OnboardingPage() {
         },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       if (data.requiresAction) {
         const { error: confirmError } = await stripeRef.current.confirmCardPayment(data.clientSecret);
