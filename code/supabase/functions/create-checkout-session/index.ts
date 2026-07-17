@@ -96,7 +96,7 @@ serve(async (req) => {
 
     const selectedPlanId = planId || plan_id
     const selectedPaymentMethod = String(paymentMethod || 'card').toLowerCase()
-    if (!['card', 'ach', 'check'].includes(selectedPaymentMethod)) throw new Error('Payment method must be card, ach, or check')
+    if (!['card', 'ach'].includes(selectedPaymentMethod)) throw new Error('Payment method must be card or ach')
     if (!selectedPlanId) throw new Error('Missing plan ID')
 
     const { data: profile, error: profileError } = await adminClient
@@ -179,46 +179,6 @@ serve(async (req) => {
         .eq('id', authData.user.id)
 
       return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=free', freePlan: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
-    }
-
-    if (selectedPaymentMethod === 'check') {
-      // A mailed paper check can't be verified electronically at checkout time. Record the
-      // tenant's intent and hold payment_verified = false until a platform admin confirms the
-      // check actually arrived via confirm_check_payment_received().
-      await adminClient
-        .from('profiles')
-        .update({
-          payment_method_type: 'check',
-          pending_onboarding_plan_id: plan.id,
-          pending_payment_metadata: {
-            provider: 'check',
-            plan_id: plan.id,
-            coupon_code: coupon || '',
-            status: 'awaiting_check',
-            requested_at: new Date().toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authData.user.id)
-
-      const { data: admins } = await adminClient.from('profiles').select('id').eq('role', 'platform_admin')
-      if (admins?.length) {
-        await adminClient.from('notifications').insert(
-          admins.map((admin: { id: string }) => ({
-            user_id: admin.id,
-            organization_id: organizationId,
-            type: 'system',
-            title: 'Check payment pending',
-            message: `${profile.full_name || profile.email || 'A tenant'} chose to pay by check for the ${plan.name} plan and is awaiting confirmation.`,
-            is_read: false,
-          }))
-        )
-      }
-
-      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=check', check: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })

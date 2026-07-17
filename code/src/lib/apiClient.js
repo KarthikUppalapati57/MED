@@ -730,14 +730,6 @@ export const api = {
       if (error) throw error;
       return data;
     },
-    confirmCheckPayment: async ({ userId, note = null }) => {
-      const { data, error } = await supabase.rpc('confirm_check_payment_received', {
-        p_user_id: userId,
-        p_note: note,
-      });
-      if (error) throw error;
-      return data;
-    },
     reissueOwnerInvitation: async (invitationId) => {
       const { data, error } = await supabase.rpc('reissue_owner_invitation', {
         p_invitation_id: invitationId,

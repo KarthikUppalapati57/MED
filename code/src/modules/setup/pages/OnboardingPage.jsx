@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, Banknote, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, Landmark, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -756,12 +756,6 @@ export default function OnboardingPage() {
       });
       if (error) throw error;
 
-      if (data.check) {
-        await refreshProfile();
-        toast.success('Check payment recorded. A platform admin will confirm it once received.');
-        return;
-      }
-
       if (data.requiresAction) {
         const { error: confirmError } = await stripeRef.current.confirmCardPayment(data.clientSecret);
         if (confirmError) throw new Error(confirmError.message);
@@ -898,26 +892,6 @@ export default function OnboardingPage() {
     );
   }
 
-  if (userProfile?.payment_method_type === 'check' && !userProfile?.payment_verified) {
-    return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg border-border bg-card p-2 text-center shadow-sm">
-          <CardHeader className="space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
-              <Clock3 className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl font-bold">Awaiting Check Payment</CardTitle>
-            <CardDescription className="text-base">
-              We've recorded your intent to pay by check. A platform admin will confirm your workspace setup once the check is received and processed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">You can close this page - we'll notify you as soon as it's confirmed.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-secondary p-4 sm:p-6 lg:p-8">
@@ -1039,7 +1013,7 @@ export default function OnboardingPage() {
                       <h3 className="text-sm font-semibold text-foreground">Payment Method</h3>
                       <p className="text-xs text-muted-foreground">Choose how RestOps should collect billing details now. Trial coupons still require a payment method so billing can start automatically after the trial.</p>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <button type="button" onClick={() => setPaymentMethod('card')} className={`rounded-md border p-4 text-left transition hover:border-primary ${paymentMethod === 'card' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
                         <CreditCard className="mb-2 h-5 w-5 text-primary" />
                         <p className="font-semibold text-foreground">Credit or Debit Card</p>
@@ -1049,11 +1023,6 @@ export default function OnboardingPage() {
                         <Landmark className="mb-2 h-5 w-5 text-primary" />
                         <p className="font-semibold text-foreground">Bank ACH</p>
                         <p className="mt-1 text-xs text-muted-foreground">Secure bank setup through Dwolla.</p>
-                      </button>
-                      <button type="button" onClick={() => setPaymentMethod('check')} className={`rounded-md border p-4 text-left transition hover:border-primary ${paymentMethod === 'check' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
-                        <Banknote className="mb-2 h-5 w-5 text-primary" />
-                        <p className="font-semibold text-foreground">Check</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Mail a check. A platform admin confirms it once received.</p>
                       </button>
                     </div>
                     {paymentMethod === 'card' && (
@@ -1069,11 +1038,6 @@ export default function OnboardingPage() {
                         </Elements>
                         {cardError && <p className="mt-2 text-xs text-destructive">{cardError}</p>}
                         <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">Secured by Stripe - your card number never touches our servers.</p>
-                      </div>
-                    )}
-                    {paymentMethod === 'check' && (
-                      <div className="mt-4 rounded-md border bg-card p-4 text-sm text-muted-foreground">
-                        Clicking Complete records your intent to pay by check. Your workspace setup stays on hold until a platform admin confirms the check has arrived.
                       </div>
                     )}
                     {paymentMethod === 'ach' && (

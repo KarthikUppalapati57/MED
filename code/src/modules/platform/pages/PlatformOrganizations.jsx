@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, ClipboardCheck, XCircle, AlertTriangle, Banknote } from "lucide-react";
+import { Building2, Search, Users, MapPin, Store, ChevronRight, CheckCircle2, Shield, Settings2, Loader2, CreditCard, Trash2, Upload, FileSpreadsheet, Plus, ClipboardCheck, XCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -548,16 +548,6 @@ export default function PlatformOrganizations() {
     }
   };
 
-  const handleConfirmCheckPayment = async (userId) => {
-    try {
-      await api.onboarding.confirmCheckPayment({ userId });
-      toast.success('Check payment confirmed');
-      refreshOnboardingReview();
-    } catch (err) {
-      toast.error(err.message || 'Could not confirm check payment');
-    }
-  };
-
   return (
     <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden bg-secondary/20 rounded-xl border border-border">
       
@@ -993,13 +983,6 @@ export default function PlatformOrganizations() {
                             </div>
                           </div>
 
-                          {item.profile?.payment_method_type === 'check' && !item.profile?.payment_verified && (
-                            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                              <p className="text-sm text-amber-800"><Banknote className="mr-2 inline h-4 w-4" /> Awaiting check payment for this tenant's subscription.</p>
-                              <Button size="sm" onClick={() => handleConfirmCheckPayment(item.profile.id)}>Confirm Check Received</Button>
-                            </div>
-                          )}
-
                           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                             <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
                             <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
@@ -1353,13 +1336,6 @@ export default function PlatformOrganizations() {
                                 <p><span className="text-muted-foreground">Website:</span> {verification.metadata?.website || 'Not provided'}</p>
                               </div>
                             </div>
-
-                            {item.profile?.payment_method_type === 'check' && !item.profile?.payment_verified && (
-                              <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                                <p className="text-sm text-amber-800"><Banknote className="mr-2 inline h-4 w-4" /> Awaiting check payment for this tenant's subscription.</p>
-                                <Button size="sm" onClick={() => handleConfirmCheckPayment(item.profile.id)}>Confirm Check Received</Button>
-                              </div>
-                            )}
 
                             <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                               <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
