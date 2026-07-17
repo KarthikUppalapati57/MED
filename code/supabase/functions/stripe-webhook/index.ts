@@ -1,6 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import Stripe from 'https://esm.sh/stripe@14.17.0?target=deno'
 import { getSupabaseSystemClient } from '../_shared/supabase.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+
+const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+const stripe = stripeSecretKey
+  ? new Stripe(stripeSecretKey, { apiVersion: '2023-10-16', httpClient: Stripe.createFetchHttpClient() })
+  : null
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -67,6 +73,57 @@ serve(async (req) => {
           entity_id: orgId,
           details: { plan_id: planId, session_id: session.id },
         }})
+      }
+    }
+
+    // Card onboarding no longer goes through Checkout Sessions -- the tenant enters card
+    // details inline and the subscription is created directly (see create-checkout-session).
+    // That flow marks payment_verified synchronously when the first invoice's PaymentIntent
+    // succeeds immediately, but if the card required 3D Secure the PaymentIntent came back
+    // 'requires_action' and the frontend confirms it client-side afterward -- this event is
+    // how the server catches that async completion and finishes marking the profile verified.
+    if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object
+      const subscriptionId = invoice.subscription
+
+      if (subscriptionId && stripe) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+        const metadata = subscription.metadata || {}
+        const userId = metadata.user_id || null
+        const planId = metadata.plan_id || null
+
+        if (userId) {
+          const { data: existingProfile } = await supabaseClient
+            .from('profiles')
+            .select('payment_verified')
+            .eq('id', userId)
+            .maybeSingle()
+
+          if (existingProfile && existingProfile.payment_verified !== true) {
+            const { error: profileError } = await supabaseClient
+              .from('profiles')
+              .update({
+                payment_verified: true,
+                payment_method_type: 'stripe_subscription',
+                pending_onboarding_plan_id: planId || null,
+                pending_stripe_customer_id: invoice.customer || null,
+                pending_stripe_subscription_id: subscriptionId,
+                pending_payment_metadata: {
+                  provider: 'stripe',
+                  plan_id: planId || '',
+                  stripe_customer_id: invoice.customer || '',
+                  stripe_subscription_id: subscriptionId,
+                  invoice_id: invoice.id,
+                  checkout_status: 'subscription_created',
+                  completed_at: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', userId)
+
+            if (profileError) throw profileError
+          }
+        }
       }
     }
 

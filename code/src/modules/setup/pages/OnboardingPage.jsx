@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
+import { getStripe } from '@/lib/paymentService';
 import posthog from '@/lib/posthog';
 import Papa from 'papaparse';
 import { Button } from '@/components/ui/button';
@@ -212,6 +214,30 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
   );
 }
 
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: { fontSize: '15px', color: 'hsl(var(--foreground))', '::placeholder': { color: 'hsl(var(--muted-foreground))' } },
+    invalid: { color: '#dc2626' },
+  },
+};
+
+function CardFields({ stripeRef, elementsRef, cardHolderName, onCardHolderNameChange, onCardChange }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  useEffect(() => { stripeRef.current = stripe; elementsRef.current = elements; }, [stripe, elements, stripeRef, elementsRef]);
+
+  return (
+    <div className="space-y-1.5">
+      <FieldLabel htmlFor="card-holder-name" required>Cardholder Name</FieldLabel>
+      <Input id="card-holder-name" value={cardHolderName} onChange={(event) => onCardHolderNameChange(event.target.value)} className="h-10 bg-card" />
+      <FieldLabel required>Card Details</FieldLabel>
+      <div className="h-10 rounded-md border bg-card px-3 py-2.5">
+        <CardElement options={CARD_ELEMENT_OPTIONS} onChange={onCardChange} />
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -221,7 +247,12 @@ export default function OnboardingPage() {
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
-  const [bankAccount, setBankAccount] = useState({ bankName: '', accountHolderName: '', accountType: 'checking', routingNumber: '', accountNumber: '' });
+  const [bankAccount, setBankAccount] = useState({ bankName: '', accountHolderName: '', accountType: 'checking', routingNumber: '', accountNumber: '', billingAddress: emptyAddress() });
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardError, setCardError] = useState('');
+  const stripeRef = useRef(null);
+  const elementsRef = useRef(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [finalizingOnboarding, setFinalizingOnboarding] = useState(false);
   const autoFinalizeRef = useRef(false);
@@ -297,6 +328,7 @@ export default function OnboardingPage() {
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
   const updateBankAccount = (field, value) => setBankAccount((prev) => ({ ...prev, [field]: value }));
+  const updateBankBillingAddress = (value) => setBankAccount((prev) => ({ ...prev, billingAddress: normalizeAddress(value) }));
   const updateBusinessIdentityAddress = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: normalizeAddress(value) }));
   const updateOrganization = (orgIdx, updater) => setOrganizations((prev) => prev.map((org, index) => (index === orgIdx ? updater(org) : org)));
   const updateBrand = (orgIdx, brandIdx, updater) => updateOrganization(orgIdx, (org) => ({ ...org, brands: org.brands.map((brand, index) => (index === brandIdx ? updater(brand) : brand)) }));
@@ -677,13 +709,21 @@ export default function OnboardingPage() {
 
   const handleSubscribe = async () => {
     if (!selectedPlan) return toast.error('Please select a plan to continue.');
-    if (Number(selectedPlan.price_monthly || 0) > 0 && paymentMethod === 'ach') {
+    const isPaidPlan = Number(selectedPlan.price_monthly || 0) > 0;
+    if (isPaidPlan && paymentMethod === 'ach') {
       const routingDigits = String(bankAccount.routingNumber || '').replace(/\D/g, '');
       const accountDigits = String(bankAccount.accountNumber || '').replace(/\D/g, '');
       if (!bankAccount.bankName.trim()) return toast.error('Enter the bank name for ACH setup.');
       if (!bankAccount.accountHolderName.trim()) return toast.error('Enter the account holder name for ACH setup.');
       if (!/^\d{9}$/.test(routingDigits)) return toast.error('Enter a valid 9-digit routing number.');
       if (!/^\d{4,17}$/.test(accountDigits)) return toast.error('Enter a valid bank account number.');
+      const billingAddressError = addressError(bankAccount.billingAddress, 'ACH billing address');
+      if (billingAddressError) return toast.error(billingAddressError);
+    }
+    if (isPaidPlan && paymentMethod === 'card') {
+      if (!cardHolderName.trim()) return toast.error('Enter the cardholder name.');
+      if (!cardComplete) return toast.error(cardError || 'Enter complete card details.');
+      if (!stripeRef.current || !elementsRef.current) return toast.error('Payment form is still loading. Try again in a moment.');
     }
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
@@ -691,19 +731,30 @@ export default function OnboardingPage() {
     saveDraft(3, false);
     setCheckoutLoading(true);
     try {
+      let paymentMethodId = null;
+      if (isPaidPlan && paymentMethod === 'card') {
+        const { error: pmError, paymentMethod: pm } = await stripeRef.current.createPaymentMethod({
+          type: 'card',
+          card: elementsRef.current.getElement(CardElement),
+          billing_details: { name: cardHolderName, email: user?.email || undefined },
+        });
+        if (pmError) throw new Error(pmError.message);
+        paymentMethodId = pm.id;
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           planId: selectedPlan.id,
           priceId: selectedPlan.stripe_price_id || null,
           couponCode: normalizeCouponCodeInput(couponCode) || null,
           paymentMethod,
+          paymentMethodId,
           bankAccount: paymentMethod === 'ach' ? bankAccount : null,
           successUrl: `${window.location.origin}/onboarding?checkout=success`,
           cancelUrl: `${window.location.origin}/onboarding`,
         },
       });
       if (error) throw error;
-      if (!data?.url) throw new Error('No checkout URL returned');
 
       if (data.check) {
         await refreshProfile();
@@ -711,13 +762,22 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (data.freePlan || data.ach) {
+      if (data.requiresAction) {
+        const { error: confirmError } = await stripeRef.current.confirmCardPayment(data.clientSecret);
+        if (confirmError) throw new Error(confirmError.message);
+        toast.success('Card verified. Finishing setup...');
         await refreshProfile();
         await performOnboarding();
         return;
       }
 
-      window.location.href = data.url;
+      if (data.freePlan || data.ach || data.card) {
+        await refreshProfile();
+        await performOnboarding();
+        return;
+      }
+
+      throw new Error('Unrecognized checkout response.');
     } catch (error) {
       const message = await getFunctionErrorMessage(error);
       toast.error(message || 'Failed to start checkout process.');
@@ -996,6 +1056,21 @@ export default function OnboardingPage() {
                         <p className="mt-1 text-xs text-muted-foreground">Mail a check. A platform admin confirms it once received.</p>
                       </button>
                     </div>
+                    {paymentMethod === 'card' && (
+                      <div className="mt-4 rounded-md border bg-card p-4">
+                        <Elements stripe={getStripe()}>
+                          <CardFields
+                            stripeRef={stripeRef}
+                            elementsRef={elementsRef}
+                            cardHolderName={cardHolderName}
+                            onCardHolderNameChange={setCardHolderName}
+                            onCardChange={(event) => { setCardComplete(event.complete); setCardError(event.error?.message || ''); }}
+                          />
+                        </Elements>
+                        {cardError && <p className="mt-2 text-xs text-destructive">{cardError}</p>}
+                        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">Secured by Stripe - your card number never touches our servers.</p>
+                      </div>
+                    )}
                     {paymentMethod === 'check' && (
                       <div className="mt-4 rounded-md border bg-card p-4 text-sm text-muted-foreground">
                         Clicking Complete records your intent to pay by check. Your workspace setup stays on hold until a platform admin confirms the check has arrived.
@@ -1027,6 +1102,10 @@ export default function OnboardingPage() {
                             <FieldLabel htmlFor="ach-account" required>Account Number</FieldLabel>
                             <Input id="ach-account" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount('accountNumber', event.target.value.replace(/\D/g, '').slice(0, 17))} inputMode="numeric" type="password" className="h-10 bg-card" />
                           </div>
+                        </div>
+                        <div className="mt-4 border-t pt-4">
+                          <p className="mb-2 text-sm font-semibold text-foreground">Billing Address</p>
+                          <AddressFields idPrefix="ach-billing-address" value={bankAccount.billingAddress} onChange={updateBankBillingAddress} required compact line1Label="Billing Address" />
                         </div>
                       </div>
                     )}

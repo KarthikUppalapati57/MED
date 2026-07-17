@@ -90,6 +90,7 @@ serve(async (req) => {
       org_id,
       organization_id,
       paymentMethod = 'card',
+      paymentMethodId = null,
       bankAccount = null,
     } = await req.json()
 
@@ -230,10 +231,16 @@ serve(async (req) => {
       const bankAccountType = String(account.accountType || 'checking').toLowerCase()
       const bankName = String(account.bankName || 'Tenant bank account').trim()
       const holderName = String(account.accountHolderName || profile.full_name || profile.email || authData.user.email || 'RestOps Tenant').trim()
+      const billingAddress = (account.billingAddress && typeof account.billingAddress === 'object' ? account.billingAddress : {}) as Record<string, unknown>
+      const billingLine1 = String(billingAddress.line1 || '').trim()
+      const billingCity = String(billingAddress.city || '').trim()
+      const billingState = String(billingAddress.state || '').trim()
+      const billingPostalCode = String(billingAddress.postalCode || '').trim()
 
       if (!/^\d{9}$/.test(routingNumber)) throw new Error('A valid 9-digit routing number is required for ACH setup')
       if (!/^\d{4,17}$/.test(accountNumber)) throw new Error('A valid bank account number is required for ACH setup')
       if (!['checking', 'savings'].includes(bankAccountType)) throw new Error('Bank account type must be checking or savings')
+      if (!billingLine1 || !billingCity || !billingState || !billingPostalCode) throw new Error('A complete billing address is required for ACH setup')
 
       const [firstName, ...lastNameParts] = holderName.split(/\s+/)
       const lastName = lastNameParts.join(' ') || 'Tenant'
@@ -244,6 +251,11 @@ serve(async (req) => {
         email: profile.email || authData.user.email,
         type: 'unverified',
         businessName: holderName,
+        address1: billingLine1,
+        address2: String(billingAddress.line2 || '').trim() || undefined,
+        city: billingCity,
+        state: billingState,
+        postalCode: billingPostalCode,
       }, accessToken)
 
       if (!customerUrl) throw new Error('Dwolla customer creation did not return a resource URL')
@@ -273,6 +285,7 @@ serve(async (req) => {
             bank_name: bankName,
             account_type: bankAccountType,
             account_last4: accountNumber.slice(-4),
+            billing_address: { line1: billingLine1, line2: String(billingAddress.line2 || '').trim(), city: billingCity, state: billingState, postal_code: billingPostalCode, country: String(billingAddress.country || 'United States').trim() },
             completed_at: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
@@ -331,73 +344,138 @@ serve(async (req) => {
       }
     }
 
-    await adminClient
-      .from('profiles')
-      .update({
-        pending_onboarding_plan_id: plan.id,
-        pending_stripe_customer_id: customerId,
-        payment_method_type: 'stripe_subscription',
-        pending_payment_metadata: {
-          provider: 'stripe',
-          plan_id: plan.id,
-          coupon_code: coupon || '',
-          checkout_status: 'created',
-          trial_days: couponTrialDays || 0,
-          requires_payment_method_collection: couponTrialDays > 0,
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', authData.user.id)
+    if (!paymentMethodId) {
+      // No inline card token was sent -- this is a caller that still expects the old
+      // redirect-based Stripe Checkout page (e.g. the post-onboarding Billing plan-upgrade
+      // page, which hasn't been wired to inline Stripe Elements). Keep that path working.
+      await adminClient
+        .from('profiles')
+        .update({
+          pending_onboarding_plan_id: plan.id,
+          pending_stripe_customer_id: customerId,
+          payment_method_type: 'stripe_subscription',
+          pending_payment_metadata: {
+            provider: 'stripe',
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            checkout_status: 'created',
+            trial_days: couponTrialDays || 0,
+            requires_payment_method_collection: couponTrialDays > 0,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authData.user.id)
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [{ price: resolvedPriceId, quantity: 1 }],
-      success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
-      cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
-      metadata: {
-        tenant_id: tenantId || '',
-        organization_id: organizationId || '',
-        user_id: authData.user.id,
-        plan_id: plan.id,
-        coupon_code: coupon || '',
-        payment_method_type: 'stripe_subscription',
-      },
-      payment_method_collection: couponTrialDays > 0 ? 'always' : 'if_required',
-      subscription_data: {
-        ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: resolvedPriceId, quantity: 1 }],
+        success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
+        cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
         metadata: {
           tenant_id: tenantId || '',
           organization_id: organizationId || '',
           user_id: authData.user.id,
           plan_id: plan.id,
           coupon_code: coupon || '',
-          trial_days: String(couponTrialDays || 0),
+          payment_method_type: 'stripe_subscription',
         },
+        payment_method_collection: couponTrialDays > 0 ? 'always' : 'if_required',
+        subscription_data: {
+          ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
+          metadata: {
+            tenant_id: tenantId || '',
+            organization_id: organizationId || '',
+            user_id: authData.user.id,
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            trial_days: String(couponTrialDays || 0),
+          },
+        },
+        allow_promotion_codes: true,
+      })
+
+      await adminClient
+        .from('profiles')
+        .update({
+          pending_checkout_session_id: session.id,
+          pending_payment_metadata: {
+            provider: 'stripe',
+            plan_id: plan.id,
+            coupon_code: coupon || '',
+            checkout_status: 'session_created',
+            checkout_session_id: session.id,
+            trial_days: couponTrialDays || 0,
+            requires_payment_method_collection: couponTrialDays > 0,
+            stripe_customer_id: customerId,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authData.user.id)
+
+      return new Response(JSON.stringify({ success: true, url: session.url }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    // Inline card details (Stripe Elements, client-side tokenized into paymentMethodId, so the
+    // raw card number never reaches this server). Attach it to the customer and create the
+    // subscription directly -- no redirect.
+    await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId })
+    await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethodId } })
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: resolvedPriceId }],
+      default_payment_method: paymentMethodId,
+      ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        tenant_id: tenantId || '',
+        organization_id: organizationId || '',
+        user_id: authData.user.id,
+        plan_id: plan.id,
+        coupon_code: coupon || '',
+        trial_days: String(couponTrialDays || 0),
       },
-      allow_promotion_codes: true,
     })
+
+    const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null
+    const paymentIntent = (latestInvoice?.payment_intent ?? null) as Stripe.PaymentIntent | null
+    const requiresAction = paymentIntent?.status === 'requires_action'
+    const succeeded = !requiresAction && (paymentIntent?.status === 'succeeded' || paymentIntent == null || ['trialing', 'active'].includes(subscription.status))
 
     await adminClient
       .from('profiles')
       .update({
-        pending_checkout_session_id: session.id,
+        payment_verified: succeeded,
+        payment_method_type: 'stripe_subscription',
+        pending_onboarding_plan_id: plan.id,
+        pending_stripe_customer_id: customerId,
+        pending_stripe_subscription_id: subscription.id,
         pending_payment_metadata: {
           provider: 'stripe',
           plan_id: plan.id,
           coupon_code: coupon || '',
-          checkout_status: 'session_created',
-          checkout_session_id: session.id,
-          trial_days: couponTrialDays || 0,
-          requires_payment_method_collection: couponTrialDays > 0,
+          checkout_status: requiresAction ? 'requires_action' : 'subscription_created',
           stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          trial_days: couponTrialDays || 0,
+          completed_at: succeeded ? new Date().toISOString() : null,
         },
         updated_at: new Date().toISOString(),
       })
       .eq('id', authData.user.id)
 
-    return new Response(JSON.stringify({ success: true, url: session.url }), {
+    return new Response(JSON.stringify({
+      success: true,
+      card: true,
+      requiresAction,
+      clientSecret: requiresAction ? paymentIntent?.client_secret : null,
+      subscriptionId: subscription.id,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })

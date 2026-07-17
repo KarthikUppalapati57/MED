@@ -1318,7 +1318,7 @@ export default function PlatformOrganizations() {
                             </div>
                           </CardHeader>
                           <CardContent className="space-y-4 p-5">
-                            <div className="grid gap-3 md:grid-cols-3">
+                            <div className="grid gap-3 md:grid-cols-4">
                               <div className="rounded-xl border border-border bg-secondary/30 p-3">
                                 <p className="text-[10px] font-bold uppercase text-muted-foreground">Trust score</p>
                                 <p className="mt-1 text-lg font-black text-foreground">{verification.trust_score ?? 'N/A'}</p>
@@ -1329,9 +1329,38 @@ export default function PlatformOrganizations() {
                               </div>
                               <div className="rounded-xl border border-border bg-secondary/30 p-3">
                                 <p className="text-[10px] font-bold uppercase text-muted-foreground">Hierarchy</p>
-                                <p className="mt-1 text-sm font-bold text-foreground">Not submitted</p>
+                                <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.organization_id ? 'Submitted' : 'Not submitted'}</p>
+                              </div>
+                              <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">RestOps payment</p>
+                                <p className="mt-1 text-sm font-bold text-foreground">{item.profile?.payment_verified ? 'Complete' : 'Pending'}</p>
                               </div>
                             </div>
+
+                            {(verification.rejection_reason || verification.metadata?.review_reason) && (
+                              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                <AlertTriangle className="mr-2 inline h-4 w-4" /> {verification.rejection_reason || verification.metadata?.review_reason}
+                              </div>
+                            )}
+
+                            <div className="rounded-xl border border-border bg-secondary/30 p-3 text-sm">
+                              <p className="mb-2 text-xs font-bold uppercase text-muted-foreground">Business details</p>
+                              <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+                                <p><span className="text-muted-foreground">Business type:</span> {verification.business_type || 'Not provided'}</p>
+                                <p><span className="text-muted-foreground">Tax ID:</span> {verification.identifier_last4 ? `${(verification.identifier_type || '').toUpperCase()} ending in ${verification.identifier_last4}` : 'Not provided'}</p>
+                                <p><span className="text-muted-foreground">Email:</span> {verification.metadata?.email || 'Not provided'}</p>
+                                <p><span className="text-muted-foreground">Phone:</span> {verification.metadata?.phone || 'Not provided'}</p>
+                                <p><span className="text-muted-foreground">Website:</span> {verification.metadata?.website || 'Not provided'}</p>
+                              </div>
+                            </div>
+
+                            {item.profile?.payment_method_type === 'check' && !item.profile?.payment_verified && (
+                              <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                <p className="text-sm text-amber-800"><Banknote className="mr-2 inline h-4 w-4" /> Awaiting check payment for this tenant's subscription.</p>
+                                <Button size="sm" onClick={() => handleConfirmCheckPayment(item.profile.id)}>Confirm Check Received</Button>
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                               <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
                               <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
