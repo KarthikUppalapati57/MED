@@ -4,6 +4,8 @@ import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck,
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { api } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,6 +78,7 @@ function statusFromScore(score) {
 
 export default function BusinessVerification() {
   const { user, userProfile, refreshProfile, logout } = useAuth();
+  const { confirm } = useConfirmation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -459,6 +462,15 @@ export default function BusinessVerification() {
       toast.error('You must be signed in to continue.');
       return;
     }
+
+    const confirmed = await confirm(getConfirmationMessage(
+      'submitOnboardingBusinessVerification',
+      form.legalName.trim(),
+      requiredIdentifierType,
+      maskIdentifier(form.taxIdentifier),
+      isTaxVerificationEnabled
+    ));
+    if (!confirmed) return;
 
     setLoading(true);
     try {

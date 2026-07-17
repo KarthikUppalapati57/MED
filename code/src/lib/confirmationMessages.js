@@ -1233,6 +1233,57 @@ export const confirmationMessages = {
     variant: 'warning',
     severity: 'medium',
   }),
+
+  // ========================================
+  // TENANT ONBOARDING
+  // ========================================
+
+  submitOnboardingBusinessVerification: (legalName, identifierType, maskedTaxId, taxVerificationEnabled) => ({
+    title: 'Submit business verification?',
+    description: taxVerificationEnabled
+      ? `Submit "${legalName}" for verification using ${identifierType.toUpperCase()} ending in ${maskedTaxId}. Your full ${identifierType.toUpperCase()} is encrypted and never shown to platform staff.`
+      : `Submit "${legalName}" for verification. Tax ID verification is currently disabled by your platform admin.`,
+    confirmText: 'Submit for Verification',
+    cancelText: 'Review Again',
+    variant: 'warning',
+    severity: 'high',
+  }),
+
+  applyOnboardingCoupon: (code) => ({
+    title: `Apply coupon "${code}"?`,
+    description: 'This coupon or trial code will be applied to your subscription.',
+    confirmText: 'Apply Coupon',
+    cancelText: 'Cancel',
+    variant: 'info',
+    severity: 'low',
+  }),
+
+  completeOnboardingPayment: (planName, priceLabel, paymentMethodLabel, hierarchySummary) => ({
+    title: 'Complete setup and submit payment?',
+    description: `You're subscribing to ${planName} (${priceLabel}) via ${paymentMethodLabel}, and submitting ${hierarchySummary} for platform review. This charges your payment method now and cannot be undone from here.`,
+    confirmText: 'Confirm & Pay',
+    cancelText: 'Go Back',
+    variant: 'warning',
+    severity: 'critical',
+  }),
+
+  saveOnboardingBankAccount: (bankName, last4, assignmentLabel) => ({
+    title: 'Save bank account?',
+    description: `Add ${bankName} ending in ${last4}${assignmentLabel ? ` for ${assignmentLabel}` : ''}. You'll still need to add an authorization signature before it can be used for payments.`,
+    confirmText: 'Save Bank Account',
+    cancelText: 'Cancel',
+    variant: 'warning',
+    severity: 'high',
+  }),
+
+  captureOnboardingBankSignature: (last4, signerName) => ({
+    title: 'Capture authorization signature?',
+    description: `${signerName} will electronically sign the payment authorization for the account ending in ${last4}. This creates a legally binding, audit-logged consent record.`,
+    confirmText: 'Sign & Authorize',
+    cancelText: 'Cancel',
+    variant: 'warning',
+    severity: 'critical',
+  }),
 };
 
 /**

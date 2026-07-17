@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { getStripe } from '@/lib/paymentService';
@@ -240,10 +242,11 @@ function CardFields({ stripeRef, elementsRef, cardHolderName, onCardHolderNameCh
 
 export default function OnboardingPage() {
   const { user, userProfile, refreshProfile } = useAuth();
+  const { confirm } = useConfirmation();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [completed, setCompleted] = useState(false);
+  const [hierarchySubmissionReason, setHierarchySubmissionReason] = useState('');
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
@@ -301,15 +304,27 @@ export default function OnboardingPage() {
     if (inviteCoupon && !couponCode.trim()) setCouponCode(normalizeCouponCodeInput(inviteCoupon));
   }, [userProfile?.coupon_code, userProfile?.metadata, couponCode]);
 
+  useEffect(() => {
+    if (userProfile?.hierarchy_review_status !== 'rejected' && userProfile?.hierarchy_review_status !== 'failed') return;
+    let cancelled = false;
+    api.onboarding.getState()
+      .then((state) => { if (!cancelled) setHierarchySubmissionReason(state?.hierarchy_submission?.rejection_reason || ''); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [userProfile?.hierarchy_review_status]);
 
   useEffect(() => {
-    if (completed && userProfile?.organization_id) navigate('/', { replace: true });
-  }, [completed, userProfile?.organization_id, navigate]);
+    if (userProfile?.hierarchy_review_status === 'failed' && draftReady) {
+      setStep(2);
+      setHierarchyView('build');
+    }
+  }, [userProfile?.hierarchy_review_status, draftReady]);
+
 
   useEffect(() => {
     const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
     if (!checkoutStatus || !['success', 'free', 'mock', 'trial', 'ach'].includes(checkoutStatus)) return;
-    if (!draftReady || !user || completed || finalizingOnboarding || autoFinalizeRef.current) return;
+    if (!draftReady || !user || userProfile?.hierarchy_review_status || finalizingOnboarding || autoFinalizeRef.current) return;
 
     autoFinalizeRef.current = true;
     setFinalizingOnboarding(true);
@@ -318,7 +333,7 @@ export default function OnboardingPage() {
     refreshProfile()
       .then(() => performOnboarding())
       .finally(() => setFinalizingOnboarding(false));
-  }, [draftReady, user, completed, finalizingOnboarding]);
+  }, [draftReady, user, userProfile?.hierarchy_review_status, finalizingOnboarding]);
 
   const totals = useMemo(() => {
     const brandCount = organizations.reduce((sum, org) => sum + org.brands.length, 0);
@@ -669,19 +684,16 @@ export default function OnboardingPage() {
     setLoading(true);
     try {
       const hierarchy = buildHierarchyPayload();
-      const result = await api.onboarding.setupHierarchy(user.id, hierarchy);
-      hierarchy.forEach((org) => posthog.capture('workspace_created', { orgName: org.name }));
-      await supabase.auth.refreshSession();
+      await api.onboarding.submitHierarchyForReview(user.id, hierarchy);
+      hierarchy.forEach((org) => posthog.capture('workspace_submitted_for_review', { orgName: org.name }));
 
-      toast.success(`Created ${result.counts?.organizations || hierarchy.length} organization(s).`);
+      toast.success('Submitted for review. A platform admin will confirm your workspace shortly.');
       window.localStorage.removeItem(DRAFT_KEY);
-      setCompleted(true);
-      refreshProfile().catch((profileError) => console.warn('Profile refresh after onboarding failed:', profileError));
-      window.setTimeout(() => navigate('/', { replace: true }), 1200);
+      await refreshProfile();
       return true;
     } catch (error) {
-      console.error('Onboarding failed:', error);
-      toast.error(error.message?.includes('organizations_slug_key') ? 'One of your organization slugs is already taken. Please try a different one.' : (error.message || 'Failed to complete onboarding.'), { duration: 5000 });
+      console.error('Hierarchy submission failed:', error);
+      toast.error(error.message?.includes('organizations_slug_key') ? 'One of your organization slugs is already taken. Please try a different one.' : (error.message || 'Failed to submit for review.'), { duration: 5000 });
       return false;
     } finally {
       setLoading(false);
@@ -693,6 +705,8 @@ export default function OnboardingPage() {
     const normalizedCouponCode = normalizeCouponCodeInput(couponCode);
     if (!normalizedCouponCode) return toast.error('Enter a coupon or trial code first.');
     if (normalizedCouponCode !== couponCode) setCouponCode(normalizedCouponCode);
+    const confirmed = await confirm(getConfirmationMessage('applyOnboardingCoupon', normalizedCouponCode));
+    if (!confirmed) return;
     setCouponLoading(true);
     try {
       const result = await api.onboarding.applyCoupon({ code: normalizedCouponCode, planId: selectedPlan?.id || null });
@@ -727,6 +741,16 @@ export default function OnboardingPage() {
     }
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
+
+    const priceLabel = isPaidPlan ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/mo` : 'Free';
+    const paymentMethodLabel = !isPaidPlan
+      ? 'no charge — free plan'
+      : paymentMethod === 'card'
+        ? `credit/debit card (cardholder: ${cardHolderName.trim()})`
+        : `ACH transfer from ${bankAccount.bankName.trim()} ending in ${String(bankAccount.accountNumber).replace(/\D/g, '').slice(-4)}`;
+    const hierarchySummary = `${organizations.length} organization(s), ${totals.brandCount} brand(s), ${totals.locationCount} location(s)`;
+    const confirmed = await confirm(getConfirmationMessage('completeOnboardingPayment', selectedPlan.name, priceLabel, paymentMethodLabel, hierarchySummary));
+    if (!confirmed) return;
 
     saveDraft(3, false);
     setCheckoutLoading(true);
@@ -818,12 +842,12 @@ export default function OnboardingPage() {
   const nextLabel = step === 2 && hierarchyView === 'build' ? 'Continue to review' : step === 2 ? 'Confirm & continue' : step === 3 ? 'Continue to payment' : step === 4 ? 'Complete' : 'Next';
 
   useEffect(() => {
-    if (!draftReady || !user || !userProfile?.payment_verified || userProfile?.organization_id || completed || finalizingOnboarding || autoFinalizeRef.current) return;
+    if (!draftReady || !user || !userProfile?.payment_verified || userProfile?.organization_id || userProfile?.hierarchy_review_status || finalizingOnboarding || autoFinalizeRef.current) return;
     autoFinalizeRef.current = true;
     setFinalizingOnboarding(true);
-    setStep(3);
+    setStep(4);
     performOnboarding().finally(() => setFinalizingOnboarding(false));
-  }, [draftReady, user, userProfile?.payment_verified, userProfile?.organization_id, completed, finalizingOnboarding]);
+  }, [draftReady, user, userProfile?.payment_verified, userProfile?.organization_id, userProfile?.hierarchy_review_status, finalizingOnboarding]);
 
   const renderHierarchyBuild = () => (
     <>
@@ -838,6 +862,13 @@ export default function OnboardingPage() {
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
+        {userProfile?.hierarchy_review_status === 'failed' && hierarchySubmissionReason && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+            <p className="font-bold">Platform admin requested changes</p>
+            <p className="mt-1">{hierarchySubmissionReason}</p>
+            <p className="mt-1 text-xs">Update the details below and resubmit for review.</p>
+          </div>
+        )}
         {hierarchyMode === 'upload' ? (
           <div className="space-y-5">
             <div className="rounded-md border border-dashed bg-muted/20 p-6">
@@ -876,22 +907,54 @@ export default function OnboardingPage() {
       <CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-3">{[['Organizations', organizations.length], ['Brands', totals.brandCount], ['Locations', totals.locationCount]].map(([label, value]) => <div key={label} className="rounded-md border bg-card p-4"><div className="text-3xl font-bold text-foreground">{value}</div><div className="mt-1 text-xs font-semibold uppercase text-muted-foreground">{label}</div></div>)}</div>{hierarchyIssues.length > 0 && <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-400">{locationIssueCount || hierarchyIssues.length} item(s) need attention - fix them before you can confirm.</div>}<div className="rounded-md border bg-card">{checklist.map((item) => <div key={item.label} className="flex items-start gap-3 border-b px-4 py-3 last:border-b-0"><span className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border ${item.ok ? 'border-primary text-primary' : 'border-amber-500 text-amber-400'}`}>{item.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}</span><div><p className="text-sm font-medium text-foreground">{item.label}</p>{!item.ok && item.detail && <p className="mt-1 text-xs text-amber-400">{item.detail}</p>}</div></div>)}</div><div className="rounded-md border bg-card">{organizations.map((org, orgIdx) => { const flagged = issueCountForOrganization(orgIdx); return <div key={`review-org-${orgIdx}`} className="border-b last:border-b-0"><div className="flex items-center justify-between gap-3 px-4 py-3"><h3 className="font-semibold text-foreground">{org.name || `Organization ${orgIdx + 1}`}</h3><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${flagged ? 'border-amber-500/40 bg-amber-500/10 text-amber-400' : 'border-primary/40 bg-primary/10 text-primary'}`}>{flagged ? `${flagged} flagged` : 'Complete'}</span></div>{org.brands.map((brand, brandIdx) => <div key={`review-brand-${orgIdx}-${brandIdx}`} className="border-t px-6 py-3"><p className="mb-2 text-sm font-semibold text-foreground">{brand.name || `Brand ${brandIdx + 1}`}</p><div className="space-y-2 border-l pl-4">{brand.locations.map((location, locIdx) => { const issue = hierarchyIssues.find((item) => item.orgIdx === orgIdx && item.brandIdx === brandIdx && item.locIdx === locIdx); return <div key={`review-location-${orgIdx}-${brandIdx}-${locIdx}`} className={`flex items-start justify-between gap-3 border-l-2 pl-3 ${issue ? 'border-amber-500 text-amber-400' : 'border-border text-muted-foreground'}`}><div><p className="text-sm font-semibold text-foreground">{location.name || `Location ${locIdx + 1}`}</p><p className="font-mono text-xs">{formatAddress(location.businessAddress) || 'Address missing'}{location.businessAddressSource !== 'custom' ? ` - same as ${location.businessAddressSource}` : ''}</p>{issue && <p className="mt-1 text-xs font-semibold text-amber-400">{issue.message}</p>}</div><Button type="button" variant="ghost" size="sm" onClick={() => { setHierarchyView('build'); setExpandedOrganizations((current) => new Set([...current, orgIdx])); }}>Edit</Button></div>; })}</div></div>)}</div>; })}</div></CardContent>
     </>
   );
-  if (userProfile?.role && userProfile.role !== 'tenant_super_admin' && !completed) return <Navigate to="/" replace />;
-  if (userProfile && userProfile.business_verification_status !== 'verified' && !completed) return <Navigate to="/business-verification" replace />;
-  if (userProfile?.organization_id && userProfile?.payment_verified && !completed) return <Navigate to="/" replace />;
+  if (userProfile?.role && userProfile.role !== 'tenant_super_admin') return <Navigate to="/" replace />;
+  if (userProfile && userProfile.business_verification_status !== 'verified') return <Navigate to="/business-verification" replace />;
+  if (userProfile?.organization_id && userProfile?.payment_verified) return <Navigate to="/" replace />;
 
-  if (completed) {
+  if (userProfile?.hierarchy_review_status === 'pending_review') {
     return (
       <div className="min-h-screen bg-secondary flex items-center justify-center p-6">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto animate-pulse"><CheckCircle2 className="w-8 h-8 text-primary" /></div>
-          <h2 className="text-2xl font-bold text-foreground">Onboarding Complete!</h2>
-          <p className="text-muted-foreground">Setting up your workspace. Redirecting shortly...</p>
-          <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto" />
-        </div>
+        <Card className="w-full max-w-lg border-border bg-card p-2 text-center shadow-sm">
+          <CardHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Workspace Pending Review</CardTitle>
+            <CardDescription className="text-base">
+              A platform admin is reviewing your organization setup. You'll be notified as soon as it's approved.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
+
+  if (userProfile?.hierarchy_review_status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-secondary flex items-center justify-center p-6">
+        <Card className="w-full max-w-lg border-border bg-card p-2 text-center shadow-sm">
+          <CardHeader className="space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Workspace Setup Rejected</CardTitle>
+            <CardDescription className="text-base">
+              Your platform admin has rejected this workspace setup. This decision is final.
+            </CardDescription>
+          </CardHeader>
+          {hierarchySubmissionReason && (
+            <CardContent>
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left text-sm">
+                <p className="font-bold text-foreground">Reason</p>
+                <p className="mt-1 text-muted-foreground">{hierarchySubmissionReason}</p>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
 
 
   return (

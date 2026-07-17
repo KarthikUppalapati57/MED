@@ -661,7 +661,7 @@ export const api = {
     listOnboardingBankAccounts: async () => {
       const { data, error } = await supabase
         .from('onboarding_bank_accounts')
-        .select('id, bank_name, account_holder_name, account_type, nickname, routing_number_last4, account_number_last4, billing_address_source, is_default, status, created_at')
+        .select('id, organization_id, brand_id, location_id, bank_name, account_holder_name, account_type, nickname, routing_number_last4, account_number_last4, billing_address_source, is_default, status, created_at')
         .neq('status', 'inactive')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -759,6 +759,43 @@ export const api = {
         primaryBrand: data?.brands?.find((brand) => brand.id === data.primary_brand_id) || data?.brands?.[0],
         primaryLocation: data?.locations?.find((location) => location.id === data.primary_location_id) || data?.locations?.[0],
       };
+    },
+    submitHierarchyForReview: async (userId, organizations) => {
+      const { data, error } = await supabase.rpc('submit_onboarding_hierarchy_for_review', {
+        p_user_id: userId,
+        p_hierarchy: organizations,
+      });
+      if (error) throw error;
+      return data;
+    },
+    approveHierarchy: async ({ userId, note = null }) => {
+      const { data, error } = await supabase.rpc('approve_onboarding_hierarchy', {
+        p_user_id: userId,
+        p_note: note,
+      });
+      if (error) throw error;
+      return data;
+    },
+    rejectHierarchy: async ({ userId, reason }) => {
+      const { data, error } = await supabase.rpc('reject_onboarding_hierarchy', {
+        p_user_id: userId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return data;
+    },
+    requestHierarchyResubmit: async ({ userId, reason }) => {
+      const { data, error } = await supabase.rpc('request_onboarding_hierarchy_resubmit', {
+        p_user_id: userId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getHierarchyReviewQueue: async () => {
+      const { data, error } = await supabase.rpc('platform_hierarchy_review_queue');
+      if (error) throw error;
+      return data || [];
     },
     setupOrgAndFirstLocation: async (userId, orgData, brandName, locationData) => {
       // Execute the entire onboarding process as a single atomic transaction.

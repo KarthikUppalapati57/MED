@@ -139,19 +139,21 @@ export default function PlatformOrganizations() {
   const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews, error: onboardingReviewsError } = useAuthQuery({
     queryKey: ['platform_onboarding_reviews'],
     queryFn: async () => {
-      const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult] = await Promise.all([
+      const [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult, hierarchyResult] = await Promise.all([
         supabase.rpc('platform_business_verification_reviews'),
-        supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, payment_verified, payment_method_type').in('business_verification_status', ['pending_review', 'failed', 'rejected', 'verified']),
+        supabase.from('profiles').select('id, full_name, email, organization_id, onboarding_status, onboarding_current_step, business_verification_status, hierarchy_review_status, payment_verified, payment_method_type').in('business_verification_status', ['pending_review', 'failed', 'rejected', 'verified']),
         supabase.from('organization_addresses').select('*').order('created_at', { ascending: false }).limit(300),
         supabase.from('onboarding_step_events').select('id, user_id, organization_id, step_key, event_type, status, metadata, created_at').order('created_at', { ascending: false }).limit(200),
         supabase.from('invitations').select('id, email, role, organization_id, expires_at, accepted_at, closed_at, expired_notified_at, status, created_at').in('role', ['owner', 'org_manager', 'tenant_super_admin']).order('created_at', { ascending: false }).limit(100),
+        supabase.rpc('platform_hierarchy_review_queue'),
       ]);
 
-      const results = [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult];
+      const results = [verificationsResult, profilesResult, addressesResult, eventsResult, invitesResult, hierarchyResult];
       const failed = results.find((result) => result.error);
       if (failed?.error) throw failed.error;
 
       const profilesById = new Map((profilesResult.data || []).map((profile) => [profile.id, profile]));
+      const hierarchyByUserId = new Map((hierarchyResult.data || []).map((row) => [row.user_id, row]));
       return (verificationsResult.data || []).map((verification) => {
         const profile = profilesById.get(verification.user_id) || null;
         return {
@@ -160,6 +162,7 @@ export default function PlatformOrganizations() {
           addresses: (addressesResult.data || []).filter((address) => address.user_id === verification.user_id),
           events: (eventsResult.data || []).filter((event) => event.user_id === verification.user_id).slice(0, 5),
           invites: (invitesResult.data || []).filter((invite) => invite.email?.toLowerCase() === profile?.email?.toLowerCase()),
+          hierarchySubmission: hierarchyByUserId.get(verification.user_id) || null,
         };
       });
     }
@@ -500,8 +503,8 @@ export default function PlatformOrganizations() {
     queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
   };
 
-  const openReviewActionDialog = (item, action) => {
-    setReviewActionDialog({ item, action });
+  const openReviewActionDialog = (item, action, domain = 'business_verification') => {
+    setReviewActionDialog({ item, action, domain });
     setReviewActionReason('');
   };
 
@@ -512,7 +515,7 @@ export default function PlatformOrganizations() {
 
   const handleOnboardingAction = async () => {
     if (!reviewActionDialog) return;
-    const { item, action } = reviewActionDialog;
+    const { item, action, domain } = reviewActionDialog;
     const reason = reviewActionReason.trim();
     if ((action === 'reject' || action === 'more_info') && !reason) {
       toast.error(action === 'reject' ? 'A rejection reason is required.' : 'Tell the tenant what information is needed.');
@@ -520,6 +523,22 @@ export default function PlatformOrganizations() {
     }
 
     try {
+      if (domain === 'hierarchy') {
+        if (action === 'approve') {
+          await api.onboarding.approveHierarchy({ userId: item.profile.id, note: reason || null });
+          toast.success('Workspace approved and organization created');
+        } else if (action === 'reject') {
+          await api.onboarding.rejectHierarchy({ userId: item.profile.id, reason });
+          toast.success('Workspace setup rejected');
+        } else if (action === 'more_info') {
+          await api.onboarding.requestHierarchyResubmit({ userId: item.profile.id, reason });
+          toast.success('Sent back to the tenant to fix and resubmit');
+        }
+        closeReviewActionDialog();
+        refreshOnboardingReview();
+        return;
+      }
+
       if (action === 'approve') {
         await api.onboarding.approveBusinessVerification({ userId: item.verification.user_id, note: reason || null });
         toast.success('Business verification approved');
@@ -983,6 +1002,22 @@ export default function PlatformOrganizations() {
                             </div>
                           </div>
 
+                          {item.hierarchySubmission?.status === 'pending_review' && (
+                            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                              <p className="text-sm font-bold text-foreground">Hierarchy pending review</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(item.hierarchySubmission.hierarchy_payload || []).length} organization(s) -{' '}
+                                {(item.hierarchySubmission.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands?.length || 0), 0)} brand(s) -{' '}
+                                {(item.hierarchySubmission.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands || []).reduce((bsum, brand) => bsum + (brand.locations?.length || 0), 0), 0)} location(s)
+                              </p>
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info', 'hierarchy')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Resubmit</Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject', 'hierarchy')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                                <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve', 'hierarchy')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve &amp; Create Workspace</Button>
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                             <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
                             <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
@@ -1337,6 +1372,22 @@ export default function PlatformOrganizations() {
                               </div>
                             </div>
 
+                            {item.hierarchySubmission?.status === 'pending_review' && (
+                              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                                <p className="text-sm font-bold text-foreground">Hierarchy pending review</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(item.hierarchySubmission.hierarchy_payload || []).length} organization(s) -{' '}
+                                  {(item.hierarchySubmission.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands?.length || 0), 0)} brand(s) -{' '}
+                                  {(item.hierarchySubmission.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands || []).reduce((bsum, brand) => bsum + (brand.locations?.length || 0), 0), 0)} location(s)
+                                </p>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info', 'hierarchy')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Resubmit</Button>
+                                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject', 'hierarchy')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                                  <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve', 'hierarchy')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve &amp; Create Workspace</Button>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                               <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
                               <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
@@ -1369,15 +1420,34 @@ export default function PlatformOrganizations() {
         <DialogContent className="max-w-lg bg-card border-border shadow-2xl">
           <DialogHeader>
             <DialogTitle>
-              {reviewActionDialog?.action === 'approve' ? 'Approve Business Verification?' : reviewActionDialog?.action === 'reject' ? 'Reject Business Verification?' : 'Request More Information?'}
+              {reviewActionDialog?.domain === 'hierarchy'
+                ? (reviewActionDialog?.action === 'approve' ? 'Approve Workspace & Create Organization?' : reviewActionDialog?.action === 'reject' ? 'Reject Workspace Setup?' : 'Request Hierarchy Resubmit?')
+                : (reviewActionDialog?.action === 'approve' ? 'Approve Business Verification?' : reviewActionDialog?.action === 'reject' ? 'Reject Business Verification?' : 'Request More Information?')}
             </DialogTitle>
             <DialogDescription>
-              {reviewActionDialog?.action === 'approve'
-                ? 'This will unlock the tenant to continue to hierarchy and RestOps payment setup.'
-                : 'This sends the tenant back to business verification to fix and resubmit -- they will not be able to continue to hierarchy setup until approved.'}
+              {reviewActionDialog?.domain === 'hierarchy'
+                ? (reviewActionDialog?.action === 'approve'
+                    ? 'This creates the real organization, brands, and locations from the submitted hierarchy immediately.'
+                    : reviewActionDialog?.action === 'reject'
+                    ? 'This is final -- the tenant cannot resubmit and their workspace setup stops here.'
+                    : 'This sends the tenant back to the Hierarchy step to fix and resubmit -- no re-payment needed.')
+                : (reviewActionDialog?.action === 'approve'
+                    ? 'This will unlock the tenant to continue to hierarchy and RestOps payment setup.'
+                    : 'This sends the tenant back to business verification to fix and resubmit -- they will not be able to continue to hierarchy setup until approved.')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {reviewActionDialog?.domain === 'hierarchy' ? (
+              <div className="rounded-xl border bg-secondary/40 p-3 text-sm">
+                <p className="font-bold text-foreground">{reviewActionDialog?.item?.profile?.email || 'Tenant'}</p>
+                <p className="text-xs text-muted-foreground">Current status: {reviewActionDialog?.item?.hierarchySubmission?.status || 'pending_review'}</p>
+                <div className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                  {(reviewActionDialog?.item?.hierarchySubmission?.hierarchy_payload || []).length} organization(s) -{' '}
+                  {(reviewActionDialog?.item?.hierarchySubmission?.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands?.length || 0), 0)} brand(s) -{' '}
+                  {(reviewActionDialog?.item?.hierarchySubmission?.hierarchy_payload || []).reduce((sum, org) => sum + (org.brands || []).reduce((bsum, brand) => bsum + (brand.locations?.length || 0), 0), 0)} location(s)
+                </div>
+              </div>
+            ) : (
             <div className="rounded-xl border bg-secondary/40 p-3 text-sm">
               <p className="font-bold text-foreground">{reviewActionDialog?.item?.profile?.email || reviewActionDialog?.item?.verification?.legal_business_name || 'Tenant'}</p>
               <p className="text-xs text-muted-foreground">Current status: {reviewActionDialog?.item?.verification?.verification_status || 'pending_review'}</p>
@@ -1388,6 +1458,7 @@ export default function PlatformOrganizations() {
                 <p><span className="text-muted-foreground">Phone:</span> {reviewActionDialog?.item?.verification?.metadata?.phone || 'Not provided'}</p>
               </div>
             </div>
+            )}
             <div className="space-y-2">
               <Label>{reviewActionDialog?.action === 'approve' ? 'Approval note (optional)' : 'Message to tenant'}</Label>
               <textarea

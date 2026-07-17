@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { api } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +18,28 @@ const CONSENT_TEXT = 'I authorize this organization to use the selected bank acc
 const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalCode: '', country: 'United States' });
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
 
+// accessTree is [{ organization, role, brands: [{ brand, role, locations: [{ location, role }] }] }]
+// -- the same tree ContextSwitcher uses, sourced from the tenant's own hierarchy submission.
+const buildAssignmentOptions = (tree) => {
+  const options = [];
+  (tree || []).forEach((orgNode) => {
+    const org = orgNode?.organization;
+    if (!org?.id) return;
+    options.push({ value: `organization:${org.id}`, label: `Organization — ${org.name}` });
+    (orgNode.brands || []).forEach((brandNode) => {
+      const brand = brandNode?.brand;
+      if (!brand?.brand_id) return;
+      options.push({ value: `brand:${brand.brand_id}`, label: `Brand — ${brand.name}` });
+      (brandNode.locations || []).forEach((locationNode) => {
+        const location = locationNode?.location;
+        if (!location?.id) return;
+        options.push({ value: `location:${location.id}`, label: `Location — ${location.name}` });
+      });
+    });
+  });
+  return options;
+};
+
 async function sha256Hex(value) {
   const encoded = new TextEncoder().encode(value);
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
@@ -23,7 +47,8 @@ async function sha256Hex(value) {
 }
 
 export default function CompleteOnboarding() {
-  const { userProfile, refreshProfile } = useAuth();
+  const { userProfile, refreshProfile, accessTree, fetchAccessTree } = useAuth();
+  const { confirm } = useConfirmation();
   const navigate = useNavigate();
 
   const [accounts, setAccounts] = useState([]);
@@ -33,7 +58,24 @@ export default function CompleteOnboarding() {
   const [capturingSignature, setCapturingSignature] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
 
+  const assignmentOptions = React.useMemo(() => buildAssignmentOptions(accessTree), [accessTree]);
+  const assignmentLabel = React.useCallback(
+    (value) => assignmentOptions.find((opt) => opt.value === value)?.label || null,
+    [assignmentOptions]
+  );
+  const pendingSignatureAccounts = React.useMemo(
+    () => accounts.filter((account) => account.status === 'pending_signature'),
+    [accounts]
+  );
+  const accountAssignmentValue = (account) => {
+    if (account.location_id) return `location:${account.location_id}`;
+    if (account.brand_id) return `brand:${account.brand_id}`;
+    if (account.organization_id) return `organization:${account.organization_id}`;
+    return null;
+  };
+
   const [bankForm, setBankForm] = useState({
+    assignment: '',
     bank_name: '',
     account_holder_name: userProfile?.full_name || '',
     account_type: 'checking',
@@ -56,7 +98,7 @@ export default function CompleteOnboarding() {
     try {
       const rows = await api.onboarding.listOnboardingBankAccounts();
       setAccounts(rows);
-      const preferred = rows.find((row) => row.is_default) || rows[0];
+      const preferred = rows.find((row) => row.status === 'pending_signature') || rows.find((row) => row.is_default) || rows[0];
       setSelectedBankId((current) => current || preferred?.id || '');
     } catch (err) {
       toast.error(err.message || 'Could not load bank accounts.');
@@ -67,6 +109,7 @@ export default function CompleteOnboarding() {
 
   useEffect(() => {
     loadAccounts();
+    fetchAccessTree();
   }, []);
 
   if (userProfile && userProfile.business_verification_status !== 'verified') {
@@ -87,14 +130,30 @@ export default function CompleteOnboarding() {
 
   const saveBankAccount = async (event) => {
     event.preventDefault();
+    const [assignmentScope, assignmentId] = bankForm.assignment.split(':');
+    if (!assignmentScope || !assignmentId) {
+      toast.error('Choose which organization, brand, or location this bank account belongs to.');
+      return;
+    }
     if (bankForm.billing_address_source === 'custom' && !addressComplete(customAddress)) {
       toast.error('Enter a complete billing address (line 1, city, state, postal code, country).');
       return;
     }
+    const accountLast4 = String(bankForm.account_number).replace(/\D/g, '').slice(-4);
+    const confirmed = await confirm(getConfirmationMessage(
+      'saveOnboardingBankAccount',
+      bankForm.bank_name.trim(),
+      accountLast4,
+      assignmentLabel(bankForm.assignment)
+    ));
+    if (!confirmed) return;
     setSavingBank(true);
     try {
+      const { assignment, ...bankFormRest } = bankForm;
       const payload = {
-        ...bankForm,
+        ...bankFormRest,
+        assignment_scope: assignmentScope,
+        assignment_id: assignmentId,
         metadata: { source: 'complete_onboarding' },
       };
       if (bankForm.billing_address_source === 'custom') {
@@ -110,7 +169,7 @@ export default function CompleteOnboarding() {
       toast.success('Bank account saved. Add authorization signature next.');
       await loadAccounts();
       if (saved?.id) setSelectedBankId(saved.id);
-      setBankForm((prev) => ({ ...prev, routing_number: '', account_number: '', nickname: '', is_default: false }));
+      setBankForm((prev) => ({ ...prev, assignment: '', routing_number: '', account_number: '', nickname: '', is_default: false }));
     } catch (err) {
       toast.error(err.message || 'Could not save bank account.');
     } finally {
@@ -132,6 +191,14 @@ export default function CompleteOnboarding() {
       toast.error('Type your signature before continuing.');
       return;
     }
+
+    const targetAccount = accounts.find((account) => account.id === selectedBankId);
+    const confirmed = await confirm(getConfirmationMessage(
+      'captureOnboardingBankSignature',
+      targetAccount?.account_number_last4 || '----',
+      signatureForm.signerFullName.trim()
+    ));
+    if (!confirmed) return;
 
     setCapturingSignature(true);
     try {
@@ -160,12 +227,15 @@ export default function CompleteOnboarding() {
         signaturePayload,
         userAgent: navigator.userAgent,
       });
-      toast.success('Signature authorization captured.');
       setFinalizing(true);
       const freshProfile = await refreshProfile();
       if (freshProfile?.banking_onboarding_completed) {
+        toast.success('Signature authorization captured. Banking setup complete.');
         navigate('/', { replace: true });
       } else {
+        toast.success('Signature captured for that account. Sign your next bank account to finish.');
+        setSignatureForm({ signerFullName: userProfile?.full_name || '', signerTitle: '', signatureText: '', consentAccepted: false });
+        setSelectedBankId('');
         await loadAccounts();
       }
     } catch (err) {
@@ -215,6 +285,9 @@ export default function CompleteOnboarding() {
                         <div>
                           <p className="text-sm font-bold text-foreground">{account.nickname || account.bank_name} ****{account.account_number_last4}</p>
                           <p className="text-xs text-muted-foreground">{account.account_type} account, routing ****{account.routing_number_last4}</p>
+                          {assignmentLabel(accountAssignmentValue(account)) && (
+                            <p className="text-xs font-semibold text-primary">{assignmentLabel(accountAssignmentValue(account))}</p>
+                          )}
                         </div>
                         <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${account.status === 'verified' || account.status === 'authorized' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{account.status}</span>
                       </div>
@@ -226,6 +299,17 @@ export default function CompleteOnboarding() {
 
             <form onSubmit={saveBankAccount} className="space-y-3 rounded-xl border border-border bg-card p-4">
               <p className="text-sm font-bold text-foreground">Add bank account</p>
+              <div className="space-y-1.5">
+                <Label>Assign this account to</Label>
+                <Select value={bankForm.assignment} onValueChange={(value) => handleBankChange('assignment', value)}>
+                  <SelectTrigger><SelectValue placeholder="Select an organization, brand, or location" /></SelectTrigger>
+                  <SelectContent>
+                    {assignmentOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input placeholder="Bank name" value={bankForm.bank_name} onChange={(e) => handleBankChange('bank_name', e.target.value)} required />
                 <Input placeholder="Account holder name" value={bankForm.account_holder_name} onChange={(e) => handleBankChange('account_holder_name', e.target.value)} required />
@@ -293,7 +377,23 @@ export default function CompleteOnboarding() {
             </form>
 
             <form onSubmit={captureSignature} className="space-y-3 rounded-xl border border-border bg-card p-4">
-              <p className="text-sm font-bold text-foreground">Signature authorization</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-foreground">Signature authorization</p>
+                {pendingSignatureAccounts.length > 0 && accounts.length > 0 && (
+                  <span className="text-xs font-semibold text-muted-foreground">{accounts.length - pendingSignatureAccounts.length}/{accounts.length} signed</span>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Bank account to authorize</Label>
+                <Select value={selectedBankId} onValueChange={setSelectedBankId}>
+                  <SelectTrigger><SelectValue placeholder="Select a bank account (last 4 digits only)" /></SelectTrigger>
+                  <SelectContent>
+                    {pendingSignatureAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>**** {account.account_number_last4} &middot; {account.account_type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input placeholder="Signer full name" value={signatureForm.signerFullName} onChange={(e) => setSignatureForm((prev) => ({ ...prev, signerFullName: e.target.value }))} required />
                 <Input placeholder="Title or role" value={signatureForm.signerTitle} onChange={(e) => setSignatureForm((prev) => ({ ...prev, signerTitle: e.target.value }))} />

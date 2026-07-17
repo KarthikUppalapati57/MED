@@ -2,7 +2,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'node:buffer'
 import { getSupabaseAuthAdminClient, getSupabaseClient } from '../_shared/supabase.ts'
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -347,65 +346,6 @@ async function extractWithAzureDocumentIntelligence(fileBlob) {
   throw new Error('Azure Document Intelligence timed out.');
 }
 
-function buildAzureOpenAIInvoicePrompt(compactExtraction) {
-  return {
-    task: 'Map compact Azure Document Intelligence invoice extraction into the invoice JSON shape used by the MED invoice workflow.',
-    output_shape: {
-      vendor_name: null,
-      vendor_address: null,
-      invoice_number: null,
-      account_number: null,
-      customer_number: null,
-      order_number: null,
-      purchase_order_number: null,
-      invoice_date: null,
-      due_date: null,
-      payment_terms: null,
-      subtotal: null,
-      tax_amount: null,
-      fuel_surcharge: null,
-      delivery_fee: null,
-      other_charges: null,
-      total_amount: null,
-      payment_status: 'unpaid',
-      paid_status_detection: null,
-      line_items: [
-        {
-          vendor_item_code: null,
-          description: null,
-          quantity: null,
-          unit: null,
-          unit_price: null,
-          extended_price: null,
-          pack_size: null,
-          label: null,
-          ai_confidence: null,
-        },
-      ],
-      validation: {
-        needs_review: false,
-        warnings: [],
-        errors: [],
-      },
-    },
-    rules: [
-      'Return only valid JSON. Do not include markdown fences or explanations.',
-      'Use only values present in the compact extraction payload. Do not invent values.',
-      'Dates must be YYYY-MM-DD. Money and quantities must be numbers.',
-      'Prefer visible header_table_pairs over ADI prebuilt fields when they conflict.',
-      'Keep document identifiers separate. Never map order_number into purchase_order_number unless there is a visible Purchase Order/PO label with that value.',
-      'If an invoice number is not visible, return invoice_number as null. The application will generate a fallback invoice number.',
-      'Use the supplier/vendor as vendor_name, not bill-to, ship-to, or customer recipient.',
-      'Preserve all invoice line items. Use shipped/invoiced quantity when available.',
-      'For every line item, map ADI ProductCode, ProductNumber, ItemNumber, ItemCode, SKU, SUPC, or Code to vendor_item_code. Keep the value even when confidence is low; low confidence should create a validation warning, not a null vendor_item_code.',
-      'If a product/item code appears in a line item table under a product/code/SKU/SUPC column, output that value as vendor_item_code.',
-      'If table_line_items is present, use it as the preferred source for line item vendor_item_code, pack_size, and label/brand values.',
-      'Set validation.needs_review true when required fields are missing, confidence is low, or totals do not reconcile.',
-    ],
-    compact_extraction: compactExtraction,
-  };
-}
-
 async function mapWithAzureOpenAI(compactExtraction) {
   const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\/+$/, '');
   const key = Deno.env.get('AZURE_OPENAI_API_KEY')?.trim();
@@ -414,17 +354,62 @@ async function mapWithAzureOpenAI(compactExtraction) {
 
   if (!endpoint || !key || !deployment) throw new Error('Azure OpenAI is not configured.');
 
+  const systemPrompt = `
+    You are an expert AP invoice data extractor for restaurant supplier invoices.
+    Extract every visible header field and every invoice line from the provided extraction data.
+    Return STRICT JSON only. No markdown fences. Use this exact shape:
+    {
+      "vendor_name": "string or null",
+      "invoice_number": "string or null",
+      "account_number": "string or null",
+      "customer_number": "string or null",
+      "invoice_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+      "due_date": "YYYY-MM-DD or MM/DD/YYYY or null",
+      "payment_terms": "string or null",
+      "subtotal": 0.0,
+      "tax_amount": 0.0,
+      "fuel_surcharge": 0.0,
+      "delivery_fee": 0.0,
+      "other_charges": 0.0,
+      "total_amount": 0.0,
+      "payment_status": "paid, unpaid, or unknown",
+      "paid_status_detection": {
+        "detected": true,
+        "confidence": 0.0,
+        "evidence": "visible paid stamp/check/payment confirmation text, or null",
+        "should_mark_paid": true
+      },
+      "line_items": [
+        {
+          "vendor_item_code": "product/item number as printed",
+          "description": "full item description",
+          "quantity": 0,
+          "unit": "CS/EA/LB/etc from pricing unit or UOM",
+          "unit_price": 0.0,
+          "extended_price": 0.0,
+          "pack_size": "pack size if visible",
+          "label": "brand/label if visible",
+          "ai_confidence": 0.0
+        }
+      ]
+    }
+    For line-item tables, use shipped/invoiced quantity, product/item code, label/brand, pack size, pricing unit, unit price, and extended price when visible.
+    Include all line rows across all pages, excluding subtotal/summary/footer rows.
+    If the invoice visibly says PAID, paid by check, paid by ACH, balance due 0, payment received, or contains a payment confirmation,
+    set payment_status to paid and paid_status_detection.should_mark_paid to true. If no paid signal is visible, set payment_status to unpaid.
+  `;
+
   let url;
   const body = {
     model: deployment,
     messages: [
       {
         role: 'system',
-        content: 'You are a precise invoice extraction mapper. Return only JSON that matches the requested output shape.',
+        content: systemPrompt,
       },
       {
         role: 'user',
-        content: JSON.stringify(buildAzureOpenAIInvoicePrompt(compactExtraction)),
+        content: JSON.stringify(compactExtraction),
       },
     ],
     max_completion_tokens: 12000,
@@ -660,85 +645,7 @@ function normalizeExtraction(data = {}) {
     validation: data.validation || null,
   };
 }
-function getDoclingBackendUrl() {
-  const configuredUrl = Deno.env.get('PYTHON_BACKEND_URL')?.trim();
-  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  const isLocalSupabase = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost');
-  if (isLocalSupabase) return 'http://127.0.0.1:8000';
-
-  throw new Error('PYTHON_BACKEND_URL is required for deployed invoice extraction.');
-}
-
-async function extractWithGeminiVision(fileBlob) {
-  const apiKey = Deno.env.get('VITE_GEMINI_API_KEY') || Deno.env.get('vertex_api_key') || Deno.env.get('GEMINI_API_KEY');
-  if (!apiKey) throw new Error('Gemini API key is not configured for invoice extraction fallback.');
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const fileBuffer = await fileBlob.arrayBuffer();
-  const base64Data = Buffer.from(fileBuffer).toString('base64');
-
-  const prompt = `
-    You are an expert AP invoice data extractor for restaurant supplier invoices.
-    Extract every visible header field and every invoice line from the PDF or image.
-    Return STRICT JSON only. No markdown fences. Use this exact shape:
-    {
-      "vendor_name": "string or null",
-      "invoice_number": "string or null",
-      "account_number": "string or null",
-      "customer_number": "string or null",
-      "invoice_date": "YYYY-MM-DD or MM/DD/YYYY or null",
-      "due_date": "YYYY-MM-DD or MM/DD/YYYY or null",
-      "payment_terms": "string or null",
-      "subtotal": 0.0,
-      "tax_amount": 0.0,
-      "fuel_surcharge": 0.0,
-      "delivery_fee": 0.0,
-      "other_charges": 0.0,
-      "total_amount": 0.0,
-      "payment_status": "paid, unpaid, or unknown",
-      "paid_status_detection": {
-        "detected": true,
-        "confidence": 0.0,
-        "evidence": "visible paid stamp/check/payment confirmation text, or null",
-        "should_mark_paid": true
-      },
-      "line_items": [
-        {
-          "vendor_item_code": "product/item number as printed",
-          "description": "full item description",
-          "quantity": 0,
-          "unit": "CS/EA/LB/etc from pricing unit or UOM",
-          "unit_price": 0.0,
-          "extended_price": 0.0,
-          "pack_size": "pack size if visible",
-          "label": "brand/label if visible",
-          "ai_confidence": 0.0
-        }
-      ]
-    }
-    For line-item tables, use shipped/invoiced quantity, product/item code, label/brand, pack size, pricing unit, unit price, and extended price when visible.
-    Include all line rows across all pages, excluding subtotal/summary/footer rows.
-    If the invoice visibly says PAID, paid by check, paid by ACH, balance due 0, payment received, or contains a payment confirmation,
-    set payment_status to paid and paid_status_detection.should_mark_paid to true. If no paid signal is visible, set payment_status to unpaid.
-  `;
-
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        data: base64Data,
-        mimeType: fileBlob.type || 'application/pdf',
-      },
-    },
-    prompt,
-  ]);
-
-  const responseText = result.response.text();
-  const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-  return { data: JSON.parse(cleanJsonStr), rawText: responseText };
-}
 // Background processing function
 async function processInvoiceBackground(record, supabaseClient) {
   try {
