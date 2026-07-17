@@ -519,6 +519,11 @@ export const api = {
       if (error) throw error;
       return data || { ein_verification_enabled: true, ssn_verification_enabled: true };
     },
+    isBusinessNameAvailable: async (legalName) => {
+      const { data, error } = await supabase.rpc('is_business_name_available', { p_legal_name: legalName });
+      if (error) throw error;
+      return data !== false;
+    },
     updateVerificationSettings: async ({ einEnabled, ssnEnabled }) => {
       const { data, error } = await supabase.rpc('update_onboarding_verification_settings', {
         p_ein_enabled: einEnabled,

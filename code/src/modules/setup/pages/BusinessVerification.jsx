@@ -86,6 +86,7 @@ export default function BusinessVerification() {
   const [reviewFeedback, setReviewFeedback] = useState(null);
   const [revealedTaxId, setRevealedTaxId] = useState(null);
   const [revealingTaxId, setRevealingTaxId] = useState(false);
+  const [nameAvailable, setNameAvailable] = useState(true);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
   const [contactOtp, setContactOtp] = useState({
     email: {
@@ -166,6 +167,21 @@ export default function BusinessVerification() {
     loadDraft();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const name = form.legalName.trim();
+    if (name.length < 3) {
+      setNameAvailable(true);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      api.onboarding.isBusinessNameAvailable(name)
+        .then((available) => { if (!cancelled) setNameAvailable(available); })
+        .catch(() => { if (!cancelled) setNameAvailable(true); });
+    }, 500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [form.legalName]);
 
   const buildDraftPayload = () => {
     const { taxIdentifier, ...formWithoutTaxId } = form;
@@ -522,6 +538,9 @@ export default function BusinessVerification() {
                     <div className="space-y-1 md:col-span-2">
                       <Label>Legal Business Name</Label>
                       <Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} placeholder="Acme Hospitality LLC" />
+                      {!nameAvailable && (
+                        <p className="text-xs text-amber-600">A business named "{form.legalName.trim()}" is already registered on RestOps. If that's not you, you can still continue.</p>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label>Business Type</Label>
