@@ -63,6 +63,7 @@ const TABLE_SCOPE_COLUMNS = {
   recipe_equipment_assignments: ['organization_id'],
   recipe_preparation_steps: ['organization_id'],
   recipe_location_prices: ['organization_id'],
+  recipe_categories: ['organization_id'],
   smart_prep_plans: ['organization_id', 'brand_id', 'location_id'],
   transfers: ['organization_id'],
   vendors: ['organization_id', 'brand_id', 'location_id'],
@@ -323,6 +324,7 @@ export const api = {
     RecipePreparationStep: createEntityClient('recipe_preparation_steps'),
     RecipeLocationPrice: createEntityClient('recipe_location_prices'),
     RecipeCostSnapshot: createEntityClient('recipe_cost_snapshots'),
+    RecipeCategory: createEntityClient('recipe_categories'),
     InventoryMovement: createEntityClient('inventory_movements'),
     PurchaseOrder: createEntityClient('purchase_orders'),
     PurchaseOrderItem: createEntityClient('purchase_order_items'),
@@ -1119,6 +1121,55 @@ export const api = {
     deleteBarItem: async (recipeId) => {
       const { error } = await supabase.rpc('delete_bar_item', { p_recipe_id: recipeId });
       if (error) throw error;
+    },
+    listRecipeCategories: async (organizationId = null, includeInactive = false) => {
+      const { data, error } = await supabase.rpc('list_recipe_categories', {
+        p_organization_id: organizationId,
+        p_include_inactive: includeInactive,
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    createRecipeCategory: async ({ name, description = null, organizationId = null }) => {
+      const { data, error } = await supabase.rpc('create_recipe_category', {
+        p_name: name,
+        p_description: description,
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    updateRecipeCategory: async ({
+      categoryId,
+      name,
+      description = null,
+      isActive = null,
+      organizationId = null,
+    }) => {
+      const { data, error } = await supabase.rpc('update_recipe_category', {
+        p_category_id: categoryId,
+        p_name: name,
+        p_description: description,
+        p_is_active: isActive,
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    deleteRecipeCategory: async ({ categoryId, organizationId = null }) => {
+      const { data, error } = await supabase.rpc('delete_recipe_category', {
+        p_category_id: categoryId,
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getRecipeCategoryCounts: async (organizationId = null) => {
+      const { data, error } = await supabase.rpc('get_recipe_category_counts', {
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      return data || [];
     },
   },
   vendors: {

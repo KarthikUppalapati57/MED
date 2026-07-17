@@ -787,6 +787,26 @@ export const confirmationMessages = {
     severity: 'medium',
   }),
 
+  saveRecipeCategory: (categoryName) => ({
+    title: categoryName ? `Save changes to "${categoryName}"?` : 'Save category changes?',
+    description:
+      'Category name and settings will be updated for this organization. Recipes using this category stay linked to the updated category.',
+    confirmText: 'Save Changes',
+    cancelText: 'Cancel',
+    variant: 'warning',
+    severity: 'medium',
+  }),
+
+  deleteRecipeCategory: (categoryName) => ({
+    title: categoryName ? `Delete category "${categoryName}"?` : 'Delete category?',
+    description:
+      'This category will be removed from Recipe Setup. Recipes already using it keep their category value, but the category will no longer be available for new selections.',
+    confirmText: 'Delete Category',
+    cancelText: 'Cancel',
+    variant: 'destructive',
+    severity: 'high',
+  }),
+
   // ========================================
   // ORDERS / AUTO-ORDERING
   // ========================================

@@ -145,7 +145,6 @@ const navigation = [
     icon: Store, 
     minRole: 'location_manager',
     subItems: [
-      { name: 'Menu Engineering', href: 'Recipes', icon: BookOpen },
       { name: 'Consumer Online Ordering', href: 'OrderOnline', icon: Store }
     ]
   },
@@ -160,7 +159,6 @@ const navigation = [
       { name: 'Prepared Items', href: 'Recipes/prepared-items', icon: Plus },
       { name: 'Bar Items', href: 'Recipes/bar-items', icon: Wine },
       { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
-      { name: 'Delivery Menus', href: 'DeliveryAggregator', icon: Package },
       { name: 'Setup', href: 'Recipes/setup', icon: Settings }
     ]
   },

@@ -11,7 +11,6 @@ import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/geminiService';
 import { calculateIngredientCost, calculateRecipeCost } from '@/modules/recipes/lib/recipeCosting';
-import ProductsLiveDashboard from '@/modules/products/components/ProductsLiveDashboard';
 import MenuItemsOperations from '@/modules/recipes/components/MenuItemsOperations';
 import MenuItemAuthoringPage from '@/modules/recipes/components/MenuItemAuthoringPage';
 import MenuItemDetailPage from '@/modules/recipes/components/MenuItemDetailPage';
@@ -78,15 +77,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+
+const FALLBACK_RECIPE_CATEGORY_OPTIONS = ['appetizer', 'main_course', 'dessert', 'beverage', 'side', 'sauce'];
 
 export default function Recipes() {
   const navigate = useNavigate();
@@ -111,6 +107,14 @@ export default function Recipes() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [costDialogOpen, setCostDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [categoryDialogMode, setCategoryDialogMode] = useState('create'); // create | edit
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryFormName, setCategoryFormName] = useState('');
+  const [categoryFormDescription, setCategoryFormDescription] = useState('');
+  const [categoryFormActive, setCategoryFormActive] = useState(true);
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState(null);
   const [viewingRecipe, setViewingRecipe] = useState(null);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [calculatingCost, setCalculatingCost] = useState(false);
@@ -203,6 +207,48 @@ export default function Recipes() {
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id && needsProducts,
   });
+
+  const {
+    data: recipeCategories = [],
+    isLoading: loadingRecipeCategories,
+    isError: recipeCategoriesError,
+    error: recipeCategoriesErrorDetail,
+  } = useAuthQuery({
+    queryKey: ['recipe-categories', organization?.id],
+    queryFn: () => api.recipes.listRecipeCategories(organization?.id),
+    enabled: !!organization?.id && activeTab === 'setup',
+    // Keep Setup usable when RPCs are missing/unavailable (do not throw to a page crash).
+    throwOnError: false,
+  });
+
+  const {
+    data: recipeCategoryCounts = [],
+    isError: recipeCategoryCountsError,
+    error: recipeCategoryCountsErrorDetail,
+  } = useAuthQuery({
+    queryKey: ['recipe-category-counts', organization?.id],
+    queryFn: () => api.recipes.getRecipeCategoryCounts(organization?.id),
+    enabled: !!organization?.id && activeTab === 'setup',
+    throwOnError: false,
+  });
+
+  // List failure is hard (empty state + error). Counts are soft (badges default to 0).
+  const recipeCategoriesLoadFailed = recipeCategoriesError;
+  const recipeCategoriesLoading = loadingRecipeCategories && !recipeCategoriesLoadFailed;
+  const recipeCategoriesErrorMessage =
+    recipeCategoriesErrorDetail?.message || 'Unable to load recipe categories.';
+  const recipeCategoryCountsWarning =
+    !recipeCategoriesLoadFailed && recipeCategoryCountsError
+      ? (recipeCategoryCountsErrorDetail?.message || 'Unable to load category recipe counts.')
+      : null;
+
+  const recipeCategoryCountMap = React.useMemo(() => {
+    const map = new Map();
+    for (const row of recipeCategoryCounts) {
+      map.set(row.slug, Number(row.recipe_count || 0));
+    }
+    return map;
+  }, [recipeCategoryCounts]);
 
   const { data: recipeVisibility = { supported: true, rows: [] } } = useAuthQuery({
     queryKey: ['recipe-location-visibility', organization?.id],
@@ -761,16 +807,43 @@ export default function Recipes() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Recipes</h1>
-          <p className="text-muted-foreground mt-1">Manage recipes and calculate costs</p>
+          {activeTab === 'setup' ? (
+            <>
+              <h1 className="text-2xl font-bold text-foreground">Recipe Setup</h1>
+              <p className="text-muted-foreground mt-1">Configure organization-wide recipe settings and categories</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-foreground">Recipes</h1>
+              <p className="text-muted-foreground mt-1">Manage recipes and calculate costs</p>
+            </>
+          )}
         </div>
-        <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Recipe
-        </Button>
+        {activeTab === 'setup' ? (
+          <Button
+            onClick={() => {
+              setCategoryDialogMode('create');
+              setEditingCategory(null);
+              setCategoryFormName('');
+              setCategoryFormDescription('');
+              setCategoryFormActive(true);
+              setCategoryDialogOpen(true);
+            }}
+            className="bg-primary hover:bg-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        ) : (
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Recipe
+          </Button>
+        )}
       </div>
 
-      {/* Stats */}
+      {/* Stats — Recipes List and related views only */}
+      {activeTab !== 'setup' && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
@@ -803,9 +876,7 @@ export default function Recipes() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Live Margins Ticker */}
-      <ProductsLiveDashboard targetCogs={30} />
+      )}
         </>
       )}
 
@@ -1227,28 +1298,132 @@ export default function Recipes() {
                 <CardTitle className="text-base">Category Definitions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {['appetizer', 'main_course', 'dessert', 'beverage', 'side', 'sauce'].map(cat => (
-                  <div key={cat} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                    <span className="font-medium capitalize">{cat.replace('_', ' ')}</span>
-                    <Badge variant="secondary">
-                      {stats.categoryCounts[cat] || 0} recipes
-                    </Badge>
+                {recipeCategoriesLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading categories...
                   </div>
-                ))}
+                )}
+                {recipeCategoriesLoadFailed && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                    <p className="text-sm text-destructive">
+                      {recipeCategoriesErrorMessage}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recipe Configuration above remains available. Retry after the recipe categories migration is applied.
+                    </p>
+                  </div>
+                )}
+                {recipeCategoryCountsWarning && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    {recipeCategoryCountsWarning}
+                  </p>
+                )}
+                {!recipeCategoriesLoading && !recipeCategoriesLoadFailed && recipeCategories.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No categories found for this organization.</p>
+                )}
+                {!recipeCategoriesLoading && !recipeCategoriesLoadFailed && recipeCategories.map((cat) => {
+                  const recipeCount = recipeCategoryCountMap.get(cat.slug) ?? 0;
+                  return (
+                  <div key={cat.id} className="flex items-center justify-between gap-3 p-3 bg-secondary rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{cat.name}</span>
+                        {cat.is_system && <Badge variant="outline">Default</Badge>}
+                        {cat.is_active === false && <Badge variant="secondary">Inactive</Badge>}
+                      </div>
+                      {cat.description ? (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{cat.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="secondary">
+                        {recipeCount} recipes
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title="Edit category"
+                        disabled={savingCategory || deletingCategoryId === cat.id}
+                        onClick={() => {
+                          setCategoryDialogMode('edit');
+                          setEditingCategory(cat);
+                          setCategoryFormName(cat.name || '');
+                          setCategoryFormDescription(cat.description || '');
+                          setCategoryFormActive(cat.is_active !== false);
+                          setCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        title="Delete category"
+                        disabled={savingCategory || deletingCategoryId === cat.id}
+                        onClick={async () => {
+                          if (confirmLockRef.current) return;
+                          confirmLockRef.current = true;
+                          try {
+                            const confirmed = await confirm(
+                              getConfirmationMessage('deleteRecipeCategory', cat.name)
+                            );
+                            if (!confirmed) return;
+                            setDeletingCategoryId(cat.id);
+                            try {
+                              await api.recipes.deleteRecipeCategory({
+                                categoryId: cat.id,
+                                organizationId: organization?.id || null,
+                              });
+                              await Promise.all([
+                                queryClient.invalidateQueries({ queryKey: ['recipe-categories', organization?.id] }),
+                                queryClient.invalidateQueries({ queryKey: ['recipe-category-counts', organization?.id] }),
+                              ]);
+                              toast.success(`Category "${cat.name}" deleted.`);
+                            } catch (error) {
+                              const message = String(error?.message || 'Unable to delete category');
+                              const usedMatch = message.match(/used by (\d+) recipes/i);
+                              if (usedMatch) {
+                                toast.error(
+                                  `This category is used by ${usedMatch[1]} recipes and cannot be deleted.`
+                                );
+                              } else {
+                                toast.error(message);
+                              }
+                            } finally {
+                              setDeletingCategoryId(null);
+                            }
+                          } finally {
+                            confirmLockRef.current = false;
+                          }
+                        }}
+                      >
+                        {deletingCategoryId === cat.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
 
-      {/* Recipe Form Sheet */}
-      <Sheet open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editingRecipe ? 'Edit Recipe' : 'Add Recipe'}</SheetTitle>
-          </SheetHeader>
+      {/* Recipe Form Dialog (centered modal) */}
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+        <DialogContent className="w-[min(100vw-1.5rem,1100px)] max-w-[1100px] max-h-[90vh] overflow-y-auto p-6 sm:w-[min(100vw-2rem,1000px)]">
+          <DialogHeader>
+            <DialogTitle>{editingRecipe ? 'Edit Recipe' : 'Add Recipe'}</DialogTitle>
+          </DialogHeader>
 
-          <div className="space-y-6 mt-6">
+          <div className="space-y-6 mt-2">
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
@@ -1269,12 +1444,11 @@ export default function Recipes() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="appetizer">Appetizer</SelectItem>
-                    <SelectItem value="main_course">Main Course</SelectItem>
-                    <SelectItem value="dessert">Dessert</SelectItem>
-                    <SelectItem value="beverage">Beverage</SelectItem>
-                    <SelectItem value="side">Side</SelectItem>
-                    <SelectItem value="sauce">Sauce</SelectItem>
+                    {FALLBACK_RECIPE_CATEGORY_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={value} className="capitalize">
+                        {value.replace('_', ' ')}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1560,8 +1734,8 @@ export default function Recipes() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       {/* AI Cost Dialog */}
       <Dialog open={costDialogOpen} onOpenChange={setCostDialogOpen}>
@@ -1581,6 +1755,144 @@ export default function Recipes() {
           )}
           <DialogFooter>
             <Button onClick={() => setCostDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Setup: Add / Edit Category (persisted per organization) */}
+      <Dialog open={categoryDialogOpen} onOpenChange={(open) => {
+        if (savingCategory) return;
+        setCategoryDialogOpen(open);
+        if (!open) {
+          setEditingCategory(null);
+          setCategoryDialogMode('create');
+          setCategoryFormName('');
+          setCategoryFormDescription('');
+          setCategoryFormActive(true);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{categoryDialogMode === 'edit' ? 'Edit Category' : 'Add Category'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="recipe-category-name">Category name</Label>
+              <Input
+                id="recipe-category-name"
+                value={categoryFormName}
+                onChange={(e) => setCategoryFormName(e.target.value)}
+                placeholder="e.g. Snacks"
+                disabled={savingCategory}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('confirm-save-recipe-category')?.click();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="recipe-category-description">Description</Label>
+              <Textarea
+                id="recipe-category-description"
+                value={categoryFormDescription}
+                onChange={(e) => setCategoryFormDescription(e.target.value)}
+                placeholder="Optional"
+                disabled={savingCategory}
+                rows={2}
+              />
+            </div>
+            {categoryDialogMode === 'edit' && (
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Active</p>
+                  <p className="text-xs text-muted-foreground">Inactive categories stay hidden from selectors.</p>
+                </div>
+                <Switch
+                  checked={categoryFormActive}
+                  onCheckedChange={setCategoryFormActive}
+                  disabled={savingCategory}
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Categories are saved for this organization. Categories in use by recipes cannot be deleted.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={savingCategory} onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+            <Button
+              id="confirm-save-recipe-category"
+              className="bg-primary hover:bg-primary"
+              disabled={savingCategory}
+              onClick={async () => {
+                const name = categoryFormName.trim();
+                if (!name) {
+                  toast.error('Enter a category name.');
+                  return;
+                }
+                if (categoryDialogMode === 'edit' && editingCategory?.id) {
+                  if (confirmLockRef.current) return;
+                  confirmLockRef.current = true;
+                  let confirmed = false;
+                  try {
+                    confirmed = await confirm(
+                      getConfirmationMessage('saveRecipeCategory', editingCategory.name || name)
+                    );
+                  } finally {
+                    confirmLockRef.current = false;
+                  }
+                  if (!confirmed) return;
+                }
+                setSavingCategory(true);
+                try {
+                  if (categoryDialogMode === 'edit' && editingCategory?.id) {
+                    const updated = await api.recipes.updateRecipeCategory({
+                      categoryId: editingCategory.id,
+                      name,
+                      description: categoryFormDescription,
+                      isActive: categoryFormActive,
+                      organizationId: organization?.id || null,
+                    });
+                    toast.success(`Category "${updated?.name || name}" updated.`);
+                  } else {
+                    const created = await api.recipes.createRecipeCategory({
+                      name,
+                      description: categoryFormDescription || null,
+                      organizationId: organization?.id || null,
+                    });
+                    toast.success(`Category "${created?.name || name}" added.`);
+                  }
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['recipe-categories', organization?.id] }),
+                    queryClient.invalidateQueries({ queryKey: ['recipe-category-counts', organization?.id] }),
+                    queryClient.invalidateQueries({ queryKey: ['recipes'] }),
+                  ]);
+                  setCategoryDialogOpen(false);
+                  setEditingCategory(null);
+                  setCategoryDialogMode('create');
+                  setCategoryFormName('');
+                  setCategoryFormDescription('');
+                  setCategoryFormActive(true);
+                } catch (error) {
+                  const message = String(error?.message || 'Unable to save category');
+                  if (/already exists/i.test(message)) {
+                    toast.error('A category with this name already exists.');
+                  } else if (/migration|schema cache|function/i.test(message)) {
+                    toast.error('Category changes require the recipe categories migration.');
+                  } else {
+                    toast.error(message);
+                  }
+                } finally {
+                  setSavingCategory(false);
+                }
+              }}
+            >
+              {savingCategory
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                : (categoryDialogMode === 'edit' ? 'Save Changes' : 'Add Category')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
