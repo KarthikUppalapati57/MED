@@ -8,6 +8,8 @@
 
 BEGIN;
 
+SELECT plan(5);
+
 CREATE TEMP TABLE bnu_ids (
   key text PRIMARY KEY,
   value uuid NOT NULL
@@ -126,13 +128,8 @@ SELECT 'tenant_b_has_a_verification_row_after_duplicate_submit',
 
 -- ===================== verdict =====================
 
-SELECT * FROM bnu_results ORDER BY test_name;
+SELECT ok(passed, test_name) FROM bnu_results ORDER BY test_name;
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM bnu_results WHERE NOT passed) THEN
-    RAISE EXCEPTION 'business_name_availability_check_acceptance failed';
-  END IF;
-END $$;
+SELECT * FROM finish();
 
 ROLLBACK;
