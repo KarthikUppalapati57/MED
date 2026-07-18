@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '@/lib/apiClient';
 import { CheckCircle2, XCircle, AlertTriangle, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,8 +12,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { runInvoiceValidationChecks, VALIDATION_CHECK_LABELS } from '../lib/invoiceValidation';
 
-const ValidationCheck = ({ label, status }) => {
+const CHECKING_RESULTS = Object.fromEntries(
+  Object.keys(VALIDATION_CHECK_LABELS).map(key => [key, { status: 'checking', message: '' }])
+);
+
+const ValidationCheck = ({ label, result }) => {
+  const status = result?.status || 'checking';
   const icons = {
     pass: <CheckCircle2 className="h-5 w-5 text-green-500" />,
     fail: <XCircle className="h-5 w-5 text-red-500" />,
@@ -38,15 +43,20 @@ const ValidationCheck = ({ label, status }) => {
 
   return (
     <div className={cn(
-      "flex items-center justify-between p-4 rounded-lg border",
+      "flex items-center justify-between gap-4 p-4 rounded-lg border",
       statusColors[status]
     )}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         {icons[status] || icons.checking}
-        <span className="font-medium text-slate-900">{label}</span>
+        <div className="min-w-0">
+          <span className="font-medium text-slate-900 block">{label}</span>
+          {result?.message && (
+            <span className="text-xs text-slate-500 block mt-0.5">{result.message}</span>
+          )}
+        </div>
       </div>
       <span className={cn(
-        "text-sm font-medium",
+        "text-sm font-medium whitespace-nowrap",
         status === 'pass' && 'text-green-600',
         status === 'fail' && 'text-red-600',
         status === 'warning' && 'text-yellow-600',
@@ -68,12 +78,7 @@ export default function ValidationDialog({
   const [step, setStep] = useState('validating');
   const [validating, setValidating] = useState(true);
   const [approvalNotes, setApprovalNotes] = useState('');
-  const [results, setResults] = useState({
-    duplicate_check: 'checking',
-    fraud_detection: 'checking',
-    price_deviation: 'checking',
-    delivery_match: 'checking',
-  });
+  const [results, setResults] = useState(CHECKING_RESULTS);
 
   const lastValidatedRef = useRef(null);
 
@@ -84,70 +89,17 @@ export default function ValidationDialog({
       lastValidatedRef.current = invoice;
 
       let isMounted = true;
-      
+
       const doValidation = async () => {
         setStep('validating');
         setApprovalNotes('');
         setValidating(true);
-        setResults({
-          duplicate_check: 'checking',
-          fraud_detection: 'checking',
-          price_deviation: 'checking',
-          delivery_match: 'checking',
-        });
+        setResults(CHECKING_RESULTS);
 
         try {
-          // 1. Duplicate Check
-          let duplicateStatus = 'pass';
-          if (invoice.invoice_number && invoice.vendor_name) {
-            try {
-              const existing = await api.entities.Invoice.filter({
-                invoice_number: invoice.invoice_number,
-                vendor_name: invoice.vendor_name
-              });
-              if (existing && existing.length > 0) {
-                const isSame = existing.some(e => e.id === invoice.id);
-                if (!isSame) duplicateStatus = 'fail';
-              }
-            } catch (e) {
-              console.error("[Validation] Duplicate check error:", e);
-              duplicateStatus = 'warning';
-            }
-          }
+          const checkResults = await runInvoiceValidationChecks(invoice);
           if (!isMounted) return;
-          setResults(prev => ({ ...prev, duplicate_check: duplicateStatus }));
-
-          // 2. Fraud Check + 3. Delivery Match (3-Way Matching via DB)
-          let fraudStatus = 'pass';
-          let priceStatus = (invoice.total_amount > 5000) ? 'warning' : 'pass';
-          let deliveryStatus = 'checking';
-
-          try {
-            const variances = await api.entities.ReconciliationVariance.filter({
-              invoice_id: invoice.id,
-              organization_id: invoice.organization_id,
-              is_resolved: false
-            });
-            
-            if (variances && variances.length > 0) {
-               deliveryStatus = 'fail';
-               const hasPriceDev = variances.some(v => v.variance_type === 'price');
-               if (hasPriceDev) priceStatus = 'fail';
-            } else {
-               deliveryStatus = 'pass';
-            }
-          } catch (err) {
-            console.error("[Validation] 3-way matching DB error:", err);
-            deliveryStatus = 'warning';
-          }
-
-          if (!isMounted) return;
-          setResults(prev => ({ 
-            ...prev, 
-            fraud_detection: fraudStatus,
-            price_deviation: priceStatus,
-            delivery_match: deliveryStatus 
-          }));
+          setResults(checkResults);
         } catch (err) {
           console.error("[Validation] Global failure:", err);
         } finally {
@@ -167,8 +119,8 @@ export default function ValidationDialog({
     }
   }, [open, invoice]);
 
-  const hasFailures = Object.values(results).some(r => r === 'fail');
-  const hasWarnings = Object.values(results).some(r => r === 'warning');
+  const hasFailures = Object.values(results).some(r => r.status === 'fail');
+  const hasWarnings = Object.values(results).some(r => r.status === 'warning');
   const allPassed = !hasFailures && !hasWarnings && !validating;
   const paidDetection = invoice?.validation_results?.paid_status_detection;
 
@@ -220,14 +172,13 @@ export default function ValidationDialog({
         {step === 'validating' ? (
           <div className="space-y-6 py-4">
             <div className="space-y-3">
-              <ValidationCheck label="Duplicate Check" status={results.duplicate_check} />
-              <ValidationCheck label="Fraud Detection" status={results.fraud_detection} />
-              <ValidationCheck label="Price Deviation" status={results.price_deviation} />
-              <ValidationCheck label="Delivery Match" status={results.delivery_match} />
+              {Object.entries(VALIDATION_CHECK_LABELS).map(([key, label]) => (
+                <ValidationCheck key={key} label={label} result={results[key]} />
+              ))}
               {paidDetection?.detected && (
                 <ValidationCheck
                   label={paidDetection.should_mark_paid ? 'Paid Stamp Detected' : 'Possible Paid Stamp'}
-                  status={paidDetection.should_mark_paid ? 'pass' : 'warning'}
+                  result={{ status: paidDetection.should_mark_paid ? 'pass' : 'warning' }}
                 />
               )}
             </div>

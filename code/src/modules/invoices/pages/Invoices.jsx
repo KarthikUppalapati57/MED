@@ -82,6 +82,11 @@ import {
   getInvoiceAging,
   invoicesToCsv,
 } from '@/lib/invoiceAp';
+import {
+  runInvoiceValidationChecks,
+  summarizeValidationIssues,
+  confirmApprovalWithValidation,
+} from '../lib/invoiceValidation';
 
 const InvoiceUploader = React.lazy(() => import('@/modules/invoices/components/InvoiceUploader'));
 const InvoiceEditor = React.lazy(() => import('@/modules/invoices/components/InvoiceEditor'));
@@ -965,8 +970,9 @@ export default function Invoices() {
       if (!hasInvoiceLineItems(invoiceForApproval.line_items)) {
         throw new Error('This invoice has no saved line items. Open it, add/review line items, then approve it.');
       }
+      if (!(await confirmApprovalWithValidation(invoiceForApproval))) return;
 
-      await updateMutation.mutateAsync({ 
+      await updateMutation.mutateAsync({
         id: invoice.id, 
         data: {
           ...invoiceForApproval,
@@ -992,11 +998,36 @@ export default function Invoices() {
   };
 
   const handleReject = async (invoice) => {
-    await updateMutation.mutateAsync({ 
-      id: invoice.id, 
+    await updateMutation.mutateAsync({
+      id: invoice.id,
       data: { status: 'rejected', ap_status: 'rejected' }
     });
     posthog.capture('invoice_failed', { invoiceId: invoice.id, reason: 'rejected' });
+  };
+
+  const handleApproveBatch = async () => {
+    const selected = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    const withIssues = (
+      await Promise.all(selected.map(async (inv) => ({
+        inv,
+        issues: summarizeValidationIssues(await runInvoiceValidationChecks(inv)),
+      })))
+    ).filter(r => r.issues.length > 0);
+
+    if (withIssues.length > 0) {
+      const summary = withIssues
+        .map(r => `${r.inv.vendor_name || 'Unknown vendor'} #${r.inv.invoice_number || r.inv.id}:\n  ${r.issues.join('\n  ')}`)
+        .join('\n\n');
+      const proceed = window.confirm(
+        `${withIssues.length} of ${selected.length} selected invoice(s) have validation issues:\n\n${summary}\n\nApprove all anyway?`
+      );
+      if (!proceed) return;
+    }
+
+    batchUpdateMutation.mutate({
+      ids: selectedInvoiceIds,
+      data: { status: 'approved', ap_status: 'approved', action_required_reason: null }
+    });
   };
 
   const handleEditorSave = async () => {
@@ -1060,6 +1091,7 @@ export default function Invoices() {
 
   const handleEditorApprove = async () => {
     try {
+      if (!(await confirmApprovalWithValidation(editingInvoice))) return;
       const data = {
         ...editingInvoice,
         status: 'approved',
@@ -1513,10 +1545,7 @@ export default function Invoices() {
                   size="sm"
                   className="bg-resend-green hover:bg-resend-green/90 whitespace-nowrap"
                   disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
-                  onClick={() => batchUpdateMutation.mutate({
-                    ids: selectedInvoiceIds,
-                    data: { status: 'approved', ap_status: 'approved', action_required_reason: null }
-                  })}
+                  onClick={handleApproveBatch}
                 >
                   Approve Batch
                 </Button>
