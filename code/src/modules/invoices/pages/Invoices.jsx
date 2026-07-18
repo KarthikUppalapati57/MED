@@ -210,6 +210,7 @@ export default function Invoices() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isHigherRole = ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+  const isSingleSelected = selectedInvoiceIds.length === 1;
 
   const createBlankManualInvoice = useCallback(() => ({
     vendor_name: '',
@@ -1538,7 +1539,7 @@ export default function Invoices() {
                     date: batchScheduleDate 
                   })}
                 >
-                  {batchScheduleMutation.isPending ? 'Scheduling...' : 'Schedule Batch'}
+                  {batchScheduleMutation.isPending ? 'Scheduling...' : (isSingleSelected ? 'Schedule' : 'Schedule Batch')}
                 </Button>
                 <Button
                   size="sm"
@@ -1546,7 +1547,7 @@ export default function Invoices() {
                   disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
                   onClick={handleApproveBatch}
                 >
-                  Approve Batch
+                  {isSingleSelected ? 'Approve' : 'Approve Batch'}
                 </Button>
                 <Button
                   size="sm"
@@ -1558,7 +1559,7 @@ export default function Invoices() {
                     data: { status: 'rejected', ap_status: 'rejected' }
                   })}
                 >
-                  Reject Batch
+                  {isSingleSelected ? 'Reject' : 'Reject Batch'}
                 </Button>
                 <Button
                   size="sm"
@@ -1567,7 +1568,7 @@ export default function Invoices() {
                   disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
                   onClick={handleBulkDelete}
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> Delete Batch
+                  <Trash2 className="h-4 w-4 mr-1" /> {isSingleSelected ? 'Delete' : 'Delete Batch'}
                 </Button>
                 <Button
                   size="sm"
