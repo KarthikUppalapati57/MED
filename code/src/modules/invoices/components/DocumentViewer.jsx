@@ -195,22 +195,30 @@ export default function DocumentViewer({ fileUrl, fileType }) {
         </Button>
       </div>
 
+      {/*
+        No items-center/justify-center here: centering an overflowing flex
+        child that way makes the "before" side of the overflow unreachable by
+        scroll in every browser (the scrollable region only ever grows on the
+        end side). Centering via margin:auto on the children below instead
+        centers when content fits and leaves 100% of it scrollable when it
+        doesn't — verified against scrollWidth/scrollLeft directly.
+      */}
       <div
         ref={viewportRef}
         onMouseDown={handlePanStart}
-        className={`flex-1 overflow-auto relative flex items-center justify-center bg-slate-200/50 p-4 select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`flex-1 overflow-auto relative flex bg-slate-200/50 p-4 select-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         {isPdf ? (
           pdfError ? (
-            <div className="flex flex-col items-center gap-2 text-slate-400 p-8">
+            <div className="m-auto flex flex-col items-center gap-2 text-slate-400 p-8">
               <AlertTriangle className="h-8 w-8" />
               <p className="text-sm">{pdfError}</p>
               <Button variant="outline" size="sm" onClick={handleDownload}>Download instead</Button>
             </div>
           ) : !pdfDoc ? (
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="m-auto h-6 w-6 animate-spin text-slate-400" />
           ) : (
-            <div className="flex flex-col items-center gap-3">
+            <div className="m-auto flex flex-col items-center gap-3">
               {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
                 <canvas
                   key={i}
@@ -222,7 +230,7 @@ export default function DocumentViewer({ fileUrl, fileType }) {
           )
         ) : (
           <div
-            className="transition-transform duration-200 origin-center shadow-xl rounded-sm bg-white"
+            className="m-auto transition-transform duration-200 origin-center shadow-xl rounded-sm bg-white"
             style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
           >
             <img
