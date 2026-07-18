@@ -137,13 +137,3 @@ export function summarizeValidationIssues(results) {
     .filter(r => r.status !== 'pass' && r.message)
     .map(r => `${r.status === 'fail' ? '✗' : '⚠'} ${r.message}`);
 }
-
-// Warn-and-confirm, never block: returns true if the caller should proceed.
-export async function confirmApprovalWithValidation(invoice) {
-  const results = await runInvoiceValidationChecks(invoice);
-  const issues = summarizeValidationIssues(results);
-  if (issues.length === 0) return true;
-  return window.confirm(
-    `Validation found the following issue(s) with this invoice:\n\n${issues.join('\n')}\n\nApprove anyway?`
-  );
-}
