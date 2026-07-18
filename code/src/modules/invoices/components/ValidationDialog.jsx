@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { runInvoiceValidationChecks, VALIDATION_CHECK_LABELS } from '../lib/invoiceValidation';
+import { runInvoiceValidationChecks, summarizeValidationIssues, VALIDATION_CHECK_LABELS } from '../lib/invoiceValidation';
 
 const CHECKING_RESULTS = Object.fromEntries(
   Object.keys(VALIDATION_CHECK_LABELS).map(key => [key, { status: 'checking', message: '' }])
@@ -68,12 +68,13 @@ const ValidationCheck = ({ label, result }) => {
   );
 };
 
-export default function ValidationDialog({ 
-  open, 
-  onOpenChange, 
-  invoice, 
-  onSave, 
-  onCancel 
+export default function ValidationDialog({
+  open,
+  onOpenChange,
+  invoice,
+  onSave,
+  onCancel,
+  onValidated,
 }) {
   const [step, setStep] = useState('validating');
   const [validating, setValidating] = useState(true);
@@ -100,6 +101,7 @@ export default function ValidationDialog({
           const checkResults = await runInvoiceValidationChecks(invoice);
           if (!isMounted) return;
           setResults(checkResults);
+          onValidated?.();
         } catch (err) {
           console.error("[Validation] Global failure:", err);
         } finally {
@@ -145,14 +147,7 @@ export default function ValidationDialog({
     onOpenChange(false);
   };
 
-  const handleManualValidate = () => {
-    onSave({
-      ...invoice,
-      validation_results: results,
-      status: hasFailures ? 'flagged' : 'validated',
-    });
-    onOpenChange(false);
-  };
+  const issues = summarizeValidationIssues(results);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,16 +193,9 @@ export default function ValidationDialog({
               <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               <div className="flex gap-2">
                 {!validating && (
-                  <>
-                    <Button variant="outline" onClick={() => setStep('approval')}>
-                      Continue to Approval
-                    </Button>
-                    {hasFailures && (
-                      <Button onClick={handleManualValidate} className="bg-slate-800">
-                        Force Validate
-                      </Button>
-                    )}
-                  </>
+                  <Button variant="outline" onClick={() => setStep('approval')}>
+                    Continue to Approval
+                  </Button>
                 )}
               </div>
             </DialogFooter>
@@ -239,6 +227,19 @@ export default function ValidationDialog({
                 </div>
               )}
             </div>
+
+            {issues.length > 0 && (
+              <div className={cn(
+                "rounded-lg border p-3 text-sm space-y-1",
+                hasFailures ? "bg-red-50 border-red-100 text-red-800" : "bg-yellow-50 border-yellow-100 text-yellow-800"
+              )}>
+                <p className="font-medium">
+                  {hasFailures ? 'This invoice is flagged — validation failed:' : 'Validation warnings:'}
+                </p>
+                {issues.map((line, i) => <p key={i}>{line}</p>)}
+                {hasFailures && <p className="mt-1">Add a note below to approve anyway, or reject it.</p>}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Approval/Rejection Notes</Label>

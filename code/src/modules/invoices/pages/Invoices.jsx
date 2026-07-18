@@ -202,6 +202,7 @@ export default function Invoices() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
+  const [invoiceValidated, setInvoiceValidated] = useState(false);
   const previousInvoicesRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -258,6 +259,12 @@ export default function Invoices() {
     setEditingInvoice(createBlankManualInvoice());
     setEditorOpen(true);
   }, [createBlankManualInvoice]);
+
+  // Each new editor session starts un-validated; Approve stays locked until
+  // the user runs Validate at least once for this invoice.
+  useEffect(() => {
+    if (editorOpen) setInvoiceValidated(false);
+  }, [editorOpen, editingInvoice?.id]);
 
   useEffect(() => {
     if (!editorOpen || !editingInvoice?.id || editingInvoice.status !== 'extracting') return undefined;
@@ -1080,6 +1087,9 @@ export default function Invoices() {
 
   const handleEditorApprove = async () => {
     try {
+      if (!invoiceValidated) {
+        throw new Error('Run Validate before approving this invoice.');
+      }
       if (!(await runApprovalGate(editingInvoice))) return;
       const data = {
         ...editingInvoice,
@@ -1869,7 +1879,9 @@ export default function Invoices() {
                       <Button
                         variant="outline"
                         onClick={handleEditorApprove}
-                        className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5"
+                        disabled={!invoiceValidated}
+                        title={!invoiceValidated ? 'Run Validate first' : undefined}
+                        className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Check className="h-4 w-4 mr-1" /> Approve
                       </Button>
@@ -1897,6 +1909,7 @@ export default function Invoices() {
             invoice={editingInvoice}
             onSave={handleSaveValidated}
             onCancel={() => setValidationOpen(false)}
+            onValidated={() => setInvoiceValidated(true)}
           />
         </React.Suspense>
       )}
