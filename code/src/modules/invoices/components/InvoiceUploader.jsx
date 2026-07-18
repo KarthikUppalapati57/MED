@@ -292,7 +292,7 @@ export default function InvoiceUploader({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={reviewFile ? "sm:max-w-2xl" : "sm:max-w-lg"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-teal-600" />
@@ -302,27 +302,27 @@ export default function InvoiceUploader({
 
         {reviewFile ? (
           <div className="mt-4 space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center min-h-[220px]">
+            <div className="rounded-xl border bg-muted/40 overflow-hidden flex items-center justify-center min-h-[420px]">
               {reviewFile.type?.startsWith('image/') ? (
                 <img
                   src={reviewPreviewUrl}
                   alt="Invoice preview"
-                  className="max-h-[320px] w-full object-contain"
+                  className="max-h-[520px] w-full object-contain"
                 />
               ) : (
                 <object
                   data={reviewPreviewUrl}
                   type={reviewFile.type || 'application/pdf'}
-                  className="w-full h-[320px]"
+                  className="w-full h-[520px]"
                 >
                   <div className="flex flex-col items-center gap-2 py-12">
-                    <FileText className="h-10 w-10 text-slate-400" />
-                    <p className="text-sm text-slate-500">{reviewFile.name}</p>
+                    <FileText className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{reviewFile.name}</p>
                   </div>
                 </object>
               )}
             </div>
-            <p className="text-xs text-slate-400 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               {reviewFile.name} ({(reviewFile.size / 1024).toFixed(0)} KB)
             </p>
 
@@ -339,7 +339,9 @@ export default function InvoiceUploader({
                 <label
                   htmlFor="payment-status-unpaid"
                   className={`flex items-center gap-2 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                    paymentStatus === 'unpaid' ? 'border-teal-500 bg-teal-50' : 'border-slate-200'
+                    paymentStatus === 'unpaid'
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-input text-foreground hover:bg-accent/50'
                   }`}
                 >
                   <RadioGroupItem value="unpaid" id="payment-status-unpaid" />
@@ -348,7 +350,9 @@ export default function InvoiceUploader({
                 <label
                   htmlFor="payment-status-paid"
                   className={`flex items-center gap-2 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
-                    paymentStatus === 'paid' ? 'border-teal-500 bg-teal-50' : 'border-slate-200'
+                    paymentStatus === 'paid'
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-input text-foreground hover:bg-accent/50'
                   }`}
                 >
                   <RadioGroupItem value="paid" id="payment-status-paid" />
