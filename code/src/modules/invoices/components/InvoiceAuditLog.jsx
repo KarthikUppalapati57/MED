@@ -1,15 +1,15 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { History, Activity } from 'lucide-react';
+import { History, Activity, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 export function InvoiceAuditLog({ invoiceId }) {
-  const { data: events, isLoading } = useQuery({
+  const { data: events = [], isLoading, isError, error } = useQuery({
     queryKey: ['invoice-audit-events', invoiceId],
     queryFn: async () => {
       if (!invoiceId) return [];
-      return await supabase
+      const { data, error } = await supabase
         .from('invoice_audit_events')
         .select(`
           *,
@@ -20,6 +20,8 @@ export function InvoiceAuditLog({ invoiceId }) {
         `)
         .eq('invoice_id', invoiceId)
         .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
     },
     enabled: !!invoiceId
   });
@@ -28,7 +30,17 @@ export function InvoiceAuditLog({ invoiceId }) {
     return <div className="p-8 text-center text-slate-500">Loading audit history...</div>;
   }
 
-  if (!events?.data || events.data.length === 0) {
+  if (isError) {
+    return (
+      <div className="p-12 text-center flex flex-col items-center justify-center">
+        <AlertTriangle className="w-12 h-12 text-amber-400 mb-4" />
+        <h3 className="text-lg font-medium text-slate-900">Couldn't load audit history</h3>
+        <p className="text-slate-500 text-sm mt-1">{error?.message || 'Please try again.'}</p>
+      </div>
+    );
+  }
+
+  if (events.length === 0) {
     return (
       <div className="p-12 text-center flex flex-col items-center justify-center">
         <Activity className="w-12 h-12 text-slate-200 mb-4" />
@@ -48,7 +60,7 @@ export function InvoiceAuditLog({ invoiceId }) {
       </div>
 
       <div className="relative border-l border-slate-200 ml-3 space-y-8 pb-4">
-        {events.data.map((event, idx) => (
+        {events.map((event, idx) => (
           <div key={event.id} className="relative pl-6">
             <div className="absolute -left-1.5 top-1 w-3 h-3 bg-white border-2 border-slate-300 rounded-full" />
             

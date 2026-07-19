@@ -69,6 +69,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -81,8 +86,8 @@ import {
   invoicesToCsv,
 } from '@/lib/invoiceAp';
 import {
-  runInvoiceValidationChecks,
-  summarizeValidationIssues,
+  runApprovalGate as runApprovalGateShared,
+  runBatchApprovalGate as runBatchApprovalGateShared,
 } from '../lib/invoiceValidation';
 
 const InvoiceUploader = React.lazy(() => import('@/modules/invoices/components/InvoiceUploader'));
@@ -594,6 +599,9 @@ export default function Invoices() {
     },
   });
 
+  // Guards Save/Reject/Approve against double-submit while either mutation is in flight.
+  const isSavingInvoice = updateMutation.isPending || createMutation.isPending;
+
   const batchUpdateMutation = useMutation({
     mutationFn: async ({ ids, data }) => {
       const { error } = await api.client.rpc('bulk_process_invoices', {
@@ -920,61 +928,10 @@ export default function Invoices() {
 
 
 
-  // Always surfaces the validation outcome before approving — clean or not,
-  // the user sees what ran and makes an explicit call. Never a silent pass-through.
-  const runApprovalGate = async (invoice) => {
-    const results = await runInvoiceValidationChecks(invoice);
-    const issues = summarizeValidationIssues(results);
-    const clean = issues.length === 0;
-    return confirm({
-      title: clean ? 'All validation checks passed' : `Validation found ${issues.length} issue(s)`,
-      description: clean ? (
-        'Duplicate check, line-item math, vendor status, price deviation, and three-way match all came back clean.'
-      ) : (
-        <>
-          {issues.map((line, i) => (
-            <React.Fragment key={i}>
-              {line}
-              <br />
-            </React.Fragment>
-          ))}
-        </>
-      ),
-      confirmLabel: 'Approve',
-      destructive: !clean,
-    });
-  };
-
-  const runBatchApprovalGate = async (selected) => {
-    const perInvoice = await Promise.all(selected.map(async (inv) => ({
-      inv,
-      issues: summarizeValidationIssues(await runInvoiceValidationChecks(inv)),
-    })));
-    const withIssues = perInvoice.filter(r => r.issues.length > 0);
-    const clean = withIssues.length === 0;
-    return confirm({
-      title: clean
-        ? `All ${selected.length} invoice(s) passed validation`
-        : `${withIssues.length} of ${selected.length} invoice(s) have validation issues`,
-      description: clean ? (
-        'Duplicate check, line-item math, vendor status, price deviation, and three-way match all came back clean for every selected invoice.'
-      ) : (
-        <>
-          {withIssues.map(({ inv, issues }) => (
-            <React.Fragment key={inv.id}>
-              <strong>{inv.vendor_name || 'Unknown vendor'} #{inv.invoice_number || inv.id}</strong>
-              <br />
-              {issues.join(' · ')}
-              <br />
-              <br />
-            </React.Fragment>
-          ))}
-        </>
-      ),
-      confirmLabel: 'Approve all',
-      destructive: !clean,
-    });
-  };
+  // Thin wrappers binding the shared gate (invoiceValidation.jsx) to this
+  // page's own useConfirm() instance — same checks Payments.jsx uses.
+  const runApprovalGate = (invoice) => runApprovalGateShared(confirm, invoice);
+  const runBatchApprovalGate = (selected) => runBatchApprovalGateShared(confirm, selected);
 
   const handleApprove = async (invoice) => {
     try {
@@ -1729,12 +1686,12 @@ export default function Invoices() {
                                 <Eye className="h-4 w-4 mr-2" /> View/Edit
                               </DropdownMenuItem>
                               {isHigherRole && ['validated', 'pending_review'].includes(invoice.status) && (
-                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
+                                <DropdownMenuItem disabled={isSavingInvoice} onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
                                   <Check className="h-4 w-4 mr-2" /> Approve
                                 </DropdownMenuItem>
                               )}
                               {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
-                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
+                                <DropdownMenuItem disabled={isSavingInvoice} onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
                                   <X className="h-4 w-4 mr-2" /> Reject
                                 </DropdownMenuItem>
                               )}
@@ -1827,26 +1784,18 @@ export default function Invoices() {
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="p-0 gap-0 w-[95vw] max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent
+          className="p-0 gap-0 w-[95vw] h-[90vh] min-w-[480px] min-h-[400px] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden resize"
+        >
           <DialogHeader className="px-6 py-4 border-b shrink-0">
             <DialogTitle>
               {editingInvoice?.source === 'manual_entry' && !editingInvoice?.id ? 'Create Invoice' : editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
             </DialogTitle>
           </DialogHeader>
 
-          {editingInvoice && (
-            <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden gap-6 p-6">
-              {/* Left Pane: Document Viewer */}
-              {editingInvoice.file_url && (
-                <div className="w-full lg:w-1/2 h-[400px] lg:h-full rounded-xl overflow-hidden border bg-slate-50 shrink-0">
-                  <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
-                    <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
-                  </React.Suspense>
-                </div>
-              )}
-
-              {/* Right Pane: Editor */}
-              <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'w-full lg:w-1/2' : 'w-full'}`}>
+          {editingInvoice && (() => {
+            const editorForm = (
+              <>
                 <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
                   <InvoiceEditor
                     invoice={editingInvoice}
@@ -1864,7 +1813,8 @@ export default function Invoices() {
                   <Button
                     variant="outline"
                     onClick={handleEditorSave}
-                    className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5"
+                    disabled={isSavingInvoice}
+                    className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5 disabled:opacity-40"
                   >
                     <Save className="h-4 w-4 mr-1" /> Save
                   </Button>
@@ -1873,14 +1823,15 @@ export default function Invoices() {
                       <Button
                         variant="outline"
                         onClick={handleEditorReject}
-                        className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5"
+                        disabled={isSavingInvoice}
+                        className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5 disabled:opacity-40"
                       >
                         <X className="h-4 w-4 mr-1" /> Reject
                       </Button>
                       <Button
                         variant="outline"
                         onClick={handleEditorApprove}
-                        disabled={!invoiceValidated}
+                        disabled={!invoiceValidated || isSavingInvoice}
                         title={!invoiceValidated ? 'Run Validate first' : undefined}
                         className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
@@ -1895,9 +1846,35 @@ export default function Invoices() {
                     </>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
+              </>
+            );
+
+            if (!editingInvoice.file_url) {
+              return <div className="flex-1 min-h-0 overflow-y-auto p-6">{editorForm}</div>;
+            }
+
+            return (
+              <ResizablePanelGroup
+                direction="horizontal"
+                autoSaveId="invoice-editor-panels"
+                className="flex-1 min-h-0 p-6"
+              >
+                <ResizablePanel defaultSize={50} minSize={25}>
+                  <div className="h-full mr-3 rounded-xl overflow-hidden border bg-slate-50">
+                    <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
+                      <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                    </React.Suspense>
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  <div className="h-full ml-3 overflow-y-auto pr-2">
+                    {editorForm}
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

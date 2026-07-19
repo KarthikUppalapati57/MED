@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Camera, Upload, AlertCircle, X, DollarSign, Send, Loader2 } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
@@ -22,8 +23,14 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
-  const [isCameraMode, setIsCameraMode] = useState(false);
-  const [photo, setPhoto] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
 
   const requestCreditMutation = useMutation({
     mutationFn: async () => {
@@ -34,11 +41,19 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
         throw new Error("Provide a reason for the credit");
       }
 
+      let photoUrl = null;
+      if (photoFile) {
+        const path = `${invoice.organization_id || organization?.id || 'unassigned'}/credit-requests/${invoice.id}/${Date.now()}_${photoFile.name}`;
+        const { error: uploadError } = await supabase.storage.from('invoices').upload(path, photoFile);
+        if (uploadError) throw uploadError;
+        photoUrl = path;
+      }
+
       return api.financial.requestInvoiceCredit({
         invoiceId: invoice.id,
         amount: parseFloat(amount),
         reason: reason.trim(),
-        photoUrl: photo ? "s3://mock-bucket/credit-photo.jpg" : null,
+        photoUrl,
       });
     },
     onSuccess: () => {
@@ -48,19 +63,23 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
       // Reset form
       setAmount('');
       setReason('');
-      setPhoto(null);
-      setIsCameraMode(false);
+      clearPhoto();
     },
     onError: (error) => toast.error(error.message || "Failed to process credit request")
   });
 
-  const simulateCameraCapture = () => {
-    setIsCameraMode(true);
-    setTimeout(() => {
-      setPhoto('captured'); // Mock successful capture
-      setIsCameraMode(false);
-      toast.success("Photo captured!");
-    }, 1500);
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearPhoto = () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
   };
 
   return (
@@ -76,76 +95,85 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
           </DialogDescription>
         </DialogHeader>
 
-        {isCameraMode ? (
-          <div className="flex flex-col items-center justify-center p-8 space-y-6 text-center bg-black/5 rounded-xl h-[300px] border-2 border-dashed">
-            <Camera className="h-16 w-16 text-muted-foreground animate-pulse mb-4" />
-            <p className="font-medium">Camera activated...</p>
-            <p className="text-sm text-muted-foreground">Point at the damaged item and hold still.</p>
-          </div>
-        ) : (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Credit Amount Requested</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="0.00" 
-                  className="pl-9 text-lg font-mono"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Reason (Required)</Label>
-              <Textarea 
-                placeholder="e.g., Driver dropped a case of milk, 2 gallons burst."
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="resize-none"
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Credit Amount Requested</Label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className="pl-9 text-lg font-mono"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label>Photo Evidence (Optional)</Label>
-              {!photo ? (
-                <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1" onClick={simulateCameraCapture}>
-                    <Camera className="h-4 w-4 mr-2" /> Take Photo
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    <Upload className="h-4 w-4 mr-2" /> Upload File
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-secondary/30">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center">
-                      <Camera className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">evidence_001.jpg</p>
-                      <p className="text-xs text-muted-foreground">Ready to attach</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setPhoto(null)} className="text-resend-red">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
           </div>
-        )}
+
+          <div className="space-y-2">
+            <Label>Reason (Required)</Label>
+            <Textarea
+              placeholder="e.g., Driver dropped a case of milk, 2 gallons burst."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Photo Evidence (Optional)</Label>
+            {!photoFile ? (
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                  id="credit-photo-camera"
+                />
+                <Button variant="outline" className="flex-1" asChild>
+                  <label htmlFor="credit-photo-camera" className="cursor-pointer">
+                    <Camera className="h-4 w-4 mr-2" /> Take Photo
+                  </label>
+                </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                  id="credit-photo-upload"
+                />
+                <Button variant="outline" className="flex-1" asChild>
+                  <label htmlFor="credit-photo-upload" className="cursor-pointer">
+                    <Upload className="h-4 w-4 mr-2" /> Upload File
+                  </label>
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 border rounded-md bg-secondary/30">
+                <div className="flex items-center gap-2">
+                  <img src={photoPreviewUrl} alt="Evidence preview" className="w-10 h-10 rounded object-cover" />
+                  <div>
+                    <p className="text-sm font-medium truncate max-w-[180px]">{photoFile.name}</p>
+                    <p className="text-xs text-muted-foreground">Ready to attach</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={clearPhoto} className="text-resend-red">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <DialogFooter className="sm:justify-between">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button 
+          <Button
             className="bg-resend-orange hover:bg-resend-orange/90 text-white px-8"
             onClick={() => requestCreditMutation.mutate()}
-            disabled={requestCreditMutation.isPending || isCameraMode}
+            disabled={requestCreditMutation.isPending}
           >
             {requestCreditMutation.isPending ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

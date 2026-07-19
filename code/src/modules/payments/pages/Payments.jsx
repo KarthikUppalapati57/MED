@@ -67,6 +67,8 @@ import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayMod
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
+import { useConfirm } from '@/hooks/useConfirm';
+import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
 function CreateCheckDialog({ open, onClose, organization, brand, location }) {
   const queryClient = useQueryClient();
@@ -230,6 +232,7 @@ const PAYMENT_ROW_OVERSCAN = 8;
 
 export default function Payments() {
   const navigate = useNavigate();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [sortBy, setSortBy] = useState('-created_at');
@@ -266,6 +269,7 @@ export default function Payments() {
   const [newReminderDay, setNewReminderDay] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('all');
   const [showCreateCheck, setShowCreateCheck] = useState(false);
+  const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
@@ -560,13 +564,17 @@ export default function Payments() {
   };
 
   const handleApprove = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'approved' } });
+    if (!(await runApprovalGate(confirm, invoice))) return;
+    await updateInvoice.mutateAsync({
+      id: invoice.id,
+      data: { status: 'approved', ap_status: 'approved', action_required_reason: null, action_required_details: null },
+    });
     await ensureLedgerBill({ ...invoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
     toast.success('Invoice approved');
   };
 
   const handleReject = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected' } });
+    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
     toast.success('Invoice rejected');
   };
 
@@ -622,6 +630,7 @@ export default function Payments() {
   };
 
   const submitSchedulePayment = async () => {
+    setIsSubmittingSchedule(true);
     try {
       if (scheduleDialogInvoice) {
         // Single schedule
@@ -653,6 +662,8 @@ export default function Payments() {
       }
     } catch (e) {
       toast.error(e.message || 'Failed to schedule payments');
+    } finally {
+      setIsSubmittingSchedule(false);
     }
   };
 
@@ -1756,9 +1767,10 @@ export default function Payments() {
             <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
             <Button
               onClick={submitSchedulePayment}
+              disabled={isSubmittingSchedule}
               className="bg-primary hover:bg-primary"
             >
-              Confirm Schedule
+              {isSubmittingSchedule ? 'Scheduling...' : 'Confirm Schedule'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1874,6 +1886,8 @@ export default function Payments() {
           );
         }}
       />
+
+      <ConfirmDialog />
     </div>
   );
 }

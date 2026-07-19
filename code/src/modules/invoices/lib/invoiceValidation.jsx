@@ -1,6 +1,20 @@
+import React from 'react';
 import { api } from '@/lib/apiClient';
 
 const PASS = { status: 'pass', message: '' };
+
+// Explicit org/brand/location scope for the invoice being checked — never the
+// caller's currently-active ContextSwitcher scope. Without this, a branch_manager
+// validating an invoice outside their active context silently compares against
+// the wrong location's data (withActiveScope() falls back to ambient context
+// for any key not already present in the filter conditions).
+function invoiceScope(invoice) {
+  const scope = {};
+  if (invoice?.organization_id) scope.organization_id = invoice.organization_id;
+  if (invoice?.brand_id) scope.brand_id = invoice.brand_id;
+  if (invoice?.location_id) scope.location_id = invoice.location_id;
+  return scope;
+}
 
 async function checkDuplicate(invoice) {
   if (!invoice?.invoice_number || !invoice?.vendor_name) return PASS;
@@ -8,6 +22,7 @@ async function checkDuplicate(invoice) {
     const existing = await api.entities.Invoice.filter({
       invoice_number: invoice.invoice_number,
       vendor_name: invoice.vendor_name,
+      ...invoiceScope(invoice),
     });
     const isDuplicate = existing.some(e => e.id !== invoice.id);
     return isDuplicate
@@ -19,19 +34,46 @@ async function checkDuplicate(invoice) {
   }
 }
 
-// Line-item math vs invoice totals — the DB is the source of truth (validate_invoice RPC).
+// Line-item math vs invoice totals, computed client-side. Deliberately NOT the
+// validate_invoice() RPC: that function persists its result (UPDATE ... SET
+// validation_results, updated_at) on every call, which re-fires the unfiltered
+// trg_invoices_webhook — meaning just opening the confirm dialog (even if the
+// user cancels) silently wrote to the invoice and re-invoked extraction. A
+// read-only check has no business writing to the row it's checking.
 async function checkInvoiceMath(invoice) {
   if (!invoice?.id) return PASS;
   try {
-    const { data, error } = await api.client.rpc('validate_invoice', { p_invoice_id: invoice.id });
-    if (error) throw error;
-    if (data?.line_math === 'fail' || data?.total_math === 'fail') {
-      const detail = (data.discrepancies || [])
-        .map(d => `${d.field ?? 'line'}: expected $${d.expected}, got $${d.got}`)
-        .join('; ');
-      return { status: 'fail', message: `Line items don't reconcile with the invoice total${detail ? ` (${detail})` : ''}.` };
+    const lines = await api.entities.InvoiceLineItem.filter(
+      { invoice_id: invoice.id, ...invoiceScope(invoice) }
+    );
+    const discrepancies = [];
+    let lineSum = 0;
+    for (const line of lines) {
+      const expected = (Number(line.quantity) || 0) * (Number(line.unit_price) || 0);
+      const got = Number(line.total_price) || 0;
+      lineSum += got;
+      if (Math.abs(expected - got) >= 0.01) {
+        discrepancies.push(`line total: expected $${expected.toFixed(2)}, got $${got.toFixed(2)}`);
+      }
     }
-    return PASS;
+
+    const subtotal = Number(invoice.subtotal) || 0;
+    if (lines.length > 0 && Math.abs(lineSum - subtotal) >= 0.01) {
+      discrepancies.push(`subtotal: expected $${lineSum.toFixed(2)}, got $${subtotal.toFixed(2)}`);
+    }
+
+    const expectedTotal = subtotal
+      + (Number(invoice.tax_amount) || 0)
+      + (Number(invoice.fuel_surcharge) || 0)
+      + (Number(invoice.delivery_fee) || 0)
+      + (Number(invoice.other_charges) || 0);
+    const totalAmount = Number(invoice.total_amount) || 0;
+    if (Math.abs(expectedTotal - totalAmount) >= 0.01) {
+      discrepancies.push(`total: expected $${expectedTotal.toFixed(2)}, got $${totalAmount.toFixed(2)}`);
+    }
+
+    if (discrepancies.length === 0) return PASS;
+    return { status: 'fail', message: `Line items don't reconcile with the invoice total (${discrepancies.join('; ')}).` };
   } catch (e) {
     console.error('[Validation] Invoice math check error:', e);
     return { status: 'warning', message: 'Could not verify line-item math.' };
@@ -72,7 +114,7 @@ async function checkPriceDeviation(invoice) {
 
   try {
     const history = await api.entities.Invoice.filter(
-      { vendor_id: invoice.vendor_id, status: 'approved' },
+      { vendor_id: invoice.vendor_id, status: 'approved', ...invoiceScope(invoice) },
       { orderBy: '-approved_date', limit: 10 }
     );
     const priorAmounts = history.filter(h => h.id !== invoice.id).map(h => Number(h.total_amount) || 0);
@@ -101,6 +143,7 @@ async function checkDeliveryMatch(invoice) {
     const variances = await api.entities.ReconciliationVariance.filter({
       invoice_id: invoice.id,
       is_resolved: false,
+      ...invoiceScope(invoice),
     });
     if (variances.length > 0) {
       const types = [...new Set(variances.map(v => v.variance_type))].join(', ');
@@ -136,4 +179,62 @@ export function summarizeValidationIssues(results) {
   return Object.values(results)
     .filter(r => r.status !== 'pass' && r.message)
     .map(r => `${r.status === 'fail' ? '✗' : '⚠'} ${r.message}`);
+}
+
+// Shared approve gate: always surfaces the validation outcome (clean or not)
+// before approving, via the caller's own useConfirm() instance. Used by both
+// the invoice editor and the Payments page so approving from either place goes
+// through the same checks instead of two different opinions of what's safe.
+export async function runApprovalGate(confirm, invoice) {
+  const results = await runInvoiceValidationChecks(invoice);
+  const issues = summarizeValidationIssues(results);
+  const clean = issues.length === 0;
+  return confirm({
+    title: clean ? 'All validation checks passed' : `Validation found ${issues.length} issue(s)`,
+    description: clean ? (
+      'Duplicate check, line-item math, vendor status, price deviation, and three-way match all came back clean.'
+    ) : (
+      <>
+        {issues.map((line, i) => (
+          <React.Fragment key={i}>
+            {line}
+            <br />
+          </React.Fragment>
+        ))}
+      </>
+    ),
+    confirmLabel: 'Approve',
+    destructive: !clean,
+  });
+}
+
+export async function runBatchApprovalGate(confirm, selected) {
+  const perInvoice = await Promise.all(selected.map(async (inv) => ({
+    inv,
+    issues: summarizeValidationIssues(await runInvoiceValidationChecks(inv)),
+  })));
+  const withIssues = perInvoice.filter(r => r.issues.length > 0);
+  const clean = withIssues.length === 0;
+  return confirm({
+    title: clean
+      ? `All ${selected.length} invoice(s) passed validation`
+      : `${withIssues.length} of ${selected.length} invoice(s) have validation issues`,
+    description: clean ? (
+      'Duplicate check, line-item math, vendor status, price deviation, and three-way match all came back clean for every selected invoice.'
+    ) : (
+      <>
+        {withIssues.map(({ inv, issues }) => (
+          <React.Fragment key={inv.id}>
+            <strong>{inv.vendor_name || 'Unknown vendor'} #{inv.invoice_number || inv.id}</strong>
+            <br />
+            {issues.join(' · ')}
+            <br />
+            <br />
+          </React.Fragment>
+        ))}
+      </>
+    ),
+    confirmLabel: 'Approve all',
+    destructive: !clean,
+  });
 }
