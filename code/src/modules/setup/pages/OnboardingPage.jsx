@@ -176,7 +176,23 @@ const addressFromRow = (row, prefix) => ({
 const US_STATE_ABBREVIATIONS = {
   alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC'
 };
+const ADDRESS_SUGGESTION_LIMIT = 12;
+const COMMON_STREET_SUFFIXES = ['springs', 'spring', 'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln', 'circle', 'cir', 'court', 'ct', 'boulevard', 'blvd', 'parkway', 'pkwy', 'place', 'pl', 'terrace', 'ter', 'trail', 'trl', 'way'];
 const streetLineFromSuggestion = (address = {}) => [address.house_number, address.road || address.pedestrian || address.footway || address.neighbourhood].filter(Boolean).join(' ').trim();
+const addressSearchVariants = (query) => {
+  const normalized = String(query || '').trim().replace(/\s+/g, ' ');
+  const variants = new Set([normalized]);
+  for (const suffix of COMMON_STREET_SUFFIXES) {
+    const suffixPattern = new RegExp(`([a-z])(${suffix})\\b`, 'i');
+    if (suffixPattern.test(normalized)) {
+      const spaced = normalized.replace(suffixPattern, '$1 $2');
+      variants.add(spaced);
+      if (suffix === 'spring') variants.add(spaced.replace(/\bspring\b/i, 'springs'));
+    }
+  }
+  return Array.from(variants).filter(Boolean).slice(0, 4);
+};
+const suggestionKey = (suggestion) => [suggestion.address.line1, suggestion.address.city, suggestion.address.state, suggestion.address.postalCode].map((part) => normalizeKey(part)).join('|');
 const normalizeSuggestedAddress = (item) => {
   const address = item?.address || {};
   const state = address.state_code || US_STATE_ABBREVIATIONS[String(address.state || '').toLowerCase()] || address.state || '';
@@ -224,17 +240,27 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
     const timer = window.setTimeout(async () => {
       setSuggestionStatus('loading');
       try {
-        const search = [query, value.city, value.state].filter(Boolean).join(' ');
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&limit=5&q=${encodeURIComponent(search)}`, {
-          signal: controller.signal,
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) throw new Error('Address lookup failed');
-        const rows = await response.json();
-        const nextSuggestions = (Array.isArray(rows) ? rows : [])
+        const searches = addressSearchVariants([query, value.city, value.state].filter(Boolean).join(' '));
+        const results = await Promise.all(searches.map(async (search) => {
+          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=0&limit=${ADDRESS_SUGGESTION_LIMIT}&q=${encodeURIComponent(search)}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          });
+          if (!response.ok) throw new Error('Address lookup failed');
+          return response.json();
+        }));
+        const seen = new Set();
+        const nextSuggestions = results
+          .flatMap((rows) => (Array.isArray(rows) ? rows : []))
           .map(normalizeSuggestedAddress)
           .filter((item) => item.label && item.address.line1)
-          .slice(0, 5);
+          .filter((item) => {
+            const key = suggestionKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, ADDRESS_SUGGESTION_LIMIT);
         setSuggestions(nextSuggestions);
         setSuggestionStatus(nextSuggestions.length ? 'ready' : 'empty');
       } catch (error) {

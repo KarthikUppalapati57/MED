@@ -635,6 +635,8 @@ UPDATE public.inventory inv
      OR public.product_unit_is_generic(inv.report_by)
    );
 
+DROP FUNCTION IF EXISTS public.get_product_purchase_report(uuid, uuid, uuid, date, date, text, text, text);
+
 CREATE OR REPLACE FUNCTION public.get_product_purchase_report(
   p_organization_id uuid DEFAULT NULL,
   p_brand_id uuid DEFAULT NULL,
