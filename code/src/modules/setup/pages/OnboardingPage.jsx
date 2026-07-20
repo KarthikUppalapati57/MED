@@ -1109,9 +1109,14 @@ export default function OnboardingPage() {
           </div>
         )}
         {!uspsAddressValidationEnabled && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-            <p className="font-bold">USPS address validation is not enabled</p>
-            <p className="mt-1 text-xs">A platform admin must enable the USPS address validation API before address onboarding can be submitted.</p>
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold">USPS address validation is not enabled</p>
+              <p className="mt-1 text-xs">A platform admin must enable the USPS address validation API before address onboarding can be submitted.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200" onClick={() => navigate('/PlatformOrganizations')}>
+              Enable in platform settings
+            </Button>
           </div>
         )}
         {hierarchyMode === 'upload' ? (
@@ -1410,5 +1415,6 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
 
 
