@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, MapPin, Plus, Save, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -173,6 +173,26 @@ const addressFromRow = (row, prefix) => ({
   postalCode: valueFor(row, `${prefix}_postal_code`),
   country: valueFor(row, `${prefix}_country`) || 'United States',
 });
+const US_STATE_ABBREVIATIONS = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC'
+};
+const streetLineFromSuggestion = (address = {}) => [address.house_number, address.road || address.pedestrian || address.footway || address.neighbourhood].filter(Boolean).join(' ').trim();
+const normalizeSuggestedAddress = (item) => {
+  const address = item?.address || {};
+  const state = address.state_code || US_STATE_ABBREVIATIONS[String(address.state || '').toLowerCase()] || address.state || '';
+  return {
+    id: String(item?.place_id || item?.osm_id || item?.display_name || Math.random()),
+    label: item?.display_name || '',
+    address: {
+      line1: streetLineFromSuggestion(address) || String(item?.name || '').trim(),
+      line2: '',
+      city: address.city || address.town || address.village || address.hamlet || address.county || '',
+      state,
+      postalCode: address.postcode || '',
+      country: address.country || 'United States',
+    },
+  };
+};
 const parseCsvBoolean = (value, defaultValue = true) => {
   const normalized = normalizeKey(value);
   if (!normalized) return defaultValue;
@@ -186,17 +206,113 @@ function FieldLabel({ htmlFor, children, required = false }) {
 }
 
 function AddressFields({ idPrefix, value, onChange, required = false, compact = false, line1Label = 'Business/Service Address' }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionStatus, setSuggestionStatus] = useState('idle');
+  const [line1Focused, setLine1Focused] = useState(false);
+  const selectedLineRef = useRef('');
   const update = (field, nextValue) => onChange({ ...value, [field]: nextValue });
+
+  useEffect(() => {
+    const query = String(value.line1 || '').trim();
+    if (!line1Focused || query.length < 3 || selectedLineRef.current === query) {
+      setSuggestions([]);
+      setSuggestionStatus('idle');
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSuggestionStatus('loading');
+      try {
+        const search = [query, value.city, value.state].filter(Boolean).join(' ');
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&limit=5&q=${encodeURIComponent(search)}`, {
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error('Address lookup failed');
+        const rows = await response.json();
+        const nextSuggestions = (Array.isArray(rows) ? rows : [])
+          .map(normalizeSuggestedAddress)
+          .filter((item) => item.label && item.address.line1)
+          .slice(0, 5);
+        setSuggestions(nextSuggestions);
+        setSuggestionStatus(nextSuggestions.length ? 'ready' : 'empty');
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setSuggestions([]);
+        setSuggestionStatus('error');
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [line1Focused, value.city, value.line1, value.state]);
+
+  const selectSuggestion = (suggestion) => {
+    selectedLineRef.current = suggestion.address.line1;
+    onChange({
+      ...value,
+      ...suggestion.address,
+      line2: value.line2 || suggestion.address.line2,
+    });
+    setSuggestions([]);
+    setSuggestionStatus('idle');
+    setLine1Focused(false);
+  };
+
+  const showDropdown = line1Focused && String(value.line1 || '').trim().length >= 3 && (suggestionStatus !== 'idle' || suggestions.length > 0);
+
   return (
     <div className={compact ? 'space-y-3' : 'rounded-md border bg-muted/20 p-4 space-y-3'}>
       <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-1.5">
+        <div className="relative space-y-1.5">
           <FieldLabel htmlFor={`${idPrefix}-line1`} required={required}>{line1Label}</FieldLabel>
-          <Input id={`${idPrefix}-line1`} value={value.line1} onChange={(event) => update('line1', event.target.value)} className="h-10 bg-card" />
+          <Input
+            id={`${idPrefix}-line1`}
+            value={value.line1}
+            onBlur={() => window.setTimeout(() => setLine1Focused(false), 150)}
+            onChange={(event) => {
+              selectedLineRef.current = '';
+              update('line1', event.target.value);
+            }}
+            onFocus={() => setLine1Focused(true)}
+            className="h-10 bg-card"
+            autoComplete="street-address"
+          />
+          {showDropdown && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg">
+              {suggestionStatus === 'loading' && (
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching addresses
+                </div>
+              )}
+              {suggestionStatus === 'error' && <div className="px-3 py-2 text-sm text-amber-400">Address suggestions are unavailable right now.</div>}
+              {suggestionStatus === 'empty' && <div className="px-3 py-2 text-sm text-muted-foreground">No address matches found.</div>}
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    selectSuggestion(suggestion);
+                  }}
+                >
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-muted-foreground" />
+                  <span>
+                    <span className="block font-medium text-foreground">{suggestion.address.line1}</span>
+                    <span className="block text-xs text-muted-foreground">{[suggestion.address.city, suggestion.address.state, suggestion.address.postalCode].filter(Boolean).join(', ')}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-1.5">
           <FieldLabel htmlFor={`${idPrefix}-line2`}>Suite / Unit</FieldLabel>
-          <Input id={`${idPrefix}-line2`} value={value.line2} onChange={(event) => update('line2', event.target.value)} className="h-10 bg-card" />
+          <Input id={`${idPrefix}-line2`} value={value.line2} onChange={(event) => update('line2', event.target.value)} className="h-10 bg-card" autoComplete="address-line2" />
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
