@@ -6,6 +6,9 @@ ALTER TABLE public.invoice_line_items
 ALTER TABLE public.vendor_items
   ADD COLUMN IF NOT EXISTS pack_size text;
 
+ALTER TABLE public.inventory
+  ADD COLUMN IF NOT EXISTS report_by text;
+
 CREATE OR REPLACE FUNCTION public.product_unit_is_generic(p_unit text)
 RETURNS boolean
 LANGUAGE sql
