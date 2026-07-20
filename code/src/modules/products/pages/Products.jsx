@@ -18,10 +18,10 @@ import {
   MoreVertical,
   X,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Wand2,
-  AlertTriangle,
   TrendingUp,
   ArrowUpRight,
   CheckCircle2,
@@ -52,6 +52,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -74,6 +82,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
+import ProductDetail from './ProductDetail';
 
 function ProductsScrollableTable({ children, className = '' }) {
   return (
@@ -213,6 +222,33 @@ const formatNumber = (value) => Number(value || 0).toLocaleString();
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
 const formatShortDate = (value) => value ? new Date(value).toLocaleDateString('en-US') : '-';
 const CATEGORY_TYPE_OPTIONS = ['Food', 'Beer', 'Wine', 'Liquor', 'N/A Bev', 'Retail', 'Other'];
+const CATEGORY_ACCOUNTING_CODES = {
+  'Paper and Packaging': '5110',
+  'Cleaning Supplies': '5110',
+  'Restaurant Supplies': '5110',
+  Bakery: '5110',
+  Meat: '5110',
+  Poultry: '5120',
+  Seafood: '5130',
+  Dairy: '5140',
+  Produce: '5150',
+  Frozen: '5160',
+  'Grocery and Dry Goods': '5170',
+  Beer: '5230',
+  Wine: '5240',
+  Liquor: '5220',
+  'N/A Beverage': '5210',
+  'N/A Bev': '5210',
+  Retail: '5300',
+};
+const SUPPLY_CATEGORY_PATTERN = /(paper|packaging|container|cup|lid|straw|napkin|towel|bag|box|plate|foil|wrap|cleaning|cleaner|soap|detergent|sanitizer|bleach|sponge|scrubber|glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer|restaurant supplies)/;
+
+const getAccountingCategoryForCategory = (category, fallback = '5110') => {
+  const normalized = String(category || '').trim().toLowerCase();
+  const match = Object.entries(CATEGORY_ACCOUNTING_CODES)
+    .find(([label]) => label.toLowerCase() === normalized);
+  return match?.[1] || fallback;
+};
 
 const getProductAccountingCode = (product) => {
   const value = product?.accounting_category || '';
@@ -224,10 +260,11 @@ const getProductCategoryType = (product) => {
   const category = String(product?.category || '').toLowerCase();
   const name = String(product?.name || product?.product_name || '').toLowerCase();
   const text = `${accounting} ${category} ${name}`;
-  if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer|blue moon|modelo|corona|budweiser|bud light|coors|miller|heineken)/.test(text)) return 'Beer';
-  if (/(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel|rose\b|rosé)/.test(text)) return 'Wine';
-  if (/(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur|triple sec)/.test(text)) return 'Liquor';
-  if (/(n\/a bev|na beverage|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|energy drink|water|syrup, fontn|fountain|bib)/.test(text) || accounting.startsWith('52')) return 'N/A Bev';
+  if (SUPPLY_CATEGORY_PATTERN.test(`${category} ${name}`)) return 'Other';
+  if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer|blue moon|modelo|corona|budweiser|bud light|coors|miller|heineken)/.test(`${category} ${name}`) || accounting === '5230') return 'Beer';
+  if (/(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel|rose\b|rosé)/.test(`${category} ${name}`) || accounting === '5240') return 'Wine';
+  if (/(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur|triple sec)/.test(`${category} ${name}`) || accounting === '5220') return 'Liquor';
+  if (/(n\/a bev|na beverage|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|energy drink|water|syrup, fontn|fountain|bib)/.test(`${category} ${name}`) || accounting === '5210') return 'N/A Bev';
   if (/(retail|merchandise|gift card|giftcard|apparel|shirt|hat|merch)/.test(text)) return 'Retail';
   if (accounting.startsWith('51') || accounting.includes('food') || category.includes('dairy') || category.includes('produce') || category.includes('poultry') || category.includes('grocery')) return 'Food';
   return 'Other';
@@ -238,13 +275,13 @@ const getProductItemCount = (product) => Number(product?.item_count || product?.
 const suggestProductFields = (name) => {
   const text = String(name || '').toLowerCase();
   if (/(paper|napkin|towel|cup|lid|straw|foil|wrap|bag|container|box|plate|packaging)/.test(text)) {
-    return { category: 'Paper and Packaging', accounting_category: '5110' };
+    return { category: 'Paper and Packaging', accounting_category: getAccountingCategoryForCategory('Paper and Packaging') };
   }
   if (/(cleaner|cleaning|soap|detergent|sanitizer|bleach|sponge|scrubber)/.test(text)) {
-    return { category: 'Cleaning Supplies', accounting_category: '5110' };
+    return { category: 'Cleaning Supplies', accounting_category: getAccountingCategoryForCategory('Cleaning Supplies') };
   }
   if (/(glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer)/.test(text)) {
-    return { category: 'Restaurant Supplies', accounting_category: '5110' };
+    return { category: 'Restaurant Supplies', accounting_category: getAccountingCategoryForCategory('Restaurant Supplies') };
   }
   if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer)/.test(text)) {
     return { category: 'Beer', accounting_category: '5230' };
@@ -510,6 +547,7 @@ export default function Products() {
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
 
   const activeTab = currentSubPath || 'all-products';
+  const productDetailId = currentSubPath === 'product' ? pathParts[2] : null;
 
   const setActiveTab = (tab) => {
     navigate(`/Products/${tab}${routerLocation.search}`);
@@ -528,6 +566,8 @@ export default function Products() {
   const [reportCategory, setReportCategory] = useState('all');
   const [reportSortBy, setReportSortBy] = useState('product_name');
   const [verificationStatus, setVerificationStatus] = useState('all');
+  const [categoryComboboxOpen, setCategoryComboboxOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const toggleSelect = (id) => setSelectedIds(prev => {
@@ -900,6 +940,41 @@ export default function Products() {
     setDialogOpen(true);
   };
 
+  const handleCategoryChange = (category) => {
+    setFormData(current => ({
+      ...current,
+      category,
+      accounting_category: getAccountingCategoryForCategory(category, current.accounting_category),
+    }));
+  };
+
+  const handleReviewCategorySuggestion = (queueItem) => {
+    const product = products.find(item => item.id === queueItem.internal_product_id) || {};
+    const category = queueItem.category || product.suggested_category || product.category || '';
+
+    setEditingProduct({
+      ...product,
+      id: queueItem.internal_product_id,
+      name: product.name || queueItem.product_name || queueItem.vendor_item_name || '',
+      product_id: product.product_id || queueItem.restops_product_id || '',
+    });
+    setFormData({
+      name: product.name || queueItem.product_name || queueItem.vendor_item_name || '',
+      product_id: product.product_id || queueItem.restops_product_id || '',
+      description: product.description || '',
+      category,
+      accounting_category: getAccountingCategoryForCategory(category, product.accounting_category || '5110'),
+      is_inventoried: product.is_inventoried ?? true,
+      is_tax_exempt: product.is_tax_exempt ?? false,
+      report_by_unit: product.report_by_unit || 'ea',
+      base_unit: product.base_unit || 'ea',
+      latest_price: product.latest_price || 0,
+      location_specific: product.location_specific ?? false,
+    });
+    setDialogOpen(true);
+    toast.info('AI suggestion loaded for review. Adjust the category, then save.');
+  };
+
   const handleDelete = async (product) => {
     if (!product?.id) return;
     const label = product.product_id ? `${product.product_id} - ${product.name}` : product.name;
@@ -1021,6 +1096,14 @@ export default function Products() {
     return [...categories].sort((a, b) => a.localeCompare(b));
   }, [products]);
 
+  const editableCategoryOptions = React.useMemo(() => {
+    const categories = new Set([
+      ...Object.keys(CATEGORY_ACCOUNTING_CODES),
+      ...products.map(product => product.category).filter(Boolean),
+    ]);
+    return [...categories].sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
   const { totalProducts, inventoriedCount, taxExemptCount, categoriesCount } = React.useMemo(() => {
     return {
       totalProducts: productSummary.total_products ?? products.length,
@@ -1126,6 +1209,17 @@ export default function Products() {
     setReportCategory('all');
     setSearch('');
   };
+
+  if (productDetailId) {
+    const detailProduct = products.find(product => product.id === productDetailId) || null;
+    return (
+      <ProductDetail
+        productId={productDetailId}
+        initialProduct={detailProduct}
+        categoryOptions={editableCategoryOptions}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -1324,7 +1418,13 @@ export default function Products() {
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-foreground">{product.description || product.name}</p>
+                        <button
+                          type="button"
+                          className="block max-w-full truncate text-left font-semibold text-foreground hover:text-primary hover:underline"
+                          onClick={() => navigate(`/Products/product/${product.id}${routerLocation.search}`)}
+                        >
+                          {product.description || product.name}
+                        </button>
                         <p className="text-xs text-muted-foreground">{product.product_id || 'No Product ID'}</p>
                       </div>
                     </TableCell>
@@ -1372,7 +1472,7 @@ export default function Products() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(product)}>
+                            <DropdownMenuItem onClick={() => navigate(`/Products/product/${product.id}${routerLocation.search}`)}>
                               <Edit2 className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -1717,6 +1817,15 @@ export default function Products() {
                                 <div className="flex gap-2">
                                   {isProductCategoryReview ? (
                                     <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-xs"
+                                        onClick={() => handleReviewCategorySuggestion(p)}
+                                        disabled={applyCategorySuggestionMutation.isPending || rejectCategorySuggestionMutation.isPending}
+                                      >
+                                        Edit
+                                      </Button>
                                       <Button
                                         size="sm"
                                         variant="default"
@@ -2091,11 +2200,74 @@ export default function Products() {
                    </Button>
                 )}
               </div>
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="e.g., Produce, Dairy, Meat"
-              />
+              <div className="flex overflow-hidden rounded-md border border-input bg-background shadow-sm focus-within:ring-1 focus-within:ring-ring">
+                <Input
+                  value={formData.category}
+                  onChange={(event) => handleCategoryChange(event.target.value)}
+                  placeholder="Type a category"
+                  className="h-12 flex-1 rounded-none border-0 shadow-none focus-visible:ring-0"
+                />
+                <Popover
+                  open={categoryComboboxOpen}
+                  onOpenChange={(open) => {
+                    setCategoryComboboxOpen(open);
+                    if (open) setCategorySearch('');
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Select category"
+                      aria-expanded={categoryComboboxOpen}
+                      className="h-12 w-12 shrink-0 rounded-none border-l"
+                    >
+                      <ChevronDown className="h-4 w-4 opacity-70" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[min(640px,calc(100vw-3rem))] p-0" align="end">
+                    <Command>
+                      <CommandInput
+                        value={categorySearch}
+                        onValueChange={setCategorySearch}
+                        placeholder="Search or type category..."
+                      />
+                      <CommandList>
+                        <CommandEmpty>No categories found.</CommandEmpty>
+                        <CommandGroup>
+                          {categorySearch.trim()
+                            && !editableCategoryOptions.some(category => category.toLowerCase() === categorySearch.trim().toLowerCase()) && (
+                            <CommandItem
+                              value={`custom-${categorySearch.trim()}`}
+                              onSelect={() => {
+                                handleCategoryChange(categorySearch.trim());
+                                setCategoryComboboxOpen(false);
+                              }}
+                              className="whitespace-normal font-medium"
+                            >
+                              Use "{categorySearch.trim()}"
+                            </CommandItem>
+                          )}
+                          {editableCategoryOptions.slice(0, 75).map(category => (
+                            <CommandItem
+                              key={category}
+                              value={category}
+                              onSelect={() => {
+                                handleCategoryChange(category);
+                                setCategoryComboboxOpen(false);
+                              }}
+                              className="whitespace-normal"
+                            >
+                              {category}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             <div className="space-y-2">

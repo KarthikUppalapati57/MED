@@ -90,6 +90,7 @@ const POSSyncEngine = React.lazy(() => import('@/modules/inventory/components/PO
 const InventoryTransfers = React.lazy(() => import('@/modules/inventory/components/InventoryTransfers'));
 const AvTDashboard = React.lazy(() => import('@/modules/inventory/components/AvTDashboard'));
 const WASTE_CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#2563eb', '#16a34a', '#7c3aed'];
+const SUPPLY_CATEGORY_PATTERN = /(paper|packaging|container|cup|lid|straw|napkin|towel|bag|box|plate|foil|wrap|cleaning|cleaner|soap|detergent|sanitizer|bleach|sponge|scrubber|glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer|restaurant supplies)/;
 
 function getCountSheetBucket(item) {
   if (!item) return 'Other';
@@ -98,11 +99,14 @@ function getCountSheetBucket(item) {
   const label = String(getCOALabel(item.accounting_category) || '').toLowerCase();
   const name = String(item.product_name || '').toLowerCase();
   const text = `${category} ${savedCategory} ${label} ${name}`;
+  const categoryAndName = `${savedCategory} ${name}`;
 
-  if (/beer/.test(text) || category === '5230') return 'Beer';
-  if (/wine/.test(text) || category === '5240') return 'Wine';
-  if (/liquor|spirit|bar/.test(text) || category === '5220') return 'Liquor';
-  if (/beverage|n\/a|non.?alcohol|soda|coffee|tea|juice/.test(text) || category === '5210' || category === '1220') return 'N/A Bev';
+  if (SUPPLY_CATEGORY_PATTERN.test(categoryAndName)) return 'Other';
+
+  if (/beer/.test(categoryAndName) || category === '5230') return 'Beer';
+  if (/wine/.test(categoryAndName) || category === '5240') return 'Wine';
+  if (/liquor|spirit|bar/.test(categoryAndName) || category === '5220') return 'Liquor';
+  if (/beverage|n\/a|non.?alcohol|soda|coffee|tea|juice/.test(categoryAndName) || category === '5210' || category === '1220') return 'N/A Bev';
   if (/retail|merch|gift/.test(text) || category === '1230') return 'Retail';
   if (/food|meat|poultry|seafood|dairy|produce|frozen|grocery|cost/.test(text) || /^51\d0$/.test(category) || category === '1210') return 'Food';
   return 'Other';

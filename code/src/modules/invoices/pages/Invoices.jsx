@@ -165,7 +165,8 @@ const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems
       unit_price: unitPrice,
       total_price: totalPrice,
       vendor_item_code: item.vendor_item_code || null,
-      vendor_unit: item.vendor_unit || item.unit || null
+      vendor_unit: item.vendor_unit || item.unit || null,
+      pack_size: item.pack_size || item.PackSize || item.pack || item.size || null
     };
   });
 const workflowStages = [
@@ -855,6 +856,7 @@ export default function Invoices() {
         vendor_item_code: item.vendor_item_code,
         vendor_unit: item.vendor_unit,
         unit: item.vendor_unit,
+        pack_size: item.pack_size,
       })),
     };
   };

@@ -1453,7 +1453,9 @@ export const api = {
         p_report_by_unit: payload.report_by_unit || null,
         p_base_unit: payload.base_unit || null,
         p_latest_price: payload.latest_price ?? 0,
-        p_location_specific: payload.location_specific
+        p_location_specific: payload.location_specific,
+        p_report_unit_quantity: payload.report_unit_quantity ?? null,
+        p_report_unit_source_price: payload.report_unit_source_price ?? null
       });
       if (error) throw error;
       return data;
