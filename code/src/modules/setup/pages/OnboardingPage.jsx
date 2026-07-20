@@ -178,10 +178,14 @@ const US_STATE_ABBREVIATIONS = {
 };
 const ADDRESS_SUGGESTION_LIMIT = 12;
 const COMMON_STREET_SUFFIXES = ['springs', 'spring', 'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln', 'circle', 'cir', 'court', 'ct', 'boulevard', 'blvd', 'parkway', 'pkwy', 'place', 'pl', 'terrace', 'ter', 'trail', 'trl', 'way'];
+const COMMON_STREET_COMPOUNDS = [{ from: /\bmontvue\b/i, to: 'Mont Vue' }];
 const streetLineFromSuggestion = (address = {}) => [address.house_number, address.road || address.pedestrian || address.footway || address.neighbourhood].filter(Boolean).join(' ').trim();
 const addressSearchVariants = (query) => {
   const normalized = String(query || '').trim().replace(/\s+/g, ' ');
   const variants = new Set([normalized]);
+  for (const { from, to } of COMMON_STREET_COMPOUNDS) {
+    if (from.test(normalized)) variants.add(normalized.replace(from, to));
+  }
   for (const suffix of COMMON_STREET_SUFFIXES) {
     const suffixPattern = new RegExp(`([a-z])(${suffix})\\b`, 'i');
     if (suffixPattern.test(normalized)) {
@@ -190,7 +194,7 @@ const addressSearchVariants = (query) => {
       if (suffix === 'spring') variants.add(spaced.replace(/\bspring\b/i, 'springs'));
     }
   }
-  return Array.from(variants).filter(Boolean).slice(0, 4);
+  return Array.from(variants).filter(Boolean).slice(0, 6);
 };
 const suggestionKey = (suggestion) => [suggestion.address.line1, suggestion.address.city, suggestion.address.state, suggestion.address.postalCode].map((part) => normalizeKey(part)).join('|');
 const normalizeSuggestedAddress = (item) => {
@@ -206,6 +210,27 @@ const normalizeSuggestedAddress = (item) => {
       state,
       postalCode: address.postcode || '',
       country: address.country || 'United States',
+    },
+  };
+};
+const normalizeCensusSuggestion = (item) => {
+  const components = item?.addressComponents || {};
+  const state = components.state || '';
+  const city = components.city || '';
+  const zip = components.zip || '';
+  const matchedAddress = String(item?.matchedAddress || '').trim();
+  const cityStatePattern = city && state ? new RegExp(`,\\s*${city}\\s*,\\s*${state}\\s+${zip}.*$`, 'i') : null;
+  const line1 = cityStatePattern ? matchedAddress.replace(cityStatePattern, '').trim() : (components.fromAddress && components.streetName ? `${components.fromAddress} ${components.streetName}` : matchedAddress.split(',')[0] || '');
+  return {
+    id: String(item?.matchedAddress || Math.random()),
+    label: matchedAddress,
+    address: {
+      line1,
+      line2: '',
+      city,
+      state,
+      postalCode: zip,
+      country: 'United States',
     },
   };
 };
@@ -241,18 +266,33 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
       setSuggestionStatus('loading');
       try {
         const searches = addressSearchVariants([query, value.city, value.state].filter(Boolean).join(' '));
-        const results = await Promise.all(searches.map(async (search) => {
-          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=0&limit=${ADDRESS_SUGGESTION_LIMIT}&q=${encodeURIComponent(search)}`, {
+        const results = await Promise.all(searches.flatMap((search) => [
+          fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=0&limit=${ADDRESS_SUGGESTION_LIMIT}&q=${encodeURIComponent(search)}`, {
             signal: controller.signal,
             headers: { Accept: 'application/json' },
-          });
-          if (!response.ok) throw new Error('Address lookup failed');
-          return response.json();
-        }));
+          }).then(async (response) => {
+            if (!response.ok) return [];
+            const rows = await response.json();
+            return (Array.isArray(rows) ? rows : []).map(normalizeSuggestedAddress);
+          }).catch((error) => {
+            if (error.name === 'AbortError') throw error;
+            return [];
+          }),
+          fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(search)}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          }).then(async (response) => {
+            if (!response.ok) return [];
+            const payload = await response.json();
+            return (payload?.result?.addressMatches || []).map(normalizeCensusSuggestion);
+          }).catch((error) => {
+            if (error.name === 'AbortError') throw error;
+            return [];
+          }),
+        ]));
         const seen = new Set();
         const nextSuggestions = results
           .flatMap((rows) => (Array.isArray(rows) ? rows : []))
-          .map(normalizeSuggestedAddress)
           .filter((item) => item.label && item.address.line1)
           .filter((item) => {
             const key = suggestionKey(item);
@@ -288,6 +328,15 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
     setLine1Focused(false);
   };
 
+  const useEnteredAddress = () => {
+    const line1 = String(value.line1 || '').trim();
+    selectedLineRef.current = line1;
+    onChange({ ...value, line1 });
+    setSuggestions([]);
+    setSuggestionStatus('idle');
+    setLine1Focused(false);
+  };
+
   const showDropdown = line1Focused && String(value.line1 || '').trim().length >= 3 && (suggestionStatus !== 'idle' || suggestions.length > 0);
 
   return (
@@ -315,7 +364,25 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
                 </div>
               )}
               {suggestionStatus === 'error' && <div className="px-3 py-2 text-sm text-amber-400">Address suggestions are unavailable right now.</div>}
-              {suggestionStatus === 'empty' && <div className="px-3 py-2 text-sm text-muted-foreground">No address matches found.</div>}
+              {suggestionStatus === 'empty' && (
+                <div className="border-b px-3 py-2">
+                  <p className="text-sm text-muted-foreground">No address matches found.</p>
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      useEnteredAddress();
+                    }}
+                  >
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-muted-foreground" />
+                    <span>
+                      <span className="block font-medium text-foreground">Use address as entered</span>
+                      <span className="block text-xs text-muted-foreground">{String(value.line1 || '').trim()}</span>
+                    </span>
+                  </button>
+                </div>
+              )}
               {suggestions.map((suggestion) => (
                 <button
                   key={suggestion.id}
@@ -1343,3 +1410,5 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
+
