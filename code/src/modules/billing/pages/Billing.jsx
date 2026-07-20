@@ -34,6 +34,19 @@ export default function Billing() {
     }
   });
 
+  const { data: locations = [] } = useAuthQuery({
+    queryKey: ['billing-locations', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return [];
+      const { data, error } = await supabase.from('locations').select('id').eq('organization_id', organization.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!organization?.id,
+  });
+
+  const billingLocationCount = Math.max(1, locations.length || 0);
+
   const handleCheckout = async (plan) => {
     if (!organization?.id) return toast.error("Organization context missing");
     setIsProcessing(true);
@@ -41,7 +54,7 @@ export default function Billing() {
 
     try {
       const response = await supabase.functions.invoke('create-checkout-session', {
-        body: { plan_id: plan.id, organization_id: organization.id }
+        body: { plan_id: plan.id, organization_id: organization.id, location_count: billingLocationCount }
       });
 
       if (response.error) throw response.error;
@@ -67,7 +80,7 @@ export default function Billing() {
         </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing & Plans</h1>
-          <p className="text-muted-foreground mt-1">Manage your Restops SaaS subscription.</p>
+          <p className="text-muted-foreground mt-1">Manage your Restops SaaS subscription by location.</p>
         </div>
       </div>
 
@@ -78,7 +91,7 @@ export default function Billing() {
             <Badge className="bg-resend-green text-white">Active</Badge>
           </CardTitle>
           <CardDescription className="text-indigo-700/80 dark:text-indigo-300/80">
-            You are currently on the {organization?.plan_id ? "Custom" : "Starter"} Plan.
+            You are currently on the {organization?.plan_id ? "Custom" : "Starter"} Plan for {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -101,8 +114,9 @@ export default function Billing() {
               )}
               <CardHeader className="pb-2 relative z-10">
                 <CardTitle className="text-xl font-black text-foreground">{plan.name}</CardTitle>
-                <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
+                <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/location/mo</span></p>
                 <p className="text-xs text-muted-foreground mt-2">{plan.description}</p>
+                <p className="text-xs font-semibold text-foreground mt-2">Estimated monthly: ${(Number(plan.price_monthly || 0) * billingLocationCount).toLocaleString()} for {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}</p>
               </CardHeader>
               <CardContent className="relative z-10 flex flex-col h-full">
                 <div className="space-y-3 mb-8 mt-4 flex-grow">

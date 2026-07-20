@@ -119,7 +119,7 @@ export default function PlatformPlans() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Platform Plans</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage global SaaS subscriptions and service tiers</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage global per-location SaaS subscriptions and service tiers</p>
           </div>
         </div>
         <Button onClick={openNewPlan} className="bg-brand hover:bg-brand/90 text-primary-foreground font-bold rounded-xl h-10 px-6">
@@ -146,7 +146,7 @@ export default function PlatformPlans() {
                  </Button>
               </div>
               <CardTitle className="text-xl font-black text-foreground">{plan.name}</CardTitle>
-              <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
+              <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/location/mo</span></p>
             </CardHeader>
             <CardContent className="relative z-10">
                <p className="text-xs text-muted-foreground mb-6">{plan.description || 'No description provided'}</p>
@@ -256,7 +256,7 @@ export default function PlatformPlans() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs font-semibold">Monthly Price ($)</Label>
+                      <Label className="text-xs font-semibold">Monthly Price per Location ($)</Label>
                       <div className="relative mt-1">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input 

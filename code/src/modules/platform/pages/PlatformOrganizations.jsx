@@ -1187,7 +1187,7 @@ export default function PlatformOrganizations() {
                                  <SelectContent>
                                    <SelectItem value="none">No Plan (Manual)</SelectItem>
                                    {plans.map(p => (
-                                     <SelectItem key={p.id} value={p.id}>{p.name} (${p.price_monthly}/mo)</SelectItem>
+                                     <SelectItem key={p.id} value={p.id}>{p.name} (${p.price_monthly}/location/mo)</SelectItem>
                                    ))}
                                  </SelectContent>
                                </Select>

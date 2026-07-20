@@ -933,6 +933,18 @@ The Restops Platform Team
   const getBrandUsers = React.useCallback((brandId) => brandUsersMap.get(brandId) || [], [brandUsersMap]);
   const getLocationUsers = React.useCallback((locId) => locationUsersMap.get(locId) || [], [locationUsersMap]);
 
+  const locationCountByOrganization = React.useMemo(() => allLocations.reduce((acc, loc) => {
+    if (!loc.organization_id) return acc;
+    acc[loc.organization_id] = (acc[loc.organization_id] || 0) + 1;
+    return acc;
+  }, {}), [allLocations]);
+
+  const estimatedPlatformMrr = React.useMemo(() => orgs.reduce((sum, org) => {
+    const plan = plans.find((item) => item.id === org.plan_id);
+    if (!plan?.price_monthly) return sum;
+    return sum + Number(plan.price_monthly || 0) * Math.max(1, locationCountByOrganization[org.id] || 0);
+  }, 0), [orgs, plans, locationCountByOrganization]);
+
  // Computed Stats 
   const {
     accessReqs,
@@ -1502,7 +1514,7 @@ The Restops Platform Team
           { label: 'Total Organizations', value: orgs.length, sub: 'Registered tenants', icon: Building2, color: 'blue' },
           { label: 'Demo Requests', value: demoRequests.length, sub: `${demoRequests.filter(r => r.demo_viewed).length} viewed`, icon: Video, color: 'violet' },
           { label: 'Pending Approvals', value: pendingCount, sub: 'Immediate action', icon: ShieldAlert, color: 'amber' },
-          { label: 'Platform MRR', value: `$${(plans.length ? 12450 : 0).toLocaleString()}`, sub: 'Estimated monthly', icon: DollarSign, color: 'emerald' },
+          { label: 'Platform MRR', value: `$${estimatedPlatformMrr.toLocaleString()}`, sub: 'Estimated per-location monthly', icon: DollarSign, color: 'emerald' },
         ].map(stat => (
           <Card key={stat.label} className="border-0 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
             <CardContent className="p-6 relative">
@@ -1673,17 +1685,19 @@ The Restops Platform Team
                      <CardContent>
                         <div className="space-y-6">
                           {plans.map(plan => {
-                            const count = orgs.filter(o => o.plan_id === plan.id).length;
+                            const planOrgs = orgs.filter(o => o.plan_id === plan.id);
+                            const count = planOrgs.length;
+                            const locationCount = planOrgs.reduce((sum, org) => sum + Math.max(1, locationCountByOrganization[org.id] || 0), 0);
                             return (
                               <div key={plan.id} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                    <div className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center font-bold text-muted-foreground">{plan.name[0]}</div>
                                    <div>
                                       <p className="font-bold text-sm">{plan.name}</p>
-                                      <p className="text-[10px] text-muted-foreground">{count} Organizations</p>
+                                      <p className="text-[10px] text-muted-foreground">{count} organizations - {locationCount} billable locations</p>
                                    </div>
                                 </div>
-                                <p className="font-black text-foreground">${(count * plan.price_monthly).toLocaleString()}</p>
+                                <p className="font-black text-foreground">${(locationCount * plan.price_monthly).toLocaleString()}</p>
                               </div>
                             )
                           })}

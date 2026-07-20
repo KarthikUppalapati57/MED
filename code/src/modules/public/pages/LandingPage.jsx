@@ -311,7 +311,7 @@ export default function LandingPage() {
                   <h3 className="text-2xl font-bold tracking-tight mb-8 text-black dark:text-white">Platform Complete</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-8xl font-bold tracking-tighter text-black dark:text-white">$149</span>
-                    <span className="text-black/30 dark:text-white/50 font-bold text-sm uppercase tracking-[4px]">USD / Mo</span>
+                    <span className="text-black/30 dark:text-white/50 font-bold text-sm uppercase tracking-[4px]">USD / Location / Mo</span>
                   </div>
                 </div>
                 <ul className="space-y-6 mb-16">

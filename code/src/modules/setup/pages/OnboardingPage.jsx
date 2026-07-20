@@ -742,7 +742,11 @@ export default function OnboardingPage() {
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
 
-    const priceLabel = isPaidPlan ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/mo` : 'Free';
+    const billingLocationCount = Math.max(1, totals.locationCount || 0);
+    const monthlyTotal = Number(selectedPlan.price_monthly || 0) * billingLocationCount;
+    const priceLabel = isPaidPlan
+      ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/location/mo (${billingLocationCount} location${billingLocationCount === 1 ? '' : 's'} = $${monthlyTotal.toFixed(2)}/mo)`
+      : 'Free';
     const paymentMethodLabel = !isPaidPlan
       ? 'no charge — free plan'
       : paymentMethod === 'card'
@@ -773,6 +777,7 @@ export default function OnboardingPage() {
           couponCode: normalizeCouponCodeInput(couponCode) || null,
           paymentMethod,
           paymentMethodId,
+          location_count: billingLocationCount,
           bankAccount: paymentMethod === 'ach' ? bankAccount : null,
           successUrl: `${window.location.origin}/onboarding?checkout=success`,
           cancelUrl: `${window.location.origin}/onboarding`,
@@ -1045,7 +1050,7 @@ export default function OnboardingPage() {
             <>
               <CardHeader>
                 <CardTitle>Plan</CardTitle>
-                <CardDescription>Select the plan for this tenant workspace.</CardDescription>
+                <CardDescription>Select the per-location plan for this tenant workspace.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -1055,7 +1060,8 @@ export default function OnboardingPage() {
                         <div><h3 className="font-semibold text-foreground">{plan.name}</h3><p className="text-sm text-muted-foreground">{plan.description}</p></div>
                         {selectedPlan?.id === plan.id && <CheckCircle2 className="h-5 w-5 text-primary" />}
                       </div>
-                      <div className="text-2xl font-bold text-foreground">${Number(plan.price_monthly || 0).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      <div className="text-2xl font-bold text-foreground">${Number(plan.price_monthly || 0).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/location/mo</span></div>
+                      {Number(plan.price_monthly || 0) > 0 && <div className="mt-1 text-xs font-semibold text-foreground">Estimated: ${(Number(plan.price_monthly || 0) * Math.max(1, totals.locationCount || 0)).toFixed(0)}/mo for {Math.max(1, totals.locationCount || 0)} location{Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}</div>}
                       {Array.isArray(plan.features) && plan.features.length > 0 && <ul className="mt-3 space-y-1 text-sm text-muted-foreground">{plan.features.slice(0, 4).map((feature) => <li key={feature}>- {feature}</li>)}</ul>}
                     </button>
                   ))}
@@ -1068,7 +1074,7 @@ export default function OnboardingPage() {
             <>
               <CardHeader>
                 <CardTitle>Payment</CardTitle>
-                <CardDescription>{selectedPlan ? `Complete payment for the ${selectedPlan.name} plan.` : 'Select a plan to continue.'}</CardDescription>
+                <CardDescription>{selectedPlan ? `Complete payment for the ${selectedPlan.name} plan across ${Math.max(1, totals.locationCount || 0)} location${Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.` : 'Select a plan to continue.'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {Number(selectedPlan?.price_monthly || 0) > 0 && (
@@ -1164,10 +1170,3 @@ export default function OnboardingPage() {
     </div>
   );
 }
-
-
-
-
-
-
-

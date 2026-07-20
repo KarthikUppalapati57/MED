@@ -89,6 +89,7 @@ serve(async (req) => {
       plan_id,
       org_id,
       organization_id,
+      location_count,
       paymentMethod = 'card',
       paymentMethodId = null,
       bankAccount = null,
@@ -123,6 +124,18 @@ serve(async (req) => {
     if (plan.is_active !== true) throw new Error('Selected plan is not active')
 
     let resolvedPriceId = priceId || plan.stripe_price_id
+    let billingLocationCount = Math.max(1, Math.floor(Number(location_count || 0)))
+    if (organizationId) {
+      const { count: persistedLocationCount, error: locationCountError } = await adminClient
+        .from('locations')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+
+      if (locationCountError) throw locationCountError
+      billingLocationCount = Math.max(1, persistedLocationCount || billingLocationCount)
+    }
+    const unitAmountCents = Math.round(Number(plan.price_monthly) * 100)
+    const monthlyAmountCents = unitAmountCents * billingLocationCount
 
     let coupon: string | undefined
     let couponTrialDays = 0
@@ -171,6 +184,8 @@ serve(async (req) => {
           pending_payment_metadata: {
             provider: 'free_plan',
             plan_id: plan.id,
+            billing_model: 'per_location',
+            location_count: billingLocationCount,
             coupon_code: coupon || '',
             completed_at: new Date().toISOString(),
           },
@@ -238,6 +253,10 @@ serve(async (req) => {
           pending_payment_metadata: {
             provider: 'dwolla',
             plan_id: plan.id,
+            billing_model: 'per_location',
+            unit_amount_cents: unitAmountCents,
+            location_count: billingLocationCount,
+            monthly_amount_cents: monthlyAmountCents,
             coupon_code: coupon || '',
             trial_days: couponTrialDays || 0,
             dwolla_customer_url: customerUrl,
@@ -263,14 +282,14 @@ serve(async (req) => {
 
     if (Number(plan.price_monthly) > 0 && !resolvedPriceId) {
       const price = await stripe.prices.create({
-        unit_amount: Math.round(Number(plan.price_monthly) * 100),
+        unit_amount: unitAmountCents,
         currency: 'usd',
         recurring: { interval: 'month' },
         product_data: {
-          name: plan.name || `RestOps ${plan.id}`,
-          metadata: { plan_id: plan.id },
+          name: `${plan.name || `RestOps ${plan.id}`} - per location`,
+          metadata: { plan_id: plan.id, billing_model: 'per_location' },
         },
-        metadata: { plan_id: plan.id },
+        metadata: { plan_id: plan.id, billing_model: 'per_location' },
       })
       resolvedPriceId = price.id
       await adminClient.from('plans').update({ stripe_price_id: resolvedPriceId }).eq('id', plan.id)
@@ -317,6 +336,10 @@ serve(async (req) => {
           pending_payment_metadata: {
             provider: 'stripe',
             plan_id: plan.id,
+            billing_model: 'per_location',
+            unit_amount_cents: unitAmountCents,
+            location_count: billingLocationCount,
+            monthly_amount_cents: monthlyAmountCents,
             coupon_code: coupon || '',
             checkout_status: 'created',
             trial_days: couponTrialDays || 0,
@@ -330,7 +353,7 @@ serve(async (req) => {
         mode: 'subscription',
         customer: customerId,
         payment_method_types: ['card'],
-        line_items: [{ price: resolvedPriceId, quantity: 1 }],
+        line_items: [{ price: resolvedPriceId, quantity: billingLocationCount }],
         success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
         cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
         metadata: {
@@ -338,6 +361,8 @@ serve(async (req) => {
           organization_id: organizationId || '',
           user_id: authData.user.id,
           plan_id: plan.id,
+          billing_model: 'per_location',
+          location_count: String(billingLocationCount),
           coupon_code: coupon || '',
           payment_method_type: 'stripe_subscription',
         },
@@ -349,6 +374,8 @@ serve(async (req) => {
             organization_id: organizationId || '',
             user_id: authData.user.id,
             plan_id: plan.id,
+            billing_model: 'per_location',
+            location_count: String(billingLocationCount),
             coupon_code: coupon || '',
             trial_days: String(couponTrialDays || 0),
           },
@@ -363,6 +390,10 @@ serve(async (req) => {
           pending_payment_metadata: {
             provider: 'stripe',
             plan_id: plan.id,
+            billing_model: 'per_location',
+            unit_amount_cents: unitAmountCents,
+            location_count: billingLocationCount,
+            monthly_amount_cents: monthlyAmountCents,
             coupon_code: coupon || '',
             checkout_status: 'session_created',
             checkout_session_id: session.id,
@@ -388,7 +419,7 @@ serve(async (req) => {
 
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
-      items: [{ price: resolvedPriceId }],
+      items: [{ price: resolvedPriceId, quantity: billingLocationCount }],
       default_payment_method: paymentMethodId,
       ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
       expand: ['latest_invoice.payment_intent'],
@@ -397,6 +428,8 @@ serve(async (req) => {
         organization_id: organizationId || '',
         user_id: authData.user.id,
         plan_id: plan.id,
+        billing_model: 'per_location',
+        location_count: String(billingLocationCount),
         coupon_code: coupon || '',
         trial_days: String(couponTrialDays || 0),
       },
@@ -418,6 +451,10 @@ serve(async (req) => {
         pending_payment_metadata: {
           provider: 'stripe',
           plan_id: plan.id,
+          billing_model: 'per_location',
+          unit_amount_cents: unitAmountCents,
+          location_count: billingLocationCount,
+          monthly_amount_cents: monthlyAmountCents,
           coupon_code: coupon || '',
           checkout_status: requiresAction ? 'requires_action' : 'subscription_created',
           stripe_customer_id: customerId,
@@ -447,4 +484,3 @@ serve(async (req) => {
     })
   }
 })
-
