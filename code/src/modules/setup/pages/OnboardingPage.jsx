@@ -269,6 +269,7 @@ export default function OnboardingPage() {
   const [hierarchyMode, setHierarchyMode] = useState('manual');
   const [hierarchyView, setHierarchyView] = useState('build');
   const [expandedOrganizations, setExpandedOrganizations] = useState(() => new Set([0]));
+  const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true, usps_address_validation_enabled: false });
 
   useEffect(() => {
     const saved = window.localStorage.getItem(DRAFT_KEY);
@@ -298,6 +299,23 @@ export default function OnboardingPage() {
     supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true }).then(({ data }) => {
       if (data) setPlans(data);
     });
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    api.onboarding.getVerificationSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setVerificationSettings({
+            ein_verification_enabled: settings?.ein_verification_enabled !== false,
+            ssn_verification_enabled: settings?.ssn_verification_enabled !== false,
+            usps_address_validation_enabled: settings?.usps_address_validation_enabled === true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to load onboarding verification settings:', error);
+      });
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
     const inviteCoupon = userProfile?.coupon_code || userProfile?.metadata?.coupon_code || userProfile?.metadata?.coupon?.code;
@@ -567,6 +585,7 @@ export default function OnboardingPage() {
   const issueCountForOrganization = (orgIdx) => hierarchyIssues.filter((issue) => issue.orgIdx === orgIdx).length;
   const firstHierarchyIssue = hierarchyIssues[0]?.message || null;
   const locationIssueCount = hierarchyIssues.filter((issue) => issue.scope === 'location').length;
+  const uspsAddressValidationEnabled = verificationSettings.usps_address_validation_enabled === true;
   const checklist = [
     { label: 'All organizations have a unique name and slug', ok: !hierarchyIssues.some((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message))?.message },
     { label: 'Every brand is linked to a valid organization', ok: !hierarchyIssues.some((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message))?.message },
@@ -574,6 +593,7 @@ export default function OnboardingPage() {
     { label: 'Every location has a complete mailing address or is marked same as business', ok: !hierarchyIssues.some((issue) => issue.scope === 'location' && /mailing/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'location' && /mailing/i.test(issue.message))?.message },
     { label: 'No duplicate location names within any brand', ok: !hierarchyIssues.some((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location'), detail: hierarchyIssues.find((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location')?.message },
     { label: 'Postal codes are valid for the stated country', ok: !hierarchyIssues.some((issue) => /postal code/i.test(issue.message)), detail: hierarchyIssues.find((issue) => /postal code/i.test(issue.message))?.message },
+    { label: 'USPS address validation is enabled', ok: uspsAddressValidationEnabled, detail: 'Platform admin must enable the USPS address validation API before address onboarding can be submitted.' },
   ];
 
   const validateBusinessIdentity = () => {
@@ -681,6 +701,10 @@ export default function OnboardingPage() {
       toast.error(hierarchyError);
       return false;
     }
+    if (!uspsAddressValidationEnabled) {
+      toast.error('USPS address validation is not enabled. Ask a platform admin to enable it before submitting addresses.');
+      return false;
+    }
     setLoading(true);
     try {
       const hierarchy = buildHierarchyPayload();
@@ -741,6 +765,7 @@ export default function OnboardingPage() {
     }
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
+    if (!uspsAddressValidationEnabled) return toast.error('USPS address validation is not enabled. Ask a platform admin to enable it before submitting addresses.');
 
     const billingLocationCount = Math.max(1, totals.locationCount || 0);
     const monthlyTotal = Number(selectedPlan.price_monthly || 0) * billingLocationCount;
@@ -872,6 +897,12 @@ export default function OnboardingPage() {
             <p className="font-bold">Platform admin requested changes</p>
             <p className="mt-1">{hierarchySubmissionReason}</p>
             <p className="mt-1 text-xs">Update the details below and resubmit for review.</p>
+          </div>
+        )}
+        {!uspsAddressValidationEnabled && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+            <p className="font-bold">USPS address validation is not enabled</p>
+            <p className="mt-1 text-xs">A platform admin must enable the USPS address validation API before address onboarding can be submitted.</p>
           </div>
         )}
         {hierarchyMode === 'upload' ? (
@@ -1162,7 +1193,7 @@ export default function OnboardingPage() {
             <Button type="button" variant="outline" onClick={() => saveDraft()} disabled={loading || checkoutLoading || finalizingOnboarding} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
             <div className="flex w-full gap-3 sm:w-auto">
               <Button type="button" variant="ghost" onClick={goBack} disabled={step === 1 || loading || checkoutLoading || finalizingOnboarding} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding || (step === 2 && hierarchyView === 'review' && hierarchyIssues.length > 0)} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{nextLabel} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
+              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding || (step === 2 && hierarchyView === 'review' && (hierarchyIssues.length > 0 || !uspsAddressValidationEnabled))} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{nextLabel} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
             </div>
           </CardFooter>
         </Card>

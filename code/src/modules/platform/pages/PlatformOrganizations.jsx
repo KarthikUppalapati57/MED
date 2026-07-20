@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
@@ -61,7 +61,7 @@ export default function PlatformOrganizations() {
   const [isModifyingHierarchy, setIsModifyingHierarchy] = useState(false);
   const [reviewActionDialog, setReviewActionDialog] = useState(null);
   const [reviewActionReason, setReviewActionReason] = useState('');
-  const [verificationSettingsForm, setVerificationSettingsForm] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
+  const [verificationSettingsForm, setVerificationSettingsForm] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true, usps_address_validation_enabled: false });
   const [isSavingVerificationSettings, setIsSavingVerificationSettings] = useState(false);
   const [manualEntry, setManualEntry] = useState({
     type: 'brand', // 'brand' or 'location'
@@ -177,6 +177,7 @@ export default function PlatformOrganizations() {
       setVerificationSettingsForm({
         ein_verification_enabled: verificationSettings.ein_verification_enabled !== false,
         ssn_verification_enabled: verificationSettings.ssn_verification_enabled !== false,
+        usps_address_validation_enabled: verificationSettings.usps_address_validation_enabled === true,
       });
     }
   }, [verificationSettings]);
@@ -187,6 +188,7 @@ export default function PlatformOrganizations() {
       await api.onboarding.updateVerificationSettings({
         einEnabled: verificationSettingsForm.ein_verification_enabled,
         ssnEnabled: verificationSettingsForm.ssn_verification_enabled,
+        uspsAddressValidationEnabled: verificationSettingsForm.usps_address_validation_enabled,
       });
       queryClient.invalidateQueries({ queryKey: ['platform_onboarding_verification_settings'] });
       toast.success('Business verification settings updated');
@@ -1141,6 +1143,13 @@ export default function PlatformOrganizations() {
                                <span>
                                  <span className="block text-xs font-bold text-foreground">Require SSN verification</span>
                                  <span className="block text-[11px] text-muted-foreground">Applies to sole proprietor and independent contractor onboarding.</span>
+                               </span>
+                             </label>
+                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+                               <Checkbox checked={verificationSettingsForm.usps_address_validation_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, usps_address_validation_enabled: Boolean(checked) }))} />
+                               <span>
+                                 <span className="block text-xs font-bold text-foreground">Enable USPS address validation</span>
+                                 <span className="block text-[11px] text-muted-foreground">Required before tenants can submit address-bearing onboarding hierarchy records.</span>
                                </span>
                              </label>
                              <Button size="sm" className="w-full" onClick={handleSaveVerificationSettings} disabled={isSavingVerificationSettings}>

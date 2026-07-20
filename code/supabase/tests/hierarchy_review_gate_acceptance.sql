@@ -11,7 +11,7 @@
 
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(11);
 
 CREATE TEMP TABLE hrg_ids (
   key text PRIMARY KEY,
@@ -83,6 +83,40 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- ===== USPS API disabled blocks otherwise valid hierarchy submission =====
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', (SELECT value::text FROM hrg_ids WHERE key = 'approve'), true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+
+DO $$
+BEGIN
+  BEGIN
+    PERFORM public.submit_onboarding_hierarchy_for_review(
+      (SELECT value FROM hrg_ids WHERE key = 'approve'),
+      jsonb_build_array(jsonb_build_object(
+        'name', 'HRG Approve Org', 'slug', 'hrg-usps-disabled-' || replace((SELECT value FROM hrg_ids WHERE key = 'approve')::text, '-', ''),
+        'metadata', '{}'::jsonb,
+        'brands', jsonb_build_array(jsonb_build_object(
+          'name', 'HRG Brand', 'metadata', '{}'::jsonb,
+          'locations', jsonb_build_array(jsonb_build_object(
+            'name', 'HRG Location', 'address', '123 Main St, Test City, TS 00000',
+            'business_address', jsonb_build_object('line1','123 Main St','city','Test City','state','TS','postalCode','00000','country','United States'),
+            'mailing_address', jsonb_build_object('line1','123 Main St','city','Test City','state','TS','postalCode','00000','country','United States')
+          ))
+        ))
+      ))
+    );
+    INSERT INTO hrg_results VALUES ('usps_disabled_blocks_hierarchy_submit', false, 'did not raise while USPS address validation was disabled');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO hrg_results VALUES ('usps_disabled_blocks_hierarchy_submit', SQLERRM LIKE '%USPS address validation%', SQLERRM);
+  END;
+END $$;
+RESET ROLE;
+
+UPDATE public.platform_onboarding_settings
+SET usps_address_validation_enabled = true
+WHERE id = true;
 -- ===== valid submit: stores payload, sets pending_review, creates NO organization yet =====
 
 SET LOCAL ROLE authenticated;

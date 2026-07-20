@@ -519,17 +519,18 @@ export const api = {
     getVerificationSettings: async () => {
       const { data, error } = await supabase.rpc('get_onboarding_verification_settings');
       if (error) throw error;
-      return data || { ein_verification_enabled: true, ssn_verification_enabled: true };
+      return data || { ein_verification_enabled: true, ssn_verification_enabled: true, usps_address_validation_enabled: false };
     },
     isBusinessNameAvailable: async (legalName) => {
       const { data, error } = await supabase.rpc('is_business_name_available', { p_legal_name: legalName });
       if (error) throw error;
       return data !== false;
     },
-    updateVerificationSettings: async ({ einEnabled, ssnEnabled }) => {
+    updateVerificationSettings: async ({ einEnabled, ssnEnabled, uspsAddressValidationEnabled }) => {
       const { data, error } = await supabase.rpc('update_onboarding_verification_settings', {
         p_ein_enabled: einEnabled,
         p_ssn_enabled: ssnEnabled,
+        p_usps_address_validation_enabled: uspsAddressValidationEnabled,
       });
       if (error) throw error;
       return data;

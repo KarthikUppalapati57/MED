@@ -55,6 +55,10 @@ BEGIN
     onboarding_status = EXCLUDED.onboarding_status;
 END $$;
 
+UPDATE public.platform_onboarding_settings
+SET usps_address_validation_enabled = true
+WHERE id = true;
+
 -- ===== build a real hierarchy for 'owner' via the same path production uses =====
 
 SET LOCAL ROLE authenticated;
