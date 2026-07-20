@@ -282,7 +282,7 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
             autoComplete="street-address"
           />
           {showDropdown && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg">
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-md border bg-popover text-popover-foreground shadow-lg">
               {suggestionStatus === 'loading' && (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching addresses
