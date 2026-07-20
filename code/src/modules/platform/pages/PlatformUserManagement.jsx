@@ -129,7 +129,7 @@ export default function PlatformUserManagement() {
       });
       if (insertError) throw insertError;
 
-      const link = `${window.location.origin}/signup?token=${token}`;
+      const link = `${window.location.origin}/signup/${token}`;
       setGeneratedInviteLink(link);
       setShowPlatformInviteModal(false);
       setIsInviteLinkDialogOpen(true);
