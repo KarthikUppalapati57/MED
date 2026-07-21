@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Calculator, DownloadCloud, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function POSSyncEngine() {
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [pmix, setPmix] = useState(null);
   const [depletionPreview, setDepletionPreview] = useState(null);
   const { organization } = useAuth();
@@ -22,7 +22,7 @@ export default function POSSyncEngine() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setIsSimulating(true);
+    setIsProcessing(true);
     
     Papa.parse(file, {
       header: true,
@@ -30,7 +30,7 @@ export default function POSSyncEngine() {
       complete: async (results) => {
         try {
           const parsedData = results.data;
-          const mockSales = [];
+          const salesItems = [];
 
           parsedData.forEach(row => {
             const name = row['Menu Item'] || row['name'] || row['Item Name'];
@@ -38,37 +38,37 @@ export default function POSSyncEngine() {
             const qtySold = parseInt(qtyString, 10);
 
             if (name && qtySold > 0) {
-              mockSales.push({ name, qty: qtySold });
+              salesItems.push({ name, qty: qtySold });
             }
           });
 
-          if (mockSales.length === 0) {
+          if (salesItems.length === 0) {
             toast.error("No valid sales data found in the CSV.");
-            setIsSimulating(false);
+            setIsProcessing(false);
             return;
           }
 
           // Offload intense joining and math to Postgres
           const { data, error } = await supabase.rpc('calculate_theoretical_depletion', {
             p_org_id: organization.id,
-            p_sales_json: mockSales
+            p_sales_json: salesItems
           });
 
           if (error) throw error;
 
-          setPmix(mockSales.sort((a, b) => b.qty - a.qty));
+          setPmix(salesItems.sort((a, b) => b.qty - a.qty));
           setDepletionPreview(data || []);
           toast.success(`POS Sales Extracted: Matched natively via RPC`);
         } catch (err) {
           console.error(err);
           toast.error("Server-side depletion calculation failed.");
         } finally {
-          setIsSimulating(false);
+          setIsProcessing(false);
         }
       },
       error: (err) => {
         toast.error("Failed to parse CSV file");
-        setIsSimulating(false);
+        setIsProcessing(false);
       }
     });
   };
@@ -119,14 +119,14 @@ export default function POSSyncEngine() {
                    type="file" 
                    accept=".csv"
                    onChange={handleFileUpload}
-                   disabled={isSimulating}
+                   disabled={isProcessing}
                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                  />
                  <Button 
-                   disabled={isSimulating}
+                   disabled={isProcessing}
                    className="bg-indigo-600 hover:bg-indigo-700 text-white pointer-events-none"
                  >
-                   {isSimulating ? (
+                   {isProcessing ? (
                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Native Processing...</>
                    ) : (
                      "Select CSV File"
@@ -165,7 +165,7 @@ export default function POSSyncEngine() {
                       </TableHeader>
                       <TableBody>
                         {pmix.map(item => (
-                          <TableRow key={item.recipe_id}>
+                          <TableRow key={`${item.name}-${item.qty}`}>
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell className="text-right font-bold text-indigo-600">{item.qty}</TableCell>
                           </TableRow>
@@ -212,3 +212,4 @@ export default function POSSyncEngine() {
     </div>
   );
 }
+

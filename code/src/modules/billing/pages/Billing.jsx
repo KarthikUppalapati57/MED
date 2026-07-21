@@ -5,20 +5,11 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 import { MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { loadStripe } from '@stripe/stripe-js';
 
-// Mock stripe integration for MVP
-const mockStripeCheckout = async (planId, orgId) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ success: true, url: `/billing?success=true&plan=${planId}` });
-    }, 1500);
-  });
-};
 
 export default function Billing() {
   const { user, organization } = useAuth();
@@ -61,7 +52,6 @@ export default function Billing() {
 
       const { url } = response.data;
       if (url) {
-        // Redirect to Stripe checkout (or simulated success URL)
         window.location.href = url;
       }
     } catch (err) {

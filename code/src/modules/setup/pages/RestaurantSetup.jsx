@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -360,7 +360,9 @@ export default function RestaurantSetup() {
                 <CardDescription>Manage terminals and tablets used by staff without individual logins.</CardDescription>
               </div>
               <Button onClick={() => {
-                const pin = Math.floor(100000 + Math.random() * 900000).toString();
+                const pinArray = new Uint32Array(1);
+                crypto.getRandomValues(pinArray);
+                const pin = String(100000 + (pinArray[0] % 900000));
                 setDevices([...devices, { id: crypto.randomUUID(), name: `Shared Device ${devices.length + 1}`, status: 'Pending', lastActive: 'Awaiting registration', pin }]);
                 toast.success(`Registration PIN: ${pin}. Save changes to persist this device.`);
               }}>
@@ -514,3 +516,4 @@ export default function RestaurantSetup() {
     </div>
   );
 }
+

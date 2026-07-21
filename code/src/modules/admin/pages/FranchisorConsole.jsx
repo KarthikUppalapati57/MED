@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -52,7 +52,7 @@ export default function FranchisorConsole() {
     enabled: agreements.length > 0
   });
 
-  const simulateRoyaltyRun = async () => {
+  const runRoyaltyCalculation = async () => {
     const toastId = toast.loading('Running weekly royalty calculations...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -91,7 +91,7 @@ export default function FranchisorConsole() {
           <h1 className="text-2xl font-bold text-foreground">Franchisor Console</h1>
           <p className="text-muted-foreground mt-1">Manage franchise agreements and collect royalties automatically</p>
         </div>
-        <Button onClick={simulateRoyaltyRun}>
+        <Button onClick={runRoyaltyCalculation}>
           <TrendingUp className="h-4 w-4 mr-2" />
           Run Weekly Royalties
         </Button>
@@ -184,7 +184,7 @@ export default function FranchisorConsole() {
             <p className="text-muted-foreground text-sm">Loading invoices...</p>
           ) : invoices.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              No invoices generated yet. Click "Run Weekly Royalties" to test the engine.
+              No invoices generated yet. Click "Run Weekly Royalties" after franchise POS sales are synced.
             </div>
           ) : (
             <Table>
@@ -230,3 +230,4 @@ export default function FranchisorConsole() {
     </div>
   );
 }
+

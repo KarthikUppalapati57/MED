@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -87,13 +87,13 @@ export default function WebhooksTab() {
   }
 
   async function handleTestEvent(endpointId) {
-    // Insert a dummy event into the queue to test dispatch
+    // Queue a signed delivery verification event through the normal webhook dispatcher.
     try {
       await api.entities.WebhookEventQueue.create({
         organization_id: organizationId,
         endpoint_id: endpointId,
         event_type: 'test.event',
-        payload: { event: "test.event", timestamp: new Date().toISOString() },
+        payload: { event: 'test.event', organization_id: organizationId, endpoint_id: endpointId, timestamp: new Date().toISOString() },
         status: 'pending'
       });
       toast.success("Test event queued for delivery!");
@@ -183,3 +183,4 @@ export default function WebhooksTab() {
     </div>
   );
 }
+

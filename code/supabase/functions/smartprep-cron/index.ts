@@ -1,68 +1,127 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+function dateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
 
-serve(async (req) => {
+function priorityFor(quantity: number) {
+  if (quantity >= 50) return 'urgent';
+  if (quantity >= 25) return 'high';
+  if (quantity >= 10) return 'normal';
+  return 'low';
+}
+
+serve(async (_req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    // 1. Get all active organizations
     const { data: orgs, error: orgError } = await supabaseClient
       .from('organizations')
       .select('id, name');
-
     if (orgError) throw orgError;
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowStr = dateOnly(tomorrow);
 
-    for (const org of orgs) {
-      // 2. Fetch forecasted sales from mv_daily_sales_summary for tomorrow
-      // Since it's a forecast, we assume mv_daily_sales_summary might have it,
-      // or we just look at a rolling average. For MVP, we'll just mock a call to Gemini.
-      
-      const prompt = `You are an AI culinary assistant for ${org.name}. Generate a JSON prep list for tomorrow (${tomorrowStr}) based on historical sales data. Limit to 5 critical items. Return ONLY JSON like: [{"item_name":"Diced Onions","prep_amount":5,"unit":"lbs","priority":"High"}]`;
+    const historyStart = new Date();
+    historyStart.setDate(historyStart.getDate() - 28);
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
+    let plansCreated = 0;
+    let orgsSkipped = 0;
 
-      const geminiData = await response.json();
-      const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (rawText) {
-        // Strip markdown blocks if any
-        const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const prepItems = JSON.parse(cleanJson);
-        
-        // 3. Save to database
-        await supabaseClient.from('ai_insights').insert({
+    for (const org of orgs || []) {
+      const { data: orders, error: ordersError } = await supabaseClient
+        .from('pos_orders')
+        .select('id, location_id')
+        .eq('organization_id', org.id)
+        .gte('order_date', historyStart.toISOString())
+        .in('status', ['logged', 'synced']);
+      if (ordersError) throw ordersError;
+
+      const orderIds = (orders || []).map((order) => order.id);
+      if (!orderIds.length) {
+        orgsSkipped += 1;
+        continue;
+      }
+
+      const locationByOrder = new Map((orders || []).map((order) => [order.id, order.location_id]));
+      const { data: items, error: itemsError } = await supabaseClient
+        .from('pos_order_items')
+        .select('order_id, item_name, quantity')
+        .in('order_id', orderIds);
+      if (itemsError) throw itemsError;
+
+      const rollup = new Map<string, { name: string; locationId: string | null; quantity: number }>();
+      for (const item of items || []) {
+        const itemName = String(item.item_name || '').trim();
+        if (!itemName) continue;
+        const locationId = locationByOrder.get(item.order_id) || null;
+        const key = `${locationId || 'org'}:${itemName.toLowerCase()}`;
+        const current = rollup.get(key) || { name: itemName, locationId, quantity: 0 };
+        current.quantity += Number(item.quantity || 0);
+        rollup.set(key, current);
+      }
+
+      const topItems = [...rollup.values()]
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5);
+
+      if (!topItems.length) {
+        orgsSkipped += 1;
+        continue;
+      }
+
+      for (const item of topItems) {
+        const forecastQuantity = Number((item.quantity / 4).toFixed(2));
+        const prepQuantity = Number(Math.max(1, Math.ceil(forecastQuantity * 1.1)).toFixed(2));
+
+        const planPayload = {
           organization_id: org.id,
-          insight_type: 'smart_prep_list',
-          title: `SmartPrep List for ${tomorrowStr}`,
-          description: `Automatically generated prep list based on AI forecast.`,
-          severity: 'info',
-          metadata: { date: tomorrowStr, items: prepItems }
-        });
+          location_id: item.locationId,
+          name: item.name,
+          prep_date: tomorrowStr,
+          par_quantity: forecastQuantity,
+          on_hand_quantity: 0,
+          forecast_quantity: forecastQuantity,
+          prep_quantity: prepQuantity,
+          unit: 'portion',
+          priority: priorityFor(prepQuantity),
+          status: 'planned',
+          notes: `Generated from 28-day POS item velocity for ${org.name}.`,
+        };
+
+        const { data: existing, error: existingError } = await supabaseClient
+          .from('smart_prep_plans')
+          .select('id')
+          .eq('organization_id', org.id)
+          .eq('prep_date', tomorrowStr)
+          .eq('name', item.name)
+          .eq('location_id', item.locationId)
+          .maybeSingle();
+        if (existingError) throw existingError;
+
+        const query = existing
+          ? supabaseClient.from('smart_prep_plans').update(planPayload).eq('id', existing.id)
+          : supabaseClient.from('smart_prep_plans').insert(planPayload);
+        const { error: planError } = await query;
+        if (planError) throw planError;
+        plansCreated += 1;
       }
     }
 
-    return new Response(JSON.stringify({ success: true, message: "SmartPrep generated for all orgs" }), {
+    return new Response(JSON.stringify({ success: true, prep_date: tomorrowStr, plans_upserted: plansCreated, orgs_skipped_no_pos_history: orgsSkipped }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
     console.error(error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
     });

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, UploadCloud, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -104,7 +104,7 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
       }
 
       const fileExt = file.name?.split('.').pop() || 'jpg';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
       const pathOwner = organization?.id || 'unassigned';
       const filePath = `${pathOwner}/pending/${fileName}`;
 
@@ -246,3 +246,4 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
     </Dialog>
   );
 }
+

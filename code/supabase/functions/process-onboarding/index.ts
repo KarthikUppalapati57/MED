@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -33,7 +33,9 @@ serve(async (req) => {
       else if (type === 'UPDATE' && record.status !== old_record?.status) {
         if (record.status === 'approved') {
           console.log(`Generating secure onboarding token for Request ${record.id}`);
-          const token = `tok_${Math.random().toString(36).substring(7)}`;
+          const tokenBytes = new Uint8Array(32);
+          crypto.getRandomValues(tokenBytes);
+          const token = `tok_${Array.from(tokenBytes).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
           console.log(`Sending onboarding link with token ${token} to ${record.email}`);
         } else if (record.status === 'rejected') {
           console.log(`Sending decline email to ${record.email}`);
@@ -56,3 +58,5 @@ serve(async (req) => {
     })
   }
 })
+
+

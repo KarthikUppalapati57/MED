@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import { ArrowLeft, ArrowRight, Check, X, AlertCircle, ScanBarcode, Camera } from 'lucide-react';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -57,16 +57,6 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
   const actualVal = currentCount ? parseFloat(currentCount) : null;
   const isVariance = actualVal !== null && actualVal !== theoretical;
 
-  const handleSimulateScan = () => {
-    // Pick a random item from the remaining items to simulate a successful scan
-    const nextUncountedIndex = sortedItems.findIndex((item, idx) => idx !== currentIndex && !counts[item.product_id]);
-    const targetIndex = nextUncountedIndex !== -1 ? nextUncountedIndex : Math.floor(Math.random() * sortedItems.length);
-    
-    setIsScanning(false);
-    setCurrentIndex(targetIndex);
-    toast.success(`Scanned: ${sortedItems[targetIndex].product_name}`);
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col md:items-center md:justify-center md:bg-black/50">
       <div className="flex-1 w-full bg-background flex flex-col md:max-w-md md:h-[800px] md:max-h-[90vh] md:rounded-2xl md:shadow-2xl md:overflow-hidden md:border">
@@ -99,10 +89,7 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             <div className="w-64 h-64 border-2 border-primary/50 relative">
                <div className="absolute top-0 left-0 w-full h-1 bg-resend-green animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(40,167,69,0.8)]"></div>
             </div>
-            <p className="text-white font-medium z-10">Point camera at a barcode</p>
-            <Button className="mt-8 z-10 bg-primary hover:bg-primary text-white" onClick={handleSimulateScan}>
-              Simulate Successful Scan
-            </Button>
+            <p className="text-white font-medium z-10">Barcode scanning requires a live camera barcode provider. Continue counting manually until scanning is connected.</p>
             <Button variant="ghost" className="text-white/70 hover:text-white z-10 mt-2" onClick={() => setIsScanning(false)}>
               Cancel Scanning
             </Button>
@@ -206,3 +193,4 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
     </div>
   );
 }
+

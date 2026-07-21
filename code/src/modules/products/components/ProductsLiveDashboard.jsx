@@ -1,63 +1,41 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpRight, ArrowDownRight, TrendingUp, AlertTriangle, ChefHat } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 
+const getProductName = (row) => row?.name || row?.product_name || row?.display_name || 'Updated Product';
+const getCogs = (row, fallback) => Number(row?.cogs_percent ?? row?.plate_cost_percent ?? row?.cost_percent ?? fallback);
+
 export default function ProductsLiveDashboard({ targetCogs = 30 }) {
   const { organization } = useAuth();
   const [liveEvents, setLiveEvents] = useState([]);
   const [isFlashing, setIsFlashing] = useState(false);
 
-  // Initialize with some mock data to show the predictive intelligence
-  useEffect(() => {
-    setLiveEvents([
-      {
-        id: 1,
-        type: 'price_increase',
-        product: 'Ground Beef 80/20',
-        variance: '+12.5%',
-        impact: 'critical',
-        recipe_impacted: 'Classic Burger',
-        new_cogs: 34.2, // Above target 30%
-        time: new Date(Date.now() - 1000 * 60 * 5) // 5 mins ago
-      },
-      {
-        id: 2,
-        type: 'price_decrease',
-        product: 'Romaine Lettuce',
-        variance: '-4.2%',
-        impact: 'positive',
-        recipe_impacted: 'Caesar Salad',
-        new_cogs: 22.1, // Well below target 30%
-        time: new Date(Date.now() - 1000 * 60 * 15)
-      }
-    ]);
-  }, []);
-
-  // Simulate real-time WebSocket connection
   useEffect(() => {
     if (!organization?.id) return;
-    
-    // In reality, this connects to the supabase channel for `vendor_items` or `invoices` updates
-    const channel = supabase.channel('live-costing-dashboard')
+
+    const channel = supabase.channel(`live-costing-dashboard-${organization.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' }, (payload) => {
+        const oldCogs = getCogs(payload.old, targetCogs);
+        const newCogs = getCogs(payload.new, targetCogs);
+        const delta = newCogs - oldCogs;
+        const impact = newCogs > targetCogs ? (delta > 0 ? 'critical' : 'warning') : 'positive';
+
         setIsFlashing(true);
         setTimeout(() => setIsFlashing(false), 2000);
-        
-        // Mocking a live event based on real-time update
+
         const newEvent = {
-          id: Date.now(),
-          type: 'price_increase',
-          product: payload.new.name || 'Updated Product',
-          variance: '+8.4%',
-          impact: 'warning',
-          recipe_impacted: 'Multiple Recipes',
-          new_cogs: targetCogs + 1.5,
-          time: new Date()
+          id: `${payload.commit_timestamp || Date.now()}-${payload.new?.id || crypto.randomUUID()}`,
+          product: getProductName(payload.new),
+          variance: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
+          impact,
+          recipe_impacted: 'Review linked recipes',
+          new_cogs: Number.isFinite(newCogs) ? Number(newCogs.toFixed(1)) : targetCogs,
+          time: new Date(payload.commit_timestamp || Date.now()),
         };
-        
+
         setLiveEvents(prev => [newEvent, ...prev].slice(0, 5));
       })
       .subscribe();
@@ -88,12 +66,12 @@ export default function ProductsLiveDashboard({ targetCogs = 30 }) {
         <div className="divide-y divide-border/50">
           {liveEvents.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              Waiting for live invoice data...
+              Waiting for live product cost updates...
             </div>
           ) : (
             liveEvents.map(event => {
               const isDanger = event.new_cogs > targetCogs;
-              
+
               return (
                 <div key={event.id} className="p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors">
                   <div className="flex items-start gap-4">
@@ -113,7 +91,7 @@ export default function ProductsLiveDashboard({ targetCogs = 30 }) {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <span className={`text-sm font-bold ${isDanger ? 'text-resend-red' : 'text-resend-green'}`}>

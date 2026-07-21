@@ -1,7 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno'
 import { corsHeaders } from '../_shared/cors.ts'
+
+function toDateString(value: unknown, field: string) {
+  const text = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`${field} must be YYYY-MM-DD`)
+  return text
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,58 +16,70 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } },
     )
 
-    // This function is meant to be triggered by a pg_cron job or manual webhook
-    const { period_start, period_end } = await req.json()
+    const payload = await req.json()
+    const periodStart = toDateString(payload.period_start, 'period_start')
+    const periodEnd = toDateString(payload.period_end, 'period_end')
+    if (periodEnd < periodStart) throw new Error('period_end must be on or after period_start')
 
-    if (!period_start || !period_end) {
-      throw new Error("Missing billing period dates");
-    }
-
-    console.log(`Calculating royalties for period: ${period_start} to ${period_end}`);
-
-    // 1. Fetch all active franchise agreements
-    const { data: agreements, error: agError } = await supabaseClient
+    const { data: agreements, error: agreementError } = await supabaseClient
       .from('franchise_agreements')
       .select('*')
-      .eq('status', 'active');
+      .eq('status', 'active')
 
-    if (agError) throw agError;
+    if (agreementError) throw agreementError
 
-    const results = [];
+    const results = []
+    const dueDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-    // 2. Loop through agreements and calculate fees
     for (const agreement of agreements || []) {
-      // Mocking the gross sales aggregate from accounting/ledger tables
-      const mockGrossSales = Math.floor(Math.random() * 50000) + 10000; // Between $10k and $60k
-      
-      const royaltyFee = (mockGrossSales * (agreement.royalty_percentage / 100));
-      const marketingFee = (mockGrossSales * (agreement.marketing_fee_percentage / 100));
-      const totalDue = royaltyFee + marketingFee;
+      const { data: salesRows, error: salesError } = await supabaseClient
+        .from('pos_orders')
+        .select('total_amount')
+        .eq('organization_id', agreement.organization_id)
+        .gte('order_date', `${periodStart}T00:00:00.000Z`)
+        .lt('order_date', `${periodEnd}T23:59:59.999Z`)
+        .in('status', ['logged', 'synced'])
 
-      // 3. Insert Invoice Record
-      const { data: invoice, error: invError } = await supabaseClient
+      if (salesError) throw salesError
+
+      const grossSales = (salesRows || []).reduce((sum, row) => sum + Number(row.total_amount || 0), 0)
+      const royaltyFee = Number((grossSales * (Number(agreement.royalty_percentage || 0) / 100)).toFixed(2))
+      const marketingFee = Number((grossSales * (Number(agreement.marketing_fee_percentage || 0) / 100)).toFixed(2))
+      const totalDue = Number((royaltyFee + marketingFee).toFixed(2))
+
+      const { data: existingInvoice, error: existingError } = await supabaseClient
         .from('franchise_invoices')
-        .insert({
-          agreement_id: agreement.id,
-          billing_period_start: period_start,
-          billing_period_end: period_end,
-          gross_sales: mockGrossSales,
-          royalty_fee_amount: royaltyFee,
-          marketing_fee_amount: marketingFee,
-          total_amount_due: totalDue,
-          due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Net 15
-          status: 'issued'
-        })
-        .select()
-        .single();
+        .select('id, status')
+        .eq('agreement_id', agreement.id)
+        .eq('billing_period_start', periodStart)
+        .eq('billing_period_end', periodEnd)
+        .maybeSingle()
 
-      if (invError) throw invError;
-      results.push(invoice);
-      
-      // Note: In production, we would use the Stripe SDK here to issue a real invoice to the franchisee's connected account.
+      if (existingError) throw existingError
+
+      const invoicePayload = {
+        agreement_id: agreement.id,
+        billing_period_start: periodStart,
+        billing_period_end: periodEnd,
+        gross_sales: grossSales,
+        royalty_fee_amount: royaltyFee,
+        marketing_fee_amount: marketingFee,
+        total_amount_due: totalDue,
+        due_date: dueDate,
+        status: existingInvoice?.status === 'paid' ? 'paid' : 'issued',
+      }
+
+      const invoiceQuery = existingInvoice
+        ? supabaseClient.from('franchise_invoices').update(invoicePayload).eq('id', existingInvoice.id).select().single()
+        : supabaseClient.from('franchise_invoices').insert(invoicePayload).select().single()
+
+      const { data: invoice, error: invoiceError } = await invoiceQuery
+      if (invoiceError) throw invoiceError
+      results.push(invoice)
     }
 
     return new Response(JSON.stringify({ success: true, processed: results.length, invoices: results }), {
@@ -70,8 +87,8 @@ serve(async (req) => {
       status: 200,
     })
   } catch (error) {
-    console.error("Calculate royalties error:", error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Calculate royalties error:', error)
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     })

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import React, { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { ShieldCheck, Thermometer, ThermometerSnowflake, AlertTriangle, CheckCircle, Clock, Server } from 'lucide-react';
@@ -20,7 +20,7 @@ export default function FoodSafety() {
   const { organization, location } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: sensors = [], isLoading: loadingSensors } = useQuery({
+  const { data: sensors = [], isLoading: loadingSensors, refetch: refetchSensors } = useQuery({
     queryKey: ['iot_sensors', location?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -34,7 +34,7 @@ export default function FoodSafety() {
     enabled: !!location?.id
   });
 
-  const { data: logs = [], isLoading: loadingLogs } = useQuery({
+  const { data: logs = [], isLoading: loadingLogs, refetch: refetchLogs } = useQuery({
     queryKey: ['temperature_logs', location?.id],
     queryFn: async () => {
       if (sensors.length === 0) return [];
@@ -63,38 +63,19 @@ export default function FoodSafety() {
     return () => { supabase.removeChannel(channel); }
   }, [sensors, queryClient]);
 
-  const simulateIngest = async (sensor) => {
-    const isAlert = Math.random() > 0.8;
-    const temp = isAlert ? (42 + Math.random() * 5) : (34 + Math.random() * 6); // 34-40 normal, 42-47 alert
-    
-    const toastId = toast.loading(`Simulating ping for ${sensor.name}...`);
+  const checkSensorConnection = async (sensor) => {
+    const toastId = toast.loading(`Checking latest reading for ${sensor.name}...`);
     try {
-      const payload = {
-        mac_address: sensor.mac_address,
-        temperature_f: Number(temp.toFixed(2)),
-        humidity_percent: Number((40 + Math.random() * 20).toFixed(2))
-      };
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/iot-ingest`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!res.ok) throw new Error(await res.text());
-      
-      if (isAlert) {
-        toast.error(`Alert triggered! ${temp.toFixed(1)}°F recorded for ${sensor.name}`, { id: toastId });
-      } else {
-        toast.success(`Ping successful: ${temp.toFixed(1)}°F`, { id: toastId });
+      await Promise.all([refetchSensors(), refetchLogs()]);
+      const latestLog = logs.find(l => l.sensor_id === sensor.id);
+      if (!latestLog) {
+        toast.warning(`No readings received yet for ${sensor.name}.`, { id: toastId });
+        return;
       }
+      const ageMinutes = Math.round((Date.now() - new Date(latestLog.logged_at).getTime()) / 60000);
+      toast.success(`Latest reading received ${ageMinutes} minute${ageMinutes === 1 ? '' : 's'} ago.`, { id: toastId });
     } catch (e) {
-      toast.error(`Simulation failed: ${e.message}`, { id: toastId });
+      toast.error(`Connection check failed: ${e.message}`, { id: toastId });
     }
   };
 
@@ -180,8 +161,8 @@ export default function FoodSafety() {
                       <Clock className="h-3 w-3" />
                       {latestLog ? new Date(latestLog.logged_at).toLocaleTimeString() : 'Never'}
                     </div>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => simulateIngest(sensor)}>
-                      Test Ping
+                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => checkSensorConnection(sensor)}>
+                      Check Status
                     </Button>
                   </div>
                 </CardContent>
@@ -242,3 +223,4 @@ export default function FoodSafety() {
     </div>
   );
 }
+

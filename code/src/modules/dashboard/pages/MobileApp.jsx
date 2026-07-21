@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
@@ -22,6 +22,12 @@ export default function MobileApp() {
   const { organization } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
 
+  const { data: inventoryItems = [] } = useAuthQuery({
+    queryKey: ['mobile-count-inventory', organization?.id],
+    queryFn: () => api.entities.Inventory.list(),
+    enabled: !!organization?.id,
+  });
+
   // Home View
   const renderHome = () => (
     <div className="space-y-6">
@@ -44,7 +50,7 @@ export default function MobileApp() {
           <CardContent className="p-4 flex flex-col items-center text-center gap-2">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 relative">
               <ListTodo className="w-6 h-6" />
-              <span className="absolute -top-1 -right-1 bg-resend-red text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full">3</span>
+              <span className="absolute -top-1 -right-1 bg-resend-red text-white text-[10px] min-w-5 h-5 px-1 flex items-center justify-center rounded-full">{pendingInvoices.length}</span>
             </div>
             <span className="font-semibold text-sm">Approvals</span>
           </CardContent>
@@ -63,17 +69,22 @@ export default function MobileApp() {
       <div>
         <h3 className="font-bold mb-3">Recent Activity</h3>
         <div className="space-y-3">
-          {[1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
+          {pendingInvoices.slice(0, 2).map((invoice) => (
+            <div key={invoice.id} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
               <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Sysco Delivery</p>
-                <p className="text-xs text-muted-foreground">Uploaded 2 hours ago</p>
+                <p className="text-sm font-semibold">{invoice.vendor_name || 'Invoice'}</p>
+                <p className="text-xs text-muted-foreground">Needs approval</p>
               </div>
             </div>
           ))}
+          {pendingInvoices.length === 0 && (
+            <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-sm text-muted-foreground">
+              No recent approval activity.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -130,7 +141,7 @@ export default function MobileApp() {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="font-bold">{inv.vendor_name || 'Vendor'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{inv.invoice_number} • {new Date(inv.invoice_date).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{inv.invoice_number} â€¢ {new Date(inv.invoice_date).toLocaleDateString()}</p>
                   <p className="text-lg font-bold text-brand mt-1">${Number(inv.total_amount).toFixed(2)}</p>
                 </div>
                 <Button size="icon" variant="ghost" className="rounded-full bg-slate-50 text-brand">
@@ -158,12 +169,12 @@ export default function MobileApp() {
       </div>
 
       <div className="space-y-3 overflow-y-auto pb-20">
-        {['Roma Tomatoes', 'Chicken Breast (Raw)', 'Cheddar Cheese Block'].map((item, idx) => (
-          <Card key={idx} className="border-0 shadow-sm overflow-hidden">
+        {inventoryItems.slice(0, 10).map((item) => (
+          <Card key={item.id} className="border-0 shadow-sm overflow-hidden">
             <div className="flex">
               <div className="flex-1 p-4">
-                <p className="font-bold">{item}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Expected: {Math.floor(Math.random() * 20) + 5} lbs</p>
+                <p className="font-bold">{item.product_name || item.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Expected: {Number(item.current_quantity || 0).toLocaleString()} {item.current_unit || item.unit || 'units'}</p>
               </div>
               <div className="w-24 bg-brand/5 border-l border-brand/10 p-3 flex flex-col justify-center">
                 <Input 
@@ -175,6 +186,11 @@ export default function MobileApp() {
             </div>
           </Card>
         ))}
+        {inventoryItems.length === 0 && (
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4 text-sm text-muted-foreground">No countable inventory items found.</CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -209,7 +225,7 @@ export default function MobileApp() {
         >
           <div className="relative">
             <ListTodo className="w-6 h-6" />
-            <span className="absolute -top-1 -right-1 bg-resend-red text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full">3</span>
+            <span className="absolute -top-1 -right-1 bg-resend-red text-white text-[8px] min-w-3.5 h-3.5 px-0.5 flex items-center justify-center rounded-full">{pendingInvoices.length}</span>
           </div>
           <span className="text-[10px]">Approve</span>
         </button>
@@ -224,3 +240,4 @@ export default function MobileApp() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/AuthContext';
@@ -244,7 +244,7 @@ const normalizeSuggestedAddress = (item) => {
   const address = item?.address || {};
   const state = address.state_code || US_STATE_ABBREVIATIONS[String(address.state || '').toLowerCase()] || address.state || '';
   return {
-    id: String(item?.place_id || item?.osm_id || item?.display_name || Math.random()),
+    id: String(item?.place_id || item?.osm_id || item?.display_name || crypto.randomUUID()),
     label: item?.display_name || '',
     address: {
       line1: streetLineFromSuggestion(address) || String(item?.name || '').trim(),
@@ -265,7 +265,7 @@ const normalizeCensusSuggestion = (item) => {
   const cityStatePattern = city && state ? new RegExp(`,\\s*${city}\\s*,\\s*${state}\\s+${zip}.*$`, 'i') : null;
   const line1 = cityStatePattern ? matchedAddress.replace(cityStatePattern, '').trim() : (components.fromAddress && components.streetName ? `${components.fromAddress} ${components.streetName}` : matchedAddress.split(',')[0] || '');
   return {
-    id: String(item?.matchedAddress || Math.random()),
+    id: String(item?.matchedAddress || crypto.randomUUID()),
     label: matchedAddress,
     address: {
       line1,
@@ -602,7 +602,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
-    if (!checkoutStatus || !['success', 'free', 'mock', 'trial', 'ach'].includes(checkoutStatus)) return;
+    if (!checkoutStatus || !['success', 'free', 'trial', 'ach'].includes(checkoutStatus)) return;
     if (!draftReady || !user || userProfile?.hierarchy_review_status || finalizingOnboarding || autoFinalizeRef.current) return;
 
     autoFinalizeRef.current = true;
@@ -1035,7 +1035,7 @@ export default function OnboardingPage() {
       ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/location/mo (${billingLocationCount} location${billingLocationCount === 1 ? '' : 's'} = $${monthlyTotal.toFixed(2)}/mo)`
       : 'Free';
     const paymentMethodLabel = !isPaidPlan
-      ? 'no charge — free plan'
+      ? 'no charge â€” free plan'
       : paymentMethod === 'card'
         ? `credit/debit card (cardholder: ${cardHolderName.trim()})`
         : `ACH transfer from ${bankAccount.bankName.trim()} ending in ${String(bankAccount.accountNumber).replace(/\D/g, '').slice(-4)}`;
@@ -1510,6 +1510,7 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
 
 
 
