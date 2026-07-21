@@ -151,7 +151,7 @@ export default function VendorList() {
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, health_score, total_orders, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
+      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, health_score, file_routing_preference, default_expense_category, default_payment_method, default_payment_account_id',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,

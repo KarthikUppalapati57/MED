@@ -3,9 +3,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
-import { Building2, Store, MapPin, ChevronDown, Globe } from 'lucide-react';
+import { Building2, Store, MapPin, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +17,10 @@ import { cn } from '@/lib/utils';
 
 /**
  * ContextSwitcher Cascading org/brand/location selector for the Layout header.
+ * Not rendered for Platform Admin -- Layout.jsx excludes it for that role
+ * (platform admin gets platform-only nav + a separate PlatformDashboard instead).
  *
  * Behavior per role:
- *   Platform Admin -> Dropdown of ALL organizations -> brands -> locations
  *   Tenant Super Admin -> Dropdown of tenant organizations -> brands -> locations
  *   Org Manager    -> Dropdown of their org's brands -> locations
  *   Branch Manager -> Dropdown of their assigned branches -> locations
@@ -28,11 +28,11 @@ import { cn } from '@/lib/utils';
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
-  const { isPlatformAdmin, isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
+  const { isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
 
-  // Platform Admin: fetch all orgs; Tenant Super Admin: fetch tenant-visible orgs
+  // Tenant Super Admin: fetch tenant-visible orgs
   const { data: adminAllOrgs = [] } = useAuthQuery({
-    queryKey: ['ctx-all-orgs', isPlatformAdmin ? 'platform' : 'tenant'],
+    queryKey: ['ctx-all-orgs', 'tenant'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('organizations')
@@ -41,10 +41,10 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: isPlatformAdmin || isTenantSuperAdmin,
+    enabled: isTenantSuperAdmin,
   });
 
-  const availableOrgs = (isPlatformAdmin || isTenantSuperAdmin)
+  const availableOrgs = isTenantSuperAdmin
     ? adminAllOrgs
     : (accessTree || []).map(node => node.organization).filter(Boolean);
 
@@ -61,7 +61,7 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeOrgId,
+    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeOrgId,
   });
 
   // Locations: fetch only after a brand is selected.
@@ -79,11 +79,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeBrandId,
+    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeBrandId,
   });
 
   // Ground staff: no switcher, just show assigned location name
-  if (!isPlatformAdmin && !isTenantSuperAdmin && !isOrgManager && !isBranchManager && !isLocationManager) {
+  if (!isTenantSuperAdmin && !isOrgManager && !isBranchManager && !isLocationManager) {
     if (location?.name) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -98,7 +98,7 @@ export default function ContextSwitcher() {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {/* Organization Selector */}
-      {(isPlatformAdmin || isTenantSuperAdmin || availableOrgs.length > 0) && (
+      {(isTenantSuperAdmin || availableOrgs.length > 0) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-medium max-w-[200px]">
@@ -110,18 +110,6 @@ export default function ContextSwitcher() {
           <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
             <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase">Select Organization</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {isPlatformAdmin && (
-              <>
-                <DropdownMenuItem
-                  onClick={() => switchContext('organization', null)}
-                  className={cn("gap-2 text-sm", !organization && "bg-resend-blue/5 text-resend-blue")}
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  All Organizations
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
             {availableOrgs.map(org => (
               <DropdownMenuItem
                 key={org.id}
@@ -140,7 +128,7 @@ export default function ContextSwitcher() {
       )}
 
       {/* Brand Selector */}
-      {(isPlatformAdmin ? !!organization : true) && orgBrands.length > 0 && (
+      {orgBrands.length > 0 && (
         <>
           <span className="text-muted-foreground text-xs">&gt;</span>
           <DropdownMenu>
@@ -170,7 +158,7 @@ export default function ContextSwitcher() {
       )}
 
       {/* Location Selector */}
-      {(isPlatformAdmin ? !!organization : true) && brandLocations.length > 0 && (
+      {brandLocations.length > 0 && (
         <>
           <span className="text-muted-foreground text-xs">&gt;</span>
           <DropdownMenu>
@@ -200,13 +188,6 @@ export default function ContextSwitcher() {
             </DropdownMenuContent>
           </DropdownMenu>
         </>
-      )}
-
-      {/* Viewing-as badge for platform admin impersonation */}
-      {isPlatformAdmin && organization && (
-        <Badge className="ml-1 bg-resend-blue/5 text-resend-blue border border-resend-blue/20 text-[10px] font-medium">
-          Viewing: {organization.name}
-        </Badge>
       )}
     </div>
   );
