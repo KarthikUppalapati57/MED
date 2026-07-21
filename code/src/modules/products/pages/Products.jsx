@@ -1743,10 +1743,16 @@ export default function Products() {
                   {(() => {
                     const newProducts = verificationQueue.map(item => {
                       const isCatalogReview = !item.vendor_item_id && Boolean(item.internal_product_id);
+                      const catalogProduct = item.internal_product_id
+                        ? products.find(product => product.id === item.internal_product_id)
+                        : null;
                       const displayProductName = item.product_name
+                        || catalogProduct?.name
                         || item.vendor_item_name
+                        || catalogProduct?.product_id
                         || item.restops_product_id
                         || 'Unnamed product';
+                      const displayProductId = item.restops_product_id || catalogProduct?.product_id || '';
 
                       return {
                         ...item,
@@ -1757,6 +1763,7 @@ export default function Products() {
                         display_vendor_name: item.vendor_name || (isCatalogReview ? 'Product Catalog' : '-'),
                         display_vendor_item_name: item.vendor_item_name || displayProductName,
                         display_product_name: item.product_name || (isCatalogReview ? displayProductName : ''),
+                        display_product_id: displayProductId,
                         display_status_label: isCatalogReview ? 'Category review' : 'Needs verification',
                       };
                     });
@@ -1803,8 +1810,8 @@ export default function Products() {
                               {p.display_product_name ? (
                                 <div className="space-y-1">
                                   <Badge variant="outline" className="font-medium">{p.display_product_name}</Badge>
-                                  {p.restops_product_id && (
-                                    <div className="text-xs text-muted-foreground">{p.restops_product_id}</div>
+                                  {p.display_product_id && (
+                                    <div className="text-xs text-muted-foreground">{p.display_product_id}</div>
                                   )}
                                 </div>
                               ) : (
