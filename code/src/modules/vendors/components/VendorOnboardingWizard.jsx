@@ -19,6 +19,8 @@ const formatUSPhoneInput = (value) => {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 };
 
+const normalizeOtpInput = (value) => value.replace(/\D/g, '').slice(0, 6);
+
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
@@ -91,20 +93,43 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   };
 
   const handleVerifyOtp = async () => {
-    if (!otpInput) return toast.error("Please enter the OTP");
+    const normalizedOtp = normalizeOtpInput(otpInput);
+    if (normalizedOtp.length !== 6) return toast.error("Enter the 6-digit OTP");
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'verify-otp', payload: { vendor_id: vendorId, otp: otpInput } }
+        body: { action: 'verify-otp', payload: { vendor_id: vendorId, otp: normalizedOtp } }
       });
 
       if (data?.error) throw new Error(data.error);
       if (error) throw error;
 
       toast.success("OTP verified!");
+      setOtpInput('');
       setStep(2);
     } catch (err) {
       toast.error(err.message || "Invalid OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!vendorId) return toast.error("Start vendor onboarding before resending an OTP");
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
+        body: { action: 'send-otp', payload: { vendor_id: vendorId } }
+      });
+
+      if (data?.error) throw new Error(data.error);
+      if (error) throw error;
+
+      setOtpInput('');
+      setDevOtp(data?.devOtp || null);
+      toast.success("A new OTP was sent to the vendor");
+    } catch (err) {
+      toast.error(err.message || "Failed to resend OTP");
     } finally {
       setLoading(false);
     }
@@ -239,14 +264,19 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                       <Label className="text-base">Enter the 6-digit code</Label>
                       <Input 
                         value={otpInput} 
-                        onChange={e => setOtpInput(e.target.value)} 
-                        placeholder="• • • • • •" 
-                        className="text-3xl tracking-[1em] text-center h-16 font-mono bg-muted/20 placeholder:tracking-widest" 
+                        onChange={e => setOtpInput(normalizeOtpInput(e.target.value))} 
+                        placeholder="000000" 
+                        className="text-3xl tracking-[0.7em] text-center h-16 font-mono bg-muted/20 placeholder:tracking-normal" 
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
                         maxLength={6}
                       />
                       {devOtp && (
                         <p className="text-xs text-muted-foreground mt-4">Developer Note: The OTP is <strong>{devOtp}</strong></p>
                       )}
+                      <Button type="button" variant="ghost" size="sm" onClick={handleResendOtp} disabled={loading}>
+                        Resend OTP
+                      </Button>
                     </div>
                   </CardContent>
                 </>

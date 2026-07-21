@@ -25,6 +25,55 @@ function isProduction() {
   return ["production", "prod"].includes((Deno.env.get("APP_ENV") || Deno.env.get("ENVIRONMENT") || "").toLowerCase());
 }
 
+function isDevOtpEchoEnabled() {
+  if (!isProduction()) return true;
+  return ["true", "1", "yes"].includes((Deno.env.get("VENDOR_ONBOARDING_DEV_OTP_ENABLED") || "").toLowerCase());
+}
+
+function bearerToken(req: Request) {
+  const header = req.headers.get("Authorization") || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] || "";
+}
+
+const DEV_OTP_ROLES = new Set(["platform_admin", "tenant_super_admin", "org_manager", "admin", "owner"]);
+
+async function canEchoDevOtp(supabase: ReturnType<typeof createClient>, req: Request, vendorId: string) {
+  if (!isDevOtpEchoEnabled()) return false;
+
+  const token = bearerToken(req);
+  if (!token) return false;
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(token);
+  const userId = userData?.user?.id;
+  if (userError || !userId) return false;
+
+  const { data: vendor } = await supabase
+    .from("vendors")
+    .select("organization_id")
+    .eq("id", vendorId)
+    .maybeSingle();
+  if (!vendor?.organization_id) return false;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profile?.role === "platform_admin") return true;
+  if (profile?.organization_id === vendor.organization_id && DEV_OTP_ROLES.has(profile?.role)) return true;
+
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("organization_id", vendor.organization_id)
+    .maybeSingle();
+
+  return DEV_OTP_ROLES.has(member?.role);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -96,7 +145,7 @@ serve(async (req) => {
       }
 
       const response: Record<string, unknown> = { message: "OTP generated" };
-      if (!isProduction()) response.devOtp = otp;
+      if (await canEchoDevOtp(supabase, req, vendor_id)) response.devOtp = otp;
       return jsonResponse(response);
     }
 
