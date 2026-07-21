@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
@@ -20,6 +20,16 @@ import {
 } from "@/components/ui/dialog";
 import { Shield, Users, Search, Loader2, X, Copy, Mail, UserPlus, UserCheck, Clock } from "lucide-react";
 import { toast } from "sonner";
+
+const createSecureToken = (length = 48) => {
+  if (!window.crypto?.getRandomValues) {
+    throw new Error('Secure random number generation is not available in this browser.');
+  }
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = new Uint8Array(length);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+};
 
 export default function PlatformUserManagement() {
   const { user, role: userRole } = useAuth();
@@ -70,8 +80,8 @@ export default function PlatformUserManagement() {
         return (data || []).map(p => ({
           membership_id: p.id,
           user_id: p.id,
-          email: p.email || "—",
-          full_name: p.full_name || "—",
+          email: p.email || "â€”",
+          full_name: p.full_name || "â€”",
           role: p.role,
           created_at: p.created_at,
           last_sign_in_at: p.updated_at,
@@ -117,7 +127,7 @@ export default function PlatformUserManagement() {
     if (!platformInviteEmail) return;
     setPlatformInviting(true);
     try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const token = createSecureToken(48);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -312,7 +322,7 @@ export default function PlatformUserManagement() {
                     <Badge className="bg-purple-500/50/10 text-purple-400 hover:bg-purple-500/50/10 border-none text-[10px]">Platform Admin</Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                   </TableCell>
                   <TableCell>
                     <Button 
@@ -362,10 +372,10 @@ export default function PlatformUserManagement() {
                     <TableRow key={invite.id}>
                       <TableCell className="text-sm font-medium">{invite.email}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
                       </TableCell>
                       <TableCell>
                         <Badge className={isExpired ? 'bg-resend-red/10 text-resend-red text-[10px]' : 'bg-resend-yellow/10 text-resend-yellow text-[10px]'}>
@@ -488,4 +498,5 @@ export default function PlatformUserManagement() {
     </div>
   );
 }
+
 

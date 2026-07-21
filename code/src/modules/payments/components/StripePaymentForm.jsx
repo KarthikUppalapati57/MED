@@ -32,25 +32,12 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSu
     setError(null);
 
     try {
-      // 1. Create PaymentIntent (via edge function or mock)
-      const { clientSecret, isMock } = await createPaymentIntent(amount, 'usd', {
+      // 1. Create PaymentIntent via edge function
+      const { clientSecret } = await createPaymentIntent(amount, 'usd', {
         invoice_id: invoiceId,
         vendor_name: vendorName,
         invoice_number: invoiceNumber,
       });
-
-      if (isMock) {
- // Development mock simulate success
-        await new Promise(r => setTimeout(r, 1500));
-        onSuccess({
-          payment_method: 'stripe',
-          status: 'completed',
-          transaction_id: `txn_mock_${Date.now()}`,
-          payment_date: new Date().toISOString().split('T')[0],
-        });
-        setProcessing(false);
-        return;
-      }
 
       // 2. Confirm payment with Stripe
       const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {

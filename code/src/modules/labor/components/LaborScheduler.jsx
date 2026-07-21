@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { format, addDays, startOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,17 +28,15 @@ export default function LaborScheduler({ employees, shifts, forecastData, onCrea
     setIsGenerating(true);
     try {
       const weekStartDateStr = format(weekStart, 'yyyy-MM-dd');
-      // If forecastData is missing, pass dummy data for demonstration
-      const forecast = forecastData || Array.from({ length: 7 }).map((_, i) => ({
-        date: format(addDays(weekStart, i), 'yyyy-MM-dd'),
-        salesForecast: 1500 + Math.random() * 2000
-      }));
-      
-      const schedule = await generateLaborSchedule(employees, forecast, weekStartDateStr);
+      if (!forecastData || forecastData.length === 0) {
+        toast.error('A real sales forecast is required before auto-scheduling.');
+        return;
+      }
+
+      const schedule = await generateLaborSchedule(employees, forecastData, weekStartDateStr);
       
       if (schedule && schedule.shifts && schedule.shifts.length > 0) {
-        // Since we don't have a bulk API currently, we Promise.all the creations
-        // In a real prod scenario, we would add a bulk endpoint
+
         await api.entities.EmployeeShift.createMany(schedule.shifts);
         toast.success(`Generated ${schedule.shifts.length} shifts successfully!`);
       } else {
@@ -171,3 +169,4 @@ export default function LaborScheduler({ employees, shifts, forecastData, onCrea
     </Card>
   );
 }
+

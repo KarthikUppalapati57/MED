@@ -3,7 +3,32 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature, x-toast-signature, x-square-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature, x-toast-signature, x-square-signature, x-clover-signature',
+}
+
+const encoder = new TextEncoder()
+
+async function hmacSha256Hex(secret: string, payload: string) {
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
+  return Array.from(new Uint8Array(signature)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function normalizeSignature(value: string | null) {
+  return (value || '').trim().replace(/^sha256=/i, '').toLowerCase()
+}
+
+function providerSignature(req: Request, provider: string) {
+  return req.headers.get(`x-${provider}-signature`)
+    || req.headers.get('x-pos-signature')
+    || req.headers.get('x-webhook-signature')
+}
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  })
 }
 
 serve(async (req) => {
@@ -14,124 +39,105 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } },
     )
 
-    // Identify POS provider from URL or headers
     const url = new URL(req.url)
-    const provider = url.searchParams.get('provider')
+    const provider = url.searchParams.get('provider')?.trim()
+    if (!provider) throw new Error("Missing 'provider' query parameter. Expected: toast, square, clover, or 7shifts")
 
-    if (!provider) {
-      throw new Error("Missing 'provider' query parameter. Expected: toast, square, clover, or 7shifts")
+    const rawBody = await req.text()
+    const payload = JSON.parse(rawBody || '{}')
+    const orgId = payload.organization_id
+    const locationId = payload.location_id || null
+    if (!orgId) throw new Error('Missing organization_id in payload')
+
+    let configQuery = supabaseClient
+      .from('pos_configurations')
+      .select('*')
+      .eq('organization_id', orgId)
+      .eq('provider', provider)
+      .eq('is_active', true)
+      .limit(1)
+
+    if (locationId) configQuery = configQuery.eq('location_id', locationId)
+    const { data: configs, error: configError } = await configQuery
+    if (configError) throw configError
+    const config = configs?.[0]
+    if (!config) throw new Error('Invalid or inactive POS configuration')
+
+    if (config.webhook_secret) {
+      const expected = await hmacSha256Hex(config.webhook_secret, rawBody)
+      const received = normalizeSignature(providerSignature(req, provider))
+      if (!received || received !== expected) throw new Error('Invalid POS webhook signature')
     }
 
-    const payload = await req.json()
-
-    // Webhook verification (Simulated for this implementation)
-    // In production, we would verify signatures like:
-    // const signature = req.headers.get('x-square-signature')
-    
-    // Log the webhook payload to the database
     const { error: insertError } = await supabaseClient
       .from('event_logs')
-      .insert([
-        {
-          organization_id: payload.organization_id || null,
-          event_name: `${provider}.${payload.type || payload.event_type || 'unknown_event'}`,
-          entity_type: 'pos_webhook',
-          entity_id: payload.id || null,
-          payload: payload
-        }
-      ])
+      .insert([{
+        organization_id: orgId,
+        event_name: `${provider}.${payload.type || payload.event_type || 'unknown_event'}`,
+        entity_type: 'pos_webhook',
+        entity_id: payload.id || payload.order?.id || null,
+        payload,
+      }])
 
-    if (insertError) {
-      console.warn("Could not log POS webhook event. Proceeding.", insertError)
+    if (insertError) console.warn('Could not log POS webhook event. Proceeding.', insertError)
+
+    let lineItems: Array<{ pos_item_id: string; item_name: string; quantity: number; price: number }> = []
+    const eventType = payload.type || payload.event_type
+
+    if (provider === 'toast' || provider === 'square') {
+      if (eventType === 'order.completed') {
+        const items = payload.order?.line_items || payload.order?.lineItems || []
+        lineItems = items.map((item: Record<string, unknown>) => ({
+          pos_item_id: String(item.id || item.item_id || item.guid || ''),
+          item_name: String(item.name || item.display_name || item.item_name || ''),
+          quantity: Number(item.quantity || 1),
+          price: Number((item.total_money as { amount?: number })?.amount ? Number((item.total_money as { amount: number }).amount) / 100 : item.price || 0),
+        })).filter((item) => item.pos_item_id && item.item_name)
+      }
+    } else if (provider === 'clover' || provider === '7shifts') {
+      return jsonResponse({ received: true, provider, ignored: true, reason: 'Provider event accepted and logged; order-line ingestion is not enabled for this provider.' })
+    } else {
+      throw new Error(`Unsupported provider: ${provider}`)
     }
 
-    // Extract line items based on provider
-    let lineItems: any[] = []
-    const orgId = payload.organization_id;
-    const locationId = payload.location_id;
-
-    if (!orgId) {
-      throw new Error("Missing organization_id in payload");
-    }
-
-    switch (provider) {
-      case 'toast':
-      case 'square':
-        // For test/mock purposes, we expect normalized data in payload.order.line_items
-        if (payload.type === 'order.completed' || payload.event_type === 'order.completed') {
-          const items = payload.order?.line_items || [];
-          lineItems = items.map((item: any) => ({
-            pos_item_id: item.id || item.item_id,
-            item_name: item.name,
-            quantity: item.quantity || 1,
-            price: item.total_money?.amount ? item.total_money.amount / 100 : item.price || 0,
-          }));
-        }
-        break;
-      case 'clover':
-        console.log('Processing Clover webhook:', payload)
-        break;
-      case '7shifts':
-        console.log('Processing 7shifts webhook:', payload)
-        break;
-      default:
-        throw new Error(`Unsupported provider: ${provider}`)
-    }
-
-    // Process line items
     if (lineItems.length > 0) {
-      // 1. Insert the pos_order header
+      const posOrderId = payload.order?.id || payload.id
+      if (!posOrderId) throw new Error('Missing provider order id')
+
       const { data: posOrder, error: orderError } = await supabaseClient
         .from('pos_orders')
-        .upsert(
-          {
-            organization_id: orgId,
-            location_id: locationId || null,
-            pos_provider: provider,
-            pos_order_id: payload.id || `mock_${Date.now()}`,
-            total_amount: lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-            order_date: payload.created_at || new Date().toISOString(),
-            status: 'logged'
-          },
-          { onConflict: 'organization_id, pos_provider, pos_order_id' }
-        )
+        .upsert({
+          organization_id: orgId,
+          location_id: locationId,
+          pos_provider: provider,
+          pos_order_id: String(posOrderId),
+          total_amount: lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+          order_date: payload.created_at || payload.createdAt || new Date().toISOString(),
+          status: 'logged',
+        }, { onConflict: 'organization_id, pos_provider, pos_order_id' })
         .select()
-        .single();
+        .single()
+      if (orderError) throw orderError
 
-      if (orderError) {
-        console.error('Failed to insert pos_order:', orderError);
-        throw orderError;
-      }
-
-      // 2. Insert line items
-      const orderItemsToInsert = lineItems.map(item => ({
-        order_id: posOrder.id,
-        pos_item_id: item.pos_item_id,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        price: item.price
-      }));
-
+      await supabaseClient.from('pos_order_items').delete().eq('order_id', posOrder.id)
       const { error: itemsError } = await supabaseClient
         .from('pos_order_items')
-        .insert(orderItemsToInsert);
-
-      if (itemsError) {
-        console.error('Failed to insert pos_order_items:', itemsError);
-      }
+        .insert(lineItems.map((item) => ({
+          order_id: posOrder.id,
+          pos_item_id: item.pos_item_id,
+          item_name: item.item_name,
+          quantity: item.quantity,
+          price: item.price,
+        })))
+      if (itemsError) throw itemsError
     }
 
-    return new Response(
-      JSON.stringify({ received: true, provider }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    )
+    return jsonResponse({ received: true, provider, line_items: lineItems.length })
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    )
+    return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, 400)
   }
 })

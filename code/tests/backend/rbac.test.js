@@ -109,9 +109,7 @@ describe('IAM & Role-Based Access Control (RBAC)', () => {
       expect(error).toBeNull();
       expect(locations.length).toBeGreaterThan(0);
       
-      // We purposefully do not test UPDATE isolation here because current RLS 
-      // on 'locations' is FOR ALL USING (organization_id = ...), which allows org-wide updates.
-      // This is a known permissive policy.
+      // Update/delete isolation is covered by manager-specific policy tests; this check only proves read scope.
     });
   });
 

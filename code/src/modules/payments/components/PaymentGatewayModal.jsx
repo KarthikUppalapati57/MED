@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { CreditCard, Building2, FileCheck, Wallet, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,9 +92,8 @@ export default function PaymentGatewayModal({
 
   const processManualPayment = async () => {
     setProcessing(true);
-    await new Promise(r => setTimeout(r, 800));
 
-    const transactionId = `TXN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const transactionId = `TXN-${crypto.randomUUID()}`;
 
     const paymentData = {
       payment_method: manualForm.type,
@@ -141,7 +140,7 @@ export default function PaymentGatewayModal({
             <h3 className="text-lg font-semibold text-slate-900">Payment Charged, Recording Failed</h3>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
               {lastPaymentData?.payment_method === 'card'
-                ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details — just try recording again.'
+                ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details â€” just try recording again.'
                 : 'The payment could not be saved. It is safe to try recording it again.'}
             </p>
             <Button className="mt-4" onClick={handleRetryRecording} disabled={processing}>
@@ -289,3 +288,5 @@ export default function PaymentGatewayModal({
     </Dialog>
   );
 }
+
+

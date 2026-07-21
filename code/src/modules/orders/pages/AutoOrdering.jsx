@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -451,7 +451,7 @@ export default function AutoOrdering() {
           organization_id: organization?.id,
           brand_id: (brand?.brand_id || brand?.id) || null,
           location_id: location?.id || null,
-          order_number: `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          order_number: `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
           vendor_name: vendorName,
           status: 'pending_approval',
           items: items,
@@ -1455,3 +1455,4 @@ export default function AutoOrdering() {
     </div>
   );
 }
+

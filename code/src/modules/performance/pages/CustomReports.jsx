@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,12 @@ const DIMENSIONS = [
   { id: 'location', label: 'Location' },
 ];
 
+const formatMetricValue = (metricId, value) => {
+  const numericValue = Number(value || 0);
+  if (metricId === 'pos_transaction_count') return numericValue.toLocaleString();
+  return numericValue.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+};
+
 export default function CustomReports() {
   const { organization } = useAuth();
   const [reportName, setReportName] = useState('Untitled Report');
@@ -51,27 +57,20 @@ export default function CustomReports() {
 
   const handleRunReport = async () => {
     if (selectedMetrics.length === 0) return toast.error("Please select at least one metric.");
-    
+
     setIsGenerating(true);
     try {
-      // In production, this would call a Supabase Edge Function to dynamically construct and execute the query
-      // using the read-only replica, returning aggregated data.
-      // For MVP, we simulate the return data based on selections.
-      
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate query execution
-      
-      const mockData = Array.from({ length: 5 }).map((_, i) => {
-        const row = { dimension: `Day ${i + 1}` };
-        selectedMetrics.forEach(m => {
-          row[m] = Math.floor(Math.random() * 5000) + 500; // Mock value
-        });
-        return row;
+      const { data, error } = await supabase.rpc('run_custom_report', {
+        p_metrics: selectedMetrics,
+        p_dimension: selectedDimension,
       });
-      
-      setReportData(mockData);
-      toast.success("Report generated successfully");
+
+      if (error) throw error;
+
+      setReportData(Array.isArray(data) ? data : []);
+      toast.success(data?.length ? "Report generated successfully" : "Report ran with no matching data");
     } catch (err) {
-      toast.error("Failed to generate report");
+      toast.error("Failed to generate report: " + err.message);
     } finally {
       setIsGenerating(false);
     }
@@ -222,11 +221,17 @@ export default function CustomReports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reportData.map((row, idx) => (
+                      {reportData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={selectedMetrics.length + 1} className="py-8 text-center text-muted-foreground">
+                            No rows returned for the selected metrics.
+                          </TableCell>
+                        </TableRow>
+                      ) : reportData.map((row, idx) => (
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{row.dimension}</TableCell>
                           {selectedMetrics.map(mId => (
-                            <TableCell key={mId} className="text-right">${row[mId].toLocaleString()}</TableCell>
+                            <TableCell key={mId} className="text-right">{formatMetricValue(mId, row[mId])}</TableCell>
                           ))}
                         </TableRow>
                       ))}
@@ -242,3 +247,7 @@ export default function CustomReports() {
     </div>
   );
 }
+
+
+
+

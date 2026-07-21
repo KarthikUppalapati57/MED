@@ -1,4 +1,4 @@
-﻿import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 
@@ -20,10 +20,8 @@ export function getStripe() {
   }
   return stripePromise;
 }
-
 /**
  * Create a PaymentIntent via Supabase Edge Function.
- * Local development can opt into a mock fallback, but production must fail loudly.
  */
 export async function createPaymentIntent(amount, currency = 'usd', metadata = {}) {
   try {
@@ -43,14 +41,6 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
 
     return data;
   } catch (err) {
-    const allowDevMock = !import.meta.env.PROD && import.meta.env.VITE_ALLOW_MOCK_PAYMENTS === 'true';
-    if (allowDevMock && (err.message?.includes('FunctionsFetchError') || err.message?.includes('Failed to fetch'))) {
-      console.warn('[PaymentService] Edge function unreachable, using mock for dev:', err.message);
-      return {
-        clientSecret: `pi_mock_${Date.now()}_secret_mock`,
-        isMock: true,
-      };
-    }
     throw err;
   }
 }

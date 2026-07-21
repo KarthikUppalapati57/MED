@@ -270,45 +270,23 @@ export default function Integrations() {
     }
   }).data || {};
 
-  const handleTestWebhook = async (integration) => {
-    if (integration.type !== INTEGRATION_TYPES.POS) return;
-    const toastId = toast.loading(`Simulating ${integration.name} webhook...`);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
+  const handleCheckConnection = async (integration) => {
+    const dbInt = dbIntegrations.find(i =>
+      (i.provider === integration.id) ||
+      (i.provider === 'other' && i.metadata?.originalId === integration.id)
+    );
 
-      // Usually, webhook endpoint does not require auth, but our test payload needs org_id
-      const payload = {
-        organization_id: organization?.id,
-        type: 'order.completed',
-        order: {
-          id: `mock-order-${Date.now()}`,
-          line_items: [
-            { id: 'item-burger-1', name: 'Cheeseburger', quantity: 2, price: 12.50 },
-            { id: 'item-fries-1', name: 'Large Fries', quantity: 1, price: 4.50 }
-          ]
-        }
-      };
-
-      // Call the webhook manually to pass the provider query string natively
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pos-webhook?provider=${integration.id}`;
-      const manualRes = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!manualRes.ok) {
-        const err = await manualRes.text();
-        throw new Error(err);
-      }
-
-      toast.success(`${integration.name} webhook processed successfully!`, { id: toastId });
-    } catch (e) {
-      toast.error(`Webhook test failed: ${e.message}`, { id: toastId });
+    if (!dbInt?.is_active) {
+      toast.error(`${integration.name} is not connected`);
+      return;
     }
+
+    const lastSync = dbInt.last_sync_at || dbInt.metadata?.last_sync_at;
+    toast.success(
+      lastSync
+        ? `${integration.name} is connected. Last sync: ${new Date(lastSync).toLocaleString()}`
+        : `${integration.name} is connected. Waiting for the first provider sync.`,
+    );
   };
 
   const renderIntegrationCard = (integration) => {
@@ -345,9 +323,9 @@ export default function Integrations() {
                   <Button
                     variant="outline"
                     className="flex-1 border-brand text-brand hover:bg-brand/10"
-                    onClick={() => handleTestWebhook(integration)}
+                    onClick={() => handleCheckConnection(integration)}
                   >
-                    Test Webhook
+                    Check Status
                   </Button>
                 )}
                 <Button

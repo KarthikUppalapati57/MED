@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -2038,7 +2038,7 @@ export default function Inventory() {
   };
 
   const saveConvert = () => {
-    // Simple conversion example - in real app would use conversion_rates
+    // Local deterministic conversion rates used by this inventory adjustment form.
     const conversionRates = {
       'box_to_lb': 10,
       'lb_to_ea': 16,
@@ -2757,7 +2757,7 @@ export default function Inventory() {
                           ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {items} item{items === 1 ? '' : 's'} · {percent === null ? '0.0' : percent.toFixed(1)}% of inventory
+                          {items} item{items === 1 ? '' : 's'} Â· {percent === null ? '0.0' : percent.toFixed(1)}% of inventory
                         </p>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-secondary">
@@ -4894,7 +4894,7 @@ export default function Inventory() {
                 {selectedStockCountLabel}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {format(new Date(`${stockCountDate}T00:00:00`), 'MMM d, yyyy')} · {currentStockCountItems.filter(item => item.count > 0).length} counted item{currentStockCountItems.filter(item => item.count > 0).length === 1 ? '' : 's'} · ${currentStockCountTotal.toFixed(2)}
+                {format(new Date(`${stockCountDate}T00:00:00`), 'MMM d, yyyy')} Â· {currentStockCountItems.filter(item => item.count > 0).length} counted item{currentStockCountItems.filter(item => item.count > 0).length === 1 ? '' : 's'} Â· ${currentStockCountTotal.toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -4921,7 +4921,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-yellow/40 bg-resend-yellow/10 p-4">
               <p className="font-semibold text-foreground">{stockCountCloseTarget?.type || stockCountCloseTarget?.scope || 'Inventory Count'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {stockCountCloseTarget?.date ? format(new Date(`${stockCountCloseTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} · ${Number(stockCountCloseTarget?.total || 0).toFixed(2)}
+                {stockCountCloseTarget?.date ? format(new Date(`${stockCountCloseTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} Â· ${Number(stockCountCloseTarget?.total || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -4951,7 +4951,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-red/25 bg-resend-red/10 p-4">
               <p className="font-semibold text-foreground">{stockCountDeleteTarget?.type || stockCountDeleteTarget?.scope || 'Inventory Count'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {stockCountDeleteTarget?.date ? format(new Date(`${stockCountDeleteTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} · ${Number(stockCountDeleteTarget?.total || 0).toFixed(2)}
+                {stockCountDeleteTarget?.date ? format(new Date(`${stockCountDeleteTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} Â· ${Number(stockCountDeleteTarget?.total || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5002,7 +5002,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-red/20 bg-resend-red/10 p-4">
               <p className="font-semibold text-foreground">{wastageDeleteTarget?.product_name || 'Waste item'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {Number(wastageDeleteTarget?.quantity || 0)} {wastageDeleteTarget?.unit || ''} · ${Number(wastageDeleteTarget?.value || 0).toFixed(2)}
+                {Number(wastageDeleteTarget?.quantity || 0)} {wastageDeleteTarget?.unit || ''} Â· ${Number(wastageDeleteTarget?.value || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5042,24 +5042,13 @@ export default function Inventory() {
                <div className="absolute top-0 left-0 w-full h-1 bg-resend-green animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_rgba(40,167,69,0.8)]"></div>
             </div>
 
-            <p className="text-white font-medium z-10">Point camera at a product barcode to quickly find and edit it.</p>
+            <p className="text-white font-medium z-10">Barcode scanning requires a live camera barcode provider. Use inventory search until scanning is connected.</p>
 
             <Button
               className="mt-8 z-10 bg-primary hover:bg-primary text-white w-full"
-              onClick={() => {
-                if (inventory.length > 0) {
-                  const randomItem = inventory[Math.floor(Math.random() * inventory.length)];
-                  setSelectedItem(randomItem);
-                  setEditForm({ ...randomItem });
-                  setScannerDialogOpen(false);
-                  setTimeout(() => setEditDialogOpen(true), 100);
-                  toast.success(`Scanned: ${randomItem.product_name}`);
-                } else {
-                  toast.error("No items in inventory to scan.");
-                }
-              }}
+              onClick={() => setScannerDialogOpen(false)}
             >
-              Simulate Successful Scan
+              Back to Inventory Search
             </Button>
             <Button variant="ghost" className="text-white/70 hover:text-white z-10 absolute top-2 right-2" onClick={() => setScannerDialogOpen(false)}>
               <X className="h-5 w-5" />
@@ -5077,3 +5066,6 @@ export default function Inventory() {
     </div>
   );
 }
+
+
+

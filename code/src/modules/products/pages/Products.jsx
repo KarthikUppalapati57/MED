@@ -618,6 +618,7 @@ export default function Products() {
   };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [pendingVendorItemMapping, setPendingVendorItemMapping] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     product_id: '',
@@ -806,7 +807,15 @@ export default function Products() {
       // Capture quantity from vendor at onboarding time, if given, as a vendor_items row
       // mapped to the new product -- same create-then-map pattern VendorItemsTab.jsx already
       // uses, just triggered from the product side instead of the vendor side.
-      if (data.vendor_id && data.vendor_quantity) {
+      if (pendingVendorItemMapping?.vendor_item_id) {
+        await api.entities.VendorItemMapping.create({
+          organization_id: organizationId,
+          vendor_item_id: pendingVendorItemMapping.vendor_item_id,
+          internal_product_id: product.id,
+          conversion_multiplier: 1,
+          is_verified: true,
+        });
+      } else if (data.vendor_id && data.vendor_quantity) {
         const vendorItem = await api.entities.VendorItem.create({
           organization_id: organizationId,
           vendor_id: data.vendor_id,
@@ -930,6 +939,7 @@ export default function Products() {
       vendor_quantity: '',
     });
     setEditingProduct(null);
+    setPendingVendorItemMapping(null);
   };
 
   const handleEdit = (product) => {
@@ -1001,6 +1011,37 @@ export default function Products() {
     deleteMutation.mutate(product.id);
   };
 
+  const handleReviewVendorItemMapping = (queueItem) => {
+    const displayName = queueItem.display_vendor_item_name
+      || queueItem.vendor_item_name
+      || queueItem.product_name
+      || 'Unnamed product';
+    const category = queueItem.category || '';
+
+    setEditingProduct(null);
+    setPendingVendorItemMapping({
+      vendor_item_id: queueItem.vendor_item_id,
+      vendor_name: queueItem.display_vendor_name || queueItem.vendor_name || '',
+      vendor_item_name: displayName,
+    });
+    setFormData({
+      name: displayName,
+      product_id: queueItem.display_product_id || queueItem.restops_product_id || '',
+      description: '',
+      category,
+      accounting_category: getAccountingCategoryForCategory(category, queueItem.category_type || '5110'),
+      is_inventoried: true,
+      is_tax_exempt: false,
+      report_by_unit: queueItem.vendor_unit || queueItem.unit || 'ea',
+      base_unit: queueItem.vendor_unit || queueItem.unit || 'ea',
+      latest_price: Number(queueItem.latest_price || queueItem.last_price || queueItem.unit_price || 0),
+      location_specific: false,
+      vendor_id: queueItem.vendor_id || '',
+      vendor_quantity: queueItem.vendor_unit || queueItem.pack_size || '',
+    });
+    setDialogOpen(true);
+    toast.info('Vendor item loaded. Create the product to complete the mapping.');
+  };
   const handleReviewNetworkMapping = (product, globalMatch) => {
     const trustedCategory = normalizeGlobalCategory(globalMatch?.most_common_category);
     if (!trustedCategory) {
@@ -1900,7 +1941,7 @@ export default function Products() {
                                   ) : (
                                     <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
                                       if (!p.internal_product_id) {
-                                        toast.info('Mapping editor will be added in the next phase.');
+                                        handleReviewVendorItemMapping(p);
                                         return;
                                       }
                                       const product = products.find(item => item.id === p.internal_product_id);
@@ -2224,6 +2265,11 @@ export default function Products() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {pendingVendorItemMapping && !editingProduct && (
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-foreground">
+                Creating this product will map vendor item {pendingVendorItemMapping.vendor_item_name} from {pendingVendorItemMapping.vendor_name || 'the selected vendor'}.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Product Name *</Label>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Mail, Globe, Loader2, Sparkles, CheckCircle2, Camera, RefreshCw, Trash2, DollarSign } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,7 +185,7 @@ export default function InvoiceUploader({
       setFileUrl(newFileUrl);
 
       const fileExt = fileToProcess.name?.split('.').pop() || 'pdf';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
 
       if (onCreateUploadDraft) {
         draftInvoice = await onCreateUploadDraft({
@@ -434,7 +434,7 @@ export default function InvoiceUploader({
                     Drop your invoice here or click to browse
                   </p>
                   <p className="text-sm text-slate-500 mt-1">
-                    Supports PDF, PNG, JPG — AI will extract all details
+                    Supports PDF, PNG, JPG â€” AI will extract all details
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -537,3 +537,4 @@ export default function InvoiceUploader({
     </Dialog>
   );
 }
+

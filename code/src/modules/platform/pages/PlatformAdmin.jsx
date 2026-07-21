@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -44,11 +44,10 @@ const TABS = [
 const createSecureToken = (length = 20) => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const bytes = new Uint8Array(length);
-  if (window.crypto?.getRandomValues) {
-    window.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  if (!window.crypto?.getRandomValues) {
+    throw new Error('Secure random number generation is not available in this browser.');
   }
+  window.crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
 };
 
@@ -331,7 +330,7 @@ export default function PlatformAdmin() {
     setInviting(true);
     try {
       const normalizedInviteEmail = inviteEmail.trim().toLowerCase();
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const token = createSecureToken(48);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -465,7 +464,7 @@ export default function PlatformAdmin() {
     setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
     
     try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const token = createSecureToken(48);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -1004,9 +1003,9 @@ The Restops Platform Team
                   <p className="text-sm font-semibold text-foreground">{r.full_name || r.name}</p>
                   <p className="text-[10px] text-muted-foreground">{r.email}</p>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.company_name || '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{r.company_name || 'â€”'}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="text-[10px] capitalize bg-card">{r.plan || r.request_type || '—'}</Badge>
+                  <Badge variant="outline" className="text-[10px] capitalize bg-card">{r.plan || r.request_type || 'â€”'}</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge className={cn(
@@ -1480,7 +1479,7 @@ The Restops Platform Team
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">Global infrastructure & organization governance · v2.1.0</p>
+            <p className="text-sm text-muted-foreground mt-1">Global infrastructure & organization governance Â· v2.1.0</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -1941,4 +1940,5 @@ The Restops Platform Team
     </div>
   );
 }
+
 

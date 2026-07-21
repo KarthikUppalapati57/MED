@@ -2,6 +2,17 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
+const encoder = new TextEncoder()
+
+async function hmacSha256Hex(secret: string, payload: string) {
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
+  return Array.from(new Uint8Array(signature)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function normalizeSignature(value: string | null) {
+  return (value || '').trim().replace(/^sha256=/i, '').toLowerCase()
+}
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -34,10 +45,14 @@ serve(async (req) => {
       throw new Error("Invalid or inactive POS configuration");
     }
 
-    // Note: In production, we would use crypto to verify the webhook signature using config.webhook_secret
+    const rawBody = await req.text();
+    if (config.webhook_secret) {
+      const expectedSignature = await hmacSha256Hex(config.webhook_secret, rawBody);
+      if (normalizeSignature(signature) !== expectedSignature) throw new Error('Invalid POS webhook signature');
+    }
 
     // 2. Parse payload based on provider
-    const rawPayload = await req.json();
+    const rawPayload = JSON.parse(rawBody || '{}');
     let standardizedTicket = {};
 
     if (provider === 'toast') {
