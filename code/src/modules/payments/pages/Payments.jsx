@@ -294,6 +294,33 @@ export default function Payments() {
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
 
+  // Org-wide roles see invoices/payments across brands/locations without picking one --
+  // correct per RLS, but the lists need to say whose row is whose.
+  const { data: orgLocationsForLabels = [] } = useAuthQuery({
+    queryKey: ['payments-location-labels', organization?.id],
+    queryFn: () => api.entities.Location.list(),
+    enabled: !!organization?.id,
+  });
+  const { data: orgBrandsForLabels = [] } = useAuthQuery({
+    queryKey: ['payments-brand-labels', organization?.id],
+    queryFn: () => api.entities.Brand.list(),
+    enabled: !!organization?.id,
+  });
+  const locationNameById = React.useMemo(
+    () => new Map(orgLocationsForLabels.map((loc) => [loc.id, loc.name])),
+    [orgLocationsForLabels]
+  );
+  const brandNameById = React.useMemo(
+    () => new Map(orgBrandsForLabels.map((b) => [b.brand_id, b.name])),
+    [orgBrandsForLabels]
+  );
+  const LocationCell = ({ row }) => (
+    <TableCell>
+      <div className="text-sm">{locationNameById.get(row?.location_id) || 'Unknown location'}</div>
+      <div className="text-xs text-muted-foreground">{brandNameById.get(row?.brand_id) || ''}</div>
+    </TableCell>
+  );
+
   const {
     data = {},
     isLoading: invoicesLoading,
@@ -1031,6 +1058,7 @@ export default function Payments() {
                           </span>
                         </div>
                       </TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead
                         className="cursor-pointer hover:text-foreground group"
                         onClick={() => setInvoiceSortBy(invoiceSortBy === 'invoice_number' ? '-invoice_number' : 'invoice_number')}
@@ -1072,13 +1100,13 @@ export default function Payments() {
                   <TableBody>
                     {invoicesLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No invoices found
                         </TableCell>
                       </TableRow>
@@ -1086,7 +1114,7 @@ export default function Payments() {
                       <>
                       {invoiceWindow.paddingTop > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={8} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
+                          <TableCell colSpan={9} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
                         </TableRow>
                       )}
                       {invoiceWindow.visibleInvoices.map((invoice) => {
@@ -1115,6 +1143,7 @@ export default function Payments() {
                               )}
                             </TableCell>
                             <TableCell className="font-medium">{invoice.vendor_name}</TableCell>
+                            <LocationCell row={invoice} />
                             <TableCell>{invoice.invoice_number}</TableCell>
                             <TableCell>
                               <span className={cn(
@@ -1202,7 +1231,7 @@ export default function Payments() {
                       })}
                       {invoiceWindow.paddingBottom > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={8} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
+                          <TableCell colSpan={9} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
                         </TableRow>
                       )}
                       </>
@@ -1245,6 +1274,7 @@ export default function Payments() {
                     <TableRow>
                       <TableHead>Scheduled Date</TableHead>
                       <TableHead>Vendor</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Payment Account</TableHead>
@@ -1256,7 +1286,7 @@ export default function Payments() {
                   <TableBody>
                     {scheduledInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No scheduled payments yet
                         </TableCell>
                       </TableRow>
@@ -1274,6 +1304,7 @@ export default function Payments() {
                               </span>
                             </TableCell>
                             <TableCell className="font-medium">{invoice.vendor_name || '-'}</TableCell>
+                            <LocationCell row={invoice} />
                             <TableCell>{invoice.invoice_number || '-'}</TableCell>
                             <TableCell>{invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : '-'}</TableCell>
                             <TableCell>{paymentAccount?.name || 'Unassigned'}</TableCell>
@@ -1330,6 +1361,7 @@ export default function Payments() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Vendor</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead>Transaction ID</TableHead>
@@ -1341,13 +1373,13 @@ export default function Payments() {
                   <TableBody>
                     {paymentsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredPayments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No payments recorded yet
                         </TableCell>
                       </TableRow>
@@ -1355,7 +1387,7 @@ export default function Payments() {
                       <>
                       {paymentHistoryWindow.paddingTop > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={8} className="p-0" style={{ height: `${paymentHistoryWindow.paddingTop}px` }} />
+                          <TableCell colSpan={9} className="p-0" style={{ height: `${paymentHistoryWindow.paddingTop}px` }} />
                         </TableRow>
                       )}
                       {paymentHistoryWindow.visiblePayments.map((p) => {
@@ -1366,6 +1398,7 @@ export default function Payments() {
                               {p.payment_date ? format(new Date(p.payment_date), 'MMM d, yyyy') : '-'}
                             </TableCell>
                             <TableCell className="font-medium">{p.vendor_name}</TableCell>
+                            <LocationCell row={p} />
                             <TableCell>{p.invoice_number}</TableCell>
                             <TableCell>
                               <Badge className={paymentMethodColors[p.payment_method] || 'bg-secondary text-foreground'}>
@@ -1411,7 +1444,7 @@ export default function Payments() {
                       })}
                       {paymentHistoryWindow.paddingBottom > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={8} className="p-0" style={{ height: `${paymentHistoryWindow.paddingBottom}px` }} />
+                          <TableCell colSpan={9} className="p-0" style={{ height: `${paymentHistoryWindow.paddingBottom}px` }} />
                         </TableRow>
                       )}
                       </>
@@ -1451,6 +1484,7 @@ export default function Payments() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Vendor</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Payment Method</TableHead>
@@ -1462,7 +1496,7 @@ export default function Payments() {
                   <TableBody>
                     {payments.filter(p => p.status === 'completed').length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No payments pending reconciliation
                         </TableCell>
                       </TableRow>
@@ -1472,6 +1506,7 @@ export default function Payments() {
                         return (
                           <TableRow key={p.id}>
                             <TableCell className="font-medium">{p.vendor_name}</TableCell>
+                            <LocationCell row={p} />
                             <TableCell>{p.invoice_number}</TableCell>
                             <TableCell className="font-semibold">${p.amount?.toLocaleString()}</TableCell>
                             <TableCell>

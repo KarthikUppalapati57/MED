@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -219,6 +219,28 @@ export default function Invoices() {
   const isHigherRole = ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
   const isSingleSelected = selectedInvoiceIds.length === 1;
   const { hasLocation, warnIfMissing } = useRequireLocation();
+
+  // Org-wide roles (org_manager, tenant_super_admin, branch_manager) can see invoices
+  // across brands/locations without picking one in the switcher -- correct per RLS, but
+  // the list needs to say whose row is whose so it's not an unlabeled aggregate.
+  const { data: orgLocationsForLabels = [] } = useAuthQuery({
+    queryKey: ['invoice-location-labels', organization?.id],
+    queryFn: () => api.entities.Location.list(),
+    enabled: !!organization?.id,
+  });
+  const { data: orgBrandsForLabels = [] } = useAuthQuery({
+    queryKey: ['invoice-brand-labels', organization?.id],
+    queryFn: () => api.entities.Brand.list(),
+    enabled: !!organization?.id,
+  });
+  const locationNameById = useMemo(
+    () => new Map(orgLocationsForLabels.map((loc) => [loc.id, loc.name])),
+    [orgLocationsForLabels]
+  );
+  const brandNameById = useMemo(
+    () => new Map(orgBrandsForLabels.map((b) => [b.brand_id, b.name])),
+    [orgBrandsForLabels]
+  );
 
   const createBlankManualInvoice = useCallback(() => ({
     vendor_name: '',
@@ -824,7 +846,7 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
 
       if (savedInvoice) {
-        // Don't open the editor yet — it has only placeholder data at this point.
+        // Don't open the editor yet ï¿½ it has only placeholder data at this point.
         // The in-flight watcher above opens it automatically once extraction
         // finishes and the invoice has real vendor/line-item data.
         void triggerInvoiceExtraction(savedInvoice);
@@ -956,7 +978,7 @@ export default function Invoices() {
 
 
   // Thin wrappers binding the shared gate (invoiceValidation.jsx) to this
-  // page's own useConfirm() instance — same checks Payments.jsx uses.
+  // page's own useConfirm() instance ï¿½ same checks Payments.jsx uses.
   const runApprovalGate = (invoice) => runApprovalGateShared(confirm, invoice);
   const runBatchApprovalGate = (selected) => runBatchApprovalGateShared(confirm, selected);
 
@@ -1597,6 +1619,7 @@ export default function Invoices() {
                   <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('vendor_name')}>
                     <div className="flex items-center">Vendor {sortConfig.key === 'vendor_name' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
                   </TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('invoice_number')}>
                     <div className="flex items-center">Invoice # {sortConfig.key === 'invoice_number' ? (sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />) : <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/30" />}</div>
                   </TableHead>
@@ -1620,13 +1643,13 @@ export default function Invoices() {
               <TableBody>
                 {loadingInvoices ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : filteredInvoices.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No invoices found
                     </TableCell>
                   </TableRow>
@@ -1634,7 +1657,7 @@ export default function Invoices() {
                   <>
                   {invoiceWindow.paddingTop > 0 && (
                     <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                      <TableCell colSpan={10} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
+                      <TableCell colSpan={11} className="p-0" style={{ height: `${invoiceWindow.paddingTop}px` }} />
                     </TableRow>
                   )}
                   {invoiceWindow.visibleInvoices.map((invoice) => {
@@ -1662,6 +1685,10 @@ export default function Invoices() {
                               {ACTION_REASON_LABELS[actionReason] || actionReason}
                             </div>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{locationNameById.get(invoice.location_id) || 'Unknown location'}</div>
+                          <div className="text-xs text-muted-foreground">{brandNameById.get(invoice.brand_id) || ''}</div>
                         </TableCell>
                         <TableCell onClick={() => openEditorWithFullData(invoice)}>
                           {invoice.invoice_number || '-'}
@@ -1755,7 +1782,7 @@ export default function Invoices() {
                   })}
                   {invoiceWindow.paddingBottom > 0 && (
                     <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                      <TableCell colSpan={10} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
+                      <TableCell colSpan={11} className="p-0" style={{ height: `${invoiceWindow.paddingBottom}px` }} />
                     </TableRow>
                   )}
                   </>

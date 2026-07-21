@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Mail, Globe, Loader2, Sparkles, CheckCircle2, Camera, RefreshCw, Trash2, DollarSign } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,33 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { hashFile } from '@/lib/fileHash';
 
+const MAX_INVOICE_FILE_BYTES = 50 * 1024 * 1024;
+const ACCEPTED_INVOICE_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+const ACCEPTED_INVOICE_EXTENSIONS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp']);
+
+const getFileExtension = (name = '') => name.split('.').pop()?.toLowerCase() || '';
+
+const validateInvoiceFile = (selectedFile) => {
+  if (!selectedFile || selectedFile.size <= 0) {
+    return 'Invoice file is empty.';
+  }
+
+  if (selectedFile.size > MAX_INVOICE_FILE_BYTES) {
+    return 'Invoice file must be 50 MB or smaller.';
+  }
+
+  const extension = getFileExtension(selectedFile.name);
+  if (!ACCEPTED_INVOICE_MIME_TYPES.has(selectedFile.type) || !ACCEPTED_INVOICE_EXTENSIONS.has(extension)) {
+    return 'Invoice file must be a PDF, JPG, PNG, or WebP image.';
+  }
+
+  return null;
+};
 export default function InvoiceUploader({
   open,
   onOpenChange,
@@ -120,10 +147,24 @@ export default function InvoiceUploader({
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
+
+    const validationError = validateInvoiceFile(selectedFile);
+    if (validationError) {
+      toast.error(validationError);
+      e.target.value = '';
+      return;
+    }
+
     startReview(selectedFile, 'manual_upload');
   };
 
   const startReview = (selectedFile, source) => {
+    const validationError = validateInvoiceFile(selectedFile);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     if (reviewPreviewUrl) URL.revokeObjectURL(reviewPreviewUrl);
     setReviewFile(selectedFile);
     setReviewSource(source);
@@ -184,7 +225,7 @@ export default function InvoiceUploader({
       const newFileUrl = URL.createObjectURL(fileToProcess);
       setFileUrl(newFileUrl);
 
-      const fileExt = fileToProcess.name?.split('.').pop() || 'pdf';
+      const fileExt = getFileExtension(fileToProcess.name) || 'pdf';
       const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
 
       if (onCreateUploadDraft) {
@@ -285,9 +326,9 @@ export default function InvoiceUploader({
   const handleDrop = (e) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) {
-      startReview(droppedFile, 'manual_upload');
-    }
+    if (!droppedFile) return;
+
+    startReview(droppedFile, 'manual_upload');
   };
 
   return (
@@ -434,7 +475,7 @@ export default function InvoiceUploader({
                     Drop your invoice here or click to browse
                   </p>
                   <p className="text-sm text-slate-500 mt-1">
-                    Supports PDF, PNG, JPG â€” AI will extract all details
+                    Supports PDF, JPG, PNG, or WebP up to 50 MB
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -444,7 +485,7 @@ export default function InvoiceUploader({
                   </div>
                   <Input
                     type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
+                    accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
                     onChange={handleFileSelect}
                     className="hidden"
                     id="invoice-upload"

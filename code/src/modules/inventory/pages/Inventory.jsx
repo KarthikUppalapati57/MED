@@ -397,6 +397,27 @@ export default function Inventory() {
     brand: brandId ? { ...(brand || {}), id: brandId, brand_id: brandId } : brand,
     location: locationId ? { ...(location || {}), id: locationId, brand_id: location?.brand_id || brandId || null } : location,
   }), [brand, brandId, location, locationId, organization, organizationId]);
+
+  // Org-wide roles see inventory across brands/locations without picking one --
+  // correct per RLS, but the list needs to say whose row is whose.
+  const { data: orgLocationsForLabels = [] } = useAuthQuery({
+    queryKey: ['inventory-location-labels', organizationId],
+    queryFn: () => api.entities.Location.list(),
+    enabled: !!organizationId,
+  });
+  const { data: orgBrandsForLabels = [] } = useAuthQuery({
+    queryKey: ['inventory-brand-labels', organizationId],
+    queryFn: () => api.entities.Brand.list(),
+    enabled: !!organizationId,
+  });
+  const locationNameById = React.useMemo(
+    () => new Map(orgLocationsForLabels.map((loc) => [loc.id, loc.name])),
+    [orgLocationsForLabels]
+  );
+  const brandNameById = React.useMemo(
+    () => new Map(orgBrandsForLabels.map((b) => [b.brand_id, b.name])),
+    [orgBrandsForLabels]
+  );
   const stockCountHistoryCacheKey = React.useMemo(() => {
     if (!organizationId) return null;
     return [
@@ -2574,6 +2595,7 @@ export default function Inventory() {
                      </TableHead>
                      <TableHead>Category</TableHead>
                      <TableHead>Item</TableHead>
+                     <TableHead>Location</TableHead>
                      <TableHead>Report By</TableHead>
                      <TableHead>Prev Count</TableHead>
                      <TableHead>Prev Value</TableHead>
@@ -2587,13 +2609,13 @@ export default function Inventory() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>
@@ -2601,7 +2623,7 @@ export default function Inventory() {
                       <>
                       {inventoryWindow.paddingTop > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={11} className="p-0" style={{ height: `${inventoryWindow.paddingTop}px` }} />
+                          <TableCell colSpan={12} className="p-0" style={{ height: `${inventoryWindow.paddingTop}px` }} />
                         </TableRow>
                       )}
 	                      {inventoryWindow.visibleItems.map((item) => {
@@ -2631,6 +2653,10 @@ export default function Inventory() {
                                 <span className="font-medium">{item.product_name}</span>
                                 {isLow && <AlertTriangle className="h-4 w-4 text-resend-red" />}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">{locationNameById.get(item.location_id) || 'Unknown location'}</div>
+                              <div className="text-xs text-muted-foreground">{brandNameById.get(item.brand_id) || ''}</div>
                             </TableCell>
                             <TableCell>{item.current_unit}</TableCell>
                             <TableCell>{item.previous_quantity || 0}</TableCell>
@@ -2690,7 +2716,7 @@ export default function Inventory() {
                       })}
                       {inventoryWindow.paddingBottom > 0 && (
                         <TableRow aria-hidden="true" className="border-0 hover:bg-transparent">
-                          <TableCell colSpan={11} className="p-0" style={{ height: `${inventoryWindow.paddingBottom}px` }} />
+                          <TableCell colSpan={12} className="p-0" style={{ height: `${inventoryWindow.paddingBottom}px` }} />
                         </TableRow>
                       )}
                       </>
