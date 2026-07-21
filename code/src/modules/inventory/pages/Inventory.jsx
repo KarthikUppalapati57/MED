@@ -501,15 +501,30 @@ export default function Inventory() {
       ids: new Set(),
       productIds: new Set(),
       names: new Set(),
+      byId: new Map(),
+      byProductId: new Map(),
+      byName: new Map(),
     };
 
     inventoriedProductData
       .filter(product => product?.is_inventoried)
       .forEach(product => {
-        if (product.id) lookup.ids.add(String(product.id));
-        if (product.product_id) lookup.productIds.add(String(product.product_id).trim().toLowerCase());
+        if (product.id) {
+          const id = String(product.id);
+          lookup.ids.add(id);
+          lookup.byId.set(id, product);
+        }
+        if (product.product_id) {
+          const productId = String(product.product_id).trim().toLowerCase();
+          lookup.productIds.add(productId);
+          lookup.byProductId.set(productId, product);
+        }
         const productName = product.name || product.product_name;
-        if (productName) lookup.names.add(String(productName).trim().toLowerCase());
+        if (productName) {
+          const name = String(productName).trim().toLowerCase();
+          lookup.names.add(name);
+          lookup.byName.set(name, product);
+        }
       });
 
     return lookup;
@@ -530,12 +545,37 @@ export default function Inventory() {
       names: new Set(),
     };
 
-    const trackedInventoryRows = rawInventory.filter(item => {
-      if (item.internal_product_id && inventoriedProductLookup.ids.has(String(item.internal_product_id))) return true;
-      if (item.product_id && inventoriedProductLookup.productIds.has(String(item.product_id).trim().toLowerCase())) return true;
-      if (item.product_name && inventoriedProductLookup.names.has(String(item.product_name).trim().toLowerCase())) return true;
-      return false;
-    });
+    const findInventoriedProduct = (item) => {
+      if (item.internal_product_id) {
+        const product = inventoriedProductLookup.byId.get(String(item.internal_product_id));
+        if (product) return product;
+      }
+      if (item.product_id) {
+        const product = inventoriedProductLookup.byProductId.get(String(item.product_id).trim().toLowerCase());
+        if (product) return product;
+      }
+      if (item.product_name) {
+        const product = inventoriedProductLookup.byName.get(String(item.product_name).trim().toLowerCase());
+        if (product) return product;
+      }
+      return null;
+    };
+
+    const trackedInventoryRows = rawInventory
+      .map(item => {
+        const product = findInventoriedProduct(item);
+        if (!product) return null;
+        const productName = product.name || product.product_name;
+        return {
+          ...item,
+          internal_product_id: item.internal_product_id || product.id || null,
+          product_id: item.product_id || product.product_id || null,
+          product_name: item.product_name || productName || 'Unnamed item',
+          category: product.category || item.category,
+          accounting_category: product.accounting_category || item.accounting_category,
+        };
+      })
+      .filter(Boolean);
 
     trackedInventoryRows.forEach(item => {
       if (item.internal_product_id) matchedInventoryKeys.ids.add(String(item.internal_product_id));
