@@ -16,13 +16,43 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, MapPin, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, MapPin, Plus, Save, Sparkles, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
 const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalCode: '', country: 'United States' });
 const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city: 'Knoxville', state: 'TN', postalCode: '37902', country: 'United States' };
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const ONBOARDING_PLAN_CATALOG = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    priceMonthly: 149,
+    description: 'Core location operations for one restaurant, store, or service location.',
+    badge: 'Available now',
+    tone: 'primary',
+    features: ['Core location workspace', 'Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
+  },
+  {
+    id: 'starter-ai',
+    name: 'Starter + AI',
+    priceMonthly: 249,
+    description: 'Starter modules plus AI-assisted operating intelligence.',
+    badge: 'Coming soon',
+    comingSoon: true,
+    tone: 'amber',
+    features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
+  },
+  {
+    id: 'advanced',
+    name: 'Advanced modules',
+    priceMonthly: 349,
+    description: 'Expanded controls for larger teams and advanced operating workflows.',
+    badge: 'Coming soon',
+    comingSoon: true,
+    tone: 'slate',
+    features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
+  },
+];const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
 const normalizeCouponCodeInput = (value) => String(value || '').trim().replace(/\s+-\s+\d+\s*(month|months|mo).*$/i, '').toUpperCase();
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
@@ -47,6 +77,19 @@ const normalizeOrganization = (org = {}) => {
 };
 const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
+const normalizePlanId = (value) => normalizeKey(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const buildOnboardingPlanOptions = (dbPlans = []) => ONBOARDING_PLAN_CATALOG.map((catalogPlan) => {
+  const dbPlan = dbPlans.find((plan) => normalizePlanId(plan.id) === catalogPlan.id || normalizePlanId(plan.name) === catalogPlan.id);
+  const available = !catalogPlan.comingSoon && Boolean(dbPlan);
+  return {
+    ...(dbPlan || { id: catalogPlan.id, stripe_price_id: null }),
+    ...catalogPlan,
+    price_monthly: catalogPlan.priceMonthly,
+    features: catalogPlan.features,
+    selectable: available,
+    unavailableReason: catalogPlan.comingSoon ? 'Coming soon' : 'Plan setup required',
+  };
+});
 const addressPayloadOrUndefined = (address) => address && typeof address === 'object' && addressComplete(address) ? address : undefined;
 
 const isValidPostalCode = (address) => {
@@ -567,6 +610,7 @@ export default function OnboardingPage() {
     const locationCount = organizations.reduce((sum, org) => sum + org.brands.reduce((brandSum, brand) => brandSum + brand.locations.length, 0), 0);
     return { brandCount, locationCount };
   }, [organizations]);
+  const onboardingPlanOptions = useMemo(() => buildOnboardingPlanOptions(plans), [plans]);
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
   const updateBankAccount = (field, value) => setBankAccount((prev) => ({ ...prev, [field]: value }));
@@ -1294,27 +1338,69 @@ export default function OnboardingPage() {
           {step === 3 && (
             <>
               <CardHeader>
-                <CardTitle>Plan</CardTitle>
-                <CardDescription>Select the per-location plan for this tenant workspace.</CardDescription>
+                <CardTitle>Choose your operating plan</CardTitle>
+                <CardDescription>Start with the core location plan today. The AI and advanced tiers are staged here so the upgrade path is visible from day one.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-3">
-                  {plans.map((plan) => (
-                    <button key={plan.id} type="button" onClick={() => setSelectedPlan(plan)} className={`rounded-md border p-4 text-left transition hover:border-primary ${selectedPlan?.id === plan.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <div><h3 className="font-semibold text-foreground">{plan.name}</h3><p className="text-sm text-muted-foreground">{plan.description}</p></div>
-                        {selectedPlan?.id === plan.id && <CheckCircle2 className="h-5 w-5 text-primary" />}
-                      </div>
-                      <div className="text-2xl font-bold text-foreground">${Number(plan.price_monthly || 0).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/location/mo</span></div>
-                      {Number(plan.price_monthly || 0) > 0 && <div className="mt-1 text-xs font-semibold text-foreground">Estimated: ${(Number(plan.price_monthly || 0) * Math.max(1, totals.locationCount || 0)).toFixed(0)}/mo for {Math.max(1, totals.locationCount || 0)} location{Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}</div>}
-                      {Array.isArray(plan.features) && plan.features.length > 0 && <ul className="mt-3 space-y-1 text-sm text-muted-foreground">{plan.features.slice(0, 4).map((feature) => <li key={feature}>- {feature}</li>)}</ul>}
-                    </button>
-                  ))}
+                <div className="rounded-md border bg-muted/20 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Pricing follows your real footprint</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Current setup: {Math.max(1, totals.locationCount || 0)} billable location{Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.</p>
+                    </div>
+                    <div className="rounded-md border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
+                      Starter launches now. More tiers unlock soon.
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {onboardingPlanOptions.map((plan) => {
+                    const selected = selectedPlan?.id === plan.id;
+                    const locationCount = Math.max(1, totals.locationCount || 0);
+                    const monthlyTotal = Number(plan.price_monthly || 0) * locationCount;
+                    const comingSoon = plan.comingSoon || !plan.selectable;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        disabled={comingSoon}
+                        onClick={() => plan.selectable && setSelectedPlan(plan)}
+                        className={`relative flex min-h-[360px] flex-col overflow-hidden rounded-md border p-5 text-left transition ${selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : comingSoon ? 'border-border bg-muted/20 opacity-80' : 'bg-card hover:border-primary hover:shadow-sm'}`}
+                      >
+                        <div className="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-primary/10" />
+                        <div className="relative z-10 flex items-start justify-between gap-3">
+                          <div>
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase ${plan.tone === 'amber' ? 'border-amber-500/40 bg-amber-500/10 text-amber-400' : plan.tone === 'slate' ? 'border-muted-foreground/30 bg-muted text-muted-foreground' : 'border-primary/40 bg-primary/10 text-primary'}`}>{plan.badge}</span>
+                            <h3 className="mt-4 text-xl font-black text-foreground">{plan.name}</h3>
+                            <p className="mt-2 min-h-[42px] text-sm text-muted-foreground">{plan.description}</p>
+                          </div>
+                          {selected ? <CheckCircle2 className="h-5 w-5 flex-none text-primary" /> : <Sparkles className={`h-5 w-5 flex-none ${comingSoon ? 'text-muted-foreground' : 'text-primary'}`} />}
+                        </div>
+                        <div className="relative z-10 mt-5">
+                          <div className="flex items-end gap-1 text-foreground">
+                            <span className="text-4xl font-black">${Number(plan.price_monthly || 0).toFixed(0)}</span>
+                            <span className="pb-1 text-sm font-semibold text-muted-foreground">/location/mo</span>
+                          </div>
+                          <p className="mt-2 text-xs font-semibold text-foreground">Estimated: ${monthlyTotal.toFixed(0)}/mo for {locationCount} location{locationCount === 1 ? '' : 's'}</p>
+                        </div>
+                        <ul className="relative z-10 mt-5 flex-1 space-y-2 text-sm text-muted-foreground">
+                          {plan.features.map((feature) => (
+                            <li key={feature} className="flex items-center gap-2">
+                              <CheckCircle2 className={`h-3.5 w-3.5 flex-none ${comingSoon ? 'text-muted-foreground' : 'text-primary'}`} />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className={`relative z-10 mt-5 rounded-md border px-3 py-2 text-center text-xs font-bold ${selected ? 'border-primary/40 bg-primary/10 text-primary' : comingSoon ? 'border-border bg-card text-muted-foreground' : 'border-border bg-muted/20 text-foreground'}`}>
+                          {selected ? 'Selected' : comingSoon ? plan.unavailableReason : 'Select Starter'}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </>
           )}
-
           {step === 4 && (
             <>
               <CardHeader>
@@ -1415,6 +1501,10 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
+
+
+
 
 
 
