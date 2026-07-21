@@ -487,6 +487,39 @@ export default function PlatformOrganizations() {
     }
   };
 
+  const renderVerificationSettingsCard = () => (
+    <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit space-y-4">
+      <div>
+        <p className="text-sm font-bold text-foreground mb-1">Business Verification</p>
+        <p className="text-xs text-muted-foreground">Enable or disable EIN, SSN, and USPS address validation requirements during tenant onboarding.</p>
+      </div>
+      <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+        <Checkbox checked={verificationSettingsForm.ein_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ein_verification_enabled: Boolean(checked) }))} />
+        <span>
+          <span className="block text-xs font-bold text-foreground">Require EIN verification</span>
+          <span className="block text-[11px] text-muted-foreground">Applies to LLC, corporation, partnership, and other business entities.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+        <Checkbox checked={verificationSettingsForm.ssn_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ssn_verification_enabled: Boolean(checked) }))} />
+        <span>
+          <span className="block text-xs font-bold text-foreground">Require SSN verification</span>
+          <span className="block text-[11px] text-muted-foreground">Applies to sole proprietor and independent contractor onboarding.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
+        <Checkbox checked={verificationSettingsForm.usps_address_validation_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, usps_address_validation_enabled: Boolean(checked) }))} />
+        <span>
+          <span className="block text-xs font-bold text-foreground">Enable USPS address validation</span>
+          <span className="block text-[11px] text-muted-foreground">Required before tenants can submit address-bearing onboarding hierarchy records.</span>
+        </span>
+      </label>
+      <Button size="sm" className="w-full" onClick={handleSaveVerificationSettings} disabled={isSavingVerificationSettings}>
+        {isSavingVerificationSettings && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+        Save Verification Settings
+      </Button>
+    </div>
+  );
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const isBusinessReviewMode = searchParams.get('review') === 'business';
   const businessReviewItems = onboardingReviews.filter((item) => item.verification.verification_status !== 'verified');
@@ -598,6 +631,23 @@ export default function PlatformOrganizations() {
               {isLoadingOnboardingReviews ? '...' : pendingTenantReviewCount}
             </Badge>
           </Button>
+          <div className="rounded-xl border border-border/60 bg-secondary/40 p-3 space-y-3">
+            <div>
+              <p className="text-xs font-black uppercase text-foreground">Onboarding Settings</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Available before any tenant review exists.</p>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border bg-card p-2">
+              <Checkbox checked={verificationSettingsForm.usps_address_validation_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, usps_address_validation_enabled: Boolean(checked) }))} />
+              <span>
+                <span className="block text-xs font-bold text-foreground">Enable USPS validation</span>
+                <span className="block text-[11px] text-muted-foreground">Required for address onboarding.</span>
+              </span>
+            </label>
+            <Button size="sm" className="w-full h-8 text-xs" onClick={handleSaveVerificationSettings} disabled={isSavingVerificationSettings}>
+              {isSavingVerificationSettings && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+              Save Settings
+            </Button>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
@@ -1126,36 +1176,8 @@ export default function PlatformOrganizations() {
                                <span className="font-mono bg-card px-2 py-1 rounded-md border border-border/50">{new Date(selectedOrg.created_at).toLocaleDateString()}</span>
                              </p>
                           </div>
-                          <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 h-fit xl:col-span-1 space-y-4">
-                             <div>
-                               <p className="text-sm font-bold text-foreground mb-1">Business Verification</p>
-                               <p className="text-xs text-muted-foreground">Enable or disable EIN/SSN verification requirements during tenant onboarding.</p>
-                             </div>
-                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
-                               <Checkbox checked={verificationSettingsForm.ein_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ein_verification_enabled: Boolean(checked) }))} />
-                               <span>
-                                 <span className="block text-xs font-bold text-foreground">Require EIN verification</span>
-                                 <span className="block text-[11px] text-muted-foreground">Applies to LLC, corporation, partnership, and other business entities.</span>
-                               </span>
-                             </label>
-                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
-                               <Checkbox checked={verificationSettingsForm.ssn_verification_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, ssn_verification_enabled: Boolean(checked) }))} />
-                               <span>
-                                 <span className="block text-xs font-bold text-foreground">Require SSN verification</span>
-                                 <span className="block text-[11px] text-muted-foreground">Applies to sole proprietor and independent contractor onboarding.</span>
-                               </span>
-                             </label>
-                             <label className="flex items-start gap-3 rounded-lg border bg-card p-3 cursor-pointer">
-                               <Checkbox checked={verificationSettingsForm.usps_address_validation_enabled} onCheckedChange={(checked) => setVerificationSettingsForm((prev) => ({ ...prev, usps_address_validation_enabled: Boolean(checked) }))} />
-                               <span>
-                                 <span className="block text-xs font-bold text-foreground">Enable USPS address validation</span>
-                                 <span className="block text-[11px] text-muted-foreground">Required before tenants can submit address-bearing onboarding hierarchy records.</span>
-                               </span>
-                             </label>
-                             <Button size="sm" className="w-full" onClick={handleSaveVerificationSettings} disabled={isSavingVerificationSettings}>
-                               {isSavingVerificationSettings && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                               Save Verification Settings
-                             </Button>
+                          <div className="xl:col-span-1">
+                            {renderVerificationSettingsCard()}
                           </div>
                         </div>
                         <div className="pt-4 border-t border-border flex justify-end">
@@ -1304,6 +1326,7 @@ export default function PlatformOrganizations() {
                     <h2 className="text-xl font-black text-foreground tracking-tight">Pending Tenant Onboarding Reviews</h2>
                     <p className="text-sm text-muted-foreground">These tenants have not created an organization yet. Approve business verification here so they can continue to hierarchy setup.</p>
                   </div>
+                  {renderVerificationSettingsCard()}
                   {isLoadingOnboardingReviews ? (
                     <Card className="border-0 bg-card shadow-sm">
                       <CardContent className="flex items-center justify-center gap-3 p-8 text-sm text-muted-foreground">
@@ -1635,5 +1658,7 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
+
 
 
