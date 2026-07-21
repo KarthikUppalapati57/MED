@@ -5,32 +5,34 @@ import path from 'node:path';
 const root = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-describe('Docling extraction deployment contract', () => {
-  it('requires the deployed Docling backend URL outside local Supabase development', () => {
+describe('Azure invoice extraction deployment contract', () => {
+  it('requires Azure Document Intelligence and Azure OpenAI configuration in the Edge Function', () => {
     const edgeSource = read('supabase/functions/invoice-processing/index.ts');
 
-    expect(edgeSource).toContain('function getDoclingBackendUrl()');
-    expect(edgeSource).toContain("Deno.env.get('PYTHON_BACKEND_URL')?.trim()");
-    expect(edgeSource).toContain("return configuredUrl.replace(/\\/+$/, '')");
-    expect(edgeSource).toContain("supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')");
-    expect(edgeSource).toContain("if (isLocalSupabase) return 'http://127.0.0.1:8000'");
-    expect(edgeSource).toContain('PYTHON_BACKEND_URL is required for deployed invoice extraction.');
-    expect(edgeSource).not.toContain("Deno.env.get('PYTHON_BACKEND_URL') || 'http://127.0.0.1:8000'");
+    expect(edgeSource).toContain('async function extractWithAzureDocumentIntelligence(fileBlob)');
+    expect(edgeSource).toContain("Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')?.trim()?.replace(/\\/+$/, '')");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_KEY')?.trim()");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_MODEL')?.trim() || 'prebuilt-invoice'");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_DOCUMENT_INTELLIGENCE_API_VERSION')?.trim() || '2024-11-30'");
+    expect(edgeSource).toContain('Azure Document Intelligence is not configured.');
+    expect(edgeSource).toContain('Azure Document Intelligence did not return Operation-Location.');
+
+    expect(edgeSource).toContain('async function mapWithAzureOpenAI(compactExtraction)');
+    expect(edgeSource).toContain("Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\\/+$/, '')");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_OPENAI_API_KEY')?.trim()");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_OPENAI_DEPLOYMENT')?.trim()");
+    expect(edgeSource).toContain("Deno.env.get('AZURE_OPENAI_API_VERSION')?.trim() || 'v1'");
+    expect(edgeSource).toContain('Azure OpenAI is not configured.');
   });
 
-  it('keeps the extraction service deployable as a standalone Python web service', () => {
-    const dockerfile = read('backend/Dockerfile');
-    const main = read('backend/main.py');
-    const requirements = read('backend/requirements.txt');
-    const runbook = read('docs/docling_invoice_extraction_plan.md');
+  it('uses the Azure extraction path and no longer relies on a Python backend URL fallback', () => {
+    const edgeSource = read('supabase/functions/invoice-processing/index.ts');
 
-    expect(requirements).toContain('docling');
-    expect(requirements).toContain('fastapi');
-    expect(dockerfile).toContain('FROM python:3.11-slim');
-    expect(dockerfile).toContain('ENV PORT=8080');
-    expect(dockerfile).toContain('uvicorn main:app --host 0.0.0.0 --port ${PORT}');
-    expect(main).toContain('@app.get("/health")');
-    expect(main).toContain('@app.post("/extract-invoice")');
-    expect(runbook).toContain('supabase secrets set PYTHON_BACKEND_URL=https://<docling-service-url>');
+    expect(edgeSource).toContain('const azureDocumentResult = await extractWithAzureDocumentIntelligence(fileBlob);');
+    expect(edgeSource).toContain('compactExtraction = simplifyAzureDocumentIntelligenceResult(azureDocumentResult);');
+    expect(edgeSource).toContain('const mappedResult = await mapWithAzureOpenAI(compactExtraction);');
+    expect(edgeSource).toContain("extraction_method: extractionMethod");
+    expect(edgeSource).not.toContain("Deno.env.get('PYTHON_BACKEND_URL') || 'http://127.0.0.1:8000'");
+    expect(edgeSource).not.toContain('function getDoclingBackendUrl()');
   });
 });

@@ -6,6 +6,7 @@ import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { format } from 'date-fns';
@@ -82,7 +83,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
+import { getCOALabel } from '@/lib/accountingConfig';
 
 const LoadingDockReceiving = React.lazy(() => import('@/modules/inventory/components/LoadingDockReceiving'));
 const ActiveCountSession = React.lazy(() => import('@/modules/inventory/components/ActiveCountSession'));
@@ -90,6 +91,7 @@ const POSSyncEngine = React.lazy(() => import('@/modules/inventory/components/PO
 const InventoryTransfers = React.lazy(() => import('@/modules/inventory/components/InventoryTransfers'));
 const AvTDashboard = React.lazy(() => import('@/modules/inventory/components/AvTDashboard'));
 const WASTE_CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#2563eb', '#16a34a', '#7c3aed'];
+const SUPPLY_CATEGORY_PATTERN = /(paper|packaging|container|cup|lid|straw|napkin|towel|bag|box|plate|foil|wrap|cleaning|cleaner|soap|detergent|sanitizer|bleach|sponge|scrubber|glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer|restaurant supplies)/;
 
 function getCountSheetBucket(item) {
   if (!item) return 'Other';
@@ -98,12 +100,15 @@ function getCountSheetBucket(item) {
   const label = String(getCOALabel(item.accounting_category) || '').toLowerCase();
   const name = String(item.product_name || '').toLowerCase();
   const text = `${category} ${savedCategory} ${label} ${name}`;
+  const categoryAndName = `${savedCategory} ${name}`;
 
-  if (/beer/.test(text) || category === '5230') return 'Beer';
-  if (/wine/.test(text) || category === '5240') return 'Wine';
-  if (/liquor|spirit|bar/.test(text) || category === '5220') return 'Liquor';
-  if (/beverage|n\/a|non.?alcohol|soda|coffee|tea|juice/.test(text) || category === '5210' || category === '1220') return 'N/A Bev';
-  if (/retail|merch|gift/.test(text)) return 'Retail';
+  if (SUPPLY_CATEGORY_PATTERN.test(categoryAndName)) return 'Other';
+
+  if (/beer/.test(categoryAndName) || category === '5230') return 'Beer';
+  if (/wine/.test(categoryAndName) || category === '5240') return 'Wine';
+  if (/liquor|spirit|bar/.test(categoryAndName) || category === '5220') return 'Liquor';
+  if (/beverage|n\/a|non.?alcohol|soda|coffee|tea|juice/.test(categoryAndName) || category === '5210' || category === '1220') return 'N/A Bev';
+  if (/retail|merch|gift/.test(text) || category === '1230') return 'Retail';
   if (/food|meat|poultry|seafood|dairy|produce|frozen|grocery|cost/.test(text) || /^51\d0$/.test(category) || category === '1210') return 'Food';
   return 'Other';
 }
@@ -201,6 +206,51 @@ function csvValue(value) {
 const INVENTORY_ROW_HEIGHT = 72;
 const INVENTORY_TABLE_VIEWPORT_HEIGHT = 640;
 const INVENTORY_ROW_OVERSCAN = 8;
+const INVENTORY_CATEGORY_OPTIONS = [
+  { key: 'all', label: 'All', code: null },
+  { key: 'food', label: 'Food', code: '1210' },
+  { key: 'beer', label: 'Beer', code: '5230' },
+  { key: 'wine', label: 'Wine', code: '5240' },
+  { key: 'liquor', label: 'Liquor', code: '5220' },
+  { key: 'na_bev', label: 'N/A Bev', code: '5210' },
+  { key: 'retail', label: 'Retail', code: '1230' },
+  { key: 'other', label: 'Other', code: '5300' },
+];
+const INVENTORY_ITEM_CATEGORY_OPTIONS = INVENTORY_CATEGORY_OPTIONS.filter(option => option.key !== 'all');
+const INVENTORY_COUNT_UNITS = [
+  'CS',
+  'Each',
+  'Bottle',
+  'Bottle (12 Ounces)',
+  'Bottle (750 Milliliters)',
+  'Can',
+  'Can (12 Fluid Ounces)',
+  'Liter',
+  'Milliliter',
+  'Fluid Ounce',
+  'Ounce',
+  'Pound',
+  'Gram',
+  'Kilogram',
+  'Gallon',
+  'Quart',
+  'Pint',
+  'Keg (1/2BBL) 15.5GAL',
+  'Keg (1/4BBL) 7.75GAL',
+  'Pack',
+  'Package',
+  'Case',
+  'Box',
+  'Bag',
+  'Jar',
+  'Other',
+];
+
+function getInventoryCategoryOption(itemOrCode) {
+  const item = typeof itemOrCode === 'object' ? itemOrCode : { accounting_category: itemOrCode };
+  const bucket = getCountSheetBucket(item);
+  return INVENTORY_ITEM_CATEGORY_OPTIONS.find(option => option.label === bucket) || INVENTORY_ITEM_CATEGORY_OPTIONS[0];
+}
 
 function InventorySectionFallback({ label = 'Loading inventory section...' }) {
   return (
@@ -244,6 +294,7 @@ function useDebouncedQueryInvalidation(queryClient, queryKeys, delay = 1000) {
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
+  const { hasLocation, warnIfMissing } = useRequireLocation();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
@@ -259,6 +310,10 @@ export default function Inventory() {
   };
 
   const activeTab = subPathToTab[currentSubPath] || currentSubPath || 'inventory';
+  const requestedStockCountSheetId = React.useMemo(() => {
+    const params = new URLSearchParams(routerLocation.search);
+    return params.get('countSheetId') || params.get('count_sheet_id') || '';
+  }, [routerLocation.search]);
 
   const setActiveTab = (tab) => {
     const subPath = tabToSubPath[tab] || tab;
@@ -302,7 +357,12 @@ export default function Inventory() {
     organizeBy: 'auto_category',
   });
   const [countSheetStatus, setCountSheetStatus] = useState('active');
-  const [stockCountScope, setStockCountScope] = useState('all');
+  const [editingCountSheetId, setEditingCountSheetId] = useState(null);
+  const [countSheetDraft, setCountSheetDraft] = useState(null);
+  const [countSheetDeleteTarget, setCountSheetDeleteTarget] = useState(null);
+  const [countSheetProductToAdd, setCountSheetProductToAdd] = useState('');
+  const [stockCountScopes, setStockCountScopes] = useState(['all']);
+  const [stockCountSheetId, setStockCountSheetId] = useState('');
   const [stockCountDate, setStockCountDate] = useState(new Date().toISOString().split('T')[0]);
   const [stockCountValues, setStockCountValues] = useState({});
   const [stockCountHistory, setStockCountHistory] = useState([]);
@@ -310,57 +370,75 @@ export default function Inventory() {
   const [stockCountSaveConfirmOpen, setStockCountSaveConfirmOpen] = useState(false);
   const [stockCountCloseTarget, setStockCountCloseTarget] = useState(null);
   const [stockCountDeleteTarget, setStockCountDeleteTarget] = useState(null);
+  const [stockCountDetailRecord, setStockCountDetailRecord] = useState(null);
   const [stockCountExpandedSections, setStockCountExpandedSections] = useState({});
-  const [stockCountHistoryPreset, setStockCountHistoryPreset] = useState('last_30_days');
-  const [stockCountHistoryStartDate, setStockCountHistoryStartDate] = useState(() => formatDateInput(addDays(new Date(), -29)));
-  const [stockCountHistoryEndDate, setStockCountHistoryEndDate] = useState(() => formatDateInput(new Date()));
+  const [stockCountHistoryPreset, setStockCountHistoryPreset] = useState('all_history');
+  const [stockCountHistoryStartDate, setStockCountHistoryStartDate] = useState('');
+  const [stockCountHistoryEndDate, setStockCountHistoryEndDate] = useState('');
   const [appliedStockCountHistoryRange, setAppliedStockCountHistoryRange] = useState(() => ({
-    startDate: formatDateInput(addDays(new Date(), -29)),
-    endDate: formatDateInput(new Date()),
+    startDate: '',
+    endDate: '',
   }));
   const [wastageDeleteTarget, setWastageDeleteTarget] = useState(null);
   const [deletingWastageId, setDeletingWastageId] = useState(null);
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
   const [expandedSummaryCategory, setExpandedSummaryCategory] = useState(null);
   const inventoryTableRef = React.useRef(null);
+  const stockCountHistoryLoadedRef = React.useRef(false);
   const [inventoryTableScrollTop, setInventoryTableScrollTop] = useState(0);
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
+  const organizationId = organization?.id || organization?.organization_id || null;
+  const brandId = brand?.brand_id || brand?.id || location?.brand_id || null;
+  const locationId = location?.location_id || location?.id || null;
+  const selectedContext = React.useMemo(() => ({
+    organization: organizationId ? { ...(organization || {}), id: organizationId } : organization,
+    brand: brandId ? { ...(brand || {}), id: brandId, brand_id: brandId } : brand,
+    location: locationId ? { ...(location || {}), id: locationId, brand_id: location?.brand_id || brandId || null } : location,
+  }), [brand, brandId, location, locationId, organization, organizationId]);
+  const stockCountHistoryCacheKey = React.useMemo(() => {
+    if (!organizationId) return null;
+    return [
+      'restops_stock_count_history',
+      organizationId,
+      brandId || 'all-brands',
+      locationId || userProfile?.location_id || 'all-locations',
+    ].join(':');
+  }, [brandId, locationId, organizationId, userProfile?.location_id]);
   const inventoryInvalidationKeys = React.useMemo(() => [
-    ['inventory', organization?.id],
-    ['inventoryMetrics', organization?.id],
-  ], [organization?.id]);
+    ['inventory', organizationId],
+    ['inventoryMetrics', organizationId],
+  ], [organizationId]);
   const wastageInvalidationKeys = React.useMemo(() => [
-    ['wastage', organization?.id],
-  ], [organization?.id]);
+    ['wastage', organizationId],
+  ], [organizationId]);
   const countSheetsInvalidationKeys = React.useMemo(() => [
-    ['count_sheets', organization?.id],
-  ], [organization?.id]);
+    ['count_sheets', organizationId],
+  ], [organizationId]);
   const countSessionsInvalidationKeys = React.useMemo(() => [
-    ['count_sessions', organization?.id],
-  ], [organization?.id]);
+    ['count_sessions', organizationId],
+  ], [organizationId]);
   const invalidateInventoryRealtime = useDebouncedQueryInvalidation(queryClient, inventoryInvalidationKeys, 1500);
   const invalidateWastageRealtime = useDebouncedQueryInvalidation(queryClient, wastageInvalidationKeys, 1500);
   const invalidateCountSheetsRealtime = useDebouncedQueryInvalidation(queryClient, countSheetsInvalidationKeys, 1500);
   const invalidateCountSessionsRealtime = useDebouncedQueryInvalidation(queryClient, countSessionsInvalidationKeys, 1500);
   const needsInventory = ['inventory', 'summary', 'daily-snapshot', 'counts', 'count-sheets', 'transfers'].includes(activeTab) || editDialogOpen || addDialogOpen || convertDialogOpen || wastageDialogOpen || scannerDialogOpen || activeSessionOpen;
-  const needsWastage = ['wastage', 'waste-summary', 'daily-snapshot', 'summary'].includes(activeTab) || wastageDialogOpen;
+  const needsWastage = true;
   const needsCountSheets = ['counts', 'count-sheets'].includes(activeTab) || activeSessionOpen || newTemplateOpen;
   const needsCountSessions = activeTab === 'counts' || activeSessionOpen;
   const needsRecipes = activeTab === 'pos-sync';
 
   const {
     data: inventoryData,
-    isLoading,
+    isLoading: inventoryLoading,
     fetchNextPage: fetchNextInventoryPage,
     hasNextPage: hasNextInventoryPage,
     isFetchingNextPage: isFetchingNextInventoryPage
   } = useAuthInfiniteQuery({
-    queryKey: ['inventory', organization?.id, location?.id, debouncedSearch, categoryFilter, sortInventory],
+    queryKey: ['inventory', organizationId, brandId, locationId, debouncedSearch, categoryFilter, sortInventory],
     queryFn: ({ pageParam = 0 }) => {
       const conditions = {};
-      if (categoryFilter !== 'all') conditions.accounting_category = categoryFilter;
       return api.entities.Inventory.filter(conditions, {
         page: pageParam,
         pageSize: 50,
@@ -371,19 +449,118 @@ export default function Inventory() {
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
-    enabled: !!organization?.id && needsInventory,
+    enabled: !!organizationId && needsInventory,
   });
 
-  const inventory = React.useMemo(() => {
+  const { data: inventoriedProductData = [], isLoading: inventoriedProductsLoading } = useAuthQuery({
+    queryKey: ['inventoryProductSource', organizationId, brandId, locationId, debouncedSearch],
+    queryFn: () => api.products.getCatalog({
+      organizationId,
+      brandId,
+      locationId,
+      search: debouncedSearch || null,
+      sortBy: 'name',
+      page: 0,
+      pageSize: 1000,
+    }),
+    enabled: !!organizationId && needsInventory,
+  });
+
+  const inventoriedProductLookup = React.useMemo(() => {
+    const lookup = {
+      ids: new Set(),
+      productIds: new Set(),
+      names: new Set(),
+    };
+
+    inventoriedProductData
+      .filter(product => product?.is_inventoried)
+      .forEach(product => {
+        if (product.id) lookup.ids.add(String(product.id));
+        if (product.product_id) lookup.productIds.add(String(product.product_id).trim().toLowerCase());
+        const productName = product.name || product.product_name;
+        if (productName) lookup.names.add(String(productName).trim().toLowerCase());
+      });
+
+    return lookup;
+  }, [inventoriedProductData]);
+
+  const rawInventory = React.useMemo(() => {
     if (!inventoryData?.pages) return [];
     const flat = inventoryData.pages.flat();
-    return filterByContext(flat, { organization, brand, location });
-  }, [inventoryData, organization, brand, location]);
+    return filterByContext(flat, selectedContext);
+  }, [inventoryData, selectedContext]);
+
+  const inventory = React.useMemo(() => {
+    if (!inventoryData?.pages || inventoriedProductsLoading) return [];
+
+    const matchedInventoryKeys = {
+      ids: new Set(),
+      productIds: new Set(),
+      names: new Set(),
+    };
+
+    const trackedInventoryRows = rawInventory.filter(item => {
+      if (item.internal_product_id && inventoriedProductLookup.ids.has(String(item.internal_product_id))) return true;
+      if (item.product_id && inventoriedProductLookup.productIds.has(String(item.product_id).trim().toLowerCase())) return true;
+      if (item.product_name && inventoriedProductLookup.names.has(String(item.product_name).trim().toLowerCase())) return true;
+      return false;
+    });
+
+    trackedInventoryRows.forEach(item => {
+      if (item.internal_product_id) matchedInventoryKeys.ids.add(String(item.internal_product_id));
+      if (item.product_id) matchedInventoryKeys.productIds.add(String(item.product_id).trim().toLowerCase());
+      if (item.product_name) matchedInventoryKeys.names.add(String(item.product_name).trim().toLowerCase());
+    });
+
+    const productBackedRows = inventoriedProductData
+      .filter(product => product?.is_inventoried)
+      .filter(product => {
+        if (product.id && matchedInventoryKeys.ids.has(String(product.id))) return false;
+        if (product.product_id && matchedInventoryKeys.productIds.has(String(product.product_id).trim().toLowerCase())) return false;
+        const productName = product.name || product.product_name;
+        if (productName && matchedInventoryKeys.names.has(String(productName).trim().toLowerCase())) return false;
+        return true;
+      })
+      .map(product => {
+        const productName = product.name || product.product_name || 'Unnamed product';
+        const unit = product.report_by_unit || product.base_unit || 'ea';
+        const categoryOption = getInventoryCategoryOption(product);
+        return {
+          id: `catalog-product:${product.id || product.product_id || productName}`,
+          inventory_id: null,
+          internal_product_id: product.id || null,
+          product_id: product.product_id || null,
+          product_name: productName,
+          accounting_category: product.accounting_category || categoryOption.code || '1210',
+          category: product.category || categoryOption.label,
+          current_quantity: 0,
+          current_unit: unit,
+          unit_cost: Number(product.latest_price || 0),
+          current_value: 0,
+          previous_quantity: 0,
+          previous_value: 0,
+          par_level: null,
+          reorder_point: null,
+          location: '',
+          organization_id: product.organization_id || organizationId || null,
+          brand_id: product.brand_id || brandId || null,
+          location_id: product.location_id || locationId || null,
+          is_product_backed_inventory: true,
+        };
+      });
+
+    return [...trackedInventoryRows, ...productBackedRows].sort((a, b) => (
+      String(a.product_name || '').localeCompare(String(b.product_name || ''))
+    ));
+  }, [brandId, inventoriedProductData, inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, locationId, organizationId, rawInventory]);
+
+  const isLoading = inventoryLoading || inventoriedProductsLoading;
 
   const { data: inventoryMetrics } = useAuthQuery({
-    queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
-    queryFn: () => api.metrics.getInventoryTotals(organization?.id, debouncedSearch, location?.id),
-    enabled: !!organization?.id && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
+    queryKey: ['inventoryMetrics', organizationId, locationId, debouncedSearch],
+    queryFn: () => api.metrics.getInventoryTotals(organizationId, debouncedSearch, locationId),
+    enabled: !!organizationId && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
   });
 
   const { data: snapshotInvoices = [] } = useAuthQuery({
@@ -527,18 +704,26 @@ export default function Inventory() {
     return filterByContext(countSheetsData.pages.flat(), { organization, brand, location });
   }, [countSheetsData, organization, brand, location]);
 
+  useEffect(() => {
+    if (activeTab !== 'counts' || !requestedStockCountSheetId || stockCountSheetId === requestedStockCountSheetId) return;
+    if (!countSheets.some(sheet => sheet.id === requestedStockCountSheetId)) return;
+    setStockCountSheetId(requestedStockCountSheetId);
+    setStockCountScopes(['all']);
+    setStockCountValues({});
+    setEditingStockCountId(null);
+    setStockCountDetailRecord(null);
+  }, [activeTab, countSheets, requestedStockCountSheetId, stockCountSheetId]);
+
   const {
     data: countSessionsData,
     fetchNextPage: fetchNextCountSessionsPage,
     hasNextPage: hasNextCountSessionsPage,
     isFetchingNextPage: isFetchingNextCountSessionsPage
   } = useAuthInfiniteQuery({
-    queryKey: ['count_sessions', organization?.id, debouncedSearch, sortCountSessions],
+    queryKey: ['count_sessions', organization?.id, sortCountSessions],
     queryFn: ({ pageParam = 0 }) => api.entities.CountSession.list(sortCountSessions, {
       page: pageParam,
       pageSize: 50,
-      search: activeTab === 'counts' ? debouncedSearch || undefined : undefined,
-      searchColumn: 'notes'
     }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
@@ -550,29 +735,85 @@ export default function Inventory() {
     return filterByContext(countSessionsData.pages.flat(), { organization, brand, location });
   }, [countSessionsData, organization, brand, location]);
 
+  const normalizeCountSessionItems = React.useCallback((session = {}) => {
+    if (Array.isArray(session.items)) return session.items;
+    if (Array.isArray(session.counted_data)) return session.counted_data;
+    if (session.counted_data && typeof session.counted_data === 'object') {
+      return Object.entries(session.counted_data).map(([id, value]) => ({
+        id,
+        product_name: value?.product_name || value?.name || id,
+        accounting_category: value?.accounting_category,
+        category: value?.category,
+        bucket: value?.bucket,
+        unit: value?.unit,
+        count: Number(value?.count ?? value?.quantity ?? value ?? 0),
+        unit_cost: Number(value?.unit_cost ?? 0),
+        value: Number(value?.value || (Number(value?.count ?? value?.quantity ?? value ?? 0) * Number(value?.unit_cost ?? 0)) || 0),
+      }));
+    }
+    return [];
+  }, []);
+
+  const normalizeCountSessionRow = React.useCallback((session = {}) => {
+    const items = normalizeCountSessionItems(session);
+    return {
+      id: session.id || session.session_id,
+      countSheetId: session.count_sheet_id,
+      date: session.count_date || session.created_at?.split('T')[0] || session.started_at?.split('T')[0] || stockCountDate,
+      scope: session.scope || session.type || 'Inventory',
+      scopeKey: session.scope_key || 'all',
+      type: session.type || session.notes || 'Inventory',
+      status: ['closed', 'completed'].includes(String(session.status || '').toLowerCase()) ? 'Closed' : 'Saved',
+      itemCount: Number(session.item_count ?? items.length),
+      countedItems: items.filter(item => Number(item.count || 0) > 0).length,
+      total: Number(session.total_value ?? items.reduce((sum, item) => sum + Number(item.value || 0), 0)),
+      items,
+      savedAt: session.saved_at || session.created_at || session.started_at || new Date().toISOString(),
+      closedAt: session.closed_at,
+      updatedAt: session.updated_at,
+    };
+  }, [normalizeCountSessionItems, stockCountDate]);
+
   useEffect(() => {
-    const rows = countSessions.map((session) => {
-      const items = Array.isArray(session.items)
-        ? session.items
-        : (Array.isArray(session.counted_data) ? session.counted_data : []);
-      return {
-        id: session.id,
-        date: session.count_date || session.created_at?.split('T')[0],
-        scope: session.scope || session.type || 'Inventory',
-        scopeKey: session.scope_key || 'all',
-        type: session.type || session.notes || 'Inventory',
-        status: ['closed', 'completed'].includes(String(session.status || '').toLowerCase()) ? 'Closed' : 'Saved',
-        itemCount: items.length,
-        countedItems: items.filter(item => Number(item.count || 0) > 0).length,
-        total: Number(session.total_value || 0),
-        items,
-        savedAt: session.saved_at || session.created_at,
-        closedAt: session.closed_at,
-        updatedAt: session.updated_at,
-      };
+    if (!stockCountHistoryCacheKey || typeof localStorage === 'undefined') return;
+    stockCountHistoryLoadedRef.current = false;
+    try {
+      const cachedRows = JSON.parse(localStorage.getItem(stockCountHistoryCacheKey) || '[]');
+      setStockCountHistory(Array.isArray(cachedRows) ? cachedRows : []);
+    } catch {
+      setStockCountHistory([]);
+    } finally {
+      stockCountHistoryLoadedRef.current = true;
+    }
+  }, [stockCountHistoryCacheKey]);
+
+  useEffect(() => {
+    if (!stockCountHistoryCacheKey || typeof localStorage === 'undefined' || !stockCountHistoryLoadedRef.current) return;
+    localStorage.setItem(stockCountHistoryCacheKey, JSON.stringify(stockCountHistory));
+  }, [stockCountHistory, stockCountHistoryCacheKey]);
+
+  useEffect(() => {
+    const rows = countSessions.map(normalizeCountSessionRow).filter(row => row.id);
+    if (rows.length === 0) return;
+    setStockCountHistory(prev => {
+      const merged = new Map(prev.map(row => [row.id, row]));
+      rows.forEach(row => {
+        const existing = merged.get(row.id);
+        const existingTotal = Number(existing?.total ?? existing?.total_value ?? 0);
+        const incomingTotal = Number(row.total ?? row.total_value ?? 0);
+        const existingHasItems = Array.isArray(existing?.items) && existing.items.length > 0;
+        const incomingHasItems = Array.isArray(row.items) && row.items.length > 0;
+
+        merged.set(row.id, existing && existingHasItems && existingTotal > 0 && (!incomingHasItems || incomingTotal === 0)
+          ? { ...row, ...existing }
+          : { ...existing, ...row }
+        );
+      });
+      return Array.from(merged.values()).sort((a, b) => (
+        new Date(b.savedAt || b.updatedAt || b.date || 0) - new Date(a.savedAt || a.updatedAt || a.date || 0)
+      ));
     });
-    setStockCountHistory(rows);
-  }, [countSessions]);
+  }, [countSessions, normalizeCountSessionRow]);
 
   const {
     data: recipesData,
@@ -613,21 +854,66 @@ export default function Inventory() {
   }, [invalidateCountSessionsRealtime, invalidateCountSheetsRealtime, invalidateInventoryRealtime, invalidateWastageRealtime, organization?.id]);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.Inventory.update(id, data),
+    mutationFn: async ({ id, data, syncProduct = false, sourceItem = null }) => {
+      const updatedInventory = await api.entities.Inventory.update(id, data);
+
+      if (syncProduct) {
+        const productRef = sourceItem?.product_id;
+        const productPayload = {
+          name: data.product_name,
+          accounting_category: data.accounting_category,
+          report_by_unit: data.current_unit,
+          base_unit: data.current_unit,
+          latest_price: data.unit_cost,
+          is_inventoried: true,
+        };
+
+        try {
+          let product = null;
+          if (productRef) {
+            try {
+              product = await api.entities.Product.get(productRef);
+            } catch {
+              const matches = await api.entities.Product.filter({ product_id: productRef }, { limit: 1 });
+              product = matches[0] || null;
+            }
+          }
+          if (!product && sourceItem?.product_name) {
+            const matches = await api.entities.Product.filter({}, {
+              search: sourceItem.product_name,
+              searchColumn: 'name',
+              limit: 1,
+            });
+            product = matches.find(row => row.name?.toLowerCase() === sourceItem.product_name.toLowerCase()) || matches[0] || null;
+          }
+          if (product?.id) await api.entities.Product.update(product.id, productPayload);
+        } catch (error) {
+          toast.error(error?.message || 'Inventory saved, but linked product was not updated');
+        }
+      }
+
+      return updatedInventory;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
       toast.success('Inventory updated');
       setEditDialogOpen(false);
     },
+    onError: (error) => toast.error(error?.message || 'Unable to update inventory'),
   });
 
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Inventory.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
       toast.success('Item added to inventory');
       setAddDialogOpen(false);
       setAddForm({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Unable to add inventory item');
     },
   });
 
@@ -648,7 +934,7 @@ export default function Inventory() {
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
     },
     onSuccess: () => {
       toast.success('Item removed from inventory');
@@ -673,9 +959,9 @@ export default function Inventory() {
         ? 'Auto organized by product group'
         : 'Manual shelf order',
       status: 'active',
-      organization_id: organization?.id || null,
-      brand_id: brand?.id || brand?.brand_id || location?.brand_id || null,
-      location_id: location?.id || userProfile?.location_id || null,
+      organization_id: organizationId,
+      brand_id: brandId,
+      location_id: locationId || userProfile?.location_id || null,
       organize_by: countSheetForm.organizeBy,
       auto_add_product_groups: countSheetForm.buckets,
       items: selectedItems.map((item) => ({
@@ -695,6 +981,34 @@ export default function Inventory() {
       toast.error(error.message || 'Unable to add count sheet');
     }
   };
+
+  const deleteCountSheetMutation = useMutation({
+    mutationFn: async (sheet) => {
+      if (!sheet?.id) throw new Error('Count sheet not found');
+      if (sheet.local_only) return sheet;
+      try {
+        return await api.entities.CountSheet.update(sheet.id, {
+          status: 'deleted',
+          deleted_at: new Date().toISOString(),
+        });
+      } catch {
+        return api.entities.CountSheet.delete(sheet.id);
+      }
+    },
+    onSuccess: (_data, sheet) => {
+      setCountSheetDeleteTarget(null);
+      if (editingCountSheetId === sheet?.id) {
+        setEditingCountSheetId(null);
+        setCountSheetDraft(null);
+      }
+      if (stockCountSheetId === sheet?.id) {
+        setStockCountSheetId('');
+      }
+      invalidateCountSheetsRealtime();
+      toast.success('Count sheet deleted');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to delete count sheet'),
+  });
 
   const completeCountSessionMutation = useMutation({
     mutationFn: async (counts = {}) => {
@@ -730,21 +1044,21 @@ export default function Inventory() {
   });
 
   // Stats
-  const { totalItems, totalValue, lowStock, totalWastageValue } = React.useMemo(() => {
+  const { totalItems, totalValue, lowStock } = React.useMemo(() => {
+    const inventoryLoaded = Boolean(inventoryData?.pages);
     const adjustedInventoryValue = inventory.reduce((sum, item) => {
       const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
       return sum + value;
     }, 0);
-    const adjustedInventoryItems = inventory.filter(item => Number(item.current_quantity || 0) > 0).length;
+    const adjustedInventoryItems = inventory.length;
     const adjustedLowStock = inventory.filter(isBelowReorderPoint).length;
 
     return {
-      totalItems: inventory.length > 0 ? adjustedInventoryItems : (inventoryMetrics?.totalItems || 0),
-      totalValue: inventory.length > 0 ? adjustedInventoryValue : Number(inventoryMetrics?.totalValue || 0),
-      lowStock: inventory.length > 0 ? adjustedLowStock : (inventoryMetrics?.lowStock || 0),
-      totalWastageValue: Number(inventoryMetrics?.totalWastageValue || 0),
+      totalItems: inventoryLoaded ? adjustedInventoryItems : (inventoryMetrics?.totalItems || 0),
+      totalValue: inventoryLoaded ? adjustedInventoryValue : Number(inventoryMetrics?.totalValue || 0),
+      lowStock: inventoryLoaded ? adjustedLowStock : (inventoryMetrics?.lowStock || 0),
     };
-  }, [inventory, inventoryMetrics]);
+  }, [inventory, inventoryData?.pages, inventoryMetrics]);
 
   const wasteLogValue = React.useMemo(() => {
     return wastageLogs.reduce((sum, log) => sum + Number(log.value || 0), 0);
@@ -763,9 +1077,7 @@ export default function Inventory() {
     }, 0);
   }, [wastageLogs]);
 
-  const displayedMtdWastageValue = needsWastage
-    ? currentMonthWastageValue
-    : Number(totalWastageValue || 0);
+  const displayedMtdWastageValue = currentMonthWastageValue;
 
   const byCategory = React.useMemo(() => {
     return inventory.reduce((acc, item) => {
@@ -817,6 +1129,36 @@ export default function Inventory() {
     }));
   }, [inventoryBuckets, totalValue]);
 
+  const summaryCategoryRows = React.useMemo(() => {
+    return Object.entries(byCategory)
+      .map(([category, data]) => ({
+        category,
+        label: getCOALabel(category),
+        ...data,
+        percent: totalValue > 0 && data.value > 0 ? (data.value / totalValue) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [byCategory, totalValue]);
+
+  const summaryLowStockRows = React.useMemo(() => {
+    return inventory
+      .filter(isBelowReorderPoint)
+      .slice()
+      .sort((a, b) => Number(a.current_quantity || 0) - Number(b.current_quantity || 0))
+      .slice(0, 6);
+  }, [inventory]);
+
+  const summaryTopValueRows = React.useMemo(() => {
+    return inventory
+      .slice()
+      .sort((a, b) => {
+        const aValue = Number(a.current_value || (Number(a.current_quantity || 0) * Number(a.unit_cost || 0)) || 0);
+        const bValue = Number(b.current_value || (Number(b.current_quantity || 0) * Number(b.unit_cost || 0)) || 0);
+        return bValue - aValue;
+      })
+      .slice(0, 6);
+  }, [inventory]);
+
   const filteredWastageLogs = React.useMemo(() => {
     const startDate = parseLocalDate(appliedWastageDateRange.startDate);
     const endDate = parseLocalDate(appliedWastageDateRange.endDate);
@@ -860,6 +1202,34 @@ export default function Inventory() {
 
   const stockCountSections = React.useMemo(() => {
     if (!stockCountDate) return [];
+    const selectedSheet = countSheets.find(sheet => sheet.id === stockCountSheetId);
+    if (selectedSheet) {
+      const inventoryById = new Map(inventory.map(item => [item.id, item]));
+      const inventoryByName = new Map(inventory.map(item => [String(item.product_name || '').toLowerCase(), item]));
+      const sheetItems = (Array.isArray(selectedSheet.items) ? selectedSheet.items : [])
+        .map(sheetItem => {
+          const inventoryItem = inventoryById.get(sheetItem.inventory_id)
+            || inventoryByName.get(String(sheetItem.product_name || '').toLowerCase());
+          return inventoryItem
+            ? { ...inventoryItem, sheet_sort_order: sheetItem.sort_order || 0 }
+            : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => Number(a.sheet_sort_order || 0) - Number(b.sheet_sort_order || 0));
+
+      const byBucket = sheetItems.reduce((acc, item) => {
+        const label = getCOALabel(item.accounting_category);
+        const key = item.accounting_category || getCountSheetBucket(item);
+        if (!acc[key]) acc[key] = { key, label, items: [] };
+        acc[key].items.push(item);
+        return acc;
+      }, {});
+
+      return Object.values(byBucket);
+    }
+
+    const selectedKeys = new Set(stockCountScopes);
+    const showAll = selectedKeys.has('all') || selectedKeys.size === 0;
 
     const byAccount = inventory.reduce((acc, item) => {
       const key = item.accounting_category || 'uncategorized';
@@ -871,40 +1241,59 @@ export default function Inventory() {
 
     return Object.values(byAccount)
       .filter(group => {
-        if (stockCountScope === 'all') return true;
+        if (showAll) return true;
         const bucket = getSummaryBucketLabel(getCountSheetBucket({
           accounting_category: group.key,
           category: group.label,
           product_name: group.label,
         }));
-        if (stockCountScope === 'food') return bucket === 'Food';
-        if (stockCountScope === 'bar') return ['Liquor', 'Wine', 'Beverages'].includes(bucket);
-        return false;
+        const exactBucket = getCountSheetBucket({
+          accounting_category: group.key,
+          category: group.label,
+          product_name: group.label,
+        });
+        return INVENTORY_ITEM_CATEGORY_OPTIONS.some((selected) => {
+          if (!selectedKeys.has(selected.key)) return false;
+          if (selected.label === 'N/A Bev') return exactBucket === 'N/A Bev';
+          return selected.label === bucket || selected.label === exactBucket;
+        });
       })
       .map(group => ({
         ...group,
         items: group.items.slice().sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || ''))),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [inventory, stockCountDate, stockCountScope]);
+  }, [countSheets, inventory, stockCountDate, stockCountScopes, stockCountSheetId]);
 
   const stockCountOptions = React.useMemo(() => {
     const counts = inventory.reduce((acc, item) => {
-      const bucket = getSummaryBucketLabel(getCountSheetBucket(item));
       acc.all += 1;
-      if (bucket === 'Food') acc.food += 1;
-      if (['Liquor', 'Wine', 'Beverages'].includes(bucket)) acc.bar += 1;
+      const bucket = getCountSheetBucket(item);
+      const option = INVENTORY_ITEM_CATEGORY_OPTIONS.find(entry => entry.label === bucket);
+      if (option) acc[option.key] = (acc[option.key] || 0) + 1;
       return acc;
-    }, { all: 0, food: 0, bar: 0 });
+    }, Object.fromEntries(INVENTORY_CATEGORY_OPTIONS.map(option => [option.key, 0])));
 
-    return [
-      { key: 'all', label: 'All Inventory', items: counts.all },
-      { key: 'food', label: 'Food Inventory', items: counts.food },
-      { key: 'bar', label: 'Bar Inventory', items: counts.bar },
-    ];
+    return INVENTORY_CATEGORY_OPTIONS.map(option => ({
+      ...option,
+      label: option.key === 'all' ? 'All Inventory' : `${option.label} Inventory`,
+      items: counts[option.key] || 0,
+    }));
   }, [inventory]);
 
-  const countSheetBucketOptions = inventoryBuckets;
+  const countSheetBucketOptions = React.useMemo(() => {
+    const bucketCounts = new Map(inventoryBuckets.map(bucket => [bucket.label, bucket]));
+    return INVENTORY_ITEM_CATEGORY_OPTIONS.map((option, index) => {
+      const bucket = bucketCounts.get(option.label);
+      return {
+        label: option.label,
+        items: bucket?.items || 0,
+        value: bucket?.value || 0,
+        percent: bucket?.percent ?? null,
+        accent: bucket?.accent || getBucketAccent(index),
+      };
+    });
+  }, [inventoryBuckets]);
 
   const allCountSheets = React.useMemo(() => {
     return countSheets;
@@ -925,6 +1314,9 @@ export default function Inventory() {
       .map(sheet => {
         const items = Array.isArray(sheet.items) ? sheet.items : [];
         const counts = Object.fromEntries(countSheetBucketOptions.map(bucket => [bucket.label, 0]));
+        const includedGroups = Array.isArray(sheet.auto_add_product_groups)
+          ? sheet.auto_add_product_groups
+          : [];
 
         items.forEach(sheetItem => {
           const inventoryItem = inventoryById.get(sheetItem.inventory_id)
@@ -938,13 +1330,189 @@ export default function Inventory() {
           ...sheet,
           itemCount: items.length,
           bucketCounts: counts,
+          bucketIncluded: Object.fromEntries(countSheetBucketOptions.map(bucket => [
+            bucket.label,
+            includedGroups.includes(bucket.label) || Number(counts[bucket.label] || 0) > 0,
+          ])),
         };
       });
   }, [allCountSheets, countSheetBucketOptions, countSheetStatus, inventory]);
 
+  const editingCountSheet = React.useMemo(() => {
+    if (!editingCountSheetId) return null;
+    return countSheetRows.find(sheet => sheet.id === editingCountSheetId) || null;
+  }, [countSheetRows, editingCountSheetId]);
+
+  const countSheetDraftItems = React.useMemo(() => {
+    if (!countSheetDraft) return [];
+    const inventoryById = new Map(inventory.map(item => [item.id, item]));
+    return (countSheetDraft.items || []).map((item, index) => {
+      const inventoryItem = inventoryById.get(item.inventory_id) || {};
+      const unitCost = Number(inventoryItem.unit_cost ?? item.unit_cost ?? 0);
+      return {
+        ...item,
+        rowId: item.inventory_id || item.id || `${item.product_name}-${index}`,
+        product_id: inventoryItem.product_id || item.product_id || null,
+        product_name: inventoryItem.product_name || item.product_name || 'Unnamed item',
+        last_purchased_at: inventoryItem.last_purchased_at || inventoryItem.updated_at || inventoryItem.created_at || item.last_purchased_at,
+        unit: inventoryItem.current_unit || item.unit || 'ea',
+        unit_cost: unitCost,
+        bucket: getCountSheetBucket(inventoryItem.id ? inventoryItem : item),
+      };
+    });
+  }, [countSheetDraft, inventory]);
+
+  const countSheetDraftSections = React.useMemo(() => {
+    const grouped = countSheetDraftItems.reduce((acc, item) => {
+      const label = item.bucket || 'Other';
+      if (!acc[label]) acc[label] = [];
+      acc[label].push(item);
+      return acc;
+    }, {});
+    return Object.entries(grouped).map(([label, items]) => ({ label, items }));
+  }, [countSheetDraftItems]);
+
+  const openCountSheetEditor = (sheet) => {
+    const sheetItems = Array.isArray(sheet.items) ? sheet.items : [];
+    setEditingCountSheetId(sheet.id);
+    setCountSheetDraft({
+      id: sheet.id,
+      name: sheet.name || '',
+      buckets: Array.isArray(sheet.auto_add_product_groups)
+        ? sheet.auto_add_product_groups
+        : countSheetBucketOptions.filter(bucket => Number(sheet.bucketCounts?.[bucket.label] || 0) > 0).map(bucket => bucket.label),
+      organizeBy: sheet.organize_by || 'auto_category',
+      items: sheetItems.map((item, index) => ({ ...item, sort_order: item.sort_order ?? index + 1 })),
+    });
+    setCountSheetProductToAdd('');
+  };
+
+  const setCountSheetDraftBuckets = (bucketLabel, checked) => {
+    setCountSheetDraft(prev => {
+      if (!prev) return prev;
+      const buckets = checked
+        ? [...new Set([...prev.buckets, bucketLabel])]
+        : prev.buckets.filter(label => label !== bucketLabel);
+      const existingIds = new Set((prev.items || []).map(item => item.inventory_id));
+      const autoItems = checked
+        ? inventory
+            .filter(item => getCountSheetBucket(item) === bucketLabel && !existingIds.has(item.id))
+            .map((item, index) => ({
+              inventory_id: item.id,
+              product_name: item.product_name,
+              unit: item.current_unit || 'ea',
+              expected_quantity: item.current_quantity || 0,
+              sort_order: (prev.items || []).length + index + 1,
+            }))
+        : [];
+      return {
+        ...prev,
+        buckets,
+        items: [...(prev.items || []), ...autoItems],
+      };
+    });
+  };
+
+  const addProductToCountSheetDraft = () => {
+    const product = inventory.find(item => item.id === countSheetProductToAdd);
+    if (!product) return;
+    setCountSheetDraft(prev => {
+      if (!prev || (prev.items || []).some(item => item.inventory_id === product.id)) return prev;
+      return {
+        ...prev,
+        items: [
+          ...(prev.items || []),
+          {
+            inventory_id: product.id,
+            product_name: product.product_name,
+            unit: product.current_unit || 'ea',
+            expected_quantity: product.current_quantity || 0,
+            sort_order: (prev.items || []).length + 1,
+          },
+        ],
+      };
+    });
+    setCountSheetProductToAdd('');
+  };
+
+  const removeProductFromCountSheetDraft = (rowId) => {
+    setCountSheetDraft(prev => prev
+      ? { ...prev, items: (prev.items || []).filter((item, index) => (item.inventory_id || item.id || `${item.product_name}-${index}`) !== rowId) }
+      : prev
+    );
+  };
+
+  const moveCountSheetDraftItem = (rowId, direction) => {
+    setCountSheetDraft(prev => {
+      if (!prev) return prev;
+      const items = [...(prev.items || [])];
+      const index = items.findIndex((item, itemIndex) => (item.inventory_id || item.id || `${item.product_name}-${itemIndex}`) === rowId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= items.length) return prev;
+      [items[index], items[nextIndex]] = [items[nextIndex], items[index]];
+      return { ...prev, items: items.map((item, itemIndex) => ({ ...item, sort_order: itemIndex + 1 })) };
+    });
+  };
+
+  const openCountSheetProduct = (item) => {
+    const inventoryItem = inventory.find(row => (
+      row.id === item.inventory_id ||
+      row.id === item.rowId ||
+      (item.product_name && row.product_name?.toLowerCase() === item.product_name.toLowerCase())
+    ));
+    if (!inventoryItem) {
+      toast.error('This product is not available in inventory yet');
+      return;
+    }
+    handleEdit(inventoryItem);
+  };
+
+  const startStockCountFromSheet = (sheet) => {
+    if (!warnIfMissing()) return;
+    if (!sheet?.id) return;
+    setStockCountSheetId(sheet.id);
+    setStockCountScopes(['all']);
+    setStockCountValues({});
+    setEditingStockCountId(null);
+    setStockCountDetailRecord(null);
+    setStockCountDate(new Date().toISOString().split('T')[0]);
+    const params = new URLSearchParams(routerLocation.search);
+    params.set('countSheetId', sheet.id);
+    navigate(`/Inventory/counts?${params.toString()}`);
+  };
+
+  const saveCountSheetDraft = async () => {
+    if (!countSheetDraft?.name?.trim()) {
+      toast.error('Enter a count sheet name');
+      return;
+    }
+    try {
+      await api.entities.CountSheet.update(countSheetDraft.id, {
+        name: countSheetDraft.name.trim(),
+        description: countSheetDraft.organizeBy === 'auto_category' ? 'Auto organized by product group' : 'Manual shelf order',
+        organize_by: countSheetDraft.organizeBy,
+        auto_add_product_groups: countSheetDraft.buckets || [],
+        items: (countSheetDraft.items || []).map((item, index) => ({
+          inventory_id: item.inventory_id,
+          product_name: item.product_name,
+          expected_quantity: item.expected_quantity || 0,
+          unit: item.unit || 'ea',
+          sort_order: index + 1,
+        })),
+      });
+      queryClient.invalidateQueries({ queryKey: ['count_sheets'] });
+      setEditingCountSheetId(null);
+      setCountSheetDraft(null);
+      toast.success('Count sheet saved');
+    } catch (error) {
+      toast.error(error.message || 'Unable to save count sheet');
+    }
+  };
+
   const currentStockCountItems = React.useMemo(() => {
     return stockCountSections.flatMap(section => section.items.map(item => {
-      const count = Number(stockCountValues[item.id] || 0);
+      const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, item.id);
+      const count = Number(hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || 0);
       const unitCost = Number(item.unit_cost || 0);
       const bucket = getSummaryBucketLabel(getCountSheetBucket(item));
       return {
@@ -965,6 +1533,13 @@ export default function Inventory() {
     return currentStockCountItems.reduce((sum, item) => sum + item.value, 0);
   }, [currentStockCountItems]);
 
+  const selectedStockCountSheet = React.useMemo(() => {
+    if (!stockCountSheetId) return null;
+    return countSheetRows.find(sheet => sheet.id === stockCountSheetId)
+      || countSheets.find(sheet => sheet.id === stockCountSheetId)
+      || null;
+  }, [countSheetRows, countSheets, stockCountSheetId]);
+
   const getStockCountTypeName = React.useCallback((items, fallback = 'Inventory') => {
     const buckets = new Set(
       (items || [])
@@ -980,9 +1555,13 @@ export default function Inventory() {
   }, []);
 
   const getStockCountScopeType = React.useCallback((scopeKey, fallback = 'Inventory') => {
-    if (scopeKey === 'food') return 'Food Inventory';
-    if (scopeKey === 'bar') return 'Bar Inventory';
-    if (scopeKey === 'all') return 'All Inventory';
+    const keys = String(scopeKey || 'all').split(',').filter(Boolean);
+    if (keys.includes('all') || keys.length === 0) return 'All Inventory';
+    const labels = keys
+      .map(key => INVENTORY_CATEGORY_OPTIONS.find(entry => entry.key === key)?.label)
+      .filter(Boolean);
+    if (labels.length === 1) return `${labels[0]} Inventory`;
+    if (labels.length > 1) return `${labels.join(' + ')} Inventory`;
     return fallback;
   }, []);
 
@@ -991,14 +1570,16 @@ export default function Inventory() {
 
     return stockCountHistory.map(record => {
       const totalsByBucket = Object.fromEntries(bucketLabels.map(label => [label, 0]));
+      const isActiveEditRow = editingStockCountId && record.id === editingStockCountId;
+      const recordItems = isActiveEditRow ? currentStockCountItems : record.items;
 
-      if (Array.isArray(record.items) && record.items.length > 0) {
-        record.items.forEach(item => {
+      if (Array.isArray(recordItems) && recordItems.length > 0) {
+        recordItems.forEach(item => {
           const rawBucket = item.bucket || item.category || getCountSheetBucket(item);
           const bucket = bucketLabels.includes(rawBucket)
             ? rawBucket
             : getSummaryBucketLabel(getCountSheetBucket({ ...item, category: rawBucket, product_name: item.product_name || rawBucket }));
-          const value = Number(item.value ?? (Number(item.count || 0) * Number(item.unit_cost || 0)) ?? 0);
+          const value = Number(item.value || (Number(item.count || 0) * Number(item.unit_cost || 0)) || 0);
           totalsByBucket[bucket] = (totalsByBucket[bucket] || 0) + value;
         });
       } else {
@@ -1011,14 +1592,19 @@ export default function Inventory() {
       }
 
       const total = Object.values(totalsByBucket).reduce((sum, value) => sum + Number(value || 0), 0);
+      const derivedType = getStockCountTypeName(recordItems, record.type || record.scope);
       return {
         ...record,
-        type: getStockCountScopeType(record.scopeKey, record.type || getStockCountTypeName(record.items, record.scope)),
+        type: isActiveEditRow && selectedStockCountSheet?.name
+          ? selectedStockCountSheet.name
+          : record.countSheetId
+          ? (record.type || record.scope || derivedType)
+          : getStockCountScopeType(record.scopeKey, derivedType),
         totalsByBucket,
         total,
       };
     });
-  }, [getStockCountScopeType, getStockCountTypeName, stockCountHistory, summaryBuckets]);
+  }, [currentStockCountItems, editingStockCountId, getStockCountScopeType, getStockCountTypeName, selectedStockCountSheet?.name, stockCountHistory, summaryBuckets]);
 
   const filteredStockCountHistoryRows = React.useMemo(() => {
     const startDate = parseLocalDate(appliedStockCountHistoryRange.startDate);
@@ -1031,7 +1617,66 @@ export default function Inventory() {
     });
   }, [appliedStockCountHistoryRange.endDate, appliedStockCountHistoryRange.startDate, stockCountHistoryRows]);
 
+  const editingStockCountRecord = React.useMemo(() => {
+    if (!editingStockCountId) return null;
+    return stockCountHistoryRows.find(record => record.id === editingStockCountId) || null;
+  }, [editingStockCountId, stockCountHistoryRows]);
+
+  const stockCountScopeKey = React.useMemo(() => {
+    const keys = stockCountScopes.length > 0 ? stockCountScopes : ['all'];
+    return keys.includes('all') ? 'all' : keys.join(',');
+  }, [stockCountScopes]);
+
+  const selectedStockCountLabel = React.useMemo(() => {
+    if (selectedStockCountSheet?.name) return selectedStockCountSheet.name;
+    return getStockCountScopeType(stockCountScopeKey, 'Inventory Count');
+  }, [getStockCountScopeType, selectedStockCountSheet?.name, stockCountScopeKey]);
+
+  useEffect(() => {
+    if (!editingStockCountId) return;
+    const scopeKey = stockCountSheetId ? `sheet:${stockCountSheetId}` : stockCountScopeKey;
+    const type = selectedStockCountSheet?.name
+      || getStockCountScopeType(stockCountScopeKey, getStockCountTypeName(currentStockCountItems, selectedStockCountLabel));
+    const total = currentStockCountItems.reduce((sum, item) => sum + Number(item.value || 0), 0);
+    const now = new Date().toISOString();
+
+    setStockCountHistory(prev => prev.map(row => (
+      row.id === editingStockCountId
+        ? {
+            ...row,
+            countSheetId: stockCountSheetId || row.countSheetId,
+            count_sheet_id: stockCountSheetId || row.count_sheet_id,
+            scopeKey,
+            scope_key: scopeKey,
+            scope: type,
+            type,
+            date: stockCountDate,
+            count_date: stockCountDate,
+            items: currentStockCountItems,
+            itemCount: currentStockCountItems.length,
+            item_count: currentStockCountItems.length,
+            total,
+            total_value: total,
+            updatedAt: now,
+            updated_at: now,
+          }
+        : row
+    )));
+  }, [currentStockCountItems, editingStockCountId, getStockCountScopeType, getStockCountTypeName, selectedStockCountLabel, selectedStockCountSheet?.name, stockCountDate, stockCountScopeKey, stockCountSheetId]);
+
+  const toggleStockCountScope = (key) => {
+    setStockCountScopes(prev => {
+      if (key === 'all') return ['all'];
+      const current = prev.includes('all') ? [] : prev;
+      const next = current.includes(key)
+        ? current.filter(item => item !== key)
+        : [...current, key];
+      return next.length > 0 ? next : ['all'];
+    });
+  };
+
   const requestSaveStockCount = () => {
+    if (!warnIfMissing()) return;
     if (!stockCountDate) {
       toast.error('Choose an inventory date first');
       return;
@@ -1040,26 +1685,50 @@ export default function Inventory() {
   };
 
   const saveStockCount = async () => {
-    const countedItems = currentStockCountItems.filter(item => item.count > 0);
-    const scopeLabel = stockCountOptions.find(option => option.key === stockCountScope)?.label || 'Inventory';
-    const type = getStockCountScopeType(stockCountScope, getStockCountTypeName(countedItems, scopeLabel));
+    if (!warnIfMissing()) return;
+    const countItems = currentStockCountItems;
+    const type = selectedStockCountSheet?.name
+      || getStockCountScopeType(stockCountScopeKey, getStockCountTypeName(countItems, selectedStockCountLabel));
 
     try {
       const savedCount = await api.metrics.saveInventoryCountSession({
         orgId: organization?.id,
         locationId: location?.id || userProfile?.location_id || null,
         brandId: brand?.id || brand?.brand_id || location?.brand_id || null,
-        scopeKey: stockCountScope,
+        countSheetId: stockCountSheetId || null,
+        scopeKey: stockCountSheetId ? `sheet:${stockCountSheetId}` : stockCountScopeKey,
         type,
         countDate: stockCountDate,
-        items: countedItems,
+        items: countItems,
         userId: userProfile?.id,
         sessionId: editingStockCountId,
       });
 
-      setEditingStockCountId(savedCount.id);
+      const savedId = savedCount?.id || savedCount?.session_id || editingStockCountId;
+      const optimisticRow = normalizeCountSessionRow({
+        ...(savedCount || {}),
+        id: savedId,
+        count_sheet_id: stockCountSheetId || null,
+        count_date: stockCountDate,
+        scope_key: stockCountSheetId ? `sheet:${stockCountSheetId}` : stockCountScopeKey,
+        type,
+        status: savedCount?.status || 'saved',
+        items: countItems,
+        total_value: countItems.reduce((sum, item) => sum + Number(item.value || 0), 0),
+        item_count: countItems.length,
+        saved_at: savedCount?.saved_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      if (savedId) {
+        setStockCountHistory(prev => {
+          const next = prev.filter(row => row.id !== savedId);
+          return [optimisticRow, ...next];
+        });
+        setEditingStockCountId(savedId);
+      }
       setStockCountSaveConfirmOpen(false);
-      invalidateCountSessionsRealtime();
+      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
       toast.success(editingStockCountId ? 'Count changes saved' : 'Count saved');
     } catch (error) {
       toast.error(error.message || 'Unable to save count');
@@ -1074,8 +1743,10 @@ export default function Inventory() {
 
     setEditingStockCountId(record.id);
     setStockCountDate(record.date || new Date().toISOString().split('T')[0]);
-    setStockCountScope(record.scopeKey || 'all');
+    setStockCountSheetId(record.countSheetId || record.count_sheet_id || '');
+    setStockCountScopes(String(record.scopeKey || 'all').split(',').filter(Boolean));
     setStockCountValues(Object.fromEntries((record.items || []).map(item => [item.id, String(item.count || '')])));
+    setStockCountDetailRecord(null);
     toast.success('Count opened for editing');
   };
 
@@ -1090,8 +1761,14 @@ export default function Inventory() {
         setEditingStockCountId(null);
         setStockCountValues({});
       }
+      setStockCountHistory(prev => prev.map(row => (
+        row.id === recordId
+          ? { ...row, status: 'Closed', closedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+          : row
+      )));
       setStockCountCloseTarget(null);
-      invalidateCountSessionsRealtime();
+      setStockCountDetailRecord(null);
+      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
       toast.success('Count closed. It is now read-only.');
     } catch (error) {
       toast.error(error.message || 'Unable to close count');
@@ -1109,8 +1786,10 @@ export default function Inventory() {
         setEditingStockCountId(null);
         setStockCountValues({});
       }
+      setStockCountHistory(prev => prev.filter(row => row.id !== recordId));
       setStockCountDeleteTarget(null);
-      invalidateCountSessionsRealtime();
+      setStockCountDetailRecord(null);
+      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
       toast.success('Saved count deleted');
     } catch (error) {
       toast.error(error.message || 'Unable to delete saved count');
@@ -1120,6 +1799,12 @@ export default function Inventory() {
   const handleStockCountHistoryPresetChange = (value) => {
     setStockCountHistoryPreset(value);
     if (value === 'custom') return;
+    if (value === 'all_history') {
+      setStockCountHistoryStartDate('');
+      setStockCountHistoryEndDate('');
+      setAppliedStockCountHistoryRange({ startDate: '', endDate: '' });
+      return;
+    }
 
     const today = new Date();
     const ranges = {
@@ -1183,6 +1868,79 @@ export default function Inventory() {
     toast.success('Saved count history exported');
   };
 
+  const exportStockCountRecord = (record) => {
+    if (!record) return;
+    const items = Array.isArray(record.items) ? record.items : [];
+    if (items.length === 0) {
+      toast.error('No counted items to export for this saved count.');
+      return;
+    }
+
+    const header = ['Count Date', 'Type', 'Status', 'Product', 'Category', 'Bucket', 'Unit', 'Count', 'Unit Cost', 'Value'];
+    const rows = items.map((item) => [
+      record.date || '',
+      record.type || record.scope || '',
+      record.status || '',
+      item.product_name || '',
+      item.category || getCOALabel(item.accounting_category) || '',
+      item.bucket || getSummaryBucketLabel(getCountSheetBucket(item)),
+      item.unit || '',
+      Number(item.count || 0),
+      Number(item.unit_cost || 0).toFixed(2),
+      Number(item.value || (Number(item.count || 0) * Number(item.unit_cost || 0)) || 0).toFixed(2),
+    ]);
+    const csv = [header, ...rows].map(row => row.map(csvValue).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `stock-count-${record.date || 'saved'}-${String(record.type || 'inventory').replace(/\s+/g, '-').toLowerCase()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Saved count exported');
+  };
+
+  const printStockCountRecord = (record) => {
+    if (!record) return;
+    window.print();
+    toast.success(`Print view opened for ${record.type || 'inventory count'}`);
+  };
+
+  const getStockCountRecordSections = React.useCallback((record) => {
+    const groups = {};
+    const inventoryById = new Map(inventory.map(item => [item.id, item]));
+    const items = Array.isArray(record?.items) ? record.items : [];
+
+    items.forEach(item => {
+      const inventoryItem = inventoryById.get(item.id) || {};
+      const bucket = item.bucket || getCountSheetBucket({ ...inventoryItem, ...item });
+      if (!groups[bucket]) groups[bucket] = { label: bucket, items: [], previousValue: 0, countValue: 0 };
+      const previousCount = Number(inventoryItem.previous_quantity ?? inventoryItem.current_quantity ?? 0);
+      const unitCost = Number(item.unit_cost ?? inventoryItem.unit_cost ?? 0);
+      const count = Number(item.count || 0);
+      const previousValue = Number(inventoryItem.previous_value ?? (previousCount * unitCost) ?? 0);
+      const countValue = Number(item.value ?? (count * unitCost) ?? 0);
+      groups[bucket].previousValue += previousValue;
+      groups[bucket].countValue += countValue;
+      groups[bucket].items.push({
+        ...inventoryItem,
+        ...item,
+        previousCount,
+        previousValue,
+        count,
+        unit_cost: unitCost,
+        value: countValue,
+      });
+    });
+
+    const order = ['Food', 'Beer', 'Wine', 'Liquor', 'N/A Bev', 'Retail', 'Other'];
+    return Object.values(groups).sort((a, b) => {
+      const ai = order.indexOf(a.label);
+      const bi = order.indexOf(b.label);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  }, [inventory]);
+
   const toggleStockCountSection = (label) => {
     setStockCountExpandedSections(prev => ({
       ...prev,
@@ -1191,6 +1949,10 @@ export default function Inventory() {
   };
 
   const handleEdit = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product is marked inventoried but has no inventory row yet. Add an inventory count or receiving record before editing stock values.');
+      return;
+    }
     setSelectedItem(item);
     setEditForm({
       product_name: item.product_name || '',
@@ -1206,18 +1968,30 @@ export default function Inventory() {
   };
 
   const handleDelete = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product is marked inventoried in Products. Turn off inventory tracking from the product if it should not appear here.');
+      return;
+    }
     if (confirm(`Remove "${item.product_name}" from inventory? This cannot be undone.`)) {
       deleteMutation.mutate(item.id);
     }
   };
 
   const handleConvert = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product needs an inventory row before unit conversion can be saved.');
+      return;
+    }
     setSelectedItem(item);
     setConvertForm({ fromUnit: item.current_unit || 'ea', toUnit: '', quantity: item.current_quantity || 0 });
     setConvertDialogOpen(true);
   };
 
   const handleLogWastage = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product needs an inventory row before wastage can be logged.');
+      return;
+    }
     setSelectedItem(item);
     setWastageForm({ quantity: 0, unit: item.current_unit || 'ea', reason: 'spoiled', notes: '' });
     setWastageDialogOpen(true);
@@ -1234,6 +2008,8 @@ export default function Inventory() {
     const value = editForm.current_quantity * editForm.unit_cost;
     updateMutation.mutate({
       id: selectedItem.id,
+      sourceItem: selectedItem,
+      syncProduct: true,
       data: {
         ...editForm,
         current_value: value,
@@ -1245,9 +2021,18 @@ export default function Inventory() {
   };
 
   const saveAdd = () => {
+    if (!addForm.product_name.trim()) {
+      toast.error('Enter a product name');
+      return;
+    }
+
     createMutation.mutate({
       ...addForm,
+      product_name: addForm.product_name.trim(),
       product_id: `PRD-${Date.now()}`,
+      organization_id: organization?.id || null,
+      brand_id: brand?.id || brand?.brand_id || location?.brand_id || null,
+      location_id: location?.id || userProfile?.location_id || null,
       current_value: addForm.current_quantity * addForm.unit_cost,
     });
   };
@@ -1276,6 +2061,7 @@ export default function Inventory() {
   };
 
   const saveWastage = async () => {
+    if (!warnIfMissing()) return;
     if (!selectedItem) {
       toast.error('Choose an inventory item first');
       return;
@@ -1496,7 +2282,7 @@ export default function Inventory() {
     ];
     const rows = countSheetRows.map(sheet => [
       sheet.name,
-      ...countSheetBucketOptions.map(bucket => sheet.bucketCounts[bucket.label] > 0 ? 'Yes' : 'No'),
+      ...countSheetBucketOptions.map(bucket => sheet.bucketIncluded?.[bucket.label] ? 'Yes' : 'No'),
       ...countSheetBucketOptions.map(bucket => sheet.bucketCounts[bucket.label] || 0),
       sheet.itemCount,
       sheet.last_count_date ? format(new Date(sheet.last_count_date), 'yyyy-MM-dd') : '',
@@ -1512,8 +2298,11 @@ export default function Inventory() {
   };
 
   const filteredInventory = React.useMemo(() => {
-    return inventory; // Data is now filtered server-side
-  }, [inventory]);
+    if (categoryFilter === 'all') return inventory;
+    const selected = INVENTORY_CATEGORY_OPTIONS.find(option => option.key === categoryFilter);
+    if (!selected) return inventory;
+    return inventory.filter(item => getInventoryCategoryOption(item).key === selected.key);
+  }, [categoryFilter, inventory]);
 
   useEffect(() => {
     setInventoryTableScrollTop(0);
@@ -1719,10 +2508,9 @@ export default function Inventory() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Accounts</SelectItem>
-                    {getFlattenedCOA().map(coa => (
-                      <SelectItem key={coa.code} value={coa.code}>
-                        {coa.code} - {coa.label}
+                    {INVENTORY_CATEGORY_OPTIONS.map(option => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1835,7 +2623,7 @@ export default function Inventory() {
                              </TableCell>
                              <TableCell>
                                <Badge variant="secondary" className="font-mono text-[10px]">
-                                 {getCOALabel(item.accounting_category)}
+                                 {getCountSheetBucket(item)}
                                </Badge>
                              </TableCell>
                             <TableCell>
@@ -1930,82 +2718,158 @@ export default function Inventory() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="summary">
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>Inventory Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                {summaryBuckets.map(({ label, accent, items, value, percent }) => {
-                  const Icon = getSummaryBucketIcon(label);
-                  return (
-                  <div key={label} className={cn("overflow-hidden rounded-md border bg-card shadow-sm", accent.split(' ').find(c => c.startsWith('border-')))}>
-                    <div className="flex items-center justify-between gap-3 border-b border-border bg-secondary/40 px-4 py-3">
-                      <span className="truncate text-sm font-semibold text-foreground">{label}</span>
-                      <span className={cn("h-2 w-10 rounded-full", accent.split(' ')[0])} />
-                    </div>
-                    <div className="flex h-28 items-center justify-between gap-3 px-4">
-                      <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-current/10", accent.split(' ').find(c => c.startsWith('text-')))}>
-                        <Icon className="h-7 w-7" strokeWidth={2.3} />
-                      </div>
-                      <div className="min-w-0 text-right">
-                        <div className="text-3xl font-light tabular-nums text-foreground">
-                          {percent === null ? 'N/A' : `${percent.toFixed(1)}%`}
-                        </div>
-                        {items > 0 && (
-                          <div className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            {items} item{items === 1 ? '' : 's'} · ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  );
-                })}
-              </div>
+        <TabsContent value="summary" className="space-y-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">Inventory Summary</h2>
+              <p className="text-sm text-muted-foreground">Value, count risk, and category movement for this restaurant/location.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setActiveTab('inventory')}>
+                <Warehouse className="mr-2 h-4 w-4" /> Inventory List
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab('counts')}>
+                <Calendar className="mr-2 h-4 w-4" /> Stock Counts
+              </Button>
+            </div>
+          </div>
 
-              <div className="grid items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(byCategory).map(([category, data]) => {
-                  const expanded = expandedSummaryCategory === category;
-                  const rows = data.rows
-                    .slice()
-                    .sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || '')));
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {summaryBuckets.map(({ label, accent, items, value, percent }) => {
+              const Icon = getSummaryBucketIcon(label);
+              const tone = accent.split(' ').find(c => c.startsWith('text-'));
+              const fill = accent.split(' ')[0];
+              return (
+                <Card key={label} className="overflow-hidden border shadow-sm">
+                  <CardContent className="p-0">
+                    <div className="flex items-center justify-between border-b bg-secondary/30 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("flex h-9 w-9 items-center justify-center rounded-md bg-current/10", tone)}>
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="font-semibold text-foreground">{label}</span>
+                      </div>
+                      <span className={cn("h-2.5 w-2.5 rounded-full", fill)} />
+                    </div>
+                    <div className="space-y-3 p-4">
+                      <div>
+                        <p className="text-2xl font-bold tabular-nums text-foreground">
+                          ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {items} item{items === 1 ? '' : 's'} · {percent === null ? '0.0' : percent.toFixed(1)}% of inventory
+                        </p>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className={cn("h-full rounded-full", fill)}
+                          style={{ width: `${Math.min(100, Math.max(0, percent || 0))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
 
-                  return (
-                    <div key={category} className={cn("relative self-start rounded-lg border bg-secondary/40", expanded && "z-30")}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-3 p-4 text-left hover:bg-secondary"
-                        onClick={() => setExpandedSummaryCategory(expanded ? null : category)}
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground font-mono text-xs">{getCOALabel(category)}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{data.items} item{data.items === 1 ? '' : 's'}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <span className="text-sm font-semibold">${data.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+            <Card className="border shadow-sm">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Inventory Value</p>
+                  <p className="text-2xl font-bold tabular-nums">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-resend-green" />
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Items</p>
+                  <p className="text-2xl font-bold tabular-nums">{totalItems}</p>
+                </div>
+                <Package className="h-8 w-8 text-primary" />
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Low Stock</p>
+                  <p className="text-2xl font-bold tabular-nums text-resend-red">{lowStock}</p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-resend-red" />
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Wastage MTD</p>
+                  <p className="text-2xl font-bold tabular-nums text-resend-orange">${displayedMtdWastageValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-resend-orange" />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_.65fr]">
+            <Card className="border shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Category Detail</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {summaryCategoryRows.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                      No inventory categories found.
+                    </div>
+                  ) : summaryCategoryRows.map((data) => {
+                    const expanded = expandedSummaryCategory === data.category;
+                    const rows = data.rows
+                      .slice()
+                      .sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || '')));
+
+                    return (
+                      <div key={data.category} className="overflow-hidden rounded-lg border bg-card">
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary/50"
+                          onClick={() => setExpandedSummaryCategory(expanded ? null : data.category)}
+                        >
                           <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", expanded && "rotate-180")} />
-                        </div>
-                      </button>
-                      {expanded && (
-                        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border bg-card shadow-xl">
-                          <div className="max-h-72 overflow-auto">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="truncate text-sm font-semibold text-foreground">{data.label}</p>
+                              <p className="text-sm font-semibold tabular-nums">${data.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                            </div>
+                            <div className="mt-2 flex items-center gap-3">
+                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                                <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, data.percent)}%` }} />
+                              </div>
+                              <span className="w-14 text-right text-xs text-muted-foreground">{data.percent.toFixed(1)}%</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{data.items} item{data.items === 1 ? '' : 's'}</p>
+                          </div>
+                        </button>
+                        {expanded && (
+                          <div className="border-t">
                             <Table className="text-xs">
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Item</TableHead>
                                   <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Unit Cost</TableHead>
                                   <TableHead className="text-right">Value</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {rows.map(item => (
-                                  <TableRow key={item.id || `${category}-${item.product_name}`}>
-                                    <TableCell className="max-w-56 truncate font-medium">{item.product_name || 'Unnamed item'}</TableCell>
+                                  <TableRow key={item.id || `${data.category}-${item.product_name}`}>
+                                    <TableCell className="max-w-72 truncate font-medium">{item.product_name || 'Unnamed item'}</TableCell>
                                     <TableCell className="text-right tabular-nums">
                                       {Number(item.current_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} {item.current_unit || ''}
                                     </TableCell>
+                                    <TableCell className="text-right tabular-nums">${Number(item.unit_cost || 0).toFixed(2)}</TableCell>
                                     <TableCell className="text-right font-semibold tabular-nums">
                                       ${Number(item.summary_value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                     </TableCell>
@@ -2014,19 +2878,59 @@ export default function Inventory() {
                               </TableBody>
                             </Table>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-5">
+              <Card className="border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Needs Attention</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {summaryLowStockRows.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No low-stock items in the current inventory.</p>
+                  ) : summaryLowStockRows.map(item => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border bg-secondary/30 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.product_name}</p>
+                        <p className="text-xs text-muted-foreground">Reorder at {item.reorder_point || '-'} {item.current_unit || ''}</p>
+                      </div>
+                      <Badge className="bg-resend-red/10 text-resend-red">
+                        {Number(item.current_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </Badge>
                     </div>
-                  );
-                })}
-                {Object.keys(byCategory).length === 0 && (
-                  <div className="rounded-lg border bg-secondary/40 p-6 text-sm text-muted-foreground">
-                    No inventory categories found.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card className="border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-base">Largest Inventory Value</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {summaryTopValueRows.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No inventory value to summarize yet.</p>
+                  ) : summaryTopValueRows.map(item => {
+                    const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{item.product_name}</p>
+                          <p className="text-xs text-muted-foreground">{getCOALabel(item.accounting_category)}</p>
+                        </div>
+                        <p className="text-sm font-semibold tabular-nums">${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="wastage">
@@ -2310,21 +3214,144 @@ export default function Inventory() {
 
  {/* Inventory Counts Tab */}
         <TabsContent value="counts">
+          {stockCountDetailRecord ? (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <Button
+                      variant="ghost"
+                      className="mb-2 -ml-3"
+                      onClick={() => setStockCountDetailRecord(null)}
+                    >
+                      Back to Counts
+                    </Button>
+                    <CardTitle className="text-3xl">
+                      {stockCountDetailRecord.date ? format(new Date(`${stockCountDetailRecord.date}T00:00:00`), 'MM/dd/yyyy') : 'Saved'} "{stockCountDetailRecord.type || stockCountDetailRecord.scope || 'Inventory'}" Count
+                    </CardTitle>
+                  </div>
+                  <Badge className={cn("w-fit px-3 py-1 text-sm", stockCountDetailRecord.status === 'Closed' ? 'bg-secondary text-foreground' : 'bg-resend-green/10 text-resend-green')}>
+                    {stockCountDetailRecord.status || 'Saved'}
+                  </Badge>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-md border bg-secondary/50 p-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {stockCountDetailRecord.status !== 'Closed' && (
+                      <>
+                        <Button className="bg-primary hover:bg-primary" onClick={() => editStockCountRecord(stockCountDetailRecord)}>
+                          <Edit2 className="mr-2 h-4 w-4" /> Edit
+                        </Button>
+                        <Button className="bg-primary hover:bg-primary" onClick={() => requestCloseStockCountRecord(stockCountDetailRecord)}>
+                          Close
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => setActiveTab('summary')}>
+                      <TrendingUp className="mr-2 h-4 w-4" /> Inventory Summary
+                    </Button>
+                    <Button variant="outline" onClick={() => setStockCountDetailRecord(null)}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> History
+                    </Button>
+                    <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => printStockCountRecord(stockCountDetailRecord)}>
+                      <Printer className="mr-2 h-4 w-4" /> Print Count
+                    </Button>
+                    <Button variant="outline" onClick={() => exportStockCountRecord(stockCountDetailRecord)}>
+                      <Download className="mr-2 h-4 w-4" /> Export
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search count items..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="overflow-auto rounded-md border">
+                  <Table className="min-w-[980px] text-sm">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[260px]">Category</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Report By</TableHead>
+                        <TableHead className="text-right">Prev Count</TableHead>
+                        <TableHead className="text-right">Prev Value</TableHead>
+                        <TableHead className="text-right">Count</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
+                        <TableHead className="text-right">Change</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getStockCountRecordSections(stockCountDetailRecord).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                            No saved count lines found for this count.
+                          </TableCell>
+                        </TableRow>
+                      ) : getStockCountRecordSections(stockCountDetailRecord).map(section => (
+                        <React.Fragment key={`detail-section-${section.label}`}>
+                          <TableRow className="bg-secondary/50 font-semibold">
+                            <TableCell>{section.label} ({section.items.length})</TableCell>
+                            <TableCell />
+                            <TableCell />
+                            <TableCell />
+                            <TableCell className="text-right">${section.previousValue.toFixed(2)}</TableCell>
+                            <TableCell />
+                            <TableCell className="text-right">${section.countValue.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">${(section.countValue - section.previousValue).toFixed(2)}</TableCell>
+                          </TableRow>
+                          {section.items
+                            .filter(item => !debouncedSearch || String(item.product_name || '').toLowerCase().includes(debouncedSearch.toLowerCase()))
+                            .map(item => (
+                              <TableRow key={`detail-${section.label}-${item.id || item.product_name}`}>
+                                <TableCell className="text-muted-foreground">{section.label}</TableCell>
+                                <TableCell className="font-medium">{item.product_name || 'Unnamed item'}</TableCell>
+                                <TableCell>{item.unit || item.current_unit || 'ea'}</TableCell>
+                                <TableCell className="text-right tabular-nums">{Number(item.previousCount || 0).toLocaleString()}</TableCell>
+                                <TableCell className="text-right tabular-nums">${Number(item.previousValue || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{Number(item.count || 0).toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-semibold tabular-nums">${Number(item.value || 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  ${(Number(item.value || 0) - Number(item.previousValue || 0)).toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Total Items: {stockCountDetailRecord.itemCount || stockCountDetailRecord.items?.length || 0}</span>
+                  <span className="font-semibold text-foreground">Total Value: ${Number(stockCountDetailRecord.total || 0).toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="border-0 shadow-sm">
             <CardHeader className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <CardTitle>Inventory Counts</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">Choose any inventory area this restaurant uses, enter counts, and save the count history.</p>
+                  <CardTitle className={cn(editingStockCountId && "text-3xl")}>
+                    {editingStockCountId
+                      ? `Edit a "${selectedStockCountLabel.replace(' Inventory', '')}" Count`
+                      : 'Inventory Counts'}
+                  </CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {editingStockCountId
+                      ? 'Update item counts, save changes, or close the count when it is final.'
+                      : 'Choose any inventory area this restaurant uses, enter counts, and save the count history.'}
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    className="bg-primary hover:bg-primary"
-                    onClick={requestSaveStockCount}
-                    disabled={!stockCountDate}
-                  >
-                    {editingStockCountId ? 'Save Changes' : 'Save Count'}
-                  </Button>
                   {editingStockCountId && (
                     <Button
                       variant="outline"
@@ -2336,18 +3363,19 @@ export default function Inventory() {
                       Cancel Edit
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    className="border-resend-red/30 text-resend-red hover:bg-resend-red/10"
-                    onClick={() => setStockCountValues({})}
-                  >
-                    <X className="mr-2 h-4 w-4" /> Clear Counts
-                  </Button>
+                  {editingStockCountRecord && (
+                    <Button
+                      variant="outline"
+                      className="border-resend-red/30 text-resend-red hover:bg-resend-red/10"
+                      onClick={() => requestDeleteStockCountRecord(editingStockCountRecord)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {stockCountHistoryRows.length > 0 && (
-                <div className="space-y-3 rounded-lg border bg-card p-4">
+              <div className="space-y-3 rounded-lg border bg-card p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">Saved Count History</p>
@@ -2363,6 +3391,7 @@ export default function Inventory() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="all_history">All History</SelectItem>
                           <SelectItem value="last_7_days">Last 7 Days</SelectItem>
                           <SelectItem value="last_30_days">Last 30 Days</SelectItem>
                           <SelectItem value="this_month">This Month</SelectItem>
@@ -2425,7 +3454,11 @@ export default function Inventory() {
                             </TableCell>
                           </TableRow>
                         ) : filteredStockCountHistoryRows.map(record => (
-                          <TableRow key={record.id} className={editingStockCountId === record.id ? 'bg-primary/5' : undefined}>
+                          <TableRow
+                            key={record.id}
+                            className={cn("cursor-pointer", editingStockCountId === record.id ? 'bg-primary/5' : undefined)}
+                            onClick={() => setStockCountDetailRecord(record)}
+                          >
                             <TableCell className="font-medium tabular-nums">{format(new Date(`${record.date}T00:00:00`), 'MM/dd/yy')}</TableCell>
                             <TableCell className="truncate">{record.type || record.scope}</TableCell>
                             <TableCell>
@@ -2445,10 +3478,26 @@ export default function Inventory() {
                                   <Badge variant="secondary" className="px-2 py-0 text-[11px]">Locked</Badge>
                                 ) : (
                                   <>
-                                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => editStockCountRecord(record)}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      editStockCountRecord(record);
+                                    }}
+                                  >
                                     Edit
                                   </Button>
-                                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => requestCloseStockCountRecord(record)}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      requestCloseStockCountRecord(record);
+                                    }}
+                                  >
                                     Close
                                   </Button>
                                   </>
@@ -2457,7 +3506,10 @@ export default function Inventory() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-xs text-resend-red hover:bg-resend-red/10 hover:text-resend-red"
-                                  onClick={() => requestDeleteStockCountRecord(record)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    requestDeleteStockCountRecord(record);
+                                  }}
                                 >
                                   Delete
                                 </Button>
@@ -2468,10 +3520,19 @@ export default function Inventory() {
                       </TableBody>
                     </Table>
                   </div>
-                </div>
-              )}
+              </div>
 
-              <div className="grid gap-4 rounded-lg border bg-secondary/30 p-4 md:grid-cols-[240px_1fr]">
+              <div className={cn("grid gap-4 rounded-lg border bg-secondary/30 p-4", editingStockCountId ? "md:grid-cols-[180px_240px_1fr]" : "md:grid-cols-[240px_1fr]")}>
+                {editingStockCountId && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Input
+                      value={editingStockCountRecord?.status || 'Saved'}
+                      disabled
+                      className="h-12 bg-card text-base"
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Inventory Date</Label>
                   <Input
@@ -2482,29 +3543,84 @@ export default function Inventory() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Count Area</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {stockCountOptions.map(option => (
+                  <Label>Count Sheet</Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={stockCountSheetId || 'category_mode'}
+                      onValueChange={(value) => {
+                        setStockCountSheetId(value === 'category_mode' ? '' : value);
+                        setStockCountValues({});
+                      }}
+                    >
+                      <SelectTrigger className="h-12 bg-card text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="category_mode">No sheet - choose categories</SelectItem>
+                        {countSheetRows.map(sheet => (
+                          <SelectItem key={sheet.id} value={sheet.id}>
+                            {sheet.name} ({sheet.itemCount || 0})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedStockCountSheet && (
                       <Button
-                        key={option.key}
                         type="button"
-                        variant={stockCountScope === option.key ? 'default' : 'outline'}
-                        className={cn(
-                          "h-12 rounded-lg",
-                          stockCountScope === option.key ? "bg-primary hover:bg-primary" : "bg-card"
-                        )}
+                        variant="outline"
+                        className="h-12 whitespace-nowrap"
                         onClick={() => {
-                          setStockCountScope(option.key);
-                          setStockCountValues({});
-                          setEditingStockCountId(null);
+                          setActiveTab('count-sheets');
+                          openCountSheetEditor(selectedStockCountSheet);
                         }}
                       >
-                        {option.label}
-                        <span className="ml-2 rounded-full bg-background/20 px-2 py-0.5 text-xs">{option.items}</span>
+                        Edit Sheet
                       </Button>
-                    ))}
+                    )}
                   </div>
                 </div>
+                {!stockCountSheetId && (
+                <div className="space-y-2 md:col-span-full">
+                  <Label>Count Category</Label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {stockCountOptions.map(option => {
+                      const selected = stockCountScopes.includes(option.key);
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => toggleStockCountScope(option.key)}
+                          className={cn(
+                            "flex h-11 min-w-28 items-center justify-center rounded-md border px-3 text-sm transition",
+                            selected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-foreground hover:border-primary/60"
+                          )}
+                        >
+                          {option.label.replace(' Inventory', '')}
+                          <span className={cn("ml-2 rounded-full px-2 py-0.5 text-xs", selected ? "bg-background/20" : "bg-secondary")}>
+                            {option.items}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {stockCountScopes.filter(key => key !== 'all').map(key => {
+                      const option = stockCountOptions.find(item => item.key === key);
+                      if (!option) return null;
+                      return (
+                        <Badge key={key} variant="secondary" className="gap-1">
+                          {option.label}
+                          <button type="button" onClick={() => toggleStockCountScope(key)} aria-label={`Remove ${option.label}`}>
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
               </div>
             </CardHeader>
 
@@ -2549,14 +3665,17 @@ export default function Inventory() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {section.items.map(item => {
-                            const count = Number(stockCountValues[item.id] || 0);
+                          {section.items
+                            .filter(item => !debouncedSearch || String(item.product_name || '').toLowerCase().includes(debouncedSearch.toLowerCase()))
+                            .map(item => {
+                            const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, item.id);
+                            const count = Number(hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || 0);
                             const unitCost = Number(item.unit_cost || 0);
                             const countedValue = count * unitCost;
                             const lastPurchased = item.last_purchased_at || item.last_counted_date || item.updated_at || item.created_at;
 
                             return (
-                              <TableRow key={item.id}>
+                          <TableRow key={item.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2">
                                     {item.product_name}
@@ -2579,7 +3698,7 @@ export default function Inventory() {
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      value={stockCountValues[item.id] || ''}
+                                      value={hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || ''}
                                       onChange={(event) => setStockCountValues(prev => ({
                                         ...prev,
                                         [item.id]: event.target.value,
@@ -2602,12 +3721,209 @@ export default function Inventory() {
                   );
                 })
               )}
+              <div className="sticky bottom-0 z-20 -mx-6 mt-2 flex justify-end gap-2 border-t bg-background/95 px-6 py-3 shadow-lg backdrop-blur">
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")}
+                    onClick={requestSaveStockCount}
+                    disabled={!stockCountDate}
+                  >
+                    {editingStockCountId ? 'Save Changes' : 'Save Count'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-resend-red/30 text-resend-red hover:bg-resend-red/10"
+                    onClick={() => setStockCountValues({})}
+                  >
+                    <X className="mr-2 h-4 w-4" /> Clear Counts
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
  {/* Count Sheets Tab */}
         <TabsContent value="count-sheets" className="space-y-4">
+          {editingCountSheet && countSheetDraft ? (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="space-y-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-3xl">Edit Count Sheet</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Choose which product groups feed this sheet, then arrange the products in the order your team counts them.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => { setEditingCountSheetId(null); setCountSheetDraft(null); }}>
+                      Back
+                    </Button>
+                    <Button className="bg-primary hover:bg-primary" onClick={saveCountSheetDraft}>
+                      Save
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Name</Label>
+                  <Input
+                    value={countSheetDraft.name}
+                    onChange={(event) => setCountSheetDraft(prev => ({ ...prev, name: event.target.value }))}
+                  />
+                </div>
+
+                <div className="grid gap-5 lg:grid-cols-[1fr_240px]">
+                  <div className="space-y-3">
+                    <Label>This count sheet should receive these types of new products automatically</Label>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {countSheetBucketOptions.map(bucket => {
+                        const checked = countSheetDraft.buckets.includes(bucket.label);
+                        return (
+                          <label key={bucket.label} className="flex items-center gap-3 rounded-md border bg-card px-3 py-2">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(nextChecked) => setCountSheetDraftBuckets(bucket.label, Boolean(nextChecked))}
+                            />
+                            <span className="text-sm font-medium">
+                              {bucket.label}
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">{bucket.items}</span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Organize By</Label>
+                    <Select
+                      value={countSheetDraft.organizeBy}
+                      onValueChange={(value) => setCountSheetDraft(prev => ({ ...prev, organizeBy: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto_category">Auto by Category</SelectItem>
+                        <SelectItem value="sheet_to_shelf">Sheet to Shelf</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-end">
+                  <div className="flex-1 space-y-2">
+                    <Label>Add Product</Label>
+                    <Select value={countSheetProductToAdd} onValueChange={setCountSheetProductToAdd}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select product from inventory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {inventory
+                          .filter(item => !countSheetDraftItems.some(sheetItem => sheetItem.inventory_id === item.id))
+                          .map(item => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.product_name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" className="bg-primary hover:bg-primary" onClick={addProductToCountSheetDraft} disabled={!countSheetProductToAdd}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Product
+                  </Button>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-5">
+                {countSheetDraftSections.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    No products assigned to this count sheet yet.
+                  </div>
+                ) : (
+                  countSheetDraftSections.map(section => (
+                    <div key={section.label} className="overflow-hidden rounded-md border">
+                      <div className="border-b bg-secondary/40 px-4 py-2 font-semibold">
+                        {section.label} ({section.items.length})
+                      </div>
+                      <div className="overflow-x-auto">
+                        <Table className="min-w-[920px] text-sm">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-16">#</TableHead>
+                              <TableHead>Item</TableHead>
+                              <TableHead>Last Purchased</TableHead>
+                              <TableHead>Count By</TableHead>
+                              <TableHead className="text-right">Price</TableHead>
+                              <TableHead className="text-right">Controls</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {section.items.map(item => {
+                              const draftIndex = countSheetDraftItems.findIndex(draftItem => draftItem.rowId === item.rowId);
+                              return (
+                                  <TableRow key={item.rowId}>
+                                    <TableCell className="tabular-nums">{draftIndex + 1}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      type="button"
+                                      variant="link"
+                                      className="h-auto p-0 text-left font-medium text-foreground underline-offset-4 hover:text-primary"
+                                      onClick={() => openCountSheetProduct(item)}
+                                    >
+                                      {item.product_name}
+                                    </Button>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">
+                                    {item.last_purchased_at ? format(new Date(item.last_purchased_at), 'MM/dd/yyyy') : '-'}
+                                  </TableCell>
+                                  <TableCell>{item.unit}</TableCell>
+                                  <TableCell className="text-right tabular-nums">${Number(item.unit_cost || 0).toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <div className="flex justify-end gap-1">
+                                      <Button size="sm" variant="ghost" onClick={() => moveCountSheetDraftItem(item.rowId, -1)} disabled={draftIndex === 0}>Up</Button>
+                                      <Button size="sm" variant="ghost" onClick={() => moveCountSheetDraftItem(item.rowId, 1)} disabled={draftIndex === countSheetDraftItems.length - 1}>Down</Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-resend-red hover:bg-resend-red/10 hover:text-resend-red"
+                                        onClick={() => removeProductFromCountSheetDraft(item.rowId)}
+                                      >
+                                        Remove
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div className="flex items-center justify-between border-t pt-4 text-sm text-muted-foreground">
+                  <span>Total Lines: {countSheetDraftItems.length}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="border-resend-red/40 text-resend-red hover:bg-resend-red/10 hover:text-resend-red"
+                      onClick={() => setCountSheetDeleteTarget(editingCountSheet)}
+                    >
+                      Delete
+                    </Button>
+                    <Button variant="outline" onClick={() => { setEditingCountSheetId(null); setCountSheetDraft(null); }}>
+                      Cancel
+                    </Button>
+                    <Button className="bg-primary hover:bg-primary" onClick={saveCountSheetDraft}>
+                      Save Count Sheet
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="border-0 shadow-sm">
             <CardHeader className="space-y-6">
               <div>
@@ -2668,7 +3984,7 @@ export default function Inventory() {
                   <Table className="min-w-max">
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-[260px] bg-background" />
+                        <TableHead className="sticky left-0 z-30 min-w-[280px] bg-background shadow-[1px_0_0_hsl(var(--border))]" />
                         <TableHead colSpan={countSheetBucketOptions.length} className="bg-primary/90 text-center text-sm font-bold uppercase text-primary-foreground">
                           Product group coverage
                         </TableHead>
@@ -2679,7 +3995,7 @@ export default function Inventory() {
                       </TableRow>
                       <TableRow>
                         <TableHead
-                          className="sticky left-0 z-10 w-[260px] cursor-pointer bg-background font-bold hover:text-foreground"
+                          className="sticky left-0 z-30 min-w-[280px] cursor-pointer bg-background font-bold shadow-[1px_0_0_hsl(var(--border))] hover:text-foreground"
                           onClick={() => setSortCountSheets(sortCountSheets === 'name' ? '-name' : 'name')}
                         >
                           <div className="flex items-center gap-2">
@@ -2704,10 +4020,16 @@ export default function Inventory() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        countSheetRows.map(sheet => (
-                          <TableRow key={sheet.id} className="odd:bg-background even:bg-secondary/40">
-                            <TableCell className="sticky left-0 z-10 bg-inherit font-medium">
-                              <div>{sheet.name}</div>
+                        countSheetRows.map((sheet, index) => (
+                          <TableRow
+                            key={sheet.id}
+                            className="cursor-pointer"
+                            onClick={() => openCountSheetEditor(sheet)}
+                          >
+                            <TableCell className="sticky left-0 z-40 min-w-[280px] bg-background font-medium shadow-[1px_0_0_hsl(var(--border))]">
+                              <button type="button" className="text-left hover:text-primary" onClick={(event) => { event.stopPropagation(); openCountSheetEditor(sheet); }}>
+                                {sheet.name}
+                              </button>
                               {sheet.local_only && (
                                 <Badge variant="secondary" className="mt-1">Local draft</Badge>
                               )}
@@ -2716,26 +4038,56 @@ export default function Inventory() {
                               )}
                             </TableCell>
                             {countSheetBucketOptions.map(bucket => (
-                              <TableCell key={`${sheet.id}-included-${bucket.label}`}>
-                                {sheet.bucketCounts[bucket.label] > 0 ? 'Yes' : 'No'}
+                              <TableCell
+                                key={`${sheet.id}-included-${bucket.label}`}
+                                className={index % 2 === 0 ? "bg-background" : "bg-secondary/40"}
+                              >
+                                {sheet.bucketIncluded?.[bucket.label] ? 'Yes' : 'No'}
                               </TableCell>
                             ))}
                             {countSheetBucketOptions.map(bucket => (
-                              <TableCell key={`${sheet.id}-count-${bucket.label}`} className="tabular-nums">
+                              <TableCell
+                                key={`${sheet.id}-count-${bucket.label}`}
+                                className={cn("tabular-nums", index % 2 === 0 ? "bg-background" : "bg-secondary/40")}
+                              >
                                 {sheet.bucketCounts[bucket.label] || 0}
                               </TableCell>
                             ))}
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedCountSheetId(sheet.id);
-                                  setActiveSessionOpen(true);
-                                }}
-                              >
-                                Start Count
-                              </Button>
+                            <TableCell className={index % 2 === 0 ? "bg-background" : "bg-secondary/40"}>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openCountSheetEditor(sheet);
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    startStockCountFromSheet(sheet);
+                                  }}
+                                >
+                                  Start Count
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-resend-red/40 text-resend-red hover:bg-resend-red/10 hover:text-resend-red"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setCountSheetDeleteTarget(sheet);
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -2755,6 +4107,7 @@ export default function Inventory() {
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
  {/* Waste Summary Tab */}
@@ -3132,12 +4485,15 @@ export default function Inventory() {
             </div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={editForm.accounting_category} onValueChange={(v) => setEditForm({ ...editForm, accounting_category: v })}>
+              <Select
+                value={getInventoryCategoryOption(editForm.accounting_category).code}
+                onValueChange={(v) => setEditForm({ ...editForm, accounting_category: v })}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {getFlattenedCOA().map(coa => (
-                    <SelectItem key={coa.code} value={coa.code}>
-                      {coa.code} - {coa.label}
+                  {INVENTORY_ITEM_CATEGORY_OPTIONS.map(option => (
+                    <SelectItem key={option.key} value={option.code}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -3150,7 +4506,19 @@ export default function Inventory() {
               </div>
               <div className="space-y-2">
                 <Label>Unit</Label>
-                <Input value={editForm.current_unit} onChange={(e) => setEditForm({ ...editForm, current_unit: e.target.value })} />
+                <Select
+                  value={editForm.current_unit || 'Each'}
+                  onValueChange={(value) => setEditForm({ ...editForm, current_unit: value })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {[...new Set([editForm.current_unit, ...INVENTORY_COUNT_UNITS].filter(Boolean))]
+                      .sort((a, b) => a.localeCompare(b))
+                      .map(unit => (
+                      <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -3197,9 +4565,9 @@ export default function Inventory() {
               <Select value={addForm.accounting_category} onValueChange={(v) => setAddForm({ ...addForm, accounting_category: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {getFlattenedCOA().map(coa => (
-                    <SelectItem key={coa.code} value={coa.code}>
-                      {coa.code} - {coa.label}
+                  {INVENTORY_ITEM_CATEGORY_OPTIONS.map(option => (
+                    <SelectItem key={option.key} value={option.code}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -3358,7 +4726,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWastageDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveWastage} className="bg-resend-red hover:bg-resend-red">Log Wastage</Button>
+            <Button onClick={saveWastage} className={cn("bg-resend-red hover:bg-resend-red", !hasLocation && "opacity-50 cursor-not-allowed")}>Log Wastage</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3470,6 +4838,37 @@ export default function Inventory() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!countSheetDeleteTarget} onOpenChange={(open) => !open && setCountSheetDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete this count sheet?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border border-resend-red/25 bg-resend-red/10 p-4">
+              <p className="font-semibold text-foreground">{countSheetDeleteTarget?.name || 'Count sheet'}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {Number(countSheetDeleteTarget?.itemCount || countSheetDeleteTarget?.items?.length || 0)} assigned product{Number(countSheetDeleteTarget?.itemCount || countSheetDeleteTarget?.items?.length || 0) === 1 ? '' : 's'}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This removes the template from active count sheets. Existing saved stock count history will stay available.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button
+              className="bg-resend-red text-white hover:bg-resend-red/90"
+              disabled={deleteCountSheetMutation.isPending}
+              onClick={() => deleteCountSheetMutation.mutate(countSheetDeleteTarget)}
+            >
+              {deleteCountSheetMutation.isPending ? 'Deleting...' : 'Delete count sheet'}
+            </Button>
+            <Button variant="outline" onClick={() => setCountSheetDeleteTarget(null)}>
+              Keep it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Active Count Session (Full Screen Wizard) */}
       {activeSessionOpen && allCountSheets.length > 0 && (
         <React.Suspense fallback={<InventorySectionFallback label="Loading count session..." />}>
@@ -3492,7 +4891,7 @@ export default function Inventory() {
           <div className="space-y-4">
             <div className="rounded-md border border-primary/20 bg-primary/10 p-4">
               <p className="font-semibold text-foreground">
-                {stockCountOptions.find(option => option.key === stockCountScope)?.label || 'Inventory Count'}
+                {selectedStockCountLabel}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {format(new Date(`${stockCountDate}T00:00:00`), 'MMM d, yyyy')} · {currentStockCountItems.filter(item => item.count > 0).length} counted item{currentStockCountItems.filter(item => item.count > 0).length === 1 ? '' : 's'} · ${currentStockCountTotal.toFixed(2)}
@@ -3503,7 +4902,7 @@ export default function Inventory() {
             </p>
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button className="bg-primary hover:bg-primary" onClick={saveStockCount}>
+            <Button className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")} onClick={saveStockCount}>
               Save count
             </Button>
             <Button variant="outline" onClick={() => setStockCountSaveConfirmOpen(false)}>

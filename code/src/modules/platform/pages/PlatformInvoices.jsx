@@ -48,7 +48,7 @@ export default function PlatformInvoices() {
       const { data, error } = await supabase.functions.invoke('create-stripe-invoice', {
         body: {
           organization_id: org.id,
-          description: `Platform Billing Invoice for ${plan.name} Tier`
+          description: `Platform Billing Invoice for ${plan.name} Tier - per-location billing`
         }
       });
 
@@ -129,7 +129,7 @@ export default function PlatformInvoices() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm font-black text-foreground">
-                      {plan ? `$${plan.price_monthly.toLocaleString()}` : '—'}
+                      {plan ? `$${plan.price_monthly.toLocaleString()}/location` : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                        <Button 

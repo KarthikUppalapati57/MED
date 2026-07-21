@@ -6,22 +6,23 @@ import AccessDenied from '@/components/AccessDenied';
 
 /**
  * ProtectedModule Route-level guard component.
- * 
+ *
  * Wraps every page in App.jsx to enforce:
  *   1. Role check: user.role >= module.minRole
  *   2. Module check: page's module is in org.enabled_modules
- * 
+ *   3. Location check: module.requiresLocation modules need one selected
+ *
  * Platform admins bypass ALL checks.
- * 
- * If either check fails, renders <AccessDenied /> with the appropriate reason.
- * 
+ *
+ * If any check fails, renders <AccessDenied /> with the appropriate reason.
+ *
  * Usage:
  *   <ProtectedModule pageName="Recipes">
  *     <RecipesPage />
  *   </ProtectedModule>
  */
 export default function ProtectedModule({ pageName, children }) {
-  const { organization, userProfile } = useAuth();
+  const { organization, userProfile, location } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
 
   // Look up which module this page belongs to
@@ -56,6 +57,14 @@ export default function ProtectedModule({ pageName, children }) {
   const userRole = userProfile?.role;
   if (!isPageInEnabledModules(pageName, enabledModules, userRole)) {
     return <AccessDenied reason="module" moduleName={moduleInfo.label} />;
+  }
+
+  // Check 3: Some modules have no meaningful multi-location view (e.g. Kitchen
+  // Displays). `location` is already role-aware -- fixed from profile for
+  // location_manager/ground_staff, so this only ever fires for switcher roles
+  // who haven't picked one yet.
+  if (moduleInfo.requiresLocation && !location?.id) {
+    return <AccessDenied reason="location" />;
   }
 
  // All checks passed render the page

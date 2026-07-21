@@ -3,7 +3,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const AUTO_APPLY_CONFIDENCE = 85;
 
 const ROLE_RANK = {
@@ -124,7 +123,21 @@ function extractJson(text: string) {
   }
 }
 
-async function callGemini(apiKey: string, products: unknown[]) {
+function getAzureOpenAIConfig() {
+  const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_OPENAI_API_KEY')?.trim();
+  const deployment = Deno.env.get('AZURE_OPENAI_DEPLOYMENT')?.trim();
+  const apiVersion = Deno.env.get('AZURE_OPENAI_API_VERSION')?.trim() || 'v1';
+
+  if (!endpoint || !key || !deployment) {
+    throw new Error('Azure OpenAI is not configured in Supabase secrets.');
+  }
+
+  return { endpoint, key, deployment, apiVersion };
+}
+
+async function callAzureOpenAI(products: unknown[]) {
+  const { endpoint, key, deployment, apiVersion } = getAzureOpenAIConfig();
   const promptProducts = products.map((product) => ({
     id: product.id,
     name: product.name,
@@ -150,27 +163,47 @@ async function callGemini(apiKey: string, products: unknown[]) {
     JSON.stringify(promptProducts, null, 2),
   ].join('\n');
 
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 3000,
-        responseMimeType: 'application/json',
+  const body = {
+    model: deployment,
+    messages: [
+      {
+        role: 'system',
+        content: 'You categorize restaurant purchasing products. Return strict JSON only.',
       },
-    }),
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ],
+    temperature: 0.1,
+    max_completion_tokens: 3000,
+  };
+
+  let url;
+  if (apiVersion.toLowerCase() === 'v1') {
+    url = endpoint.endsWith('/openai/v1') ? `${endpoint}/chat/completions` : `${endpoint}/openai/v1/chat/completions`;
+  } else {
+    url = `${endpoint}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+    delete body.model;
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'api-key': key,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    console.error('Gemini product categorization error:', error);
-    throw new Error(error?.error?.message || 'Gemini categorization failed');
+    const errorText = await response.text();
+    console.error('Azure OpenAI product categorization error:', errorText);
+    throw new Error(`Azure OpenAI categorization failed: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  const text = data.choices?.[0]?.message?.content || '[]';
   const parsed = extractJson(text);
   return Array.isArray(parsed) ? parsed : [];
 }
@@ -194,9 +227,6 @@ serve(async (req) => {
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 
   try {
-    const apiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY');
-    if (!apiKey) return jsonResponse({ error: 'Gemini API key is not configured in Supabase secrets.' }, 500);
-
     const authHeader = req.headers.get('Authorization');
     const userClient = getClient(authHeader);
     const admin = getClient(null, true);
@@ -245,7 +275,7 @@ serve(async (req) => {
     if (productsError) throw productsError;
     if (!products?.length) return jsonResponse({ processed: 0, updated: 0, applied: 0, suggestions: [] });
 
-    const suggestions = await callGemini(apiKey, products);
+    const suggestions = await callAzureOpenAI(products);
     const byId = new Map(suggestions.map((suggestion) => [String(suggestion.id), suggestion]));
     let updated = 0;
     let applied = 0;

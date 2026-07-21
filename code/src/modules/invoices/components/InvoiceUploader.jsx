@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Mail, Globe, Loader2, Sparkles, CheckCircle2, Camera, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Mail, Globe, Loader2, Sparkles, CheckCircle2, Camera, RefreshCw, Trash2, DollarSign } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,12 @@ export default function InvoiceUploader({
   const [extractionDone, setExtractionDone] = useState(false);
   const [fileUrl, setFileUrl] = useState(null);
 
+  // Review step: file has been selected/captured but not yet uploaded.
+  const [reviewFile, setReviewFile] = useState(null);
+  const [reviewSource, setReviewSource] = useState(null);
+  const [reviewPreviewUrl, setReviewPreviewUrl] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState('unpaid');
+
   // WebRTC Camera State
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraFacingMode, setCameraFacingMode] = useState('environment');
@@ -47,6 +54,17 @@ export default function InvoiceUploader({
       stopCamera();
     };
   }, [fileUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (reviewPreviewUrl) URL.revokeObjectURL(reviewPreviewUrl);
+    };
+  }, [reviewPreviewUrl]);
+
+  // Discard any in-progress review when the dialog is closed.
+  useEffect(() => {
+    if (!open) discardReview();
+  }, [open]);
 
   const startCamera = async () => {
     try {
@@ -91,24 +109,49 @@ export default function InvoiceUploader({
     const ctx = canvas.getContext('2d');
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
     
-    canvas.toBlob(async (blob) => {
+    canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `receipt_${Date.now()}.png`, { type: 'image/png' });
       stopCamera();
-      setFile(file);
-      await processFile(file, 'camera');
+      startReview(file, 'camera');
     }, 'image/png');
   };
 
-  const handleFileSelect = async (e) => {
+  const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-    
-    setFile(selectedFile);
-    await processFile(selectedFile, 'manual_upload');
+    startReview(selectedFile, 'manual_upload');
   };
 
-  const processFile = async (fileToProcess, source) => {
+  const startReview = (selectedFile, source) => {
+    if (reviewPreviewUrl) URL.revokeObjectURL(reviewPreviewUrl);
+    setReviewFile(selectedFile);
+    setReviewSource(source);
+    setReviewPreviewUrl(URL.createObjectURL(selectedFile));
+    setPaymentStatus('unpaid');
+  };
+
+  const discardReview = () => {
+    if (reviewPreviewUrl) URL.revokeObjectURL(reviewPreviewUrl);
+    setReviewFile(null);
+    setReviewSource(null);
+    setReviewPreviewUrl(null);
+    setPaymentStatus('unpaid');
+  };
+
+  const confirmReview = async () => {
+    const fileToProcess = reviewFile;
+    const source = reviewSource;
+    const status = paymentStatus;
+    if (reviewPreviewUrl) URL.revokeObjectURL(reviewPreviewUrl);
+    setReviewFile(null);
+    setReviewSource(null);
+    setReviewPreviewUrl(null);
+    setFile(fileToProcess);
+    await processFile(fileToProcess, source, status);
+  };
+
+  const processFile = async (fileToProcess, source, invoicePaymentStatus) => {
     setUploading(true);
     setProgress('Preparing invoice record...');
     setExtractionDone(false);
@@ -197,6 +240,7 @@ export default function InvoiceUploader({
         vendor_name: draftInvoice?.vendor_name || 'Pending Vendor',
         invoice_number: draftInvoice?.invoice_number || `PENDING-${Date.now()}`,
         total_amount: draftInvoice?.total_amount ?? 0,
+        payment_status: invoicePaymentStatus === 'paid' ? 'paid' : 'unpaid',
       };
 
       if (draftInvoice?.id && onFinalizeUploadDraft) {
@@ -238,18 +282,17 @@ export default function InvoiceUploader({
     }
   };
 
-  const handleDrop = async (e) => {
+  const handleDrop = (e) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
-      setFile(droppedFile);
-      await processFile(droppedFile, 'manual_upload');
+      startReview(droppedFile, 'manual_upload');
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className={reviewFile ? "sm:max-w-2xl" : "sm:max-w-lg"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-teal-600" />
@@ -257,6 +300,83 @@ export default function InvoiceUploader({
           </DialogTitle>
         </DialogHeader>
 
+        {reviewFile ? (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl border bg-muted/40 overflow-hidden flex items-center justify-center min-h-[420px]">
+              {reviewFile.type?.startsWith('image/') ? (
+                <img
+                  src={reviewPreviewUrl}
+                  alt="Invoice preview"
+                  className="max-h-[520px] w-full object-contain"
+                />
+              ) : (
+                <object
+                  data={reviewPreviewUrl}
+                  type={reviewFile.type || 'application/pdf'}
+                  className="w-full h-[520px]"
+                >
+                  <div className="flex flex-col items-center gap-2 py-12">
+                    <FileText className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{reviewFile.name}</p>
+                  </div>
+                </object>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              {reviewFile.name} ({(reviewFile.size / 1024).toFixed(0)} KB)
+            </p>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <DollarSign className="h-3.5 w-3.5" />
+                Payment status
+              </Label>
+              <RadioGroup
+                value={paymentStatus}
+                onValueChange={setPaymentStatus}
+                className="grid grid-cols-2 gap-3"
+              >
+                <label
+                  htmlFor="payment-status-unpaid"
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                    paymentStatus === 'unpaid'
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-input text-foreground hover:bg-accent/50'
+                  }`}
+                >
+                  <RadioGroupItem value="unpaid" id="payment-status-unpaid" />
+                  Unpaid
+                </label>
+                <label
+                  htmlFor="payment-status-paid"
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-3 cursor-pointer transition-colors ${
+                    paymentStatus === 'paid'
+                      ? 'border-primary bg-accent text-accent-foreground'
+                      : 'border-input text-foreground hover:bg-accent/50'
+                  }`}
+                >
+                  <RadioGroupItem value="paid" id="payment-status-paid" />
+                  Paid
+                </label>
+              </RadioGroup>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                onClick={discardReview}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+              <Button className="flex-1 bg-teal-600 hover:bg-teal-700" onClick={confirmReview}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Accept &amp; Continue
+              </Button>
+            </div>
+          </div>
+        ) : (
         <Tabs defaultValue="upload" className="mt-4">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="upload" className="flex items-center gap-2">
@@ -412,6 +532,7 @@ export default function InvoiceUploader({
             </div>
           </TabsContent>
         </Tabs>
+        )}
       </DialogContent>
     </Dialog>
   );

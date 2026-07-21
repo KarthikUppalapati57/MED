@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
@@ -64,12 +65,16 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayModal';
+import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
+import { useConfirm } from '@/hooks/useConfirm';
+import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
 function CreateCheckDialog({ open, onClose, organization, brand, location }) {
   const queryClient = useQueryClient();
+  const { hasLocation, warnIfMissing } = useRequireLocation();
   const [vendorId, setVendorId] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -102,11 +107,14 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       const numericAmount = parseFloat(amount);
       if (!(numericAmount > 0)) throw new Error('Enter a valid amount');
       if (!paymentAccountId) throw new Error('Select a payment account');
+      const locationId = location?.id || null;
+      const brandId = brand?.brand_id || brand?.id || null;
+      if (!brandId || !locationId) throw new Error('Please select a location to continue');
 
       const { data: invoice, error: invoiceError } = await supabase.from('invoices').insert({
         organization_id: organization?.id,
-        brand_id: brand?.brand_id || brand?.id || null,
-        location_id: location?.id || null,
+        brand_id: brandId,
+        location_id: locationId,
         vendor_id: vendor.id,
         vendor_name: vendor.name,
         invoice_number: memo.trim() || `Manual Check ${format(new Date(), 'MMM d, yyyy h:mm a')}`,
@@ -180,7 +188,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-          <Button onClick={() => createCheckMutation.mutate()} disabled={createCheckMutation.isPending}>
+          <Button onClick={() => { if (!warnIfMissing()) return; createCheckMutation.mutate(); }} disabled={createCheckMutation.isPending} className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}>
             {createCheckMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
             Issue Check
           </Button>
@@ -230,6 +238,7 @@ const PAYMENT_ROW_OVERSCAN = 8;
 
 export default function Payments() {
   const navigate = useNavigate();
+  const { confirm, ConfirmDialog } = useConfirm();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [sortBy, setSortBy] = useState('-created_at');
@@ -266,6 +275,7 @@ export default function Payments() {
   const [newReminderDay, setNewReminderDay] = useState('');
   const [paymentDateFilter, setPaymentDateFilter] = useState('all');
   const [showCreateCheck, setShowCreateCheck] = useState(false);
+  const [isSubmittingSchedule, setIsSubmittingSchedule] = useState(false);
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
@@ -560,13 +570,17 @@ export default function Payments() {
   };
 
   const handleApprove = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'approved' } });
+    if (!(await runApprovalGate(confirm, invoice))) return;
+    await updateInvoice.mutateAsync({
+      id: invoice.id,
+      data: { status: 'approved', ap_status: 'approved', action_required_reason: null, action_required_details: null },
+    });
     await ensureLedgerBill({ ...invoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
     toast.success('Invoice approved');
   };
 
   const handleReject = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected' } });
+    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
     toast.success('Invoice rejected');
   };
 
@@ -622,6 +636,7 @@ export default function Payments() {
   };
 
   const submitSchedulePayment = async () => {
+    setIsSubmittingSchedule(true);
     try {
       if (scheduleDialogInvoice) {
         // Single schedule
@@ -653,6 +668,8 @@ export default function Payments() {
       }
     } catch (e) {
       toast.error(e.message || 'Failed to schedule payments');
+    } finally {
+      setIsSubmittingSchedule(false);
     }
   };
 
@@ -1511,6 +1528,25 @@ export default function Payments() {
         {/* Setup Tab */}
         <TabsContent value="setup" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {queryParams.get('banking') === 'skipped' && (
+              <Card className="border-amber-500/40 bg-amber-500/10 shadow-sm lg:col-span-2">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 text-amber-500" />
+                    <div>
+                      <p className="font-semibold text-foreground">Bank setup was skipped during onboarding</p>
+                      <p className="text-sm text-muted-foreground">Add an operating account here when you are ready to pay vendors through ACH or checks.</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('setup')}>Stay in setup</Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="lg:col-span-2">
+              <PaymentAccountsSettings />
+            </div>
+
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -1756,9 +1792,10 @@ export default function Payments() {
             <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
             <Button
               onClick={submitSchedulePayment}
+              disabled={isSubmittingSchedule}
               className="bg-primary hover:bg-primary"
             >
-              Confirm Schedule
+              {isSubmittingSchedule ? 'Scheduling...' : 'Confirm Schedule'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1874,8 +1911,11 @@ export default function Payments() {
           );
         }}
       />
+
+      <ConfirmDialog />
     </div>
   );
 }
+
 
 

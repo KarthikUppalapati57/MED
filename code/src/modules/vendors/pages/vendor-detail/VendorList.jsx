@@ -83,6 +83,13 @@ const VENDOR_ROW_HEIGHT = 76;
 const VENDOR_TABLE_VIEWPORT_HEIGHT = 608;
 const VENDOR_ROW_OVERSCAN = 8;
 
+function formatVendorHealthScore(vendor) {
+  if (vendor?.health_score == null) return 'N/A';
+  const score = Number(vendor.health_score);
+  if (!Number.isFinite(score)) return 'N/A';
+  return (score / 20).toFixed(1);
+}
+
 function VendorTabFallback() {
   return (
     <Card className="border-0 shadow-sm">
@@ -144,7 +151,7 @@ export default function VendorList() {
     queryKey: ['vendors', organization?.id],
     queryFn: () => api.entities.Vendor.list('name', {
       limit: 500,
-      select: 'id, organization_id, brand_id, location_id, name, email, status, total_spent, unpaid_ap, rating, total_orders, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
+      select: 'id, organization_id, brand_id, location_id, name, contact_name, email, phone, address, city, state, zip_code, country, payment_terms, status, notes, whatsapp_number, total_spent, unpaid_ap, health_score, total_orders, file_routing_preference, ap_routing_preference, default_expense_category, default_payment_method, default_payment_account_id, is_commissary_vendor, is_internal_transfer_vendor',
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
@@ -561,7 +568,7 @@ export default function VendorList() {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>Rating</TableHead>
+                  <TableHead>Health</TableHead>
                   <TableHead>Total Spent</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
@@ -633,7 +640,7 @@ export default function VendorList() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-medium">{vendor.rating != null ? Number(vendor.rating).toFixed(1) : 'N/A'}</span>
+                          <span className="font-medium">{formatVendorHealthScore(vendor)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">

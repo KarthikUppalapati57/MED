@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { getSupabaseSystemClient } from "../_shared/supabase.ts"
+import { getSupabaseServiceRoleClient } from "../_shared/supabase.ts"
 import { corsHeaders } from "../_shared/cors.ts"
-
-const supabase = await getSupabaseSystemClient();
 
 async function generateHmacSha256(secret: string, payload: string) {
   const encoder = new TextEncoder();
@@ -28,6 +26,7 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = getSupabaseServiceRoleClient();
     const { data: events, error: fetchError } = await supabase
       .from('webhook_events_queue')
       .select('*, webhook_endpoints(*)')

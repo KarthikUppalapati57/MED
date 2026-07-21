@@ -115,7 +115,38 @@ vi.mock('../../src/hooks/useAuthQuery', () => ({
     isFetchingNextPage: false,
   }),
   useAuthQuery: ({ queryKey }) => {
-    if (queryKey[0] === 'global_vendor_items') {
+    if (queryKey[0] === 'product_verification_queue') {
+      return {
+        data: [
+          {
+            vendor_item_id: 'vendor-item-1',
+            internal_product_id: 'product-1',
+            vendor_name: 'Sysco',
+            vendor_item_name: 'Ground Beef 80/20',
+            product_name: 'Ground Beef 80/20',
+            restops_product_id: 'PRD-1',
+            match_confidence: 72,
+            category_type: '5110',
+            category: 'Meat',
+            last_purchased_at: new Date().toISOString(),
+          },
+          {
+            vendor_item_id: 'vendor-item-2',
+            internal_product_id: 'product-2',
+            vendor_name: 'Specialty Foods',
+            vendor_item_name: 'Premium Wagyu Beef',
+            product_name: 'Premium Wagyu Beef',
+            restops_product_id: 'PRD-2',
+            match_confidence: 72,
+            category_type: '5110',
+            category: 'Meat',
+            last_purchased_at: new Date().toISOString(),
+          },
+        ],
+        isLoading: false,
+      };
+    }
+    if (queryKey[0] === 'trusted_global_vendor_item_suggestions') {
       return {
         data: [
           {
@@ -156,7 +187,7 @@ describe('Products global mapping smoke test', () => {
 
     const reviewButton = screen.getByRole('button', { name: 'Review Network Mapping' });
     const beefRow = reviewButton.closest('tr');
-    expect(within(beefRow).getByText('Ground Beef 80/20')).toBeInTheDocument();
+    expect(within(beefRow).getAllByText('Ground Beef 80/20').length).toBeGreaterThan(0);
     fireEvent.click(reviewButton);
 
     expect(mutate).not.toHaveBeenCalled();

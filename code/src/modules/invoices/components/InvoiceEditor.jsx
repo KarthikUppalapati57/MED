@@ -24,6 +24,8 @@ import { CategorySummaryTable } from './CategorySummaryTable';
 import { ApprovalWorkflowEngine } from './ApprovalWorkflowEngine';
 import { BillPayWidget } from './BillPayWidget';
 import AIEmailDrafter from '@/modules/vendors/components/AIEmailDrafter';
+import { api } from '@/lib/apiClient';
+import { sendEmail } from '@/lib/emailService';
 
 export default function InvoiceEditor({ invoice, onChange }) {
   const [emailDrafterOpen, setEmailDrafterOpen] = React.useState(false);
@@ -410,16 +412,13 @@ export default function InvoiceEditor({ invoice, onChange }) {
                       />
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        // Mock confidence for extracted items (or use real if available)
-                        const confidence = item.ai_confidence || Math.floor(Math.random() * 20) + 80; // 80-99
-                        const isHigh = confidence >= 90;
-                        return (
-                          <div className={`text-[10px] font-medium px-2 py-1 rounded-full text-center ${isHigh ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/20 text-resend-yellow'}`}>
-                            {confidence}% Conf
-                          </div>
-                        );
-                      })()}
+                      {item.ai_confidence != null ? (
+                        <div className={`text-[10px] font-medium px-2 py-1 rounded-full text-center ${item.ai_confidence >= 90 ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/20 text-resend-yellow'}`}>
+                          {item.ai_confidence}% Conf
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-slate-400 text-center">—</div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Input
@@ -568,9 +567,18 @@ export default function InvoiceEditor({ invoice, onChange }) {
           onOpenChange={setEmailDrafterOpen}
           invoice={invoice}
           onSend={async (emailData) => {
-            // Simulated send; you would normally hook up `emailService.send...`
-            console.log('Sending drafted email', emailData);
-            return Promise.resolve();
+            const vendor = invoice.vendor_id
+              ? await api.entities.Vendor.get(invoice.vendor_id).catch(() => null)
+              : null;
+            const to_email = vendor?.email;
+            if (!to_email) throw new Error('This vendor has no email address on file.');
+            const result = await sendEmail({
+              to_email,
+              to_name: invoice.vendor_name || vendor?.name,
+              subject: emailData.subject,
+              message: emailData.body,
+            });
+            if (!result.success) throw new Error(result.error || 'Email send failed');
           }}
         />
       )}

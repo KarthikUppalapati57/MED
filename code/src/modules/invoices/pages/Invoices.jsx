@@ -6,6 +6,7 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { supabase } from '@/lib/supabaseClient';
 import { getApRoutingLabel, isPaymentQueueRouted, normalizeApRouting } from '@/lib/apRouting';
 import { notifyManagers } from '@/lib/notificationService';
@@ -32,8 +33,6 @@ import {
   ClipboardCheck,
   Link2,
   RefreshCcw,
-  Minimize2,
-  Maximize2,
   Plus,
   ArrowUpDown,
   ArrowUp,
@@ -66,11 +65,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +86,10 @@ import {
   getInvoiceAging,
   invoicesToCsv,
 } from '@/lib/invoiceAp';
+import {
+  runApprovalGate as runApprovalGateShared,
+  runBatchApprovalGate as runBatchApprovalGateShared,
+} from '../lib/invoiceValidation';
 
 const InvoiceUploader = React.lazy(() => import('@/modules/invoices/components/InvoiceUploader'));
 const InvoiceEditor = React.lazy(() => import('@/modules/invoices/components/InvoiceEditor'));
@@ -158,7 +166,8 @@ const mapInvoiceLineItemsForRpc = (lineItems = []) => lineItems
       unit_price: unitPrice,
       total_price: totalPrice,
       vendor_item_code: item.vendor_item_code || null,
-      vendor_unit: item.vendor_unit || item.unit || null
+      vendor_unit: item.vendor_unit || item.unit || null,
+      pack_size: item.pack_size || item.PackSize || item.pack || item.size || null
     };
   });
 const workflowStages = [
@@ -200,14 +209,16 @@ export default function Invoices() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [invoiceValidated, setInvoiceValidated] = useState(false);
   const previousInvoicesRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const isHigherRole = ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+  const isHigherRole = ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+  const isSingleSelected = selectedInvoiceIds.length === 1;
+  const { hasLocation, warnIfMissing } = useRequireLocation();
 
   const createBlankManualInvoice = useCallback(() => ({
     vendor_name: '',
@@ -227,14 +238,14 @@ export default function Invoices() {
     ap_status: 'processing',
     source: 'manual_entry',
     organization_id: organization?.id,
-    brand_id: brand?.id,
+    brand_id: brand?.id || brand?.brand_id,
     location_id: location?.id,
     created_by: userProfile?.id,
     line_items: [],
     validation_results: {
       entry_method: 'manual',
     },
-  }), [brand?.id, location?.id, organization?.id, userProfile?.id]);
+  }), [brand?.brand_id, brand?.id, location?.id, organization?.id, userProfile?.id]);
 
   const validateManualInvoice = useCallback((invoice) => {
     if (invoice?.source !== 'manual_entry') return true;
@@ -254,38 +265,38 @@ export default function Invoices() {
   }, []);
 
   const handleCreateManualInvoice = useCallback(() => {
+    if (!warnIfMissing()) return;
     setEditingInvoice(createBlankManualInvoice());
-    setIsMinimized(false);
     setEditorOpen(true);
-  }, [createBlankManualInvoice]);
+  }, [createBlankManualInvoice, warnIfMissing]);
 
-  // Resizing state
-  const [sheetWidth, setSheetWidth] = useState(() => {
-    const saved = localStorage.getItem('invoice_editor_width');
-    return saved ? parseInt(saved, 10) : 800;
-  });
-  const [isResizing, setIsResizing] = useState(false);
-  const sheetRef = useRef(null);
+  const handleOpenUpload = useCallback(() => {
+    if (!warnIfMissing()) return;
+    setUploadOpen(true);
+  }, [warnIfMissing]);
 
-  const startResizing = useCallback((e) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
+  const handleOpenMobileCapture = useCallback(() => {
+    if (!warnIfMissing()) return;
+    setMobileCaptureOpen(true);
+  }, [warnIfMissing]);
 
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const resize = useCallback((e) => {
-    if (isResizing) {
-      const newWidth = window.innerWidth - e.clientX;
-      if (newWidth > 400 && newWidth < window.innerWidth * 0.95) {
-        setSheetWidth(newWidth);
-        localStorage.setItem('invoice_editor_width', newWidth.toString());
-      }
+  const handleIntakeClick = useCallback((label) => {
+    if (label === 'Email') {
+      setEmailConfigOpen(true);
+      return;
     }
-  }, [isResizing]);
+    if (label === 'Manual') {
+      handleCreateManualInvoice();
+      return;
+    }
+    handleOpenUpload();
+  }, [handleCreateManualInvoice, handleOpenUpload]);
 
+  // Each new editor session starts un-validated; Approve stays locked until
+  // the user runs Validate at least once for this invoice.
+  useEffect(() => {
+    if (editorOpen) setInvoiceValidated(false);
+  }, [editorOpen, editingInvoice?.id]);
 
   useEffect(() => {
     if (!editorOpen || !editingInvoice?.id || editingInvoice.status !== 'extracting') return undefined;
@@ -308,23 +319,6 @@ export default function Invoices() {
       window.clearInterval(intervalId);
     };
   }, [editorOpen, editingInvoice?.id, editingInvoice?.status, queryClient, organization?.id]);
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener('mousemove', resize);
-      window.addEventListener('mouseup', stopResizing);
-      // Change body cursor while resizing
-      document.body.style.cursor = 'w-resize';
-    } else {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
-      document.body.style.cursor = 'default';
-    }
-    return () => {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
-      document.body.style.cursor = 'default';
-    };
-  }, [isResizing, resize, stopResizing]);
 
   const { data: invoices = [], isLoading: loadingInvoices } = useAuthQuery({
     queryKey: ['invoices-dashboard', organization?.id],
@@ -409,11 +403,9 @@ export default function Invoices() {
         if (current && !IN_FLIGHT_INVOICE_STATUSES.has(current.status)) {
           if (['pending_approval', 'pending_review', 'validated', 'processed'].includes(current.status)) {
             toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
-            setIsMinimized(false);
             openEditorWithFullData(current);
           } else if (['failed', 'extract_failed', 'rejected'].includes(current.status)) {
             toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
-            setIsMinimized(false);
             openEditorWithFullData(current);
           }
         }
@@ -498,10 +490,10 @@ export default function Invoices() {
     if (!cleaned.vendor_id) delete cleaned.vendor_id;
     // Remove null/undefined approved_by (it's a UUID column) 
     if (!cleaned.approved_by) delete cleaned.approved_by;
-    // Remove null/undefined organization_id and location_id (if still missing)
-    if (!cleaned.organization_id) delete cleaned.organization_id;
-    if (!cleaned.brand_id) delete cleaned.brand_id;
-    if (!cleaned.location_id) delete cleaned.location_id;
+    if (!cleaned.organization_id) throw new Error('Organization context is required to save an invoice');
+    if (!cleaned.brand_id || !cleaned.location_id) {
+      throw new Error('Please select a location to continue');
+    }
     if (!cleaned.created_by) delete cleaned.created_by;
     return cleaned;
   };
@@ -632,6 +624,9 @@ export default function Invoices() {
       toast.success('Invoice updated');
     },
   });
+
+  // Guards Save/Reject/Approve against double-submit while either mutation is in flight.
+  const isSavingInvoice = updateMutation.isPending || createMutation.isPending;
 
   const batchUpdateMutation = useMutation({
     mutationFn: async ({ ids, data }) => {
@@ -827,11 +822,11 @@ export default function Invoices() {
       const savedInvoice = await createMutation.mutateAsync(data);
       // Refresh the invoice list
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
-      
+
       if (savedInvoice) {
-        // Open the editor immediately with saved data
-        setEditingInvoice(savedInvoice);
-        setEditorOpen(true);
+        // Don't open the editor yet — it has only placeholder data at this point.
+        // The in-flight watcher above opens it automatically once extraction
+        // finishes and the invoice has real vendor/line-item data.
         void triggerInvoiceExtraction(savedInvoice);
       }
       return savedInvoice;
@@ -886,6 +881,7 @@ export default function Invoices() {
         vendor_item_code: item.vendor_item_code,
         vendor_unit: item.vendor_unit,
         unit: item.vendor_unit,
+        pack_size: item.pack_size,
       })),
     };
   };
@@ -959,14 +955,20 @@ export default function Invoices() {
 
 
 
+  // Thin wrappers binding the shared gate (invoiceValidation.jsx) to this
+  // page's own useConfirm() instance — same checks Payments.jsx uses.
+  const runApprovalGate = (invoice) => runApprovalGateShared(confirm, invoice);
+  const runBatchApprovalGate = (selected) => runBatchApprovalGateShared(confirm, selected);
+
   const handleApprove = async (invoice) => {
     try {
       const invoiceForApproval = await loadInvoiceForApproval(invoice);
       if (!hasInvoiceLineItems(invoiceForApproval.line_items)) {
         throw new Error('This invoice has no saved line items. Open it, add/review line items, then approve it.');
       }
+      if (!(await runApprovalGate(invoiceForApproval))) return;
 
-      await updateMutation.mutateAsync({ 
+      await updateMutation.mutateAsync({
         id: invoice.id, 
         data: {
           ...invoiceForApproval,
@@ -992,11 +994,21 @@ export default function Invoices() {
   };
 
   const handleReject = async (invoice) => {
-    await updateMutation.mutateAsync({ 
-      id: invoice.id, 
+    await updateMutation.mutateAsync({
+      id: invoice.id,
       data: { status: 'rejected', ap_status: 'rejected' }
     });
     posthog.capture('invoice_failed', { invoiceId: invoice.id, reason: 'rejected' });
+  };
+
+  const handleApproveBatch = async () => {
+    const selected = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    if (!(await runBatchApprovalGate(selected))) return;
+
+    batchUpdateMutation.mutate({
+      ids: selectedInvoiceIds,
+      data: { status: 'approved', ap_status: 'approved', action_required_reason: null }
+    });
   };
 
   const handleEditorSave = async () => {
@@ -1060,6 +1072,10 @@ export default function Invoices() {
 
   const handleEditorApprove = async () => {
     try {
+      if (!invoiceValidated) {
+        throw new Error('Run Validate before approving this invoice.');
+      }
+      if (!(await runApprovalGate(editingInvoice))) return;
       const data = {
         ...editingInvoice,
         status: 'approved',
@@ -1287,15 +1303,15 @@ export default function Invoices() {
             <Mail className="h-4 w-4 mr-2 text-brand" />
             Email Settings
           </Button>
-          <Button onClick={() => setMobileCaptureOpen(true)} className="bg-primary hover:bg-primary sm:hidden">
+          <Button onClick={handleOpenMobileCapture} className={cn("bg-primary hover:bg-primary sm:hidden", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt
           </Button>
-          <Button variant="outline" onClick={handleCreateManualInvoice} className="flex-1 sm:flex-none">
+          <Button variant="outline" onClick={handleCreateManualInvoice} className={cn("flex-1 sm:flex-none", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Plus className="h-4 w-4 mr-2" />
             Create Invoice
           </Button>
-          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary hidden sm:flex">
+          <Button onClick={handleOpenUpload} className={cn("bg-primary hover:bg-primary hidden sm:flex", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Invoice
           </Button>
@@ -1316,8 +1332,8 @@ export default function Invoices() {
                 <button
                   key={label}
                   type="button"
-                  onClick={label === 'Email' ? () => setEmailConfigOpen(true) : label === 'Manual' ? handleCreateManualInvoice : () => setUploadOpen(true)}
-                  className="text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors"
+                  onClick={() => handleIntakeClick(label)}
+                  className={cn("text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors", label !== 'Email' && !hasLocation && "opacity-50 cursor-not-allowed")}
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Icon className="h-4 w-4 text-primary" />
@@ -1507,18 +1523,15 @@ export default function Invoices() {
                     date: batchScheduleDate 
                   })}
                 >
-                  {batchScheduleMutation.isPending ? 'Scheduling...' : 'Schedule Batch'}
+                  {batchScheduleMutation.isPending ? 'Scheduling...' : (isSingleSelected ? 'Schedule' : 'Schedule Batch')}
                 </Button>
                 <Button
                   size="sm"
                   className="bg-resend-green hover:bg-resend-green/90 whitespace-nowrap"
                   disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
-                  onClick={() => batchUpdateMutation.mutate({
-                    ids: selectedInvoiceIds,
-                    data: { status: 'approved', ap_status: 'approved', action_required_reason: null }
-                  })}
+                  onClick={handleApproveBatch}
                 >
-                  Approve Batch
+                  {isSingleSelected ? 'Approve' : 'Approve Batch'}
                 </Button>
                 <Button
                   size="sm"
@@ -1530,7 +1543,7 @@ export default function Invoices() {
                     data: { status: 'rejected', ap_status: 'rejected' }
                   })}
                 >
-                  Reject Batch
+                  {isSingleSelected ? 'Reject' : 'Reject Batch'}
                 </Button>
                 <Button
                   size="sm"
@@ -1539,7 +1552,7 @@ export default function Invoices() {
                   disabled={batchScheduleMutation.isPending || batchUpdateMutation.isPending}
                   onClick={handleBulkDelete}
                 >
-                  <Trash2 className="h-4 w-4 mr-1" /> Delete Batch
+                  <Trash2 className="h-4 w-4 mr-1" /> {isSingleSelected ? 'Delete' : 'Delete Batch'}
                 </Button>
                 <Button
                   size="sm"
@@ -1700,12 +1713,12 @@ export default function Invoices() {
                                 <Eye className="h-4 w-4 mr-2" /> View/Edit
                               </DropdownMenuItem>
                               {isHigherRole && ['validated', 'pending_review'].includes(invoice.status) && (
-                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
+                                <DropdownMenuItem disabled={isSavingInvoice} onSelect={(e) => { e.preventDefault(); handleApprove(invoice); }}>
                                   <Check className="h-4 w-4 mr-2" /> Approve
                                 </DropdownMenuItem>
                               )}
                               {isHigherRole && (invoice.status === 'validated' || invoice.status === 'approved') && (
-                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
+                                <DropdownMenuItem disabled={isSavingInvoice} onSelect={(e) => { e.preventDefault(); handleReject(invoice); }} className="text-resend-red">
                                   <X className="h-4 w-4 mr-2" /> Reject
                                 </DropdownMenuItem>
                               )}
@@ -1796,118 +1809,101 @@ export default function Invoices() {
         </React.Suspense>
       )}
 
-      {/* Editor Sheet */}
-      <Sheet open={editorOpen} onOpenChange={setEditorOpen} modal={!isMinimized}>
-        <SheetContent 
-          overlay={!isMinimized}
-          className={
-            isMinimized 
-              ? "!w-[400px] border-l border-slate-200 shadow-2xl p-0 flex flex-col transition-all duration-300 z-50 bg-white"
-              : "p-0 sm:max-w-none overflow-hidden flex flex-col transition-all duration-300"
-          }
-          style={isMinimized ? {} : { width: `${sheetWidth}px`, maxWidth: '100vw' }}
+      {/* Editor Dialog */}
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent
+          className="p-0 gap-0 w-[95vw] h-[90vh] min-w-[480px] min-h-[400px] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden resize"
         >
-          {/* Resize Handle */}
-          {!isMinimized && (
-            <div
-              onMouseDown={startResizing}
-              className={cn(
-                "absolute left-0 top-0 w-1.5 h-full cursor-w-resize transition-colors hover:bg-primary/30 active:bg-primary/50 z-50 flex items-center justify-center",
-                isResizing && "bg-primary/40"
-              )}
-            >
-               <div className="w-0.5 h-12 bg-slate-300 rounded-full opacity-0 group-hover:opacity-100" />
-            </div>
-          )}
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <DialogTitle>
+              {editingInvoice?.source === 'manual_entry' && !editingInvoice?.id ? 'Create Invoice' : editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
+            </DialogTitle>
+          </DialogHeader>
 
-          <div className={cn("flex-1 h-full", isMinimized ? "p-4" : "p-6 overflow-y-auto")}>
-            <SheetHeader className={isMinimized ? "flex flex-row items-center justify-between pb-2" : ""}>
-              <SheetTitle className={isMinimized ? "text-left mt-0 text-base" : ""}>
-                {editingInvoice?.source === 'manual_entry' && !editingInvoice?.id ? 'Create Invoice' : editingInvoice?.id ? 'Edit Invoice' : 'Review Invoice'}
-              </SheetTitle>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={() => setIsMinimized(!isMinimized)} className="h-8 w-8 text-slate-500 hover:text-slate-800">
-                  {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-                </Button>
-              </div>
-            </SheetHeader>
-            {editingInvoice && (
+          {editingInvoice && (() => {
+            const editorForm = (
               <>
-                {isMinimized ? (
-                  <div className="mt-3 flex flex-col gap-2">
-                     <p className="text-sm text-slate-600 truncate font-medium">{editingInvoice.vendor_name || 'Processing vendor...'}</p>
-                     <p className="text-sm font-semibold text-teal-700">${parseFloat(editingInvoice.total_amount || 0).toFixed(2)}</p>
-                     <Button size="sm" onClick={() => setIsMinimized(false)} className="w-full mt-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-sm h-9">
-                       Open Review
-                     </Button>
-                  </div>
-                ) : (
-                  <div className="mt-6 flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden gap-6 h-[calc(100vh-140px)]">
-                    {/* Left Pane: Document Viewer */}
-                    {editingInvoice.file_url && (
-                      <div className="w-full lg:w-1/2 h-[400px] lg:h-full rounded-xl overflow-hidden border bg-slate-50 shrink-0">
-                        <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
-                          <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
-                        </React.Suspense>
-                      </div>
-                    )}
-                    
-                    {/* Right Pane: Editor */}
-                    <div className={`flex-1 overflow-y-auto pr-2 ${editingInvoice.file_url ? 'w-full lg:w-1/2' : 'w-full'}`}>
-                      <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
-                        <InvoiceEditor
-                          invoice={editingInvoice}
-                          onChange={setEditingInvoice}
-                        />
-                      </React.Suspense>
-                      <div className="flex flex-wrap gap-3 mt-6 pb-6">
-                        <Button
-                          variant="outline"
-                          onClick={() => setEditorOpen(false)}
-                          className="flex-1"
-                        >
-                          Cancel
-                        </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleEditorSave}
-                      className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5"
-                    >
-                      <Save className="h-4 w-4 mr-1" /> Save
-                    </Button>
-                    {userProfile?.role !== 'ground_staff' && (
-                      <>
-                        <Button
-                          variant="outline"
-                          onClick={handleEditorReject}
-                          className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5"
-                        >
-                          <X className="h-4 w-4 mr-1" /> Reject
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={handleEditorApprove}
-                          className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5"
-                        >
-                          <Check className="h-4 w-4 mr-1" /> Approve
-                        </Button>
-                        <Button
-                          onClick={handleAcceptInvoice}
-                          className="flex-1 bg-primary hover:bg-primary"
-                        >
-                          Validate
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                <React.Suspense fallback={<InlineLoader label="Loading editor..." />}>
+                  <InvoiceEditor
+                    invoice={editingInvoice}
+                    onChange={setEditingInvoice}
+                  />
+                </React.Suspense>
+                <div className="flex flex-wrap gap-3 mt-6 pb-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditorOpen(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleEditorSave}
+                    disabled={isSavingInvoice}
+                    className="flex-1 border-blue-300 text-resend-blue hover:bg-resend-blue/5 disabled:opacity-40"
+                  >
+                    <Save className="h-4 w-4 mr-1" /> Save
+                  </Button>
+                  {userProfile?.role !== 'ground_staff' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleEditorReject}
+                        disabled={isSavingInvoice}
+                        className="flex-1 border-red-300 text-resend-red hover:bg-resend-red/5 disabled:opacity-40"
+                      >
+                        <X className="h-4 w-4 mr-1" /> Reject
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleEditorApprove}
+                        disabled={!invoiceValidated || isSavingInvoice}
+                        title={!invoiceValidated ? 'Run Validate first' : undefined}
+                        className="flex-1 border-green-300 text-resend-green hover:bg-resend-green/5 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Check className="h-4 w-4 mr-1" /> Approve
+                      </Button>
+                      <Button
+                        onClick={handleAcceptInvoice}
+                        className="flex-1 bg-primary hover:bg-primary"
+                      >
+                        Validate
+                      </Button>
+                    </>
+                  )}
                 </div>
-                  </div>
-                )}
               </>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+            );
+
+            if (!editingInvoice.file_url) {
+              return <div className="flex-1 min-h-0 overflow-y-auto p-6">{editorForm}</div>;
+            }
+
+            return (
+              <ResizablePanelGroup
+                direction="horizontal"
+                autoSaveId="invoice-editor-panels"
+                className="flex-1 min-h-0 p-6"
+              >
+                <ResizablePanel defaultSize={50} minSize={25}>
+                  <div className="h-full mr-3 rounded-xl overflow-hidden border bg-slate-50">
+                    <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
+                      <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
+                    </React.Suspense>
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={30}>
+                  <div className="h-full ml-3 overflow-y-auto pr-2">
+                    {editorForm}
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Validation Dialog */}
       {validationOpen && (
@@ -1918,6 +1914,7 @@ export default function Invoices() {
             invoice={editingInvoice}
             onSave={handleSaveValidated}
             onCancel={() => setValidationOpen(false)}
+            onValidated={() => setInvoiceValidated(true)}
           />
         </React.Suspense>
       )}

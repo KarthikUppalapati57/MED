@@ -19,6 +19,33 @@ const formatUSPhoneInput = (value) => {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 };
 
+const normalizeOtpInput = (value) => value.replace(/\D/g, '').slice(0, 6);
+
+async function getFunctionErrorMessage(error) {
+  const context = error?.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.clone().json();
+      if (body?.error) return body.error;
+      if (body?.message) return body.message;
+    } catch {}
+  }
+  if (context && typeof context.text === 'function') {
+    try {
+      const text = await context.clone().text();
+      if (text) return text;
+    } catch {}
+  }
+  return error?.message;
+}
+
+async function invokeVendorOnboarding(body) {
+  const { data, error } = await supabase.functions.invoke('vendor-onboarding', { body });
+  if (data?.error) throw new Error(data.error);
+  if (error) throw new Error(await getFunctionErrorMessage(error) || error.message);
+  return data || {};
+}
+
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
@@ -73,12 +100,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       });
       setVendorId(newVendor.id);
 
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'send-otp', payload: { vendor_id: newVendor.id } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      const data = await invokeVendorOnboarding({ action: 'send-otp', payload: { vendor_id: newVendor.id } });
 
       setDevOtp(data.devOtp);
       toast.success("OTP sent successfully to vendor!");
@@ -91,17 +113,14 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   };
 
   const handleVerifyOtp = async () => {
-    if (!otpInput) return toast.error("Please enter the OTP");
+    const normalizedOtp = normalizeOtpInput(otpInput);
+    if (normalizedOtp.length !== 6) return toast.error("Enter the 6-digit OTP");
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'verify-otp', payload: { vendor_id: vendorId, otp: otpInput } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      await invokeVendorOnboarding({ action: 'verify-otp', payload: { vendor_id: vendorId, otp: normalizedOtp } });
 
       toast.success("OTP verified!");
+      setOtpInput('');
       setStep(2);
     } catch (err) {
       toast.error(err.message || "Invalid OTP");
@@ -110,15 +129,26 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     }
   };
 
+  const handleResendOtp = async () => {
+    if (!vendorId) return toast.error("Start vendor onboarding before resending an OTP");
+    setLoading(true);
+    try {
+      const data = await invokeVendorOnboarding({ action: 'send-otp', payload: { vendor_id: vendorId } });
+
+      setOtpInput('');
+      setDevOtp(data?.devOtp || null);
+      toast.success("A new OTP was sent to the vendor");
+    } catch (err) {
+      toast.error(err.message || "Failed to resend OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSendMagicLink = async (type) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'send-magic-link', payload: { vendor_id: vendorId, type } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      const data = await invokeVendorOnboarding({ action: 'send-magic-link', payload: { vendor_id: vendorId, type } });
 
       toast.success(`Magic link for ${type === 'tax' ? 'Tax info' : 'Bank details'} sent to vendor!`);
       if (type === 'tax') setStep(3);
@@ -239,14 +269,19 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                       <Label className="text-base">Enter the 6-digit code</Label>
                       <Input 
                         value={otpInput} 
-                        onChange={e => setOtpInput(e.target.value)} 
-                        placeholder="• • • • • •" 
-                        className="text-3xl tracking-[1em] text-center h-16 font-mono bg-muted/20 placeholder:tracking-widest" 
+                        onChange={e => setOtpInput(normalizeOtpInput(e.target.value))} 
+                        placeholder="000000" 
+                        className="text-3xl tracking-[0.7em] text-center h-16 font-mono bg-muted/20 placeholder:tracking-normal" 
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
                         maxLength={6}
                       />
                       {devOtp && (
                         <p className="text-xs text-muted-foreground mt-4">Developer Note: The OTP is <strong>{devOtp}</strong></p>
                       )}
+                      <Button type="button" variant="ghost" size="sm" onClick={handleResendOtp} disabled={loading}>
+                        Resend OTP
+                      </Button>
                     </div>
                   </CardContent>
                 </>

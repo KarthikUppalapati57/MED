@@ -8,6 +8,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { ShieldCheck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Lowest to highest. A role can act on a step requiring its own tier or any
+// tier below it — an exact-match check would otherwise lock platform_admin/
+// org_manager out of steps written for a lower tier, contradicting the
+// documented hierarchy (higher roles can always act where a lower one could).
+const ROLE_RANK = ['ground_staff', 'location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin'];
+const roleAtOrAbove = (currentRole, requiredRole) => {
+  const current = ROLE_RANK.indexOf(currentRole);
+  const required = ROLE_RANK.indexOf(requiredRole);
+  if (current === -1 || required === -1) return currentRole === requiredRole;
+  return current >= required;
+};
+
 export function ApprovalWorkflowEngine({ invoice }) {
   const { user, userProfile } = useAuth();
   const currentRole = userProfile?.role || 'user';
@@ -103,8 +115,8 @@ export function ApprovalWorkflowEngine({ invoice }) {
   // Check if current user can approve any pending steps
   const pendingSteps = instanceData.steps.filter(s => s.status === 'pending');
   
-  // "Any one higher role have to approve" - we find steps that match current user's role
-  const myActionableSteps = pendingSteps.filter(s => s.required_role === currentRole);
+  // A role can act on any step at or below its own tier, not just an exact match.
+  const myActionableSteps = pendingSteps.filter(s => roleAtOrAbove(currentRole, s.required_role));
   const canApprove = myActionableSteps.length > 0;
 
   const handleAction = (status) => {

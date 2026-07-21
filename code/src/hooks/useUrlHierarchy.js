@@ -64,7 +64,7 @@ export function useUrlHierarchy() {
     organization,
     location: activeLocation,
     accessTree,
-    switchContext,
+    switchContextTo,
     isAuthenticated,
     isLoadingAuth,
   } = useAuth();
@@ -120,21 +120,18 @@ export function useUrlHierarchy() {
 
     if (!targetOrg && !targetLocation) return;
 
+    // Single atomic commit -- targetOrg/targetBrand/targetLocation are always
+    // resolved together above, so one switchContextTo() call covers both the
+    // org-only and org+brand+location cases. (Three separate switchContext()
+    // calls here would race: each reads the same stale closure before the
+    // previous call's setState has landed, so brand/location silently get
+    // reset to null by the org call's cascading reset.)
     syncingFromUrl.current = true;
-    try {
-      if (targetOrg) {
-        switchContext('organization', targetOrg);
-      }
-      if (targetBrand) {
-        switchContext('brand', targetBrand);
-      }
-      if (targetLocation) {
-        switchContext('location', targetLocation);
-      }
-    } finally {
-      // Allow the context→URL sync to run after one tick
-      setTimeout(() => { syncingFromUrl.current = false; }, 0);
-    }
+    switchContextTo({ organization: targetOrg, brand: targetBrand, location: targetLocation })
+      .finally(() => {
+        // Allow the context→URL sync to run after one tick
+        setTimeout(() => { syncingFromUrl.current = false; }, 0);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, isAuthenticated, isLoadingAuth, accessTree]);
 

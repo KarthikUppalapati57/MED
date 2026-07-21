@@ -16,13 +16,43 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, MapPin, Plus, Save, Sparkles, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
 const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalCode: '', country: 'United States' });
 const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city: 'Knoxville', state: 'TN', postalCode: '37902', country: 'United States' };
-const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const ONBOARDING_PLAN_CATALOG = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    priceMonthly: 149,
+    description: 'Core location operations for one restaurant, store, or service location.',
+    badge: 'Available now',
+    tone: 'primary',
+    features: ['Core location workspace', 'Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
+  },
+  {
+    id: 'starter-ai',
+    name: 'Starter + AI',
+    priceMonthly: 249,
+    description: 'Starter modules plus AI-assisted operating intelligence.',
+    badge: 'Coming soon',
+    comingSoon: true,
+    tone: 'amber',
+    features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
+  },
+  {
+    id: 'advanced',
+    name: 'Advanced modules',
+    priceMonthly: 349,
+    description: 'Expanded controls for larger teams and advanced operating workflows.',
+    badge: 'Coming soon',
+    comingSoon: true,
+    tone: 'slate',
+    features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
+  },
+];const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
 const normalizeCouponCodeInput = (value) => String(value || '').trim().replace(/\s+-\s+\d+\s*(month|months|mo).*$/i, '').toUpperCase();
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
@@ -47,6 +77,19 @@ const normalizeOrganization = (org = {}) => {
 };
 const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
+const normalizePlanId = (value) => normalizeKey(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const buildOnboardingPlanOptions = (dbPlans = []) => ONBOARDING_PLAN_CATALOG.map((catalogPlan) => {
+  const dbPlan = dbPlans.find((plan) => normalizePlanId(plan.id) === catalogPlan.id || normalizePlanId(plan.name) === catalogPlan.id);
+  const available = !catalogPlan.comingSoon && Boolean(dbPlan);
+  return {
+    ...(dbPlan || { id: catalogPlan.id, stripe_price_id: null }),
+    ...catalogPlan,
+    price_monthly: catalogPlan.priceMonthly,
+    features: catalogPlan.features,
+    selectable: available,
+    unavailableReason: catalogPlan.comingSoon ? 'Coming soon' : 'Plan setup required',
+  };
+});
 const addressPayloadOrUndefined = (address) => address && typeof address === 'object' && addressComplete(address) ? address : undefined;
 
 const isValidPostalCode = (address) => {
@@ -173,6 +216,67 @@ const addressFromRow = (row, prefix) => ({
   postalCode: valueFor(row, `${prefix}_postal_code`),
   country: valueFor(row, `${prefix}_country`) || 'United States',
 });
+const US_STATE_ABBREVIATIONS = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC'
+};
+const ADDRESS_SUGGESTION_LIMIT = 12;
+const COMMON_STREET_SUFFIXES = ['springs', 'spring', 'street', 'st', 'avenue', 'ave', 'road', 'rd', 'drive', 'dr', 'lane', 'ln', 'circle', 'cir', 'court', 'ct', 'boulevard', 'blvd', 'parkway', 'pkwy', 'place', 'pl', 'terrace', 'ter', 'trail', 'trl', 'way'];
+const COMMON_STREET_COMPOUNDS = [{ from: /\bmontvue\b/i, to: 'Mont Vue' }];
+const streetLineFromSuggestion = (address = {}) => [address.house_number, address.road || address.pedestrian || address.footway || address.neighbourhood].filter(Boolean).join(' ').trim();
+const addressSearchVariants = (query) => {
+  const normalized = String(query || '').trim().replace(/\s+/g, ' ');
+  const variants = new Set([normalized]);
+  for (const { from, to } of COMMON_STREET_COMPOUNDS) {
+    if (from.test(normalized)) variants.add(normalized.replace(from, to));
+  }
+  for (const suffix of COMMON_STREET_SUFFIXES) {
+    const suffixPattern = new RegExp(`([a-z])(${suffix})\\b`, 'i');
+    if (suffixPattern.test(normalized)) {
+      const spaced = normalized.replace(suffixPattern, '$1 $2');
+      variants.add(spaced);
+      if (suffix === 'spring') variants.add(spaced.replace(/\bspring\b/i, 'springs'));
+    }
+  }
+  return Array.from(variants).filter(Boolean).slice(0, 6);
+};
+const suggestionKey = (suggestion) => [suggestion.address.line1, suggestion.address.city, suggestion.address.state, suggestion.address.postalCode].map((part) => normalizeKey(part)).join('|');
+const normalizeSuggestedAddress = (item) => {
+  const address = item?.address || {};
+  const state = address.state_code || US_STATE_ABBREVIATIONS[String(address.state || '').toLowerCase()] || address.state || '';
+  return {
+    id: String(item?.place_id || item?.osm_id || item?.display_name || Math.random()),
+    label: item?.display_name || '',
+    address: {
+      line1: streetLineFromSuggestion(address) || String(item?.name || '').trim(),
+      line2: '',
+      city: address.city || address.town || address.village || address.hamlet || address.county || '',
+      state,
+      postalCode: address.postcode || '',
+      country: address.country || 'United States',
+    },
+  };
+};
+const normalizeCensusSuggestion = (item) => {
+  const components = item?.addressComponents || {};
+  const state = components.state || '';
+  const city = components.city || '';
+  const zip = components.zip || '';
+  const matchedAddress = String(item?.matchedAddress || '').trim();
+  const cityStatePattern = city && state ? new RegExp(`,\\s*${city}\\s*,\\s*${state}\\s+${zip}.*$`, 'i') : null;
+  const line1 = cityStatePattern ? matchedAddress.replace(cityStatePattern, '').trim() : (components.fromAddress && components.streetName ? `${components.fromAddress} ${components.streetName}` : matchedAddress.split(',')[0] || '');
+  return {
+    id: String(item?.matchedAddress || Math.random()),
+    label: matchedAddress,
+    address: {
+      line1,
+      line2: '',
+      city,
+      state,
+      postalCode: zip,
+      country: 'United States',
+    },
+  };
+};
 const parseCsvBoolean = (value, defaultValue = true) => {
   const normalized = normalizeKey(value);
   if (!normalized) return defaultValue;
@@ -186,17 +290,165 @@ function FieldLabel({ htmlFor, children, required = false }) {
 }
 
 function AddressFields({ idPrefix, value, onChange, required = false, compact = false, line1Label = 'Business/Service Address' }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionStatus, setSuggestionStatus] = useState('idle');
+  const [line1Focused, setLine1Focused] = useState(false);
+  const selectedLineRef = useRef('');
   const update = (field, nextValue) => onChange({ ...value, [field]: nextValue });
+
+  useEffect(() => {
+    const query = String(value.line1 || '').trim();
+    if (!line1Focused || query.length < 3 || selectedLineRef.current === query) {
+      setSuggestions([]);
+      setSuggestionStatus('idle');
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSuggestionStatus('loading');
+      try {
+        const searches = addressSearchVariants([query, value.city, value.state].filter(Boolean).join(' '));
+        const results = await Promise.all(searches.flatMap((search) => [
+          fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&dedupe=0&limit=${ADDRESS_SUGGESTION_LIMIT}&q=${encodeURIComponent(search)}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          }).then(async (response) => {
+            if (!response.ok) return [];
+            const rows = await response.json();
+            return (Array.isArray(rows) ? rows : []).map(normalizeSuggestedAddress);
+          }).catch((error) => {
+            if (error.name === 'AbortError') throw error;
+            return [];
+          }),
+          fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(search)}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          }).then(async (response) => {
+            if (!response.ok) return [];
+            const payload = await response.json();
+            return (payload?.result?.addressMatches || []).map(normalizeCensusSuggestion);
+          }).catch((error) => {
+            if (error.name === 'AbortError') throw error;
+            return [];
+          }),
+        ]));
+        const seen = new Set();
+        const nextSuggestions = results
+          .flatMap((rows) => (Array.isArray(rows) ? rows : []))
+          .filter((item) => item.label && item.address.line1)
+          .filter((item) => {
+            const key = suggestionKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, ADDRESS_SUGGESTION_LIMIT);
+        setSuggestions(nextSuggestions);
+        setSuggestionStatus(nextSuggestions.length ? 'ready' : 'empty');
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        setSuggestions([]);
+        setSuggestionStatus('error');
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [line1Focused, value.city, value.line1, value.state]);
+
+  const selectSuggestion = (suggestion) => {
+    selectedLineRef.current = suggestion.address.line1;
+    onChange({
+      ...value,
+      ...suggestion.address,
+      line2: value.line2 || suggestion.address.line2,
+    });
+    setSuggestions([]);
+    setSuggestionStatus('idle');
+    setLine1Focused(false);
+  };
+
+  const useEnteredAddress = () => {
+    const line1 = String(value.line1 || '').trim();
+    selectedLineRef.current = line1;
+    onChange({ ...value, line1 });
+    setSuggestions([]);
+    setSuggestionStatus('idle');
+    setLine1Focused(false);
+  };
+
+  const showDropdown = line1Focused && String(value.line1 || '').trim().length >= 3 && (suggestionStatus !== 'idle' || suggestions.length > 0);
+
   return (
     <div className={compact ? 'space-y-3' : 'rounded-md border bg-muted/20 p-4 space-y-3'}>
       <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-1.5">
+        <div className="relative space-y-1.5">
           <FieldLabel htmlFor={`${idPrefix}-line1`} required={required}>{line1Label}</FieldLabel>
-          <Input id={`${idPrefix}-line1`} value={value.line1} onChange={(event) => update('line1', event.target.value)} className="h-10 bg-card" />
+          <Input
+            id={`${idPrefix}-line1`}
+            value={value.line1}
+            onBlur={() => window.setTimeout(() => setLine1Focused(false), 150)}
+            onChange={(event) => {
+              selectedLineRef.current = '';
+              update('line1', event.target.value);
+            }}
+            onFocus={() => setLine1Focused(true)}
+            className="h-10 bg-card"
+            autoComplete="street-address"
+          />
+          {showDropdown && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 h-48 overflow-y-scroll overscroll-contain rounded-md border bg-popover text-popover-foreground shadow-lg [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20">
+              {suggestionStatus === 'loading' && (
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching addresses
+                </div>
+              )}
+              {suggestionStatus === 'error' && <div className="px-3 py-2 text-sm text-amber-400">Address suggestions are unavailable right now.</div>}
+              {suggestionStatus === 'empty' && (
+                <div className="border-b px-3 py-2">
+                  <p className="text-sm text-muted-foreground">No address matches found.</p>
+                  <button
+                    type="button"
+                    className="mt-2 flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      useEnteredAddress();
+                    }}
+                  >
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-muted-foreground" />
+                    <span>
+                      <span className="block font-medium text-foreground">Use address as entered</span>
+                      <span className="block text-xs text-muted-foreground">{String(value.line1 || '').trim()}</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    selectSuggestion(suggestion);
+                  }}
+                >
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-muted-foreground" />
+                  <span>
+                    <span className="block font-medium text-foreground">{suggestion.address.line1}</span>
+                    <span className="block text-xs text-muted-foreground">{[suggestion.address.city, suggestion.address.state, suggestion.address.postalCode].filter(Boolean).join(', ')}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-1.5">
           <FieldLabel htmlFor={`${idPrefix}-line2`}>Suite / Unit</FieldLabel>
-          <Input id={`${idPrefix}-line2`} value={value.line2} onChange={(event) => update('line2', event.target.value)} className="h-10 bg-card" />
+          <Input id={`${idPrefix}-line2`} value={value.line2} onChange={(event) => update('line2', event.target.value)} className="h-10 bg-card" autoComplete="address-line2" />
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
@@ -217,9 +469,18 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
 }
 
 const CARD_ELEMENT_OPTIONS = {
+  hidePostalCode: false,
   style: {
-    base: { fontSize: '15px', color: 'hsl(var(--foreground))', '::placeholder': { color: 'hsl(var(--muted-foreground))' } },
-    invalid: { color: '#dc2626' },
+    base: {
+      color: '#f8fafc',
+      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '15px',
+      fontSmoothing: 'antialiased',
+      iconColor: '#ff5a1f',
+      '::placeholder': { color: '#94a3b8' },
+    },
+    invalid: { color: '#f87171', iconColor: '#f87171' },
+    complete: { color: '#f8fafc', iconColor: '#22c55e' },
   },
 };
 
@@ -233,7 +494,7 @@ function CardFields({ stripeRef, elementsRef, cardHolderName, onCardHolderNameCh
       <FieldLabel htmlFor="card-holder-name" required>Cardholder Name</FieldLabel>
       <Input id="card-holder-name" value={cardHolderName} onChange={(event) => onCardHolderNameChange(event.target.value)} className="h-10 bg-card" />
       <FieldLabel required>Card Details</FieldLabel>
-      <div className="h-10 rounded-md border bg-card px-3 py-2.5">
+      <div className="rounded-md border bg-[#0f1117] px-3 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <CardElement options={CARD_ELEMENT_OPTIONS} onChange={onCardChange} />
       </div>
     </div>
@@ -269,6 +530,7 @@ export default function OnboardingPage() {
   const [hierarchyMode, setHierarchyMode] = useState('manual');
   const [hierarchyView, setHierarchyView] = useState('build');
   const [expandedOrganizations, setExpandedOrganizations] = useState(() => new Set([0]));
+  const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true, usps_address_validation_enabled: false });
 
   useEffect(() => {
     const saved = window.localStorage.getItem(DRAFT_KEY);
@@ -298,6 +560,23 @@ export default function OnboardingPage() {
     supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true }).then(({ data }) => {
       if (data) setPlans(data);
     });
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    api.onboarding.getVerificationSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setVerificationSettings({
+            ein_verification_enabled: settings?.ein_verification_enabled !== false,
+            ssn_verification_enabled: settings?.ssn_verification_enabled !== false,
+            usps_address_validation_enabled: settings?.usps_address_validation_enabled === true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.warn('Failed to load onboarding verification settings:', error);
+      });
+    return () => { cancelled = true; };
   }, []);
   useEffect(() => {
     const inviteCoupon = userProfile?.coupon_code || userProfile?.metadata?.coupon_code || userProfile?.metadata?.coupon?.code;
@@ -340,6 +619,7 @@ export default function OnboardingPage() {
     const locationCount = organizations.reduce((sum, org) => sum + org.brands.reduce((brandSum, brand) => brandSum + brand.locations.length, 0), 0);
     return { brandCount, locationCount };
   }, [organizations]);
+  const onboardingPlanOptions = useMemo(() => buildOnboardingPlanOptions(plans), [plans]);
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
   const updateBankAccount = (field, value) => setBankAccount((prev) => ({ ...prev, [field]: value }));
@@ -567,6 +847,7 @@ export default function OnboardingPage() {
   const issueCountForOrganization = (orgIdx) => hierarchyIssues.filter((issue) => issue.orgIdx === orgIdx).length;
   const firstHierarchyIssue = hierarchyIssues[0]?.message || null;
   const locationIssueCount = hierarchyIssues.filter((issue) => issue.scope === 'location').length;
+  const uspsAddressValidationEnabled = verificationSettings.usps_address_validation_enabled === true;
   const checklist = [
     { label: 'All organizations have a unique name and slug', ok: !hierarchyIssues.some((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'organization' && /name|slug/i.test(issue.message))?.message },
     { label: 'Every brand is linked to a valid organization', ok: !hierarchyIssues.some((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'brand' && /required|needs/i.test(issue.message))?.message },
@@ -574,6 +855,7 @@ export default function OnboardingPage() {
     { label: 'Every location has a complete mailing address or is marked same as business', ok: !hierarchyIssues.some((issue) => issue.scope === 'location' && /mailing/i.test(issue.message)), detail: hierarchyIssues.find((issue) => issue.scope === 'location' && /mailing/i.test(issue.message))?.message },
     { label: 'No duplicate location names within any brand', ok: !hierarchyIssues.some((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location'), detail: hierarchyIssues.find((issue) => /duplicated/i.test(issue.message) && issue.scope === 'location')?.message },
     { label: 'Postal codes are valid for the stated country', ok: !hierarchyIssues.some((issue) => /postal code/i.test(issue.message)), detail: hierarchyIssues.find((issue) => /postal code/i.test(issue.message))?.message },
+    { label: 'USPS address validation is enabled', ok: uspsAddressValidationEnabled, detail: 'Platform admin must enable the USPS address validation API before address onboarding can be submitted.' },
   ];
 
   const validateBusinessIdentity = () => {
@@ -681,6 +963,10 @@ export default function OnboardingPage() {
       toast.error(hierarchyError);
       return false;
     }
+    if (!uspsAddressValidationEnabled) {
+      toast.error('USPS address validation is not enabled. Ask a platform admin to enable it before submitting addresses.');
+      return false;
+    }
     setLoading(true);
     try {
       const hierarchy = buildHierarchyPayload();
@@ -741,8 +1027,13 @@ export default function OnboardingPage() {
     }
     const hierarchyError = validateHierarchy();
     if (hierarchyError) return toast.error(hierarchyError);
+    if (!uspsAddressValidationEnabled) return toast.error('USPS address validation is not enabled. Ask a platform admin to enable it before submitting addresses.');
 
-    const priceLabel = isPaidPlan ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/mo` : 'Free';
+    const billingLocationCount = Math.max(1, totals.locationCount || 0);
+    const monthlyTotal = Number(selectedPlan.price_monthly || 0) * billingLocationCount;
+    const priceLabel = isPaidPlan
+      ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/location/mo (${billingLocationCount} location${billingLocationCount === 1 ? '' : 's'} = $${monthlyTotal.toFixed(2)}/mo)`
+      : 'Free';
     const paymentMethodLabel = !isPaidPlan
       ? 'no charge — free plan'
       : paymentMethod === 'card'
@@ -773,6 +1064,7 @@ export default function OnboardingPage() {
           couponCode: normalizeCouponCodeInput(couponCode) || null,
           paymentMethod,
           paymentMethodId,
+          location_count: billingLocationCount,
           bankAccount: paymentMethod === 'ach' ? bankAccount : null,
           successUrl: `${window.location.origin}/onboarding?checkout=success`,
           cancelUrl: `${window.location.origin}/onboarding`,
@@ -867,6 +1159,17 @@ export default function OnboardingPage() {
             <p className="font-bold">Platform admin requested changes</p>
             <p className="mt-1">{hierarchySubmissionReason}</p>
             <p className="mt-1 text-xs">Update the details below and resubmit for review.</p>
+          </div>
+        )}
+        {!uspsAddressValidationEnabled && (
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold">USPS address validation is not enabled</p>
+              <p className="mt-1 text-xs">A platform admin must enable the USPS address validation API before address onboarding can be submitted.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200" onClick={() => navigate('/PlatformOrganizations')}>
+              Enable in platform settings
+            </Button>
           </div>
         )}
         {hierarchyMode === 'upload' ? (
@@ -1044,31 +1347,74 @@ export default function OnboardingPage() {
           {step === 3 && (
             <>
               <CardHeader>
-                <CardTitle>Plan</CardTitle>
-                <CardDescription>Select the plan for this tenant workspace.</CardDescription>
+                <CardTitle>Choose your operating plan</CardTitle>
+                <CardDescription>Start with the core location plan today. The AI and advanced tiers are staged here so the upgrade path is visible from day one.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-3">
-                  {plans.map((plan) => (
-                    <button key={plan.id} type="button" onClick={() => setSelectedPlan(plan)} className={`rounded-md border p-4 text-left transition hover:border-primary ${selectedPlan?.id === plan.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <div><h3 className="font-semibold text-foreground">{plan.name}</h3><p className="text-sm text-muted-foreground">{plan.description}</p></div>
-                        {selectedPlan?.id === plan.id && <CheckCircle2 className="h-5 w-5 text-primary" />}
-                      </div>
-                      <div className="text-2xl font-bold text-foreground">${Number(plan.price_monthly || 0).toFixed(0)}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
-                      {Array.isArray(plan.features) && plan.features.length > 0 && <ul className="mt-3 space-y-1 text-sm text-muted-foreground">{plan.features.slice(0, 4).map((feature) => <li key={feature}>- {feature}</li>)}</ul>}
-                    </button>
-                  ))}
+                <div className="rounded-md border bg-muted/20 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Pricing follows your real footprint</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Current setup: {Math.max(1, totals.locationCount || 0)} billable location{Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.</p>
+                    </div>
+                    <div className="rounded-md border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
+                      Starter launches now. More tiers unlock soon.
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {onboardingPlanOptions.map((plan) => {
+                    const selected = selectedPlan?.id === plan.id;
+                    const locationCount = Math.max(1, totals.locationCount || 0);
+                    const monthlyTotal = Number(plan.price_monthly || 0) * locationCount;
+                    const comingSoon = plan.comingSoon || !plan.selectable;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        disabled={comingSoon}
+                        onClick={() => plan.selectable && setSelectedPlan(plan)}
+                        className={`relative flex min-h-[360px] flex-col overflow-hidden rounded-md border p-5 text-left transition ${selected ? 'border-primary bg-primary/5 ring-1 ring-primary' : comingSoon ? 'border-border bg-muted/20 opacity-80' : 'bg-card hover:border-primary hover:shadow-sm'}`}
+                      >
+                        <div className="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-primary/10" />
+                        <div className="relative z-10 flex items-start justify-between gap-3">
+                          <div>
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase ${plan.tone === 'amber' ? 'border-amber-500/40 bg-amber-500/10 text-amber-400' : plan.tone === 'slate' ? 'border-muted-foreground/30 bg-muted text-muted-foreground' : 'border-primary/40 bg-primary/10 text-primary'}`}>{plan.badge}</span>
+                            <h3 className="mt-4 text-xl font-black text-foreground">{plan.name}</h3>
+                            <p className="mt-2 min-h-[42px] text-sm text-muted-foreground">{plan.description}</p>
+                          </div>
+                          {selected ? <CheckCircle2 className="h-5 w-5 flex-none text-primary" /> : <Sparkles className={`h-5 w-5 flex-none ${comingSoon ? 'text-muted-foreground' : 'text-primary'}`} />}
+                        </div>
+                        <div className="relative z-10 mt-5">
+                          <div className="flex items-end gap-1 text-foreground">
+                            <span className="text-4xl font-black">${Number(plan.price_monthly || 0).toFixed(0)}</span>
+                            <span className="pb-1 text-sm font-semibold text-muted-foreground">/location/mo</span>
+                          </div>
+                          <p className="mt-2 text-xs font-semibold text-foreground">Estimated: ${monthlyTotal.toFixed(0)}/mo for {locationCount} location{locationCount === 1 ? '' : 's'}</p>
+                        </div>
+                        <ul className="relative z-10 mt-5 flex-1 space-y-2 text-sm text-muted-foreground">
+                          {plan.features.map((feature) => (
+                            <li key={feature} className="flex items-center gap-2">
+                              <CheckCircle2 className={`h-3.5 w-3.5 flex-none ${comingSoon ? 'text-muted-foreground' : 'text-primary'}`} />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className={`relative z-10 mt-5 rounded-md border px-3 py-2 text-center text-xs font-bold ${selected ? 'border-primary/40 bg-primary/10 text-primary' : comingSoon ? 'border-border bg-card text-muted-foreground' : 'border-border bg-muted/20 text-foreground'}`}>
+                          {selected ? 'Selected' : comingSoon ? plan.unavailableReason : 'Select Starter'}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </>
           )}
-
           {step === 4 && (
             <>
               <CardHeader>
                 <CardTitle>Payment</CardTitle>
-                <CardDescription>{selectedPlan ? `Complete payment for the ${selectedPlan.name} plan.` : 'Select a plan to continue.'}</CardDescription>
+                <CardDescription>{selectedPlan ? `Complete payment for the ${selectedPlan.name} plan across ${Math.max(1, totals.locationCount || 0)} location${Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.` : 'Select a plan to continue.'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {Number(selectedPlan?.price_monthly || 0) > 0 && (
@@ -1156,7 +1502,7 @@ export default function OnboardingPage() {
             <Button type="button" variant="outline" onClick={() => saveDraft()} disabled={loading || checkoutLoading || finalizingOnboarding} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" /> Save</Button>
             <div className="flex w-full gap-3 sm:w-auto">
               <Button type="button" variant="ghost" onClick={goBack} disabled={step === 1 || loading || checkoutLoading || finalizingOnboarding} className="flex-1 sm:flex-none"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding || (step === 2 && hierarchyView === 'review' && hierarchyIssues.length > 0)} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{nextLabel} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
+              <Button type="button" onClick={goNext} disabled={loading || checkoutLoading || finalizingOnboarding || (step === 2 && hierarchyView === 'review' && (hierarchyIssues.length > 0 || !uspsAddressValidationEnabled))} className="flex-1 min-w-[140px] sm:flex-none">{loading || checkoutLoading || finalizingOnboarding ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Working</> : <>{nextLabel} <ArrowRight className="ml-2 h-4 w-4" /></>}</Button>
             </div>
           </CardFooter>
         </Card>
@@ -1164,6 +1510,7 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
 
 
 

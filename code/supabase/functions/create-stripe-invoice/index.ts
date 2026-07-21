@@ -65,15 +65,33 @@ serve(async (req) => {
     
     if (planError || !plan) throw new Error('Organization has no active plan assigned')
 
+    const { count: locationCount, error: locationCountError } = await supabaseClient
+      .from('locations')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', targetOrganizationId)
+
+    if (locationCountError) throw locationCountError
+
+    const billingLocationCount = Math.max(1, locationCount || 0)
+    const unitAmountCents = Math.round(Number(plan.price_monthly) * 100)
+    const invoiceDescriptionBase = description || `Platform Invoice for ${plan.name} Plan`
+    const invoiceDescription = `${invoiceDescriptionBase} - ${billingLocationCount} location(s) at $${Number(plan.price_monthly).toFixed(2)}/location/mo`
+
     // 1. Create an invoice item for the customer
     await stripe.invoiceItems.create({
       customer: customerId,
-      price: plan.stripe_price_id || undefined, // If using existing price
-      amount: plan.stripe_price_id ? undefined : Math.round(plan.price_monthly * 100), // Fallback to custom amount
+      price: plan.stripe_price_id || undefined, // Price is the per-location monthly unit.
+      quantity: plan.stripe_price_id ? billingLocationCount : undefined,
+      amount: plan.stripe_price_id ? undefined : unitAmountCents * billingLocationCount,
       currency: plan.stripe_price_id ? undefined : 'usd',
-      description: description || `Platform Invoice for ${plan.name} Plan`
+      description: invoiceDescription,
+      metadata: {
+        organization_id: targetOrganizationId,
+        plan_id: org.plan_id || '',
+        billing_model: 'per_location',
+        location_count: String(billingLocationCount),
+      },
     });
-
     // 2. Draft and finalize the invoice
     const invoice = await stripe.invoices.create({
       customer: customerId,

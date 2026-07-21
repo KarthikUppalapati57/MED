@@ -8,7 +8,11 @@ import { BrowserRouter } from 'react-router-dom';
 vi.mock('../../src/lib/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 'test-user-id' },
-    userProfile: { role: 'manager' },
+    userProfile: { id: 'test-user-id', role: 'branch_manager' },
+    organization: { id: 'org-1' },
+    brand: null,
+    location: { id: 'loc-1' },
+    role: 'branch_manager',
   }),
 }));
 
@@ -33,7 +37,7 @@ vi.mock('../../src/hooks/useAuthQuery', () => ({
     if (queryKey[0] === 'vendors') {
       return { data: [], isLoading: false };
     }
-    if (queryKey[0] === 'invoices') {
+    if (queryKey[0] === 'invoices-dashboard') {
       return { 
         data: [{ id: '1', vendor_name: 'Sysco', invoice_number: 'INV-001', total_amount: 500, status: 'pending_review' }], 
         isLoading: false 

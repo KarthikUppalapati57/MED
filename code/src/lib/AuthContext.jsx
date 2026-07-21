@@ -803,7 +803,6 @@ export const AuthProvider = ({ children }) => {
     const roleActionMap = {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
-      brand_manager:    ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       org_manager:      ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
       tenant_super_admin: ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_tenant', 'manage_accounting'],
@@ -812,22 +811,10 @@ export const AuthProvider = ({ children }) => {
     return (roleActionMap[role] || []).includes(action);
   }, [role]);
 
-  const switchContext = useCallback(async (type, entity) => {
-    let updatedOrg = activeOrg;
-    let updatedBrand = activeBrand;
-    let updatedLocation = activeLocation;
-
-    if (type === 'organization') {
-      updatedOrg = entity;
-      updatedBrand = null;
-      updatedLocation = null;
-    } else if (type === 'brand') {
-      updatedBrand = entity;
-      updatedLocation = null;
-    } else if (type === 'location') {
-      updatedLocation = entity;
-    }
-
+  // Shared commit path for an org/brand/location context change. Takes the
+  // full target state directly as arguments (no closure-captured prior
+  // state), so it's safe to call standalone without a stale-closure race.
+  const applyContext = useCallback(async (updatedOrg, updatedBrand, updatedLocation) => {
     try {
       if (updatedOrg) {
         const { data, error } = await supabase.rpc('switch_user_context', {
@@ -839,7 +826,7 @@ export const AuthProvider = ({ children }) => {
 
         // Force a session refresh to get new JWT app_metadata claims
         await supabase.auth.refreshSession();
-        
+
         // Update role if returned
         if (data?.role) {
           const currentCache = getCachedProfile();
@@ -870,7 +857,38 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to switch context:', err);
     }
-  }, [activeOrg, activeBrand, activeLocation]);
+  }, []);
+
+  // Single-field delta switch (org-only / brand-only / location-only), for
+  // the ContextSwitcher dropdowns where each call is one discrete user click.
+  const switchContext = useCallback(async (type, entity) => {
+    let updatedOrg = activeOrg;
+    let updatedBrand = activeBrand;
+    let updatedLocation = activeLocation;
+
+    if (type === 'organization') {
+      updatedOrg = entity;
+      updatedBrand = null;
+      updatedLocation = null;
+    } else if (type === 'brand') {
+      updatedBrand = entity;
+      updatedLocation = null;
+    } else if (type === 'location') {
+      updatedLocation = entity;
+    }
+
+    await applyContext(updatedOrg, updatedBrand, updatedLocation);
+  }, [activeOrg, activeBrand, activeLocation, applyContext]);
+
+  // Atomic multi-field switch: sets org/brand/location together in one
+  // commit. For callers (useUrlHierarchy) that already know the full target
+  // state upfront -- calling switchContext() three times back-to-back for
+  // this would race, since each call reads the same stale
+  // activeOrg/activeBrand/activeLocation closure before any of the earlier
+  // calls' setState has landed.
+  const switchContextTo = useCallback(({ organization = null, brand = null, location = null }) =>
+    applyContext(organization, brand, location)
+  , [applyContext]);
 
   const handleSetActiveOrg = useCallback((org) => {
     setActiveOrg(org);
@@ -941,6 +959,7 @@ export const AuthProvider = ({ children }) => {
     mfaFactors,
     refreshMFAStatus,
     switchContext,
+    switchContextTo,
     setActiveOrg: handleSetActiveOrg,
     setActiveBrand: handleSetActiveBrand,
     setActiveLocation: handleSetActiveLocation,
@@ -969,6 +988,7 @@ export const AuthProvider = ({ children }) => {
     mfaFactors,
     refreshMFAStatus,
     switchContext,
+    switchContextTo,
     handleSetActiveOrg,
     handleSetActiveBrand,
     handleSetActiveLocation,

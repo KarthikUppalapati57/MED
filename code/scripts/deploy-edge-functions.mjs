@@ -1,11 +1,13 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
-const defaultFunctions = [
-  'process-email-invoices',
-  'pos-webhook',
-  'webhook-dispatcher',
-];
+const functionsRoot = 'supabase/functions';
+const defaultFunctions = existsSync(functionsRoot)
+  ? readdirSync(functionsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
+    .map((entry) => entry.name)
+    .sort()
+  : [];
 
 const requestedFunctions = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 const functionsToDeploy = requestedFunctions.length ? requestedFunctions : defaultFunctions;

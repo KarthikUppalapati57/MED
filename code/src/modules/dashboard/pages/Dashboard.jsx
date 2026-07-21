@@ -76,7 +76,7 @@ const DEFAULT_REPORT_PREFERENCES = {
   weeklyExecutive: true,
   includeForecasts: true,
   includeEscalations: true,
-  recipientRoles: ['tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager', 'location_manager'],
+  recipientRoles: ['tenant_super_admin', 'org_manager', 'branch_manager', 'location_manager'],
 };
 
 function currency(value) {
@@ -130,8 +130,8 @@ function canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }) {
   if (isPlatformAdmin) return true;
   const role = userProfile?.role;
   if (scope === 'org') return ['org_manager', 'tenant_super_admin'].includes(role);
-  if (scope === 'brand') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager'].includes(role);
-  if (scope === 'location') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager'].includes(role);
+  if (scope === 'brand') return ['org_manager', 'tenant_super_admin', 'branch_manager'].includes(role);
+  if (scope === 'location') return ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager'].includes(role);
   return false;
 }
 
@@ -3053,6 +3053,14 @@ function PlatformDashboard() {
       return data || [];
     },
   });
+  const { data: allLocations = [] } = useAuthQuery({
+    queryKey: ['platform-dashboard-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('locations').select('id, organization_id');
+      if (error) throw error;
+      return data || [];
+    },
+  });
   const { data: recentLogs = [] } = useAuthQuery({
     queryKey: ['platform-dashboard-logs'],
     queryFn: async () => {
@@ -3071,11 +3079,20 @@ function PlatformDashboard() {
   }, [invalidatePlatformDashboard]);
 
   const planPriceMap = Object.fromEntries(allPlans.map((plan) => [plan.id, Number(plan.price_monthly || 0)]));
+  const locationCountByOrg = allLocations.reduce((acc, location) => {
+    if (!location.organization_id) return acc;
+    acc[location.organization_id] = (acc[location.organization_id] || 0) + 1;
+    return acc;
+  }, {});
   const platformStats = {
     totalOrgs: allOrgs.length,
     totalUsers: allProfiles.length,
     activeSubscriptions: allOrgs.filter((org) => org.subscription_status === 'active').length,
-    mrr: allOrgs.reduce((sum, org) => sum + (planPriceMap[org.plan_id] || 0), 0),
+    mrr: allOrgs.reduce((sum, org) => {
+      const unitPrice = planPriceMap[org.plan_id] || 0;
+      if (!unitPrice) return sum;
+      return sum + unitPrice * Math.max(1, locationCountByOrg[org.id] || 0);
+    }, 0),
   };
 
   return (
