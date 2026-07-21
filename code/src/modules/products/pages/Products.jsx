@@ -951,15 +951,21 @@ export default function Products() {
   const handleReviewCategorySuggestion = (queueItem) => {
     const product = products.find(item => item.id === queueItem.internal_product_id) || {};
     const category = queueItem.category || product.suggested_category || product.category || '';
+    const displayName = product.name
+      || queueItem.product_name
+      || queueItem.vendor_item_name
+      || queueItem.display_product_name
+      || queueItem.display_vendor_item_name
+      || '';
 
     setEditingProduct({
       ...product,
       id: queueItem.internal_product_id,
-      name: product.name || queueItem.product_name || queueItem.vendor_item_name || '',
+      name: displayName,
       product_id: product.product_id || queueItem.restops_product_id || '',
     });
     setFormData({
-      name: product.name || queueItem.product_name || queueItem.vendor_item_name || '',
+      name: displayName,
       product_id: product.product_id || queueItem.restops_product_id || '',
       description: product.description || '',
       category,
@@ -1735,13 +1741,25 @@ export default function Products() {
                 </TableHeader>
                 <TableBody>
                   {(() => {
-                    const newProducts = verificationQueue.map(item => ({
-                      ...item,
-                      id: item.internal_product_id || item.vendor_item_id,
-                      name: item.vendor_item_name,
-                      created_at: item.last_purchased_at,
-                      accounting_category: item.category_type,
-                    }));
+                    const newProducts = verificationQueue.map(item => {
+                      const isCatalogReview = !item.vendor_item_id && Boolean(item.internal_product_id);
+                      const displayProductName = item.product_name
+                        || item.vendor_item_name
+                        || item.restops_product_id
+                        || 'Unnamed product';
+
+                      return {
+                        ...item,
+                        id: item.internal_product_id || item.vendor_item_id,
+                        name: item.vendor_item_name || displayProductName,
+                        created_at: item.last_purchased_at,
+                        accounting_category: item.category_type,
+                        display_vendor_name: item.vendor_name || (isCatalogReview ? 'Product Catalog' : '-'),
+                        display_vendor_item_name: item.vendor_item_name || displayProductName,
+                        display_product_name: item.product_name || (isCatalogReview ? displayProductName : ''),
+                        display_status_label: isCatalogReview ? 'Category review' : 'Needs verification',
+                      };
+                    });
                     return loadingVerificationQueue ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
@@ -1769,18 +1787,22 @@ export default function Products() {
                             <TableCell className="text-sm text-muted-foreground">
                               {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{p.vendor_name || '-'}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.display_vendor_name}</TableCell>
                             <TableCell className="font-medium text-foreground">
-                              {p.vendor_item_name || p.name}
+                              <div>{p.display_vendor_item_name}</div>
                               {p.vendor_item_code && (
                                 <div className="text-xs text-muted-foreground">Vendor code: {p.vendor_item_code}</div>
                               )}
-                              {isLowConfidence && <span className="ml-2 text-xs text-resend-yellow font-medium italic">Needs Verification</span>}
+                              {isLowConfidence && (
+                                <div className="text-xs text-resend-yellow font-medium italic">
+                                  {p.display_status_label}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
-                              {p.product_name ? (
+                              {p.display_product_name ? (
                                 <div className="space-y-1">
-                                  <Badge variant="outline" className="font-medium">{p.product_name}</Badge>
+                                  <Badge variant="outline" className="font-medium">{p.display_product_name}</Badge>
                                   {p.restops_product_id && (
                                     <div className="text-xs text-muted-foreground">{p.restops_product_id}</div>
                                   )}
