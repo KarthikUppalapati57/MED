@@ -389,28 +389,36 @@ export default function Inventory() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
+  const organizationId = organization?.id || organization?.organization_id || null;
+  const brandId = brand?.brand_id || brand?.id || location?.brand_id || null;
+  const locationId = location?.location_id || location?.id || null;
+  const selectedContext = React.useMemo(() => ({
+    organization: organizationId ? { ...(organization || {}), id: organizationId } : organization,
+    brand: brandId ? { ...(brand || {}), id: brandId, brand_id: brandId } : brand,
+    location: locationId ? { ...(location || {}), id: locationId, brand_id: location?.brand_id || brandId || null } : location,
+  }), [brand, brandId, location, locationId, organization, organizationId]);
   const stockCountHistoryCacheKey = React.useMemo(() => {
-    if (!organization?.id) return null;
+    if (!organizationId) return null;
     return [
       'restops_stock_count_history',
-      organization.id,
-      brand?.id || brand?.brand_id || 'all-brands',
-      location?.id || userProfile?.location_id || 'all-locations',
+      organizationId,
+      brandId || 'all-brands',
+      locationId || userProfile?.location_id || 'all-locations',
     ].join(':');
-  }, [brand?.brand_id, brand?.id, location?.id, organization?.id, userProfile?.location_id]);
+  }, [brandId, locationId, organizationId, userProfile?.location_id]);
   const inventoryInvalidationKeys = React.useMemo(() => [
-    ['inventory', organization?.id],
-    ['inventoryMetrics', organization?.id],
-  ], [organization?.id]);
+    ['inventory', organizationId],
+    ['inventoryMetrics', organizationId],
+  ], [organizationId]);
   const wastageInvalidationKeys = React.useMemo(() => [
-    ['wastage', organization?.id],
-  ], [organization?.id]);
+    ['wastage', organizationId],
+  ], [organizationId]);
   const countSheetsInvalidationKeys = React.useMemo(() => [
-    ['count_sheets', organization?.id],
-  ], [organization?.id]);
+    ['count_sheets', organizationId],
+  ], [organizationId]);
   const countSessionsInvalidationKeys = React.useMemo(() => [
-    ['count_sessions', organization?.id],
-  ], [organization?.id]);
+    ['count_sessions', organizationId],
+  ], [organizationId]);
   const invalidateInventoryRealtime = useDebouncedQueryInvalidation(queryClient, inventoryInvalidationKeys, 1500);
   const invalidateWastageRealtime = useDebouncedQueryInvalidation(queryClient, wastageInvalidationKeys, 1500);
   const invalidateCountSheetsRealtime = useDebouncedQueryInvalidation(queryClient, countSheetsInvalidationKeys, 1500);
@@ -428,7 +436,7 @@ export default function Inventory() {
     hasNextPage: hasNextInventoryPage,
     isFetchingNextPage: isFetchingNextInventoryPage
   } = useAuthInfiniteQuery({
-    queryKey: ['inventory', organization?.id, location?.id, debouncedSearch, categoryFilter, sortInventory],
+    queryKey: ['inventory', organizationId, brandId, locationId, debouncedSearch, categoryFilter, sortInventory],
     queryFn: ({ pageParam = 0 }) => {
       const conditions = {};
       return api.entities.Inventory.filter(conditions, {
@@ -441,21 +449,21 @@ export default function Inventory() {
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
-    enabled: !!organization?.id && needsInventory,
+    enabled: !!organizationId && needsInventory,
   });
 
   const { data: inventoriedProductData = [], isLoading: inventoriedProductsLoading } = useAuthQuery({
-    queryKey: ['inventoryProductSource', organization?.id, brand?.id || brand?.brand_id || null, location?.id || null, debouncedSearch],
+    queryKey: ['inventoryProductSource', organizationId, brandId, locationId, debouncedSearch],
     queryFn: () => api.products.getCatalog({
-      organizationId: organization?.id,
-      brandId: brand?.id || brand?.brand_id || null,
-      locationId: location?.id || null,
+      organizationId,
+      brandId,
+      locationId,
       search: debouncedSearch || null,
       sortBy: 'name',
       page: 0,
       pageSize: 1000,
     }),
-    enabled: !!organization?.id && needsInventory,
+    enabled: !!organizationId && needsInventory,
   });
 
   const inventoriedProductLookup = React.useMemo(() => {
@@ -470,7 +478,8 @@ export default function Inventory() {
       .forEach(product => {
         if (product.id) lookup.ids.add(String(product.id));
         if (product.product_id) lookup.productIds.add(String(product.product_id).trim().toLowerCase());
-        if (product.name) lookup.names.add(String(product.name).trim().toLowerCase());
+        const productName = product.name || product.product_name;
+        if (productName) lookup.names.add(String(productName).trim().toLowerCase());
       });
 
     return lookup;
@@ -479,8 +488,8 @@ export default function Inventory() {
   const rawInventory = React.useMemo(() => {
     if (!inventoryData?.pages) return [];
     const flat = inventoryData.pages.flat();
-    return filterByContext(flat, { organization, brand, location });
-  }, [inventoryData, organization, brand, location]);
+    return filterByContext(flat, selectedContext);
+  }, [inventoryData, selectedContext]);
 
   const inventory = React.useMemo(() => {
     if (!inventoryData?.pages || inventoriedProductsLoading) return [];
@@ -509,18 +518,20 @@ export default function Inventory() {
       .filter(product => {
         if (product.id && matchedInventoryKeys.ids.has(String(product.id))) return false;
         if (product.product_id && matchedInventoryKeys.productIds.has(String(product.product_id).trim().toLowerCase())) return false;
-        if (product.name && matchedInventoryKeys.names.has(String(product.name).trim().toLowerCase())) return false;
+        const productName = product.name || product.product_name;
+        if (productName && matchedInventoryKeys.names.has(String(productName).trim().toLowerCase())) return false;
         return true;
       })
       .map(product => {
+        const productName = product.name || product.product_name || 'Unnamed product';
         const unit = product.report_by_unit || product.base_unit || 'ea';
         const categoryOption = getInventoryCategoryOption(product);
         return {
-          id: `catalog-product:${product.id || product.product_id || product.name}`,
+          id: `catalog-product:${product.id || product.product_id || productName}`,
           inventory_id: null,
           internal_product_id: product.id || null,
           product_id: product.product_id || null,
-          product_name: product.name || 'Unnamed product',
+          product_name: productName,
           accounting_category: product.accounting_category || categoryOption.code || '1210',
           category: product.category || categoryOption.label,
           current_quantity: 0,
@@ -532,9 +543,9 @@ export default function Inventory() {
           par_level: null,
           reorder_point: null,
           location: '',
-          organization_id: product.organization_id || organization?.id || null,
-          brand_id: product.brand_id || brand?.id || brand?.brand_id || null,
-          location_id: product.location_id || location?.id || null,
+          organization_id: product.organization_id || organizationId || null,
+          brand_id: product.brand_id || brandId || null,
+          location_id: product.location_id || locationId || null,
           is_product_backed_inventory: true,
         };
       });
@@ -542,14 +553,14 @@ export default function Inventory() {
     return [...trackedInventoryRows, ...productBackedRows].sort((a, b) => (
       String(a.product_name || '').localeCompare(String(b.product_name || ''))
     ));
-  }, [brand?.brand_id, brand?.id, inventoriedProductData, inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, location?.id, organization?.id, rawInventory]);
+  }, [brandId, inventoriedProductData, inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, locationId, organizationId, rawInventory]);
 
   const isLoading = inventoryLoading || inventoriedProductsLoading;
 
   const { data: inventoryMetrics } = useAuthQuery({
-    queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
-    queryFn: () => api.metrics.getInventoryTotals(organization?.id, debouncedSearch, location?.id),
-    enabled: !!organization?.id && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
+    queryKey: ['inventoryMetrics', organizationId, locationId, debouncedSearch],
+    queryFn: () => api.metrics.getInventoryTotals(organizationId, debouncedSearch, locationId),
+    enabled: !!organizationId && ['inventory', 'summary', 'daily-snapshot'].includes(activeTab),
   });
 
   const { data: snapshotInvoices = [] } = useAuthQuery({
@@ -884,7 +895,7 @@ export default function Inventory() {
       return updatedInventory;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
       toast.success('Inventory updated');
@@ -896,7 +907,7 @@ export default function Inventory() {
   const createMutation = useMutation({
     mutationFn: (data) => api.entities.Inventory.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
       toast.success('Item added to inventory');
       setAddDialogOpen(false);
       setAddForm({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
@@ -923,7 +934,7 @@ export default function Inventory() {
       toast.error('Failed to delete');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id, location?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId, brandId, locationId] });
     },
     onSuccess: () => {
       toast.success('Item removed from inventory');
@@ -948,9 +959,9 @@ export default function Inventory() {
         ? 'Auto organized by product group'
         : 'Manual shelf order',
       status: 'active',
-      organization_id: organization?.id || null,
-      brand_id: brand?.id || brand?.brand_id || location?.brand_id || null,
-      location_id: location?.id || userProfile?.location_id || null,
+      organization_id: organizationId,
+      brand_id: brandId,
+      location_id: locationId || userProfile?.location_id || null,
       organize_by: countSheetForm.organizeBy,
       auto_add_product_groups: countSheetForm.buckets,
       items: selectedItems.map((item) => ({
