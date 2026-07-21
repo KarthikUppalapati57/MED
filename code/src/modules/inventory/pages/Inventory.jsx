@@ -198,6 +198,15 @@ function getInvoiceLineValue(line = {}) {
   return Number.isFinite(unitCost) ? quantity * unitCost : 0;
 }
 
+function getInventoryItemValue(item = {}) {
+  const quantity = Number(item.current_quantity ?? 0);
+  const unitCost = Number(item.unit_cost ?? 0);
+  if (Number.isFinite(quantity) && Number.isFinite(unitCost)) return quantity * unitCost;
+
+  const storedValue = Number(item.current_value ?? 0);
+  return Number.isFinite(storedValue) ? storedValue : 0;
+}
+
 function csvValue(value) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
@@ -708,7 +717,7 @@ export default function Inventory() {
     hasNextPage: hasNextCountSheetsPage,
     isFetchingNextPage: isFetchingNextCountSheetsPage
   } = useAuthInfiniteQuery({
-    queryKey: ['count_sheets', organization?.id, debouncedSearch, sortCountSheets],
+    queryKey: ['count_sheets', organizationId, debouncedSearch, sortCountSheets],
     queryFn: ({ pageParam = 0 }) => api.entities.CountSheet.list(sortCountSheets, {
       page: pageParam,
       pageSize: 50,
@@ -717,13 +726,13 @@ export default function Inventory() {
     }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
-    enabled: !!organization?.id && needsCountSheets,
+    enabled: !!organizationId && needsCountSheets,
   });
 
   const countSheets = React.useMemo(() => {
     if (!countSheetsData?.pages) return [];
-    return filterByContext(countSheetsData.pages.flat(), { organization, brand, location });
-  }, [countSheetsData, organization, brand, location]);
+    return filterByContext(countSheetsData.pages.flat(), selectedContext);
+  }, [countSheetsData, selectedContext]);
 
   useEffect(() => {
     if (activeTab !== 'counts' || !requestedStockCountSheetId || stockCountSheetId === requestedStockCountSheetId) return;
@@ -741,20 +750,20 @@ export default function Inventory() {
     hasNextPage: hasNextCountSessionsPage,
     isFetchingNextPage: isFetchingNextCountSessionsPage
   } = useAuthInfiniteQuery({
-    queryKey: ['count_sessions', organization?.id, sortCountSessions],
+    queryKey: ['count_sessions', organizationId, sortCountSessions],
     queryFn: ({ pageParam = 0 }) => api.entities.CountSession.list(sortCountSessions, {
       page: pageParam,
       pageSize: 50,
     }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
-    enabled: !!organization?.id && needsCountSessions,
+    enabled: !!organizationId && needsCountSessions,
   });
 
   const countSessions = React.useMemo(() => {
     if (!countSessionsData?.pages) return [];
-    return filterByContext(countSessionsData.pages.flat(), { organization, brand, location });
-  }, [countSessionsData, organization, brand, location]);
+    return filterByContext(countSessionsData.pages.flat(), selectedContext);
+  }, [countSessionsData, selectedContext]);
 
   const normalizeCountSessionItems = React.useCallback((session = {}) => {
     if (Array.isArray(session.items)) return session.items;
@@ -1039,8 +1048,8 @@ export default function Inventory() {
       // The new Postgres RPC handles the variance math, GL entry generation,
       // count session creation, inventory updates, and inventory movements atomically.
       const result = await api.metrics.completeCountSession(
-        organization?.id,
-        location?.id || userProfile?.location_id,
+        organizationId,
+        locationId || userProfile?.location_id,
         sheet.id,
         counts,
         userProfile?.id
@@ -1054,9 +1063,9 @@ export default function Inventory() {
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['count_sessions', organization?.id] });
-      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
-      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['count_sessions', organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organizationId] });
       toast.success('Count session completed and inventory updated');
       setSelectedCountSheetId('');
       setActiveSessionOpen(false);
@@ -1068,8 +1077,7 @@ export default function Inventory() {
   const { totalItems, totalValue, lowStock } = React.useMemo(() => {
     const inventoryLoaded = Boolean(inventoryData?.pages);
     const adjustedInventoryValue = inventory.reduce((sum, item) => {
-      const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
-      return sum + value;
+      return sum + getInventoryItemValue(item);
     }, 0);
     const adjustedInventoryItems = inventory.length;
     const adjustedLowStock = inventory.filter(isBelowReorderPoint).length;
@@ -1104,7 +1112,7 @@ export default function Inventory() {
     return inventory.reduce((acc, item) => {
       const cat = item.accounting_category || 'Other';
       if (!acc[cat]) acc[cat] = { items: 0, value: 0, rows: [] };
-      const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
+      const value = getInventoryItemValue(item);
       acc[cat].items++;
       acc[cat].value += value;
       acc[cat].rows.push({ ...item, summary_value: value });
@@ -1118,7 +1126,7 @@ export default function Inventory() {
       const label = getCountSheetBucket(item);
       if (!acc[label]) acc[label] = { label, items: 0, value: 0 };
       acc[label].items += 1;
-      acc[label].value += Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
+      acc[label].value += getInventoryItemValue(item);
       return acc;
     }, {})).sort((a, b) => {
       const aIndex = bucketOrder.indexOf(a.label);
@@ -1173,9 +1181,7 @@ export default function Inventory() {
     return inventory
       .slice()
       .sort((a, b) => {
-        const aValue = Number(a.current_value || (Number(a.current_quantity || 0) * Number(a.unit_cost || 0)) || 0);
-        const bValue = Number(b.current_value || (Number(b.current_quantity || 0) * Number(b.unit_cost || 0)) || 0);
-        return bValue - aValue;
+        return getInventoryItemValue(b) - getInventoryItemValue(a);
       })
       .slice(0, 6);
   }, [inventory]);
@@ -1713,9 +1719,9 @@ export default function Inventory() {
 
     try {
       const savedCount = await api.metrics.saveInventoryCountSession({
-        orgId: organization?.id,
-        locationId: location?.id || userProfile?.location_id || null,
-        brandId: brand?.id || brand?.brand_id || location?.brand_id || null,
+        orgId: organizationId,
+        locationId: locationId || userProfile?.location_id || null,
+        brandId,
         countSheetId: stockCountSheetId || null,
         scopeKey: stockCountSheetId ? `sheet:${stockCountSheetId}` : stockCountScopeKey,
         type,
@@ -1749,7 +1755,7 @@ export default function Inventory() {
         setEditingStockCountId(savedId);
       }
       setStockCountSaveConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['count_sessions', organizationId] });
       toast.success(editingStockCountId ? 'Count changes saved' : 'Count saved');
     } catch (error) {
       toast.error(error.message || 'Unable to save count');
@@ -1777,7 +1783,7 @@ export default function Inventory() {
 
   const closeStockCountRecord = async (recordId) => {
     try {
-      await api.metrics.closeInventoryCountSession(organization?.id, recordId, userProfile?.id);
+      await api.metrics.closeInventoryCountSession(organizationId, recordId, userProfile?.id);
       if (editingStockCountId === recordId) {
         setEditingStockCountId(null);
         setStockCountValues({});
@@ -1789,7 +1795,7 @@ export default function Inventory() {
       )));
       setStockCountCloseTarget(null);
       setStockCountDetailRecord(null);
-      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['count_sessions', organizationId] });
       toast.success('Count closed. It is now read-only.');
     } catch (error) {
       toast.error(error.message || 'Unable to close count');
@@ -1802,7 +1808,7 @@ export default function Inventory() {
 
   const deleteStockCountRecord = async (recordId) => {
     try {
-      await api.metrics.deleteInventoryCountSession(organization?.id, recordId, userProfile?.id);
+      await api.metrics.deleteInventoryCountSession(organizationId, recordId, userProfile?.id);
       if (editingStockCountId === recordId) {
         setEditingStockCountId(null);
         setStockCountValues({});
@@ -1810,7 +1816,7 @@ export default function Inventory() {
       setStockCountHistory(prev => prev.filter(row => row.id !== recordId));
       setStockCountDeleteTarget(null);
       setStockCountDetailRecord(null);
-      queryClient.invalidateQueries({ queryKey: ['count_sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['count_sessions', organizationId] });
       toast.success('Saved count deleted');
     } catch (error) {
       toast.error(error.message || 'Unable to delete saved count');
@@ -2627,7 +2633,8 @@ export default function Inventory() {
                         </TableRow>
                       )}
 	                      {inventoryWindow.visibleItems.map((item) => {
-	                        const change = (item.current_value || 0) - (item.previous_value || 0);
+	                        const currentValue = getInventoryItemValue(item);
+	                        const change = currentValue - (item.previous_value || 0);
 	                        const isLow = isBelowReorderPoint(item);
 	                        const parLevel = parsePositiveThreshold(item.par_level);
 	                        const reorderPoint = parsePositiveThreshold(item.reorder_point);
@@ -2662,7 +2669,7 @@ export default function Inventory() {
                             <TableCell>{item.previous_quantity || 0}</TableCell>
                             <TableCell>${(item.previous_value || 0).toFixed(2)}</TableCell>
                             <TableCell className="font-semibold">{item.current_quantity || 0}</TableCell>
-                             <TableCell className="font-semibold">${(item.current_value || 0).toFixed(2)}</TableCell>
+                             <TableCell className="font-semibold">${currentValue.toFixed(2)}</TableCell>
                              <TableCell>
                                <div className="flex flex-col gap-1">
                                  <span className="text-xs text-muted-foreground flex items-center justify-between">
@@ -2942,7 +2949,7 @@ export default function Inventory() {
                   {summaryTopValueRows.length === 0 ? (
                     <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No inventory value to summarize yet.</p>
                   ) : summaryTopValueRows.map(item => {
-                    const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
+                    const value = getInventoryItemValue(item);
                     return (
                       <div key={item.id} className="flex items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0">
                         <div className="min-w-0">
