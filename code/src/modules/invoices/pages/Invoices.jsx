@@ -210,6 +210,8 @@ export default function Invoices() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [invoiceValidated, setInvoiceValidated] = useState(false);
+  const [activeInvoiceAnomaly, setActiveInvoiceAnomaly] = useState(null);
+  const [dismissedInvoiceAnomalyIds, setDismissedInvoiceAnomalyIds] = useState(() => new Set());
   const previousInvoicesRef = useRef([]);
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -358,6 +360,64 @@ export default function Invoices() {
     }
   });
 
+  const makeInvoiceAnomalyKey = useCallback((anomaly) => `${anomaly?.id || ''}:${anomaly?.anomaly_type || ''}`, []);
+
+  const { data: invoiceAnomalies = [] } = useAuthQuery({
+    queryKey: ['invoice-production-anomalies', organization?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('invoice_production_anomalies')
+        .select('id, organization_id, brand_id, location_id, invoice_number, vendor_name, status, ap_status, payment_status, paid_amount, total_amount, anomaly_type, latest_review_decision, updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    },
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
+    enabled: !!organization?.id,
+  });
+
+  useEffect(() => {
+    if (activeInvoiceAnomaly || invoiceAnomalies.length === 0) return;
+    const nextAnomaly = invoiceAnomalies.find((item) => !dismissedInvoiceAnomalyIds.has(makeInvoiceAnomalyKey(item)));
+    if (nextAnomaly) setActiveInvoiceAnomaly(nextAnomaly);
+  }, [activeInvoiceAnomaly, dismissedInvoiceAnomalyIds, invoiceAnomalies, makeInvoiceAnomalyKey]);
+
+  const recordInvoiceAnomalyReview = useMutation({
+    mutationFn: async ({ anomaly, decision, notes }) => {
+      const { data, error } = await api.client.rpc('record_invoice_anomaly_review', {
+        p_invoice_id: anomaly.id,
+        p_anomaly_type: anomaly.anomaly_type,
+        p_decision: decision,
+        p_notes: notes,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['invoice-production-anomalies'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
+      setDismissedInvoiceAnomalyIds((prev) => new Set(prev).add(makeInvoiceAnomalyKey(variables.anomaly)));
+      setActiveInvoiceAnomaly(null);
+      if (variables.decision === 'accepted_historical') {
+        toast.success('Marked as accepted historical data.');
+      } else if (variables.decision === 'finance_cleanup_requested') {
+        toast.success('Finance cleanup request recorded.');
+      }
+    },
+    onError: (error) => toast.error(error.message || 'Failed to record anomaly review'),
+  });
+
+  const handleReviewInvoiceAnomaly = async () => {
+    const anomaly = activeInvoiceAnomaly;
+    if (!anomaly) return;
+    recordInvoiceAnomalyReview.mutate({
+      anomaly,
+      decision: 'opened_for_review',
+      notes: 'Reviewer opened the invoice from the anomaly popup.',
+    });
+    await openEditorWithFullData(anomaly);
+  };
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts', organization?.id],
     queryFn: () => api.entities.PaymentAccount.list('name'),
@@ -397,6 +457,8 @@ export default function Invoices() {
         table: 'invoices',
         filter: `organization_id=eq.${organization.id}`,
       }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ['invoice-production-anomalies', organization?.id] });
+        queryClient.invalidateQueries({ queryKey: ['invoice-production-anomalies', organization?.id] });
         queryClient.setQueryData(['invoices-dashboard', organization?.id], (oldData) => {
           if (!oldData) return [];
           const invoice = payload.new;
@@ -1798,6 +1860,136 @@ export default function Invoices() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Historical/production anomaly reaction popup */}
+      <Dialog open={!!activeInvoiceAnomaly} onOpenChange={(open) => {
+        if (!open && activeInvoiceAnomaly) {
+          setDismissedInvoiceAnomalyIds((prev) => new Set(prev).add(makeInvoiceAnomalyKey(activeInvoiceAnomaly)));
+          setActiveInvoiceAnomaly(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              Invoice Needs Review
+            </DialogTitle>
+          </DialogHeader>
+          {activeInvoiceAnomaly && (
+            <div className="space-y-4 text-sm">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <p className="font-semibold">{activeInvoiceAnomaly.vendor_name || 'Unknown vendor'} {activeInvoiceAnomaly.invoice_number ? '#' + activeInvoiceAnomaly.invoice_number : ''}</p>
+                <p className="mt-1">
+                  The system found a historical state mismatch: {activeInvoiceAnomaly.anomaly_type?.replaceAll('_', ' ')}.
+                </p>
+                <p className="mt-1 text-xs">
+                  Status: {activeInvoiceAnomaly.status || 'n/a'} | AP: {activeInvoiceAnomaly.ap_status || 'n/a'} | Payment: {activeInvoiceAnomaly.payment_status || 'n/a'}
+                </p>
+              </div>
+              <p className="text-muted-foreground">
+                Choose what happened after reviewing it. We will record your decision without silently changing financial history.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button
+                  variant="outline"
+                  onClick={handleReviewInvoiceAnomaly}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Review Invoice
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-50"
+                  onClick={() => recordInvoiceAnomalyReview.mutate({
+                    anomaly: activeInvoiceAnomaly,
+                    decision: 'accepted_historical',
+                    notes: 'Reviewer accepted this as historical data that should remain unchanged.',
+                  })}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Accept Historical
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700"
+                  onClick={() => recordInvoiceAnomalyReview.mutate({
+                    anomaly: activeInvoiceAnomaly,
+                    decision: 'finance_cleanup_requested',
+                    notes: 'Reviewer requested Finance cleanup for this historical anomaly.',
+                  })}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Send to Finance
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Historical/production anomaly reaction popup */}
+      <Dialog open={!!activeInvoiceAnomaly} onOpenChange={(open) => {
+        if (!open && activeInvoiceAnomaly) {
+          setDismissedInvoiceAnomalyIds((prev) => new Set(prev).add(makeInvoiceAnomalyKey(activeInvoiceAnomaly)));
+          setActiveInvoiceAnomaly(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              Invoice Needs Review
+            </DialogTitle>
+          </DialogHeader>
+          {activeInvoiceAnomaly && (
+            <div className="space-y-4 text-sm">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                <p className="font-semibold">{activeInvoiceAnomaly.vendor_name || 'Unknown vendor'} {activeInvoiceAnomaly.invoice_number ? '#' + activeInvoiceAnomaly.invoice_number : ''}</p>
+                <p className="mt-1">
+                  The system found a historical state mismatch: {activeInvoiceAnomaly.anomaly_type?.replaceAll('_', ' ')}.
+                </p>
+                <p className="mt-1 text-xs">
+                  Status: {activeInvoiceAnomaly.status || 'n/a'} | AP: {activeInvoiceAnomaly.ap_status || 'n/a'} | Payment: {activeInvoiceAnomaly.payment_status || 'n/a'}
+                </p>
+              </div>
+              <p className="text-muted-foreground">
+                Choose what happened after reviewing it. We will record your decision without silently changing financial history.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Button
+                  variant="outline"
+                  onClick={handleReviewInvoiceAnomaly}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Review Invoice
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-50"
+                  onClick={() => recordInvoiceAnomalyReview.mutate({
+                    anomaly: activeInvoiceAnomaly,
+                    decision: 'accepted_historical',
+                    notes: 'Reviewer accepted this as historical data that should remain unchanged.',
+                  })}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Accept Historical
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700"
+                  onClick={() => recordInvoiceAnomalyReview.mutate({
+                    anomaly: activeInvoiceAnomaly,
+                    decision: 'finance_cleanup_requested',
+                    notes: 'Reviewer requested Finance cleanup for this historical anomaly.',
+                  })}
+                  disabled={recordInvoiceAnomalyReview.isPending}
+                >
+                  Send to Finance
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Upload Dialog */}
       {uploadOpen && (

@@ -655,6 +655,8 @@ export default function Inventory() {
           quantity: 1,
           unit: 'invoice',
           value: Number(invoice.total_amount || 0),
+          location_id: invoice.location_id,
+          brand_id: invoice.brand_id,
         });
         return;
       }
@@ -671,6 +673,8 @@ export default function Inventory() {
           quantity: getInvoiceLineQuantity(line),
           unit: line.vendor_unit || line.unit || line.uom || 'ea',
           value: getInvoiceLineValue(line),
+          location_id: invoice.location_id,
+          brand_id: invoice.brand_id,
         });
       });
     });
@@ -2898,7 +2902,10 @@ export default function Inventory() {
                               <TableBody>
                                 {rows.map(item => (
                                   <TableRow key={item.id || `${data.category}-${item.product_name}`}>
-                                    <TableCell className="max-w-72 truncate font-medium">{item.product_name || 'Unnamed item'}</TableCell>
+                                    <TableCell className="max-w-72 truncate font-medium">
+                                      {item.product_name || 'Unnamed item'}
+                                      <div className="text-[10px] font-normal text-muted-foreground">{locationNameById.get(item.location_id) || 'Unknown location'}</div>
+                                    </TableCell>
                                     <TableCell className="text-right tabular-nums">
                                       {Number(item.current_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} {item.current_unit || ''}
                                     </TableCell>
@@ -3177,6 +3184,7 @@ export default function Inventory() {
                         </span>
                       </div>
                     </TableHead>
+                    <TableHead>Location</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead
                       className="cursor-pointer hover:text-foreground group"
@@ -3197,7 +3205,7 @@ export default function Inventory() {
                 <TableBody>
                   {wasteHistoryRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No wastage logged for the selected date range
                       </TableCell>
                     </TableRow>
@@ -3206,6 +3214,10 @@ export default function Inventory() {
                       <TableRow key={log.id}>
                         <TableCell>{format(new Date(log.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-medium">{log.product_name}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">{locationNameById.get(log.location_id) || 'Unknown location'}</div>
+                          <div className="text-xs text-muted-foreground">{brandNameById.get(log.brand_id) || ''}</div>
+                        </TableCell>
                         <TableCell>{log.quantity} {log.unit}</TableCell>
                         <TableCell className="text-resend-red font-semibold">${log.value?.toFixed(2)}</TableCell>
                         <TableCell>
@@ -3470,6 +3482,7 @@ export default function Inventory() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[82px]">Date</TableHead>
+                          <TableHead className="w-[100px]">Location</TableHead>
                           <TableHead className="w-[120px]">Type</TableHead>
                           <TableHead className="w-[78px]">Status</TableHead>
                           {summaryBuckets.map(bucket => (
@@ -3482,7 +3495,7 @@ export default function Inventory() {
                       <TableBody>
                         {filteredStockCountHistoryRows.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={summaryBuckets.length + 5} className="h-20 text-center text-muted-foreground">
+                            <TableCell colSpan={summaryBuckets.length + 6} className="h-20 text-center text-muted-foreground">
                               No saved counts found for the selected range.
                             </TableCell>
                           </TableRow>
@@ -3493,6 +3506,7 @@ export default function Inventory() {
                             onClick={() => setStockCountDetailRecord(record)}
                           >
                             <TableCell className="font-medium tabular-nums">{format(new Date(`${record.date}T00:00:00`), 'MM/dd/yy')}</TableCell>
+                            <TableCell className="truncate">{locationNameById.get(record.location_id) || 'Unknown location'}</TableCell>
                             <TableCell className="truncate">{record.type || record.scope}</TableCell>
                             <TableCell>
                               <Badge className={cn("px-2 py-0 text-[11px]", record.status === 'Closed' ? 'bg-secondary text-foreground' : 'bg-resend-green/10 text-resend-green')}>
@@ -4275,6 +4289,7 @@ export default function Inventory() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Product</TableHead>
+                        <TableHead>Location</TableHead>
                         <TableHead>Quantity</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Value</TableHead>
@@ -4285,7 +4300,7 @@ export default function Inventory() {
                     <TableBody>
                       {wasteHistoryRows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                             No waste history yet
                           </TableCell>
                         </TableRow>
@@ -4294,6 +4309,10 @@ export default function Inventory() {
                           <TableRow key={`summary-${log.id}`}>
                             <TableCell>{format(new Date(log.created_at), 'MM/dd/yyyy')}</TableCell>
                             <TableCell className="font-medium">{log.product_name}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">{locationNameById.get(log.location_id) || 'Unknown location'}</div>
+                              <div className="text-xs text-muted-foreground">{brandNameById.get(log.brand_id) || ''}</div>
+                            </TableCell>
                             <TableCell>{log.quantity} {log.unit}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className="capitalize">{log.reason?.replace(/_/g, ' ') || 'Other'}</Badge>
@@ -4341,6 +4360,7 @@ export default function Inventory() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Count</TableHead>
                       <TableHead>Unit</TableHead>
@@ -4350,7 +4370,7 @@ export default function Inventory() {
                   <TableBody>
                     {todaySnapshotRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No items received today
                         </TableCell>
                       </TableRow>
@@ -4363,6 +4383,7 @@ export default function Inventory() {
                               {item.vendor_name}{item.invoice_number ? ` - ${item.invoice_number}` : ''}
                             </div>
                           </TableCell>
+                          <TableCell>{locationNameById.get(item.location_id) || 'Unknown location'}</TableCell>
                           <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{item.unit}</TableCell>
@@ -4386,6 +4407,7 @@ export default function Inventory() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Qty</TableHead>
@@ -4395,7 +4417,7 @@ export default function Inventory() {
                   <TableBody>
                     {previousSnapshotRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No previous received items yet
                         </TableCell>
                       </TableRow>
@@ -4408,6 +4430,7 @@ export default function Inventory() {
                               {item.invoice_number ? `Invoice ${item.invoice_number}` : 'Invoice upload'}
                             </div>
                           </TableCell>
+                          <TableCell>{locationNameById.get(item.location_id) || 'Unknown location'}</TableCell>
                           <TableCell>{format(parseLocalDate(item.received_date), 'MMM d, yyyy')}</TableCell>
                           <TableCell className="max-w-40 truncate">{item.vendor_name}</TableCell>
                           <TableCell>{item.quantity} {item.unit}</TableCell>

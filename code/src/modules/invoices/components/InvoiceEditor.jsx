@@ -34,6 +34,15 @@ export default function InvoiceEditor({ invoice, onChange }) {
   const paidDetection = invoice.validation_results?.paid_status_detection;
   const hasPaidDetection = paidDetection?.detected;
   const isHighConfidencePaid = paidDetection?.should_mark_paid;
+  const lineItems = invoice.line_items || [];
+  const confidenceScores = lineItems
+    .map((item) => Number(item.ai_confidence))
+    .filter((score) => Number.isFinite(score));
+  const averageConfidence = confidenceScores.length
+    ? Math.round(confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length)
+    : null;
+  const lowConfidenceLineCount = confidenceScores.filter((score) => score < 90).length;
+  const shouldShowConfidenceReview = averageConfidence !== null && lowConfidenceLineCount > 0;
 
   const displayValue = (value) => (value === 0 || value ? value : '');
   const displayNumberInput = (value) => (value === 0 || value ? String(value) : '');
@@ -120,7 +129,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
   };
 
   const calculateTotal = () => {
-    return (invoice.line_items || []).reduce((sum, item) => sum + asNumber(item.extended_price), 0);
+    return lineItems.reduce((sum, item) => sum + asNumber(item.extended_price), 0);
   };
 
   const handleMoneyFieldBlur = (field) => {
@@ -185,6 +194,19 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 <div>
                   <p className="font-semibold">AI Extraction Failed</p>
                   <p className="mt-1">{invoice.validation_results?.error || 'Unknown error occurred during AI processing. Please enter details manually.'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {shouldShowConfidenceReview && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-blue-700" />
+                <div>
+                  <p className="font-semibold">Human review recommended for OCR score</p>
+                  <p className="mt-1">
+                    Average extraction confidence is {averageConfidence}%. {lowConfidenceLineCount} line item{lowConfidenceLineCount === 1 ? '' : 's'} scored below 90%, so a human should review and update the extracted values before approval.
+                  </p>
                 </div>
               </div>
             </div>
@@ -378,7 +400,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(invoice.line_items || []).map((item, index) => (
+                {lineItems.map((item, index) => (
                   <TableRow key={index}>
                     <TableCell>
                       <Input
@@ -414,10 +436,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
                     <TableCell>
                       {item.ai_confidence != null ? (
                         <div className={`text-[10px] font-medium px-2 py-1 rounded-full text-center ${item.ai_confidence >= 90 ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/20 text-resend-yellow'}`}>
-                          {item.ai_confidence}% Conf
+                          {item.ai_confidence}% OCR
                         </div>
                       ) : (
-                        <div className="text-[10px] text-slate-400 text-center">—</div>
+                        <div className="text-[10px] text-slate-400 text-center">n/a</div>
                       )}
                     </TableCell>
                     <TableCell>

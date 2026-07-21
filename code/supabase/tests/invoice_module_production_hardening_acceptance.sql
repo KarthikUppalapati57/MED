@@ -7,14 +7,19 @@
 
 BEGIN;
 
-ALTER TABLE public.invoices DISABLE TRIGGER trg_invoices_webhook;
-
-INSERT INTO private.workflow_runtime_settings (setting_name, setting_value, updated_at)
-VALUES ('service_role_key', 'rollback-test-service-role-key', now())
-ON CONFLICT (setting_name) DO UPDATE
-   SET setting_value = EXCLUDED.setting_value,
-       updated_at = now();
-
+DO $$
+DECLARE
+  v_trigger text;
+BEGIN
+  FOR v_trigger IN
+    SELECT tgname
+    FROM pg_trigger
+    WHERE tgrelid = 'public.invoices'::regclass
+      AND tgname IN ('trg_invoices_webhook', 'trg_invoices_webhook_insert', 'trg_invoices_webhook_update')
+  LOOP
+    EXECUTE format('ALTER TABLE public.invoices DISABLE TRIGGER %I', v_trigger);
+  END LOOP;
+END $$;
 CREATE TEMP TABLE imph_ids (
   key text PRIMARY KEY,
   value uuid NOT NULL
