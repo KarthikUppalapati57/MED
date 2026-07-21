@@ -9,6 +9,14 @@
 
 BEGIN;
 
+-- trg_invoices_webhook fires invoke_edge_function() on invoice INSERT, which requires
+-- this setting to be present. Rolled back with everything else at the end of the test.
+INSERT INTO private.workflow_runtime_settings (setting_name, setting_value, updated_at)
+VALUES ('service_role_key', 'rollback-test-service-role-key', now())
+ON CONFLICT (setting_name) DO UPDATE
+   SET setting_value = EXCLUDED.setting_value,
+       updated_at = now();
+
 CREATE TEMP TABLE tsa_scope_ids (
   key text PRIMARY KEY,
   value uuid NOT NULL
@@ -89,11 +97,11 @@ BEGIN
     ('TSA Scope Vendor', 'TSA-ORG-C', 30, 'pending_review', 'processing', v_org_c, NULL, NULL, v_org_manager_c, 'manual_upload');
 
   -- Reference table (gated by reference_scope_visible): brand-shared (location NULL) vendor per org.
-  INSERT INTO public.vendors (name, organization_id, brand_id, location_id, created_by)
+  INSERT INTO public.vendors (name, organization_id, brand_id, location_id)
   VALUES
-    ('TSA Scope Vendor Org A', v_org_a, NULL, NULL, v_tenant_admin),
-    ('TSA Scope Vendor Org B', v_org_b, NULL, NULL, v_org_manager_b),
-    ('TSA Scope Vendor Org C', v_org_c, NULL, NULL, v_org_manager_c);
+    ('TSA Scope Vendor Org A', v_org_a, NULL, NULL),
+    ('TSA Scope Vendor Org B', v_org_b, NULL, NULL),
+    ('TSA Scope Vendor Org C', v_org_c, NULL, NULL);
 END $$;
 
 -- ===================== tenant_super_admin: sees across orgs within own tenant =====================

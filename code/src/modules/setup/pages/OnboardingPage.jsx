@@ -469,9 +469,18 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
 }
 
 const CARD_ELEMENT_OPTIONS = {
+  hidePostalCode: false,
   style: {
-    base: { fontSize: '15px', color: 'hsl(var(--foreground))', '::placeholder': { color: 'hsl(var(--muted-foreground))' } },
-    invalid: { color: '#dc2626' },
+    base: {
+      color: '#f8fafc',
+      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontSize: '15px',
+      fontSmoothing: 'antialiased',
+      iconColor: '#ff5a1f',
+      '::placeholder': { color: '#94a3b8' },
+    },
+    invalid: { color: '#f87171', iconColor: '#f87171' },
+    complete: { color: '#f8fafc', iconColor: '#22c55e' },
   },
 };
 
@@ -485,7 +494,7 @@ function CardFields({ stripeRef, elementsRef, cardHolderName, onCardHolderNameCh
       <FieldLabel htmlFor="card-holder-name" required>Cardholder Name</FieldLabel>
       <Input id="card-holder-name" value={cardHolderName} onChange={(event) => onCardHolderNameChange(event.target.value)} className="h-10 bg-card" />
       <FieldLabel required>Card Details</FieldLabel>
-      <div className="h-10 rounded-md border bg-card px-3 py-2.5">
+      <div className="rounded-md border bg-[#0f1117] px-3 py-3 shadow-inner transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
         <CardElement options={CARD_ELEMENT_OPTIONS} onChange={onCardChange} />
       </div>
     </div>
@@ -1501,6 +1510,7 @@ export default function OnboardingPage() {
     </div>
   );
 }
+
 
 
 
