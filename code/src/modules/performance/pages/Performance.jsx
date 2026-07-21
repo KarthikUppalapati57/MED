@@ -25,7 +25,7 @@ const PredictiveAlerts = React.lazy(() => import('@/modules/labor/components/Pre
 const DailyPnLTab = React.lazy(() => import('@/modules/performance/components/DailyPnLTab'));
 const CrossLocationBenchmarking = React.lazy(() => import('@/modules/performance/components/CrossLocationBenchmarking'));
 const PerformanceTrendChart = React.lazy(() => import('@/modules/performance/components/PerformanceCharts').then((module) => ({ default: module.PerformanceTrendChart })));
-const PerformanceCategoryPieChart = React.lazy(() => import('@/modules/performance/components/PerformanceCharts').then((module) => ({ default: module.PerformanceCategoryPieChart })));
+const CategoryReportPage = React.lazy(() => import('@/modules/performance/tabs/CategoryReport/CategoryReportPage'));
 
 function ChartFallback() {
   return (
@@ -42,8 +42,6 @@ function TabFallback() {
     </div>
   );
 }
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#ff7300', '#38bdf8', '#fbbf24'];
 
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, {
   minimumFractionDigits: 0,
@@ -78,10 +76,10 @@ export default function Performance() {
   const todayKey = now.toISOString().slice(0, 10);
 
   const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
-  const needsSalesData = ['overview', 'pnl', 'category', 'sales_report', 'sales_forecast', 'variance'].includes(activeTab);
-  const needsInvoices = ['overview', 'pnl', 'category'].includes(activeTab);
+  const needsSalesData = ['overview', 'pnl', 'sales_report', 'sales_forecast', 'variance'].includes(activeTab);
+  const needsInvoices = ['overview', 'pnl'].includes(activeTab);
   const needsShifts = ['overview', 'pnl'].includes(activeTab);
-  const needsAllocations = ['overview', 'pnl', 'category'].includes(activeTab);
+  const needsAllocations = ['overview', 'pnl'].includes(activeTab);
   const needsLineItems = ['overview', 'movers'].includes(activeTab);
   const needsBudgetTargets = ['overview', 'pnl', 'budget'].includes(activeTab);
 
@@ -159,22 +157,6 @@ export default function Performance() {
 
   // --- PRICE MOVERS ---
   const moversData = metricsData.movers_data || [];
-
-  // --- CATEGORY REPORT ---
-  const categoryReportData = (metricsData.category_data || []).map(item => ({
-    name: item.name,
-    spend: item.spend,
-    pct: totalCogs > 0 ? (item.spend / totalCogs) * 100 : 0
-  }));
-
-  const categoryPieData = categoryReportData.map((d, i) => ({
-    name: d.name,
-    value: d.spend,
-    color: COLORS[i % COLORS.length]
-  }));
-  if (categoryPieData.length === 0) {
-    categoryPieData.push({ name: 'No Data', value: 1, color: '#e5e7eb' });
-  }
 
   // --- P&L DATA ---
   const getTarget = (category, fallback) => Number(budgetByCategory[category]?.target_amount || fallback || 0);
@@ -512,53 +494,9 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="category" className="space-y-6 m-0">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2 glass-card shadow-sm border-border/50">
-                <CardHeader>
-                  <CardTitle>Category Spend</CardTitle>
-                  <CardDescription>Breakdown of COGS across categories</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto w-full">
-                    <Table className="w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Category</TableHead>
-                          <TableHead className="text-right">Spend</TableHead>
-                          <TableHead className="text-right">% of COGS</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoryReportData.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">No category data available.</TableCell>
-                          </TableRow>
-                        ) : (
-                          categoryReportData.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="font-medium whitespace-nowrap">{item.name}</TableCell>
-                              <TableCell className="text-right whitespace-nowrap">${item.spend.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
-                              <TableCell className="text-right whitespace-nowrap">{item.pct.toFixed(1)}%</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card shadow-sm border-border/50 flex flex-col min-h-[400px]">
-                <CardHeader className="shrink-0">
-                  <CardTitle>Distribution</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 w-full min-h-[300px]">
-                  <React.Suspense fallback={<ChartFallback />}>
-                    <PerformanceCategoryPieChart data={categoryPieData} />
-                  </React.Suspense>
-                </CardContent>
-              </Card>
-            </div>
+            <React.Suspense fallback={<TabFallback />}>
+              <CategoryReportPage />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="movers" className="space-y-6 m-0">

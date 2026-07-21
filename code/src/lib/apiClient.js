@@ -1020,6 +1020,60 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    getCategoryPerformanceReport: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      categoryNames = null,
+      vendorIds = null,
+      timezone = null,
+      selectedCategory = null,
+      trendCategories = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_category_performance_report', {
+        p_organization_id: organizationId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_category_names: categoryNames,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+        p_selected_category: selectedCategory,
+        p_trend_categories: trendCategories,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getCategoryPerformanceDrilldown: async ({
+      organizationId,
+      category,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      vendorIds = null,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_category_performance_drilldown', {
+        p_organization_id: organizationId,
+        p_category: category,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
     getPnlSummary: async (orgId, startDate, endDate, brandId = null, locationId = null) => {
       const { data, error } = await supabase.rpc('get_pnl_summary', {
         p_org_id: orgId,
