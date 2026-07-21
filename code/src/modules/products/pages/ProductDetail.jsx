@@ -93,9 +93,27 @@ function formatQuantity(value) {
 
 function buildReportUnitLabel(quantity, unit, nickname = '') {
   const trimmedNickname = nickname.trim();
-  if (trimmedNickname) return trimmedNickname;
   const trimmedUnit = String(unit || '').trim() || 'Each';
+  const unitLabel = `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
+  if (trimmedNickname) return `${trimmedNickname} (${unitLabel})`;
   return `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
+}
+
+function countSheetItemKey(item = {}) {
+  const safeItem = item || {};
+  return String(safeItem.inventory_id || safeItem.product_id || safeItem.product_name || '').trim().toLowerCase();
+}
+
+function productInventoryKey(product = {}, inventoryItem = {}) {
+  const safeProduct = product || {};
+  const safeInventoryItem = inventoryItem || {};
+  return String(
+    safeInventoryItem.id ||
+    safeProduct.id ||
+    safeProduct.product_id ||
+    safeProduct.name ||
+    ''
+  ).trim().toLowerCase();
 }
 
 function getAccountingForCategory(category, fallback = '5110') {
@@ -149,6 +167,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     unit: initialProduct?.report_by_unit || 'Each',
     sourcePrice: Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0),
   });
+  const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
     queryKey: ['product-detail', productId],
@@ -157,6 +176,116 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   });
 
   const product = fetchedProduct || initialProduct;
+
+  const { data: productInventoryItems = [] } = useAuthQuery({
+    queryKey: ['product-detail-inventory', product?.id, product?.product_id],
+    queryFn: async () => {
+      if (!product?.organization_id) return [];
+      const queries = [];
+
+      if (product.id) {
+        queries.push(
+          api.client
+            .from('inventory')
+            .select('*')
+            .eq('organization_id', product.organization_id)
+            .eq('internal_product_id', product.id)
+            .is('deleted_at', null)
+            .limit(10)
+        );
+      }
+
+      if (product.product_id) {
+        queries.push(
+          api.client
+            .from('inventory')
+            .select('*')
+            .eq('organization_id', product.organization_id)
+            .eq('product_id', product.product_id)
+            .is('deleted_at', null)
+            .limit(10)
+        );
+      }
+
+      if (queries.length === 0) return [];
+
+      const results = await Promise.all(queries);
+      const rows = results.flatMap(({ data, error }) => {
+        if (error) throw error;
+        return data || [];
+      });
+      return [...new Map(rows.map(row => [row.id, row])).values()];
+    },
+    enabled: !!product?.organization_id && !!product?.id,
+  });
+
+  const primaryInventoryItem = productInventoryItems[0] || null;
+
+  const { data: countSheets = [] } = useAuthQuery({
+    queryKey: ['product-detail-count-sheets', product?.organization_id, product?.location_id],
+    queryFn: async () => {
+      if (!product?.organization_id) return [];
+      const { data, error } = await api.client
+        .from('count_sheets')
+        .select('*')
+        .eq('organization_id', product.organization_id)
+        .is('deleted_at', null)
+        .order('name', { ascending: true })
+        .limit(200);
+      if (error) throw error;
+      return (data || []).filter(sheet => {
+        if (sheet.status && !['active', 'draft'].includes(sheet.status)) return false;
+        if (product.location_id && sheet.location_id && sheet.location_id !== product.location_id) return false;
+        return true;
+      });
+    },
+    enabled: !!product?.organization_id,
+  });
+
+  const productCountSheetKey = productInventoryKey(product, primaryInventoryItem);
+  const countSheetRows = useMemo(() => {
+    return countSheets.map(sheet => {
+      const items = Array.isArray(sheet.items) ? sheet.items : [];
+      const assigned = items.some(item => countSheetItemKey(item) === productCountSheetKey);
+      return { ...sheet, assigned };
+    });
+  }, [countSheets, productCountSheetKey]);
+
+  const countSheetMutation = useMutation({
+    mutationFn: async ({ sheet, action }) => {
+      if (!sheet?.id) throw new Error('Count sheet not found');
+      const items = Array.isArray(sheet.items) ? sheet.items : [];
+      const inventoryItem = primaryInventoryItem;
+      const nextItems = action === 'remove'
+        ? items.filter(item => countSheetItemKey(item) !== productCountSheetKey)
+        : [
+            ...items.filter(item => countSheetItemKey(item) !== productCountSheetKey),
+            {
+              inventory_id: inventoryItem?.id || product.id,
+              product_id: inventoryItem?.product_id || product.product_id || product.id,
+              product_name: inventoryItem?.product_name || product.name,
+              expected_quantity: inventoryItem?.current_quantity || 0,
+              unit: inventoryItem?.current_unit || form.base_unit || form.report_by_unit || 'Each',
+              sort_order: items.length + 1,
+            },
+          ];
+
+      const { data, error } = await api.client
+        .from('count_sheets')
+        .update({ items: nextItems, updated_at: new Date().toISOString() })
+        .eq('id', sheet.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-count-sheets'] });
+      toast.success('Count sheet updated');
+      setSelectedCountSheetId('');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to update count sheet'),
+  });
 
   useEffect(() => {
     if (!product) return;
@@ -187,10 +316,38 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const convertedPrice = calculateConvertedUnitPrice(unitDraft.sourcePrice, unitDraft.quantity);
 
   const saveMutation = useMutation({
-    mutationFn: () => api.products.updateProductDetails(productId, form),
+    mutationFn: async () => {
+      const savedProduct = await api.products.updateProductDetails(productId, form);
+
+      if (form.is_inventoried) {
+        const trackingResult = await api.products.setInventoryTracking(productId, true);
+        const inventoryItemId = primaryInventoryItem?.id || trackingResult?.inventory_item_id;
+
+        if (inventoryItemId) {
+          const quantity = Number(primaryInventoryItem?.current_quantity || 0);
+          await api.entities.Inventory.update(inventoryItemId, {
+            product_name: form.name,
+            product_id: form.product_id,
+            internal_product_id: productId,
+            category: form.category,
+            accounting_category: form.accounting_category,
+            current_unit: form.base_unit || form.report_by_unit || 'Each',
+            report_by: form.report_by_unit || form.base_unit || 'Each',
+            unit_cost: form.latest_price,
+            current_value: quantity * Number(form.latest_price || 0),
+          });
+        }
+      } else if (product?.is_inventoried) {
+        await api.products.setInventoryTracking(productId, false);
+      }
+
+      return savedProduct;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product-detail', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product-detail-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Product saved');
     },
     onError: (error) => toast.error(error?.message || 'Failed to save product'),
@@ -345,22 +502,51 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
 
         <Section
           title="Count Sheets"
-          action={<Button variant="outline"><Plus className="mr-2 h-4 w-4" /> Add to a Count Sheet</Button>}
+          action={(
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Select value={selectedCountSheetId} onValueChange={setSelectedCountSheetId}>
+                <SelectTrigger className="w-64 max-w-full">
+                  <SelectValue placeholder="Select count sheet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {countSheetRows.filter(sheet => !sheet.assigned).map(sheet => (
+                    <SelectItem key={sheet.id} value={sheet.id}>{sheet.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                disabled={!selectedCountSheetId || countSheetMutation.isPending}
+                onClick={() => {
+                  const sheet = countSheetRows.find(row => row.id === selectedCountSheetId);
+                  if (sheet) countSheetMutation.mutate({ sheet, action: 'add' });
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add to Count Sheet
+              </Button>
+            </div>
+          )}
         >
           <div className="divide-y rounded-md border">
-            {['Food Inventory', 'Food Inventory 2026', 'Inventory Count Sheet New'].map((sheet, index) => (
-              <div key={sheet} className="grid gap-3 p-3 md:grid-cols-[1fr_320px_auto] md:items-center">
-                <span className="font-medium">{sheet}</span>
-                {index === 0 ? (
-                  <Badge variant="outline" className="w-fit">Ready for inventory hookup</Badge>
-                ) : (
-                  <Select value="Walk In Cooler" disabled>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="Walk In Cooler">Walk In Cooler</SelectItem></SelectContent>
-                  </Select>
-                )}
-                <Button variant="ghost" size="icon" aria-label="Remove count sheet" disabled>
-                  <X className="h-4 w-4" />
+            {countSheetRows.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">No active count sheets found for this product scope.</div>
+            ) : countSheetRows.map((sheet) => (
+              <div key={sheet.id} className="grid gap-3 p-3 md:grid-cols-[1fr_auto_auto] md:items-center">
+                <div className="min-w-0">
+                  <span className="block truncate font-medium">{sheet.name}</span>
+                  {sheet.location_id && <span className="text-xs text-muted-foreground">Location sheet</span>}
+                </div>
+                <Badge variant={sheet.assigned ? 'default' : 'outline'} className="w-fit">
+                  {sheet.assigned ? 'Assigned' : 'Not assigned'}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={sheet.assigned ? 'Remove count sheet' : 'Add count sheet'}
+                  disabled={countSheetMutation.isPending}
+                  onClick={() => countSheetMutation.mutate({ sheet, action: sheet.assigned ? 'remove' : 'add' })}
+                >
+                  {sheet.assigned ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 </Button>
               </div>
             ))}
@@ -461,36 +647,41 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell>{form.report_by_unit || 'Each'}</TableCell>
-                  <TableCell>1 {form.base_unit || form.report_by_unit || 'Each'}</TableCell>
-                  <TableCell className="text-right">{money(form.latest_price)}</TableCell>
-                  <TableCell>No</TableCell>
-                  <TableCell><Badge variant="outline">UI only</Badge></TableCell>
-                </TableRow>
+                {productInventoryItems.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                      Turn on "Product should be inventoried" and save to create the inventory item.
+                    </TableCell>
+                  </TableRow>
+                ) : productInventoryItems.map(item => (
+                  <TableRow key={item.id}>
+                    <TableCell>{item.product_name || form.name}</TableCell>
+                    <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
+                    <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
+                    <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
+                    <TableCell><Badge variant="outline">Inventory linked</Badge></TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </table>
           </div>
 
           <div className="mt-6 space-y-3">
             <h3 className="text-lg font-semibold">Units of Measure</h3>
-            <div className="grid gap-3 rounded-md border p-4 lg:grid-cols-[auto_160px_180px_auto_160px_180px_1fr_auto] lg:items-center">
-              <span>There are</span>
-              <Input type="number" value={1} readOnly />
-              <Select value={form.report_by_unit} disabled>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value={form.report_by_unit}>{form.report_by_unit}</SelectItem></SelectContent>
-              </Select>
-              <span>in:</span>
-              <Input type="number" value={1} readOnly />
-              <Select value={form.base_unit || form.report_by_unit} disabled>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value={form.base_unit || form.report_by_unit}>{form.base_unit || form.report_by_unit}</SelectItem></SelectContent>
-              </Select>
-              <span className="text-sm text-muted-foreground">
-                1 {form.report_by_unit || 'unit'} currently costs {money(form.latest_price)}
-              </span>
-              <Button variant="ghost" size="icon" disabled><X className="h-4 w-4" /></Button>
+            <div className="rounded-md border p-4">
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="grid gap-3 md:grid-cols-[auto_120px_minmax(140px,1fr)_auto_120px_minmax(140px,1fr)] md:items-center">
+                  <span className="font-medium">There are</span>
+                  <Input type="number" value={formatQuantity(form.report_unit_quantity || 1)} readOnly />
+                  <Input value={form.base_unit || 'Each'} readOnly />
+                  <span className="font-medium">in</span>
+                  <Input type="number" value="1" readOnly />
+                  <Input value={form.report_by_unit || 'Each'} readOnly />
+                </div>
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                  {form.report_by_unit || 'Unit'} currently costs {money(form.latest_price)}
+                </div>
+              </div>
             </div>
           </div>
         </Section>
@@ -524,7 +715,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           </DialogHeader>
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              The report price updates automatically from the source/package price divided by the quantity in the new unit.
+              Enter the package/source price and how many report units are inside it. The unit price is source price divided by quantity.
             </p>
             <div className="space-y-2">
               <Label>Source / Package Price</Label>
@@ -545,7 +736,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 <Input
                   value={unitDraft.nickname}
                   onChange={(event) => setUnitDraft({ ...unitDraft, nickname: event.target.value })}
-                  placeholder="Count-by nickname"
+                  placeholder="Optional name, e.g. Case"
                 />
                 <Input
                   type="number"
@@ -568,7 +759,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 {money(unitDraft.sourcePrice)} divided by {formatQuantity(unitDraft.quantity)} {unitDraft.unit}
               </p>
               <p className="mt-1 text-2xl font-bold text-foreground">
-                {money(convertedPrice)} per {buildReportUnitLabel(unitDraft.quantity, unitDraft.unit, unitDraft.nickname)}
+                {money(convertedPrice)} per {unitDraft.unit || 'unit'}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Saved report label: {buildReportUnitLabel(unitDraft.quantity, unitDraft.unit, unitDraft.nickname)}
               </p>
             </div>
           </div>

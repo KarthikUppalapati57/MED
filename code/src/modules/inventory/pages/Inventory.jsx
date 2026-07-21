@@ -423,7 +423,7 @@ export default function Inventory() {
 
   const {
     data: inventoryData,
-    isLoading,
+    isLoading: inventoryLoading,
     fetchNextPage: fetchNextInventoryPage,
     hasNextPage: hasNextInventoryPage,
     isFetchingNextPage: isFetchingNextInventoryPage
@@ -444,11 +444,55 @@ export default function Inventory() {
     enabled: !!organization?.id && needsInventory,
   });
 
-  const inventory = React.useMemo(() => {
+  const { data: inventoriedProductData = [], isLoading: inventoriedProductsLoading } = useAuthQuery({
+    queryKey: ['inventoryProductSource', organization?.id, brand?.id || brand?.brand_id || null, location?.id || null],
+    queryFn: () => api.products.getCatalog({
+      organizationId: organization?.id,
+      brandId: brand?.id || brand?.brand_id || null,
+      locationId: location?.id || null,
+      sortBy: 'name',
+      page: 0,
+      pageSize: 1000,
+    }),
+    enabled: !!organization?.id && needsInventory,
+  });
+
+  const inventoriedProductLookup = React.useMemo(() => {
+    const lookup = {
+      ids: new Set(),
+      productIds: new Set(),
+      names: new Set(),
+    };
+
+    inventoriedProductData
+      .filter(product => product?.is_inventoried)
+      .forEach(product => {
+        if (product.id) lookup.ids.add(String(product.id));
+        if (product.product_id) lookup.productIds.add(String(product.product_id).trim().toLowerCase());
+        if (product.name) lookup.names.add(String(product.name).trim().toLowerCase());
+      });
+
+    return lookup;
+  }, [inventoriedProductData]);
+
+  const rawInventory = React.useMemo(() => {
     if (!inventoryData?.pages) return [];
     const flat = inventoryData.pages.flat();
     return filterByContext(flat, { organization, brand, location });
   }, [inventoryData, organization, brand, location]);
+
+  const inventory = React.useMemo(() => {
+    if (!inventoryData?.pages || inventoriedProductsLoading) return [];
+
+    return rawInventory.filter(item => {
+      if (item.internal_product_id && inventoriedProductLookup.ids.has(String(item.internal_product_id))) return true;
+      if (item.product_id && inventoriedProductLookup.productIds.has(String(item.product_id).trim().toLowerCase())) return true;
+      if (item.product_name && inventoriedProductLookup.names.has(String(item.product_name).trim().toLowerCase())) return true;
+      return false;
+    });
+  }, [inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, rawInventory]);
+
+  const isLoading = inventoryLoading || inventoriedProductsLoading;
 
   const { data: inventoryMetrics } = useAuthQuery({
     queryKey: ['inventoryMetrics', organization?.id, location?.id, debouncedSearch],
@@ -938,6 +982,7 @@ export default function Inventory() {
 
   // Stats
   const { totalItems, totalValue, lowStock } = React.useMemo(() => {
+    const inventoryLoaded = Boolean(inventoryData?.pages);
     const adjustedInventoryValue = inventory.reduce((sum, item) => {
       const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
       return sum + value;
@@ -946,11 +991,11 @@ export default function Inventory() {
     const adjustedLowStock = inventory.filter(isBelowReorderPoint).length;
 
     return {
-      totalItems: inventory.length > 0 ? adjustedInventoryItems : (inventoryMetrics?.totalItems || 0),
-      totalValue: inventory.length > 0 ? adjustedInventoryValue : Number(inventoryMetrics?.totalValue || 0),
-      lowStock: inventory.length > 0 ? adjustedLowStock : (inventoryMetrics?.lowStock || 0),
+      totalItems: inventoryLoaded ? adjustedInventoryItems : (inventoryMetrics?.totalItems || 0),
+      totalValue: inventoryLoaded ? adjustedInventoryValue : Number(inventoryMetrics?.totalValue || 0),
+      lowStock: inventoryLoaded ? adjustedLowStock : (inventoryMetrics?.lowStock || 0),
     };
-  }, [inventory, inventoryMetrics]);
+  }, [inventory, inventoryData?.pages, inventoryMetrics]);
 
   const wasteLogValue = React.useMemo(() => {
     return wastageLogs.reduce((sum, log) => sum + Number(log.value || 0), 0);
