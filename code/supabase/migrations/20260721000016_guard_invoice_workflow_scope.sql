@@ -162,7 +162,7 @@ BEGIN
       v_invoice.matched_order_id,
       v_invoice.match_status,
       v_invoice.brand_id,
-      v_invoice.ap_status,
+      COALESCE(v_invoice.ap_status, 'processing'),
       v_invoice.action_required_reason,
       v_invoice.action_required_details,
       v_invoice.assigned_reviewer_id,
