@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Landmark, Lock, Loader2, PenLine } from 'lucide-react';
+import { ArrowRight, Landmark, Lock, Loader2, PenLine } from 'lucide-react';
 
 const CONSENT_VERSION = 'tenant-bank-authorization-v1';
 const CONSENT_TEXT = 'I authorize this organization to use the selected bank account for check, ACH, and related payment activity. I certify that I am authorized to sign for this bank account and that the signature artifact may be retained for audit and payment authorization evidence.';
@@ -177,6 +177,29 @@ export default function CompleteOnboarding() {
     }
   };
 
+  const skipBankingSetup = async () => {
+    const confirmed = await confirm({
+      title: 'Skip bank setup for now?',
+      description: 'You can finish onboarding now and add or change operating bank details later from Payments > Payment Setup. Vendor bill-pay will stay limited until an account is added.',
+      confirmText: 'Skip for Now',
+      cancelText: 'Add Bank Account',
+      variant: 'warning',
+      severity: 'medium',
+    });
+    if (!confirmed) return;
+
+    setFinalizing(true);
+    try {
+      await api.onboarding.skipBankingOnboarding();
+      await refreshProfile();
+      toast.success('Bank setup skipped. You can add bank details later from Payments > Payment Setup.');
+      navigate('/Payments/setup', { replace: true });
+    } catch (err) {
+      toast.error(err.message || 'Could not skip bank setup.');
+    } finally {
+      setFinalizing(false);
+    }
+  };
   const captureSignature = async (event) => {
     event.preventDefault();
     if (!selectedBankId) {
@@ -254,13 +277,13 @@ export default function CompleteOnboarding() {
             <Landmark className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-black text-foreground tracking-tight">Complete Onboarding</h1>
-          <p className="text-muted-foreground font-medium">Add your organization's operating bank account for vendor bill-pay.</p>
+          <p className="text-muted-foreground font-medium">Add your organization's operating bank account now, or skip and add it later from Payments.</p>
         </div>
 
         <Card className="border-none shadow-2xl bg-card/80 backdrop-blur-xl ring-1 ring-slate-200/50">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-bold text-foreground">Banking &amp; Authorization</CardTitle>
-            <CardDescription className="text-muted-foreground">This is separate from your RestOps subscription payment method -- it's the account your organization pays vendors from.</CardDescription>
+            <CardDescription className="text-muted-foreground">This is separate from your RestOps subscription payment method -- it's the account your organization pays vendors from. You can also manage it later in Payments &gt; Payment Setup.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-start gap-3 rounded-xl border bg-secondary/40 p-4">
@@ -408,14 +431,22 @@ export default function CompleteOnboarding() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="bg-secondary/50 border-t border-border rounded-b-xl flex flex-col gap-3 py-6">
-            {finalizing && (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Finishing up...</p>
-            )}
-            <p className="text-[10px] text-center text-muted-foreground">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+          <CardFooter className="bg-secondary/50 border-t border-border rounded-b-xl flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1 text-center sm:text-left">
+              {finalizing && (
+                <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground sm:justify-start"><Loader2 className="h-4 w-4 animate-spin" /> Finishing up...</p>
+              )}
+              <p className="text-xs font-medium text-foreground">Need to finish setup first?</p>
+              <p className="text-[10px] text-muted-foreground">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+            </div>
+            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={skipBankingSetup} disabled={finalizing || savingBank || capturingSignature}>
+              {finalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+              Skip, add in Payments later
+            </Button>
           </CardFooter>
         </Card>
       </div>
     </div>
   );
 }
+

@@ -64,6 +64,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayModal';
+import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
@@ -1522,6 +1523,25 @@ export default function Payments() {
         {/* Setup Tab */}
         <TabsContent value="setup" className="mt-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {queryParams.get('banking') === 'skipped' && (
+              <Card className="border-amber-500/40 bg-amber-500/10 shadow-sm lg:col-span-2">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="mt-0.5 h-5 w-5 text-amber-500" />
+                    <div>
+                      <p className="font-semibold text-foreground">Bank setup was skipped during onboarding</p>
+                      <p className="text-sm text-muted-foreground">Add an operating account here when you are ready to pay vendors through ACH or checks.</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('setup')}>Stay in setup</Button>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="lg:col-span-2">
+              <PaymentAccountsSettings />
+            </div>
+
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -1891,5 +1911,6 @@ export default function Payments() {
     </div>
   );
 }
+
 
 

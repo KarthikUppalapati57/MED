@@ -12,7 +12,6 @@ const ROLE_LEVEL = {
   ground_staff:        0,
   location_manager:    1,
   manager:             2, // legacy alias
-  brand_manager:       2,
   branch_manager:      2,
   owner:               3, // legacy alias
   org_manager:         3,
@@ -25,6 +24,10 @@ function normalizeRole(role) {
   if (role === 'owner') return 'org_manager';
   if (role === 'manager') return 'branch_manager';
   if (role === 'admin') return 'platform_admin';
+  // brand_manager is a fossil string that never matched any RLS policy
+  // (the real brand-tier role is branch_manager) -- alias it so any
+  // pre-existing row with this value still resolves correctly.
+  if (role === 'brand_manager') return 'branch_manager';
   return role || 'ground_staff';
 }
 
@@ -63,7 +66,6 @@ export function usePermissions() {
 
     isGroundStaff: normalizedRole === 'ground_staff',
     isLocationManager: normalizedRole === 'location_manager',
-    isBrandManager: normalizedRole === 'brand_manager',
     isBranchManager: normalizedRole === 'branch_manager',
     isOrgManager: normalizedRole === 'org_manager',
     isTenantSuperAdmin: normalizedRole === 'tenant_super_admin',

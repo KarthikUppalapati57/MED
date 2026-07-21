@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
-  const { isPlatformAdmin, isTenantSuperAdmin, isOrgManager, isBrandManager, isBranchManager, isLocationManager } = usePermissions();
+  const { isPlatformAdmin, isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
 
   // Platform Admin: fetch all orgs; Tenant Super Admin: fetch tenant-visible orgs
   const { data: adminAllOrgs = [] } = useAuthQuery({
@@ -61,7 +61,7 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBrandManager || isBranchManager || isLocationManager) && !!activeOrgId,
+    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeOrgId,
   });
 
   // Locations: fetch only after a brand is selected.
@@ -79,11 +79,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBrandManager || isBranchManager || isLocationManager) && !!activeBrandId,
+    enabled: !!(isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeBrandId,
   });
 
   // Ground staff: no switcher, just show assigned location name
-  if (!isPlatformAdmin && !isTenantSuperAdmin && !isOrgManager && !isBrandManager && !isBranchManager && !isLocationManager) {
+  if (!isPlatformAdmin && !isTenantSuperAdmin && !isOrgManager && !isBranchManager && !isLocationManager) {
     if (location?.name) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

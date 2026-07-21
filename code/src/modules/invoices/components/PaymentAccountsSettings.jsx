@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
@@ -109,10 +109,10 @@ export default function PaymentAccountsSettings() {
 
   const getAccountIcon = (account_type) => {
     switch(account_type) {
-      case 'checking': return <Landmark className="w-5 h-5 text-blue-600" />;
-      case 'credit': return <CreditCard className="w-5 h-5 text-indigo-600" />;
-      case 'petty_cash': return <Banknote className="w-5 h-5 text-emerald-600" />;
-      case 'ap_account': return <Building2 className="w-5 h-5 text-slate-600" />;
+      case 'checking': return <Landmark className="w-5 h-5 text-primary" />;
+      case 'credit': return <CreditCard className="w-5 h-5 text-primary" />;
+      case 'petty_cash': return <Banknote className="w-5 h-5 text-emerald-500" />;
+      case 'ap_account': return <Building2 className="w-5 h-5 text-muted-foreground" />;
       default: return <Landmark className="w-5 h-5" />;
     }
   };
@@ -128,33 +128,33 @@ export default function PaymentAccountsSettings() {
           Payment Accounts
         </CardTitle>
         <CardDescription>
-          Configure the bank accounts, credit cards, or petty cash accounts used to pay invoices.
+          Add, replace, or deactivate the operating accounts used for vendor bill-pay. Full ACH details are sent to Dwolla setup and only masked digits are kept here.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {accounts.map(account => (
-            <div key={account.id} className={`flex items-start justify-between p-4 border rounded-lg ${!account.is_active ? 'opacity-50 bg-slate-100' : 'bg-white shadow-sm'}`}>
+            <div key={account.id} className={`flex items-start justify-between p-4 border rounded-lg ${!account.is_active ? 'opacity-50 bg-secondary/50' : 'bg-card shadow-sm'}`}>
               <div className="flex gap-3">
                 <div className="mt-0.5">{getAccountIcon(account.account_type)}</div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">{account.name}</h3>
-                  <p className="text-xs text-slate-500 capitalize">{account.account_type.replace('_', ' ')} Account</p>
+                  <h3 className="font-semibold text-foreground">{account.name}</h3>
+                  <p className="text-xs text-muted-foreground capitalize">{account.account_type.replace('_', ' ')} Account</p>
                   {((account.metadata?.routing_number_last4 || account.routing_number_last4) || (account.last_four || account.account_number_last4)) && (
-                    <p className="text-xs font-mono text-slate-400 mt-1">
+                    <p className="text-xs font-mono text-muted-foreground mt-1">
                       {account.routing_number_last4 && `RTN: ...${account.routing_number_last4} `}
                       {account.account_number_last4 && `ACC: ...${account.account_number_last4}`}
                     </p>
                   )}
-                  {!account.is_active && <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded mt-1 inline-block">Inactive</span>}
+                  {!account.is_active && <span className="text-xs bg-destructive/10 text-destructive px-1.5 py-0.5 rounded mt-1 inline-block">Inactive</span>}
                 </div>
               </div>
               {account.is_active && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0 shrink-0"
+                  className="text-red-500 hover:text-red-700 hover:bg-destructive/10 h-8 w-8 p-0 shrink-0"
                   onClick={() => deleteAccountMutation.mutate(account.id)}
                   disabled={deleteAccountMutation.isPending}
                 >
@@ -164,15 +164,15 @@ export default function PaymentAccountsSettings() {
             </div>
           ))}
           {accounts.length === 0 && !isAdding && (
-            <div className="col-span-full text-center p-6 border border-dashed rounded-lg text-slate-500 text-sm">
+            <div className="col-span-full text-center p-6 border border-dashed rounded-lg text-muted-foreground text-sm">
               No payment accounts configured.
             </div>
           )}
         </div>
 
         {isAdding ? (
-          <div className="p-4 border rounded-lg bg-teal-50/50 space-y-4">
-            <h4 className="text-sm font-semibold text-teal-900">Add New Account</h4>
+          <div className="p-4 border rounded-lg bg-secondary/40 space-y-4">
+            <h4 className="text-sm font-semibold text-foreground">Add New Account</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs">Account Name</Label>
@@ -185,7 +185,7 @@ export default function PaymentAccountsSettings() {
               <div className="space-y-1">
                 <Label className="text-xs">Account Type</Label>
                 <Select value={newAccount.account_type} onValueChange={v => setNewAccount({...newAccount, account_type: v})}>
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-background">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -222,7 +222,7 @@ export default function PaymentAccountsSettings() {
                 <>
                   <div className="space-y-1 md:col-span-2">
                     <Label className="text-xs">Enable real Dwolla ACH payouts from this account (optional)</Label>
-                    <p className="text-xs text-slate-500">Provide the full routing/account number to create a real Dwolla funding source. Numbers are sent directly to a secure vault, never stored in plain text.</p>
+                    <p className="text-xs text-muted-foreground">Provide the full routing/account number to create a real Dwolla funding source. Numbers are sent directly to a secure vault, never stored in plain text.</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Full Routing Number</Label>
@@ -269,7 +269,7 @@ export default function PaymentAccountsSettings() {
     <Card className="border-border">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Zap className="w-5 h-5 text-indigo-600" />
+          <Zap className="w-5 h-5 text-primary" />
           AutoPay Rules
         </CardTitle>
         <CardDescription>
@@ -282,14 +282,14 @@ export default function PaymentAccountsSettings() {
         ) : (
           <div className="space-y-4">
             {vendors.map(vendor => (
-              <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm">
+              <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg bg-card shadow-sm">
                 <div>
-                  <h3 className="font-semibold text-slate-900">{vendor.name}</h3>
+                  <h3 className="font-semibold text-foreground">{vendor.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     {vendor.autopay_enabled ? (
-                      <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 border-none">AutoPay Active</Badge>
+                      <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border-none">AutoPay Active</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-slate-500">AutoPay Disabled</Badge>
+                      <Badge variant="outline" className="text-muted-foreground">AutoPay Disabled</Badge>
                     )}
                   </div>
                 </div>
@@ -300,7 +300,7 @@ export default function PaymentAccountsSettings() {
                       value={vendor.default_payment_method || 'checkbook_physical'}
                       onValueChange={(v) => updateVendorMutation.mutate({ id: vendor.id, updates: { default_payment_method: v }})}
                     >
-                      <SelectTrigger className="w-[140px] h-8 text-xs bg-white">
+                      <SelectTrigger className="w-[140px] h-8 text-xs bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -321,7 +321,7 @@ export default function PaymentAccountsSettings() {
               </div>
             ))}
             {vendors.length === 0 && (
-              <div className="text-center p-6 border border-dashed rounded-lg text-slate-500 text-sm">
+              <div className="text-center p-6 border border-dashed rounded-lg text-muted-foreground text-sm">
                 No vendors found.
               </div>
             )}
@@ -332,4 +332,5 @@ export default function PaymentAccountsSettings() {
     </div>
   );
 }
+
 

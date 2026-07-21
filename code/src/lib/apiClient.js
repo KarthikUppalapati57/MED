@@ -709,6 +709,11 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    skipBankingOnboarding: async () => {
+      const { data, error } = await supabase.rpc('skip_banking_onboarding');
+      if (error) throw error;
+      return data;
+    },
     approveBusinessVerification: async ({ userId, note = null }) => {
       const { data, error } = await supabase.rpc('approve_business_verification', {
         p_user_id: userId,
@@ -1502,3 +1507,4 @@ export const api = {
     }
   }
 };
+
