@@ -47,7 +47,11 @@ strings, org-wide RLS policies that ignore brand/location) across every module.
 
 ## 2. LOCKED VOCABULARY (exact strings — getting these wrong silently breaks everything)
 
-- **Tenancy column:** `organization_id` (NOT `tenant_id` / `org_id`).
+- **Tenancy column:** `organization_id` (NOT `tenant_id` / `org_id`) is still the primary scope
+  anchor everywhere RLS reads it. `invoices` and `payments` additionally carry a denormalized
+  `tenant_id` column (added 2026-07-21, auto-populated by a `BEFORE INSERT OR UPDATE OF
+  organization_id` trigger, `sync_tenant_id_from_organization()`) for direct tenant-scoped
+  queries without a join — don't hand-set it, the trigger owns it.
 - **Role strings (the ONLY valid ones):**
   `ground_staff`, `location_manager`, `branch_manager`, `org_owner`, `platform_admin`.
   Legacy fossils that match NOTHING and must never be used: `manager`, `owner`, `admin`,
@@ -93,9 +97,14 @@ belongs to the uploader's location.
   `profiles.organization_id` / `brand_id` / `location_id`. The upload stamps from their fixed
   profile, never a picker.
 
-**NULL-tier rule (financial tables):** a row with NULL `brand_id` AND NULL `location_id` is
-**org-level → visible to `org_owner` / `platform_admin` only.** (Rare in practice — almost
-every restaurant transaction has a location.)
+**NULL-tier rule — RETIRED for `invoices`/`payments` (2026-07-21).** Both tables now have
+`organization_id`, `tenant_id`, `brand_id`, and `location_id` all `NOT NULL` — a row with no
+brand/location can no longer exist. It used to be allowed ("org-level, visible to `org_owner`/
+`platform_admin` only"), but that made such rows permanently invisible to `branch_manager`/
+`location_manager`/`ground_staff` — the "black-hole bug", see §7. Every insert path (manual
+upload, `save_invoice_workflow`, `ingest_email_invoice`) now requires or derives a real
+brand+location before the row can be written. `ledger_entries` is the one financial table that
+intentionally stays org-level (append-only, org-wide by design) — that's unaffected.
 
 ---
 
@@ -247,6 +256,68 @@ the Phase 3 redesign.
   `tenant_scope_*`/`reference_scope_*` functions for this; see that plan's overload/dependency
   warning before touching those functions.
 
+- **Context-switch audit + black-hole bug closure** (2026-07-21):
+  - `20260721000011_capture_tenant_super_admin_tenant_wide_scope.sql`: `tenant_scope_visible()`
+    and `reference_scope_visible()` capped `tenant_super_admin` to their own single org (same
+    branch as `org_manager`) instead of tenant-wide access via `get_auth_tenant()` — the same
+    gap the Identity/hierarchy RLS batch above fixed for `organizations`/`brands`/`locations`/
+    `profiles`, just missed on these two shared scope-primitive functions since they predate
+    the `tenant_super_admin` role entirely (written 20260628, role model landed 20260708).
+    Fixed to match the `organizations` table's existing pattern exactly.
+  - `useUrlHierarchy.js` fired three unawaited `switchContext()` calls back-to-back for a
+    `?company=&store=` deep link; each read the same stale closure over
+    `activeOrg`/`activeBrand`/`activeLocation`, so the org call (which unconditionally nulls
+    brand/location) usually landed last and wiped out what the other two had just set — deep
+    links to a specific location silently dropped to the org root. Fixed by adding
+    `switchContextTo({organization, brand, location})` to `AuthContext.jsx` — a single atomic
+    commit path (shared `applyContext()` helper, no closure-captured prior state) — and having
+    `useUrlHierarchy` call it once instead of three racing calls. `switchContext(type, entity)`
+    itself is untouched, still used as-is by `ContextSwitcher.jsx`'s one-field-at-a-time clicks.
+  - `brand_manager` — the fossil from §2 — was still live in the frontend: assignable from
+    `UserManagement.jsx`'s role picker, with its own `ROLE_LEVEL`/`isBrandManager` entries in
+    `usePermissions.jsx` treating it as a real, distinct role. Anyone assigned it would
+    authenticate fine and see an empty app (RLS matches `branch_manager`, never `brand_manager`).
+    Removed from the assignable role list; `normalizeRole()` now aliases `'brand_manager'` →
+    `'branch_manager'` (same treatment as the existing `manager`/`owner`/`admin` legacy aliases)
+    so any pre-existing row with that string isn't left worse off.
+  - `ContextSwitcher.jsx` had a full `isPlatformAdmin` branch (an "All Organizations" option,
+    per-org drill-down, a "Viewing: X" badge) that was **entirely unreachable** —
+    `Layout.jsx` never renders `<ContextSwitcher />` for that role at all (platform admin gets
+    platform-only nav + a separate `PlatformDashboard` instead). Also had `isLocationManager` in
+    its full-switcher role list, contradicting both its own docstring and §3's "`location_manager`
+    → NO switcher" rule — that one was live, not dead: a `location_manager` clicking the Brand
+    dropdown could actually null out their own fixed location. Both removed.
+  - **The "black-hole bug"** (§8 Phase 3 originally, pulled forward and closed here): every
+    invoice/payment insert path is now guarded against writing `brand_id`/`location_id` as NULL.
+    `Invoices.jsx`'s `sanitizeInvoiceData` throws instead of silently deleting the keys;
+    `save_invoice_workflow` (`20260721000016_guard_invoice_workflow_scope.sql`) auto-fills from
+    the caller's fixed profile for `location_manager`/`ground_staff`, `RAISE EXCEPTION`s for
+    everyone else if scope is still missing, on both INSERT and UPDATE; `ingest_email_invoice`
+    (`20260721000017_mandatory_invoice_payment_scope_ids.sql`) no longer inserts an orphaned row
+    when no `location_email_addresses` match is found — it returns `matched: false` with no
+    invoice, and `process-email-invoices` emails the sender (`_shared/email.ts`'s
+    `sendTransactionalEmail`) explaining the miss instead. A new `useRequireLocation()` hook
+    (`code/src/hooks/useRequireLocation.js`) gates every transactional write button behind a
+    selected location — greyed out, toast on click if missing — across Invoices, Payments,
+    Inventory (counts, wastage, transfers), and AutoOrdering; reference-data creation
+    (vendors/products/recipes, §4) is deliberately exempt since brand-level (no location) is
+    valid there. Finally, `organization_id`/`tenant_id`/`brand_id`/`location_id` are all
+    `NOT NULL` on `invoices` and `payments` now (see §2, §3) — the null-scope state is
+    schema-impossible, not just guarded in application code.
+  - **`InventoryTransfers.jsx`**: the "From" location field seeded from context once, then a
+    broken resync guard (`if (!current) return default; return current;`) silently ignored
+    every later context switch — switch locations mid-session without reopening the page and
+    the dropdown stays stuck on the old one while "Available Inventory" correctly updates, so a
+    transfer submits against the wrong source location. Fixed to resync only while the field is
+    still tracking the default (a manual pick survives a later switch, an untouched default
+    doesn't go stale).
+  - **Acceptance tests added:** `tenant_super_admin_scope_visible_acceptance.sql`,
+    `mandatory_invoice_payment_scope_ids_acceptance.sql`.
+  - **Not done in this pass** (see §9): full audit only covered 6 of ~21 frontend modules; two
+    flagged-not-confirmed cases in `LoadingDockReceiving.jsx`/`VendorBulkTools.jsx`; the
+    duplicate `brand_manager` entry in `AuthContext.jsx`'s `hasPermission` map was left alone
+    (harmless, intentional).
+
 ---
 
 ## 8. PENDING PLAN (in dependency order)
@@ -265,10 +336,13 @@ the Phase 3 redesign.
 4. **Phase 3 — full tiered-approval redesign:** consolidate the 4+ approval paths into ONE;
    activate `invoice_approval_limit` as the live amount check with escalation; re-seed
    `approval_policies` with correct role vocabulary (fix the `org_admin` fossil); clean the
-   leftover `'org_admin'` in `execute_approval_step`'s role list; **fix every invoice INSERT
-   path to stamp full scope** — especially `process-email-invoices` (drops brand/location/
-   created_by — the "black-hole" bug) and `save_invoice_workflow` (doesn't require
-   brand/location); fix `save_invoice_workflow` column drift (`extraction_method` missing).
+   leftover `'org_admin'` in `execute_approval_step`'s role list; fix `save_invoice_workflow`
+   column drift (`extraction_method` missing — NOTE: this migration has since added columns
+   to `save_invoice_workflow`'s INSERT list, re-check whether `extraction_method` is still
+   missing before assuming it isn't). **The insert-path-scope slice of this item is DONE**
+   (2026-07-21, see §7's "Context-switch audit + black-hole bug closure") —
+   `process-email-invoices` and `save_invoice_workflow` both now require/derive full scope
+   before writing; that part doesn't need to wait for the rest of this phase.
 5. **Squash** — regenerate a clean migration baseline from the verified local DB (retires the
    251-migration round-trip history + remaining fossils like `tenant_registry`,
    `tenant_schema_retirement_archive`). Also a good time to clean helper names module-wide.
@@ -297,6 +371,26 @@ the Phase 3 redesign.
   clause scoping it to inserts + real status changes; this fixes spurious webhooks for ALL
   invoice writers, not just validation. Needs its own investigation of what currently
   depends on the trigger firing on updates.
+
+- **Context-switch audit coverage gap.** The sweep that found the Inventory Transfers bug
+  (§7) only covered 6 of ~21 frontend modules (invoices, payments, inventory, vendors,
+  products, accounting) for stale-context/bypass patterns. `labor`, `recipes`,
+  `kitchen_displays`, `performance`, `integrations`, `commissary`, `food_safety`, `smartprep`,
+  etc. haven't been checked.
+- **Two flagged-not-confirmed cases from that same sweep:** `LoadingDockReceiving.jsx`'s
+  receipt location-stamping, and a CSV-import closure in `VendorBulkTools.jsx`. Neither
+  confirmed as a bug, neither ruled out.
+- **`AuthContext.jsx`'s `hasPermission` roleActionMap still has a `brand_manager` entry**
+  (identical permissions to `branch_manager`) — left intentionally as a safety net for any
+  pre-existing row with that legacy role string; removing it would silently strip permissions
+  from such a row for no benefit. Unlike `usePermissions.jsx`, this one isn't routed through
+  `normalizeRole()`, so it still keys on the raw, unaliased role string.
+- **PROD CHECKLIST addition:** before applying
+  `20260721000017_mandatory_invoice_payment_scope_ids.sql` to prod, re-run its own NULL-count
+  check (`SELECT count(*) FILTER (WHERE brand_id IS NULL OR location_id IS NULL) FROM
+  invoices` / `payments`) — local had zero existing rows in both tables so it applied cleanly
+  there, prod almost certainly has real null-scoped rows from the black-hole bug and will need
+  manual scope assignment before the `NOT NULL` constraints can be added.
 ---
 
 ## STATUS (update as steps complete)
@@ -313,6 +407,14 @@ the Phase 3 redesign.
 - [x] Phase 2c (partial) — `profiles` RLS fixed (see Identity/hierarchy RLS batch above);
       `brands`/`locations`/`organizations` also fixed as part of the same batch (not originally
       scoped under Phase 2c, but same root cause). `dashboard_*` special case still open.
-- [ ] Phase 3 — full tiered-approval redesign + insert-path scope fixes
+- [ ] Phase 3 — full tiered-approval redesign (insert-path scope fixes are DONE, see below)
 - [ ] Squash — clean baseline
 - [ ] Production deploy — with prod-state re-checks
+- [x] Context-switch audit + black-hole bug closure (2026-07-21) — tenant_super_admin RLS gap
+      in `tenant_scope_visible`/`reference_scope_visible`, `useUrlHierarchy` race condition,
+      `brand_manager` frontend fossil, dead/broken `ContextSwitcher` role branches, Inventory
+      Transfers stale-location bug, and the full invoice/payment black-hole bug (frontend guard,
+      `save_invoice_workflow` guard, `ingest_email_invoice` fix + bounce email, mandatory
+      `organization_id`/`tenant_id`/`brand_id`/`location_id` on both tables) — all closed, see
+      §7. Coverage gaps and deferred items tracked in §9. Not yet committed to git as of this
+      writing.
