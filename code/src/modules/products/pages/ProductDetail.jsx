@@ -100,11 +100,20 @@ function buildReportUnitLabel(quantity, unit, nickname = '') {
 }
 
 function countSheetItemKey(item = {}) {
-  return String(item.inventory_id || item.product_id || item.product_name || '').trim().toLowerCase();
+  const safeItem = item || {};
+  return String(safeItem.inventory_id || safeItem.product_id || safeItem.product_name || '').trim().toLowerCase();
 }
 
 function productInventoryKey(product = {}, inventoryItem = {}) {
-  return String(inventoryItem.id || product.id || product.product_id || product.name || '').trim().toLowerCase();
+  const safeProduct = product || {};
+  const safeInventoryItem = inventoryItem || {};
+  return String(
+    safeInventoryItem.id ||
+    safeProduct.id ||
+    safeProduct.product_id ||
+    safeProduct.name ||
+    ''
+  ).trim().toLowerCase();
 }
 
 function getAccountingForCategory(category, fallback = '5110') {
