@@ -2408,13 +2408,13 @@ export default function Inventory() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
           <p className="text-muted-foreground mt-1">Track and manage stock levels</p>
         </div>
-        {!isGroundStaff && (
-          <div className="flex gap-2">
+        {activeTab === 'inventory' && !isGroundStaff && (
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" /> Export
             </Button>
@@ -2471,69 +2471,68 @@ export default function Inventory() {
         );
       })()}
 
-      {/* Stats */}
-      {!['wastage', 'waste-summary'].includes(activeTab) && (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+      {activeTab === 'inventory' && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Items</p>
+                  <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+                </div>
+                <Warehouse className="h-8 w-8 text-primary" />
               </div>
-              <Warehouse className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Value</p>
+                  <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString()}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-resend-green" />
               </div>
-              <TrendingUp className="h-8 w-8 text-resend-green" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold text-resend-red">{lowStock}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Low Stock</p>
+                  <p className="text-2xl font-bold text-resend-red">{lowStock}</p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-resend-red" />
               </div>
-              <AlertTriangle className="h-8 w-8 text-resend-red" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Wastage (MTD)</p>
-                <p className="text-2xl font-bold text-resend-orange">${displayedMtdWastageValue.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Wastage (MTD)</p>
+                  <p className="text-2xl font-bold text-resend-orange">${displayedMtdWastageValue.toLocaleString()}</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-resend-orange" />
               </div>
-              <TrendingDown className="h-8 w-8 text-resend-orange" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-10 mb-6">
-          <TabsTrigger value="inventory">Inventory List</TabsTrigger>
-          <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
-          <TabsTrigger value="avt" className="data-[state=active]:text-resend-green">Actual vs Theoretical</TabsTrigger>
-          <TabsTrigger value="pos-sync" className="text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
-          <TabsTrigger value="transfers" className="text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
-          <TabsTrigger value="counts">Stock Counts</TabsTrigger>
-          <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
-          <TabsTrigger value="daily-snapshot">Daily Snapshot</TabsTrigger>
-          <TabsTrigger value="hardware-setup">Hardware & Scales</TabsTrigger>
+        <TabsList className="flex h-auto w-full flex-wrap items-center gap-1 rounded-lg bg-muted/60 p-1">
+          <TabsTrigger value="inventory" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Inventory List</TabsTrigger>
+          <TabsTrigger value="receiving" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-primary font-bold">Receiving</TabsTrigger>
+          <TabsTrigger value="avt" className="min-w-44 flex-1 whitespace-nowrap px-3 py-2 data-[state=active]:text-resend-green">Actual vs Theoretical</TabsTrigger>
+          <TabsTrigger value="pos-sync" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
+          <TabsTrigger value="transfers" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
+          <TabsTrigger value="summary" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2">Summary</TabsTrigger>
+          <TabsTrigger value="wastage" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Wastage Log</TabsTrigger>
+          <TabsTrigger value="counts" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Stock Counts</TabsTrigger>
+          <TabsTrigger value="count-sheets" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Count Sheets</TabsTrigger>
+          <TabsTrigger value="daily-snapshot" className="min-w-36 flex-1 whitespace-nowrap px-3 py-2">Daily Snapshot</TabsTrigger>
+          <TabsTrigger value="hardware-setup" className="min-w-40 flex-1 whitespace-nowrap px-3 py-2">Hardware & Scales</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receiving" className="space-y-4">
