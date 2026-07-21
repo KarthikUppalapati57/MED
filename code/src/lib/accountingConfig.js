@@ -52,34 +52,34 @@ export const CHART_OF_ACCOUNTS = {
   // --- COST OF GOODS SOLD ---
   FOOD_COST: {
     code: '5100',
-    label: 'Food Cost',
+    label: 'Food',
     group: 'COGS',
     subAccounts: {
-      MEAT: { code: '5110', label: 'Meat Cost' },
-      POULTRY: { code: '5120', label: 'Poultry Cost' },
-      SEAFOOD: { code: '5130', label: 'Seafood Cost' },
-      DAIRY: { code: '5140', label: 'Dairy Cost' },
-      PRODUCE: { code: '5150', label: 'Produce Cost' },
-      FROZEN: { code: '5160', label: 'Frozen Cost' },
-      GROCERY: { code: '5170', label: 'Grocery Cost' },
+      MEAT: { code: '5110', label: 'Meat' },
+      POULTRY: { code: '5120', label: 'Poultry' },
+      SEAFOOD: { code: '5130', label: 'Seafood' },
+      DAIRY: { code: '5140', label: 'Dairy' },
+      PRODUCE: { code: '5150', label: 'Produce' },
+      FROZEN: { code: '5160', label: 'Frozen' },
+      GROCERY: { code: '5170', label: 'Grocery' },
       CHANGE_IN_INV: { code: '5190', label: 'Change in Food Inventory' }
     }
   },
   BEVERAGE_COST: {
     code: '5200',
-    label: 'Beverage Cost',
+    label: 'Beverage',
     group: 'COGS',
     subAccounts: {
-      NON_ALCOHOLIC: { code: '5210', label: 'N/A Beverage Cost' },
-      LIQUOR: { code: '5220', label: 'Liquor Cost' },
-      BEER: { code: '5230', label: 'Beer Cost' },
-      WINE: { code: '5240', label: 'Wine Cost' },
+      NON_ALCOHOLIC: { code: '5210', label: 'N/A Beverage' },
+      LIQUOR: { code: '5220', label: 'Liquor' },
+      BEER: { code: '5230', label: 'Beer' },
+      WINE: { code: '5240', label: 'Wine' },
       CHANGE_IN_INV: { code: '5290', label: 'Change in Beverage Inventory' }
     }
   },
   MERCHANDISE_COST: {
     code: '5300',
-    label: 'Merchandise Cost',
+    label: 'Merchandise',
     group: 'COGS'
   }
 };
