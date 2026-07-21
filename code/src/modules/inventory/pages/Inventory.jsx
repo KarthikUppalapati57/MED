@@ -445,11 +445,12 @@ export default function Inventory() {
   });
 
   const { data: inventoriedProductData = [], isLoading: inventoriedProductsLoading } = useAuthQuery({
-    queryKey: ['inventoryProductSource', organization?.id, brand?.id || brand?.brand_id || null, location?.id || null],
+    queryKey: ['inventoryProductSource', organization?.id, brand?.id || brand?.brand_id || null, location?.id || null, debouncedSearch],
     queryFn: () => api.products.getCatalog({
       organizationId: organization?.id,
       brandId: brand?.id || brand?.brand_id || null,
       locationId: location?.id || null,
+      search: debouncedSearch || null,
       sortBy: 'name',
       page: 0,
       pageSize: 1000,
@@ -484,13 +485,64 @@ export default function Inventory() {
   const inventory = React.useMemo(() => {
     if (!inventoryData?.pages || inventoriedProductsLoading) return [];
 
-    return rawInventory.filter(item => {
+    const matchedInventoryKeys = {
+      ids: new Set(),
+      productIds: new Set(),
+      names: new Set(),
+    };
+
+    const trackedInventoryRows = rawInventory.filter(item => {
       if (item.internal_product_id && inventoriedProductLookup.ids.has(String(item.internal_product_id))) return true;
       if (item.product_id && inventoriedProductLookup.productIds.has(String(item.product_id).trim().toLowerCase())) return true;
       if (item.product_name && inventoriedProductLookup.names.has(String(item.product_name).trim().toLowerCase())) return true;
       return false;
     });
-  }, [inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, rawInventory]);
+
+    trackedInventoryRows.forEach(item => {
+      if (item.internal_product_id) matchedInventoryKeys.ids.add(String(item.internal_product_id));
+      if (item.product_id) matchedInventoryKeys.productIds.add(String(item.product_id).trim().toLowerCase());
+      if (item.product_name) matchedInventoryKeys.names.add(String(item.product_name).trim().toLowerCase());
+    });
+
+    const productBackedRows = inventoriedProductData
+      .filter(product => product?.is_inventoried)
+      .filter(product => {
+        if (product.id && matchedInventoryKeys.ids.has(String(product.id))) return false;
+        if (product.product_id && matchedInventoryKeys.productIds.has(String(product.product_id).trim().toLowerCase())) return false;
+        if (product.name && matchedInventoryKeys.names.has(String(product.name).trim().toLowerCase())) return false;
+        return true;
+      })
+      .map(product => {
+        const unit = product.report_by_unit || product.base_unit || 'ea';
+        const categoryOption = getInventoryCategoryOption(product);
+        return {
+          id: `catalog-product:${product.id || product.product_id || product.name}`,
+          inventory_id: null,
+          internal_product_id: product.id || null,
+          product_id: product.product_id || null,
+          product_name: product.name || 'Unnamed product',
+          accounting_category: product.accounting_category || categoryOption.code || '1210',
+          category: product.category || categoryOption.label,
+          current_quantity: 0,
+          current_unit: unit,
+          unit_cost: Number(product.latest_price || 0),
+          current_value: 0,
+          previous_quantity: 0,
+          previous_value: 0,
+          par_level: null,
+          reorder_point: null,
+          location: '',
+          organization_id: product.organization_id || organization?.id || null,
+          brand_id: product.brand_id || brand?.id || brand?.brand_id || null,
+          location_id: product.location_id || location?.id || null,
+          is_product_backed_inventory: true,
+        };
+      });
+
+    return [...trackedInventoryRows, ...productBackedRows].sort((a, b) => (
+      String(a.product_name || '').localeCompare(String(b.product_name || ''))
+    ));
+  }, [brand?.brand_id, brand?.id, inventoriedProductData, inventoriedProductLookup, inventoriedProductsLoading, inventoryData?.pages, location?.id, organization?.id, rawInventory]);
 
   const isLoading = inventoryLoading || inventoriedProductsLoading;
 
@@ -987,7 +1039,7 @@ export default function Inventory() {
       const value = Number(item.current_value || (Number(item.current_quantity || 0) * Number(item.unit_cost || 0)) || 0);
       return sum + value;
     }, 0);
-    const adjustedInventoryItems = inventory.filter(item => Number(item.current_quantity || 0) > 0).length;
+    const adjustedInventoryItems = inventory.length;
     const adjustedLowStock = inventory.filter(isBelowReorderPoint).length;
 
     return {
@@ -1886,6 +1938,10 @@ export default function Inventory() {
   };
 
   const handleEdit = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product is marked inventoried but has no inventory row yet. Add an inventory count or receiving record before editing stock values.');
+      return;
+    }
     setSelectedItem(item);
     setEditForm({
       product_name: item.product_name || '',
@@ -1901,18 +1957,30 @@ export default function Inventory() {
   };
 
   const handleDelete = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product is marked inventoried in Products. Turn off inventory tracking from the product if it should not appear here.');
+      return;
+    }
     if (confirm(`Remove "${item.product_name}" from inventory? This cannot be undone.`)) {
       deleteMutation.mutate(item.id);
     }
   };
 
   const handleConvert = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product needs an inventory row before unit conversion can be saved.');
+      return;
+    }
     setSelectedItem(item);
     setConvertForm({ fromUnit: item.current_unit || 'ea', toUnit: '', quantity: item.current_quantity || 0 });
     setConvertDialogOpen(true);
   };
 
   const handleLogWastage = (item) => {
+    if (item?.is_product_backed_inventory) {
+      toast.info('This product needs an inventory row before wastage can be logged.');
+      return;
+    }
     setSelectedItem(item);
     setWastageForm({ quantity: 0, unit: item.current_unit || 'ea', reason: 'spoiled', notes: '' });
     setWastageDialogOpen(true);
