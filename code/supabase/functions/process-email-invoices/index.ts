@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Imap from 'npm:imap-simple';
 import { simpleParser } from 'npm:mailparser';
+import { sendTransactionalEmail } from '../_shared/email.ts';
 
 const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const RECIPIENT_HEADER_NAMES = ['delivered-to', 'x-original-to', 'envelope-to'];
@@ -192,6 +193,22 @@ serve(async (req) => {
 
                 if (!insertError) {
                    console.log('Email invoice ingested', ingestResult);
+                   if (ingestResult?.matched === false) {
+                     const senderCandidates = [];
+                     addAddressCandidate(senderCandidates, parsed.from);
+                     const senderEmail = senderCandidates[0] || null;
+                     if (senderEmail) {
+                       try {
+                         await sendTransactionalEmail({
+                           to: senderEmail,
+                           subject: 'Invoice could not be routed automatically',
+                           text: 'We received your invoice, but could not match the recipient address to a registered restaurant location. Please upload the invoice manually in the app, or ask an organization admin to register this location email address before sending future invoices.',
+                         });
+                       } catch (emailError) {
+                         console.error('Failed to send unmatched invoice routing notice:', emailError?.message || emailError);
+                       }
+                     }
+                   }
                    if (ingestResult?.organization_id) {
                      // Move the file out of the flat, unscoped "auto-ingested/" path into the
                      // same organization_id/invoice_id convention the other two upload paths use,

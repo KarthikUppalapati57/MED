@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
  */
 export default function ContextSwitcher() {
   const { organization, brand, location, switchContext, userProfile, accessTree } = useAuth();
-  const { isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager } = usePermissions();
+  const { isTenantSuperAdmin, isOrgManager, isBranchManager } = usePermissions();
 
   // Tenant Super Admin: fetch tenant-visible orgs
   const { data: adminAllOrgs = [] } = useAuthQuery({
@@ -61,7 +61,7 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeOrgId,
+    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager) && !!activeOrgId,
   });
 
   // Locations: fetch only after a brand is selected.
@@ -79,11 +79,11 @@ export default function ContextSwitcher() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager) && !!activeBrandId,
+    enabled: !!(isTenantSuperAdmin || isOrgManager || isBranchManager) && !!activeBrandId,
   });
 
   // Ground staff: no switcher, just show assigned location name
-  if (!isTenantSuperAdmin && !isOrgManager && !isBranchManager && !isLocationManager) {
+  if (!isTenantSuperAdmin && !isOrgManager && !isBranchManager) {
     if (location?.name) {
       return (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

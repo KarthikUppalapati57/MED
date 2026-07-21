@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, ArrowRightLeft, Building2, Calendar, CheckCircle2, Clock, Download, PackageCheck, Search, Send } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
+import { cn } from '@/lib/utils';
 
 function getLocationName(locations, id, fallback = 'Location') {
   return locations.find((item) => item.id === id)?.name || fallback;
@@ -72,6 +74,7 @@ function csvValue(value) {
 
 export default function InventoryTransfers({ inventory = [], organization }) {
   const { userProfile, location, brand } = useAuth();
+  const { hasLocation, warnIfMissing } = useRequireLocation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [selectedItems, setSelectedItems] = useState([]);
@@ -107,11 +110,19 @@ export default function InventoryTransfers({ inventory = [], organization }) {
     enabled: !!organization?.id,
   });
 
+  // Keep "From" tracking the active location context on every switch, but only
+  // while the field is still following the default -- a manual pick (via the
+  // From selector below) is a deliberate override and must survive a later
+  // context switch, not get silently clobbered by it.
+  const prevDefaultSourceLocationId = useRef(defaultSourceLocationId);
   useEffect(() => {
     setSourceLocationId((current) => {
-      if (!current) return defaultSourceLocationId;
+      if (!current || current === prevDefaultSourceLocationId.current) {
+        return defaultSourceLocationId;
+      }
       return current;
     });
+    prevDefaultSourceLocationId.current = defaultSourceLocationId;
   }, [defaultSourceLocationId]);
 
   const allLocations = useMemo(() => {
@@ -355,6 +366,7 @@ export default function InventoryTransfers({ inventory = [], organization }) {
   });
 
   const dispatchLocalTransfer = () => {
+    if (!warnIfMissing()) return;
     transferMutation.mutate();
   };
 
@@ -815,7 +827,7 @@ export default function InventoryTransfers({ inventory = [], organization }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReviewOpen(false)}>Cancel</Button>
-            <Button className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={dispatchLocalTransfer} disabled={transferMutation.isPending}>
+            <Button className={cn("bg-indigo-600 text-white hover:bg-indigo-700", !hasLocation && "opacity-50 cursor-not-allowed")} onClick={dispatchLocalTransfer} disabled={transferMutation.isPending}>
               {transferMutation.isPending ? 'Completing...' : 'Confirm Transfer'}
             </Button>
           </DialogFooter>

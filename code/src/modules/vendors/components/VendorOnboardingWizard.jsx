@@ -21,6 +21,31 @@ const formatUSPhoneInput = (value) => {
 
 const normalizeOtpInput = (value) => value.replace(/\D/g, '').slice(0, 6);
 
+async function getFunctionErrorMessage(error) {
+  const context = error?.context;
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.clone().json();
+      if (body?.error) return body.error;
+      if (body?.message) return body.message;
+    } catch {}
+  }
+  if (context && typeof context.text === 'function') {
+    try {
+      const text = await context.clone().text();
+      if (text) return text;
+    } catch {}
+  }
+  return error?.message;
+}
+
+async function invokeVendorOnboarding(body) {
+  const { data, error } = await supabase.functions.invoke('vendor-onboarding', { body });
+  if (data?.error) throw new Error(data.error);
+  if (error) throw new Error(await getFunctionErrorMessage(error) || error.message);
+  return data || {};
+}
+
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
@@ -75,12 +100,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       });
       setVendorId(newVendor.id);
 
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'send-otp', payload: { vendor_id: newVendor.id } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      const data = await invokeVendorOnboarding({ action: 'send-otp', payload: { vendor_id: newVendor.id } });
 
       setDevOtp(data.devOtp);
       toast.success("OTP sent successfully to vendor!");
@@ -97,12 +117,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     if (normalizedOtp.length !== 6) return toast.error("Enter the 6-digit OTP");
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'verify-otp', payload: { vendor_id: vendorId, otp: normalizedOtp } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      await invokeVendorOnboarding({ action: 'verify-otp', payload: { vendor_id: vendorId, otp: normalizedOtp } });
 
       toast.success("OTP verified!");
       setOtpInput('');
@@ -118,12 +133,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     if (!vendorId) return toast.error("Start vendor onboarding before resending an OTP");
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'send-otp', payload: { vendor_id: vendorId } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      const data = await invokeVendorOnboarding({ action: 'send-otp', payload: { vendor_id: vendorId } });
 
       setOtpInput('');
       setDevOtp(data?.devOtp || null);
@@ -138,12 +148,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const handleSendMagicLink = async (type) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('vendor-onboarding', {
-        body: { action: 'send-magic-link', payload: { vendor_id: vendorId, type } }
-      });
-
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      const data = await invokeVendorOnboarding({ action: 'send-magic-link', payload: { vendor_id: vendorId, type } });
 
       toast.success(`Magic link for ${type === 'tax' ? 'Tax info' : 'Bank details'} sent to vendor!`);
       if (type === 'tax') setStep(3);

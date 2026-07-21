@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
@@ -73,6 +74,7 @@ import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
 function CreateCheckDialog({ open, onClose, organization, brand, location }) {
   const queryClient = useQueryClient();
+  const { hasLocation, warnIfMissing } = useRequireLocation();
   const [vendorId, setVendorId] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
@@ -105,11 +107,14 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       const numericAmount = parseFloat(amount);
       if (!(numericAmount > 0)) throw new Error('Enter a valid amount');
       if (!paymentAccountId) throw new Error('Select a payment account');
+      const locationId = location?.id || null;
+      const brandId = brand?.brand_id || brand?.id || null;
+      if (!brandId || !locationId) throw new Error('Please select a location to continue');
 
       const { data: invoice, error: invoiceError } = await supabase.from('invoices').insert({
         organization_id: organization?.id,
-        brand_id: brand?.brand_id || brand?.id || null,
-        location_id: location?.id || null,
+        brand_id: brandId,
+        location_id: locationId,
         vendor_id: vendor.id,
         vendor_name: vendor.name,
         invoice_number: memo.trim() || `Manual Check ${format(new Date(), 'MMM d, yyyy h:mm a')}`,
@@ -183,7 +188,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-          <Button onClick={() => createCheckMutation.mutate()} disabled={createCheckMutation.isPending}>
+          <Button onClick={() => { if (!warnIfMissing()) return; createCheckMutation.mutate(); }} disabled={createCheckMutation.isPending} className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}>
             {createCheckMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
             Issue Check
           </Button>

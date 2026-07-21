@@ -6,6 +6,7 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
 import { useConfirm } from '@/hooks/useConfirm';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { supabase } from '@/lib/supabaseClient';
 import { getApRoutingLabel, isPaymentQueueRouted, normalizeApRouting } from '@/lib/apRouting';
 import { notifyManagers } from '@/lib/notificationService';
@@ -217,6 +218,7 @@ export default function Invoices() {
   const navigate = useNavigate();
   const isHigherRole = ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
   const isSingleSelected = selectedInvoiceIds.length === 1;
+  const { hasLocation, warnIfMissing } = useRequireLocation();
 
   const createBlankManualInvoice = useCallback(() => ({
     vendor_name: '',
@@ -236,14 +238,14 @@ export default function Invoices() {
     ap_status: 'processing',
     source: 'manual_entry',
     organization_id: organization?.id,
-    brand_id: brand?.id,
+    brand_id: brand?.id || brand?.brand_id,
     location_id: location?.id,
     created_by: userProfile?.id,
     line_items: [],
     validation_results: {
       entry_method: 'manual',
     },
-  }), [brand?.id, location?.id, organization?.id, userProfile?.id]);
+  }), [brand?.brand_id, brand?.id, location?.id, organization?.id, userProfile?.id]);
 
   const validateManualInvoice = useCallback((invoice) => {
     if (invoice?.source !== 'manual_entry') return true;
@@ -263,9 +265,32 @@ export default function Invoices() {
   }, []);
 
   const handleCreateManualInvoice = useCallback(() => {
+    if (!warnIfMissing()) return;
     setEditingInvoice(createBlankManualInvoice());
     setEditorOpen(true);
-  }, [createBlankManualInvoice]);
+  }, [createBlankManualInvoice, warnIfMissing]);
+
+  const handleOpenUpload = useCallback(() => {
+    if (!warnIfMissing()) return;
+    setUploadOpen(true);
+  }, [warnIfMissing]);
+
+  const handleOpenMobileCapture = useCallback(() => {
+    if (!warnIfMissing()) return;
+    setMobileCaptureOpen(true);
+  }, [warnIfMissing]);
+
+  const handleIntakeClick = useCallback((label) => {
+    if (label === 'Email') {
+      setEmailConfigOpen(true);
+      return;
+    }
+    if (label === 'Manual') {
+      handleCreateManualInvoice();
+      return;
+    }
+    handleOpenUpload();
+  }, [handleCreateManualInvoice, handleOpenUpload]);
 
   // Each new editor session starts un-validated; Approve stays locked until
   // the user runs Validate at least once for this invoice.
@@ -465,10 +490,10 @@ export default function Invoices() {
     if (!cleaned.vendor_id) delete cleaned.vendor_id;
     // Remove null/undefined approved_by (it's a UUID column) 
     if (!cleaned.approved_by) delete cleaned.approved_by;
-    // Remove null/undefined organization_id and location_id (if still missing)
-    if (!cleaned.organization_id) delete cleaned.organization_id;
-    if (!cleaned.brand_id) delete cleaned.brand_id;
-    if (!cleaned.location_id) delete cleaned.location_id;
+    if (!cleaned.organization_id) throw new Error('Organization context is required to save an invoice');
+    if (!cleaned.brand_id || !cleaned.location_id) {
+      throw new Error('Please select a location to continue');
+    }
     if (!cleaned.created_by) delete cleaned.created_by;
     return cleaned;
   };
@@ -1278,15 +1303,15 @@ export default function Invoices() {
             <Mail className="h-4 w-4 mr-2 text-brand" />
             Email Settings
           </Button>
-          <Button onClick={() => setMobileCaptureOpen(true)} className="bg-primary hover:bg-primary sm:hidden">
+          <Button onClick={handleOpenMobileCapture} className={cn("bg-primary hover:bg-primary sm:hidden", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Camera className="h-4 w-4 mr-2" />
             Scan Receipt
           </Button>
-          <Button variant="outline" onClick={handleCreateManualInvoice} className="flex-1 sm:flex-none">
+          <Button variant="outline" onClick={handleCreateManualInvoice} className={cn("flex-1 sm:flex-none", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Plus className="h-4 w-4 mr-2" />
             Create Invoice
           </Button>
-          <Button onClick={() => setUploadOpen(true)} className="bg-primary hover:bg-primary hidden sm:flex">
+          <Button onClick={handleOpenUpload} className={cn("bg-primary hover:bg-primary hidden sm:flex", !hasLocation && "opacity-50 cursor-not-allowed")}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Invoice
           </Button>
@@ -1307,8 +1332,8 @@ export default function Invoices() {
                 <button
                   key={label}
                   type="button"
-                  onClick={label === 'Email' ? () => setEmailConfigOpen(true) : label === 'Manual' ? handleCreateManualInvoice : () => setUploadOpen(true)}
-                  className="text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors"
+                  onClick={() => handleIntakeClick(label)}
+                  className={cn("text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors", label !== 'Email' && !hasLocation && "opacity-50 cursor-not-allowed")}
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Icon className="h-4 w-4 text-primary" />

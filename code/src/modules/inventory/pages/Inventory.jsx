@@ -6,6 +6,7 @@ import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { format } from 'date-fns';
@@ -293,6 +294,7 @@ function useDebouncedQueryInvalidation(queryClient, queryKeys, delay = 1000) {
 
 export default function Inventory() {
   const { isGroundStaff } = usePermissions();
+  const { hasLocation, warnIfMissing } = useRequireLocation();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const pathParts = routerLocation.pathname.split('/').filter(Boolean);
@@ -1358,6 +1360,7 @@ export default function Inventory() {
   };
 
   const startStockCountFromSheet = (sheet) => {
+    if (!warnIfMissing()) return;
     if (!sheet?.id) return;
     setStockCountSheetId(sheet.id);
     setStockCountScopes(['all']);
@@ -1565,6 +1568,7 @@ export default function Inventory() {
   };
 
   const requestSaveStockCount = () => {
+    if (!warnIfMissing()) return;
     if (!stockCountDate) {
       toast.error('Choose an inventory date first');
       return;
@@ -1573,6 +1577,7 @@ export default function Inventory() {
   };
 
   const saveStockCount = async () => {
+    if (!warnIfMissing()) return;
     const countItems = currentStockCountItems;
     const type = selectedStockCountSheet?.name
       || getStockCountScopeType(stockCountScopeKey, getStockCountTypeName(countItems, selectedStockCountLabel));
@@ -1932,6 +1937,7 @@ export default function Inventory() {
   };
 
   const saveWastage = async () => {
+    if (!warnIfMissing()) return;
     if (!selectedItem) {
       toast.error('Choose an inventory item first');
       return;
@@ -3594,7 +3600,7 @@ export default function Inventory() {
               <div className="sticky bottom-0 z-20 -mx-6 mt-2 flex justify-end gap-2 border-t bg-background/95 px-6 py-3 shadow-lg backdrop-blur">
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
-                    className="bg-primary hover:bg-primary"
+                    className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")}
                     onClick={requestSaveStockCount}
                     disabled={!stockCountDate}
                   >
@@ -3938,6 +3944,7 @@ export default function Inventory() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     startStockCountFromSheet(sheet);
@@ -4595,7 +4602,7 @@ export default function Inventory() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWastageDialogOpen(false)}>Cancel</Button>
-            <Button onClick={saveWastage} className="bg-resend-red hover:bg-resend-red">Log Wastage</Button>
+            <Button onClick={saveWastage} className={cn("bg-resend-red hover:bg-resend-red", !hasLocation && "opacity-50 cursor-not-allowed")}>Log Wastage</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -4771,7 +4778,7 @@ export default function Inventory() {
             </p>
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button className="bg-primary hover:bg-primary" onClick={saveStockCount}>
+            <Button className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")} onClick={saveStockCount}>
               Save count
             </Button>
             <Button variant="outline" onClick={() => setStockCountSaveConfirmOpen(false)}>
