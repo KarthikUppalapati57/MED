@@ -134,7 +134,8 @@ GRANT EXECUTE ON FUNCTION public.assert_financial_actor(UUID, TEXT[]) TO service
 -- 2. Status consistency and historical anomaly visibility.
 -- ---------------------------------------------------------------------------
 
-CREATE OR REPLACE VIEW public.invoice_production_anomalies AS
+DROP VIEW IF EXISTS public.invoice_production_anomalies;
+CREATE VIEW public.invoice_production_anomalies AS
 SELECT
   id,
   organization_id,

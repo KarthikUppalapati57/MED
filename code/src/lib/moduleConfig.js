@@ -41,12 +41,16 @@ export const MODULE_DEFINITIONS = {
     pages: ["Invoices"],
     minRole: "ground_staff",
     icon: "FileText",
+    // org_manager/tenant_super_admin/branch_manager must switch into a specific location --
+    // no org/brand-wide aggregate view. location_manager/ground_staff unaffected (fixed location).
+    requiresLocation: true,
   },
   payments: {
     label: "Bill Pay",
     pages: ["Payments"],
     minRole: "location_manager",
     icon: "CreditCard",
+    requiresLocation: true,
   },
   billing: {
     label: "Platform Subscription",
@@ -65,6 +69,7 @@ export const MODULE_DEFINITIONS = {
     pages: ["Inventory", "AvTCosting"],
     minRole: "ground_staff",
     icon: "Warehouse",
+    requiresLocation: true,
   },
   orders: {
     label: "Orders",

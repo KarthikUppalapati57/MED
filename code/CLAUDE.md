@@ -74,14 +74,24 @@ strings, org-wide RLS policies that ignore brand/location) across every module.
 
 Hierarchy: **organization → brand → location.**
 
-**Visibility (who can SEE a row):**
-- `org_owner` → all rows in their org.
-- `branch_manager` → all rows under their brand (every location in it).
-- `location_manager` → only their own location's rows.
-- `ground_staff` → only their own (fixed-profile) location's rows.
+**Visibility (who can SEE a row) — REVISED (2026-07-21), see §7:**
+- `org_manager` / `tenant_super_admin` / `branch_manager` → **only the ONE location currently
+  active on their `profiles.location_id`** (written by `switch_user_context` whenever they
+  switch). No org-wide, tenant-wide, or brand-wide aggregate view anymore for `invoices`/
+  `payments`/`inventory` (and the other `tenant_scope_visible()`-gated tables) — if they haven't
+  switched into a specific location, they see **zero** rows there, full stop.
+  ~~Previously: `org_owner` saw all rows in their org; `branch_manager` saw all rows under
+  their brand (every location in it).~~ That aggregate-viewing capability was deliberately
+  removed, not a bug fix — see §7's "Require exact location match" entry for why.
+- `location_manager` / `ground_staff` → only their own (fixed-profile) location's rows.
+  **Unchanged** — this rule already worked this way for them before the revision above.
 - `platform_admin` → everything.
 - **Soft-deleted rows (`deleted_at IS NOT NULL`) are hidden from everyone**, including the
   owner. (Recovery, if ever needed, is a separate admin path — not the default.)
+- **Exception, also unchanged:** a row with NULL `brand_id` AND NULL `location_id` (the
+  `ledger_entries` org-level tier) is still visible on `organization_id` match alone, to
+  `org_manager`/`tenant_super_admin`/`platform_admin` — this tier was explicitly NOT part of
+  the revision, it's the one deliberate aggregate exception left.
 
 **Scope source — the most important rule:** an invoice's scope comes ONLY from the
 **uploader's context at upload time**, NEVER from the invoice's printed content. The printed
@@ -91,8 +101,10 @@ the Choto address). Every invoice is stamped at insert with `organization_id` + 
 belongs to the uploader's location.
 
 **Context source is role-aware:**
-- `org_owner` / `branch_manager` → context from the **ContextSwitcher** (they can switch
-  within their accessible scope).
+- `org_manager` / `tenant_super_admin` / `branch_manager` → context from the
+  **ContextSwitcher** (they can switch within their accessible scope). As of the visibility
+  revision above, this isn't just where uploads get stamped from anymore — it's now also the
+  ONLY thing that makes any `invoices`/`payments`/`inventory` row visible to them at all.
 - `location_manager` → NO switcher. Context is FIXED to their onboarded
   `profiles.organization_id` / `brand_id` / `location_id`. The upload stamps from their fixed
   profile, never a picker.
@@ -318,12 +330,45 @@ the Phase 3 redesign.
     duplicate `brand_manager` entry in `AuthContext.jsx`'s `hasPermission` map was left alone
     (harmless, intentional).
 
+- **Require exact location match for org_manager/tenant_super_admin/branch_manager**
+  (2026-07-21, `20260721190000_require_exact_location_match_for_org_wide_roles.sql`) —
+  deliberate product decision, confirmed explicitly (not a bug fix): these three roles no
+  longer get an aggregate view of `invoices`/`payments`/`inventory` (and everything else gated
+  by `tenant_scope_visible()`) across their whole org/tenant/brand. They must have a specific
+  location active on `profiles.location_id` (written by `switch_user_context`, already
+  validated there against `get_my_accessible_location_ids()` for whichever role they are) or
+  they see **zero** rows in those tables — not "their org's rows", zero. Collapsed the
+  function's role-branching into one rule: exact `p_location_id = v_location_id` match for
+  every role except `platform_admin` (unchanged, sees everything) and the `ledger_entries`
+  org-level tier (unchanged, org match alone, see §3). `location_manager`/`ground_staff`
+  behavior is unaffected — their `profiles.location_id` was always fixed and this is exactly
+  how they already worked. Frontend: `moduleConfig.js`'s `invoices`/`payments`/`inventory`
+  modules now carry `requiresLocation: true`, reusing `ProtectedModule.jsx`'s gate built for
+  Kitchen Displays earlier this session — no new frontend code, three lines. **This reverses
+  this session's own earlier tenant_super_admin tenant-wide fix and the original
+  `org_owner`/`branch_manager` visibility rules from §3 — both were correct for what they were
+  solving (a real RLS gap, then a real UX-labeling gap), this is a deliberate, separate,
+  later product decision on top of both, not a correction of either.** Acceptance test:
+  `require_exact_location_match_acceptance.sql` — 9 cases, all three revised roles at null
+  location (zero rows) and at a specific location (only that location, not a sibling one in
+  the same org/brand), the `ledger_entries` exception, and both unaffected roles confirmed
+  unchanged.
+
 ---
 
 ## 8. PENDING PLAN (in dependency order)
 
-1. **Batch 2 — operational tables RLS** (next; spec fully defined in §4). First do a small
-   helper rename `financial_scope_*` → `tenant_scope_*` (so the name reads honestly for
+1. ~~**Batch 2 — operational tables RLS**~~ **ALREADY DONE, this checklist was stale.**
+   Verified 2026-07-21 by reading live `pg_policy` on all 8 tables directly: `vendors`,
+   `products`, `recipes`, `inventory`, `inventory_movements`, `wastage_logs`, `auto_orders`,
+   `purchase_orders` each already have exactly 3 clean policies (`operational_*`
+   select/insert/update, no leftover stale ones sitting beside them) built on
+   `tenant_scope_visible`/`reference_scope_visible` — the helper rename and the hybrid helper
+   this item describes below were also already done, they're the exact functions in use today.
+   Whoever did this never updated this section — see the "Require exact location match" entry
+   in §7, which further modifies `tenant_scope_visible()` on top of this already-completed work.
+   Original spec (kept for history, not a live to-do): spec fully defined in §4, first do a
+   small helper rename `financial_scope_*` → `tenant_scope_*` (so the name reads honestly for
    non-financial tables) and add a new `reference_scope_visible/writable` helper for the hybrid
    pattern. Then wire `vendors`/`products`/`recipes` (reference hybrid) and
    `inventory`/`inventory_movements`/`wastage_logs`/`auto_orders`/`purchase_orders`
@@ -402,7 +447,9 @@ the Phase 3 redesign.
 - [x] Step 1 — role-gate helpers fixed
 - [x] Step 2 — approval security hotfix (grants locked, cascade limits, enforcement trigger)
 - [x] Step 3 — Batch 1 financial RLS (12 tables)
-- [ ] Batch 2 — operational tables (reference hybrid + location-scoped) ← NEXT
+- [x] Batch 2 — operational tables (reference hybrid + location-scoped). This checklist said
+      "next" but it was already done — verified 2026-07-21 by reading live `pg_policy` state
+      directly, see §8 item 1.
 - [ ] Batch 3 — remaining tenant tables
 - [x] Phase 2c (partial) — `profiles` RLS fixed (see Identity/hierarchy RLS batch above);
       `brands`/`locations`/`organizations` also fixed as part of the same batch (not originally
@@ -418,3 +465,9 @@ the Phase 3 redesign.
       `organization_id`/`tenant_id`/`brand_id`/`location_id` on both tables) — all closed, see
       §7. Coverage gaps and deferred items tracked in §9. Not yet committed to git as of this
       writing.
+- [x] Require exact location match for org_manager/tenant_super_admin/branch_manager
+      (2026-07-21) — deliberate product decision on top of the line above, not a bug fix: those
+      three roles now see zero `invoices`/`payments`/`inventory` rows (and everything else
+      gated by `tenant_scope_visible()`) unless they have a specific location actively selected
+      via the switcher — no more org-wide/tenant-wide/brand-wide aggregate view. See §3, §7.
+      `location_manager`/`ground_staff` unaffected. Not yet committed to git as of this writing.
