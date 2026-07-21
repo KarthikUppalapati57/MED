@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1"
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts"
-import { encodeHex } from "https://deno.land/std@0.168.0/encoding/hex.ts"
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -16,7 +14,7 @@ const corsHeaders = {
 async function hashKey(key: string): Promise<string> {
   const data = new TextEncoder().encode(key);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return encodeHex(hashBuffer);
+  return Array.from(new Uint8Array(hashBuffer)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 serve(async (req) => {
