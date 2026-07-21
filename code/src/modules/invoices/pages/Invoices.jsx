@@ -216,7 +216,7 @@ export default function Invoices() {
   const { userProfile, role, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const isHigherRole = ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
+  const isHigherRole = ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager', 'platform_admin'].includes(role);
   const isSingleSelected = selectedInvoiceIds.length === 1;
   const { hasLocation, warnIfMissing } = useRequireLocation();
 
@@ -824,7 +824,7 @@ export default function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
 
       if (savedInvoice) {
-        // Don't open the editor yet â€” it has only placeholder data at this point.
+        // Don't open the editor yet — it has only placeholder data at this point.
         // The in-flight watcher above opens it automatically once extraction
         // finishes and the invoice has real vendor/line-item data.
         void triggerInvoiceExtraction(savedInvoice);
@@ -956,7 +956,7 @@ export default function Invoices() {
 
 
   // Thin wrappers binding the shared gate (invoiceValidation.jsx) to this
-  // page's own useConfirm() instance â€” same checks Payments.jsx uses.
+  // page's own useConfirm() instance — same checks Payments.jsx uses.
   const runApprovalGate = (invoice) => runApprovalGateShared(confirm, invoice);
   const runBatchApprovalGate = (selected) => runBatchApprovalGateShared(confirm, selected);
 

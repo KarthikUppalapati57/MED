@@ -803,7 +803,6 @@ export const AuthProvider = ({ children }) => {
     const roleActionMap = {
       ground_staff:     ['view', 'upload'],
       location_manager: ['view', 'upload', 'edit', 'approve', 'create'],
-      brand_manager:    ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       branch_manager:   ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'manage_locations', 'view_reports'],
       org_manager:      ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_accounting'],
       tenant_super_admin: ['view', 'upload', 'edit', 'approve', 'create', 'delete', 'super_delete', 'manage_users', 'manage_org', 'manage_tenant', 'manage_accounting'],

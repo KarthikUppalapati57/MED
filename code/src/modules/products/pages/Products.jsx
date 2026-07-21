@@ -706,6 +706,16 @@ export default function Products() {
     enabled: !!organizationId && activeTab === 'ai-verification',
   });
 
+  const { data: globalVendorItems = [] } = useAuthQuery({
+    queryKey: ['trusted_global_vendor_item_suggestions', organizationId],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase.rpc('get_trusted_global_vendor_item_suggestions');
+      if (error) throw error;
+      return rows || [];
+    },
+    enabled: !!organizationId && activeTab === 'ai-verification',
+  });
+
   const { data: priceVariances = [], isLoading: loadingVariances } = useAuthQuery({
     queryKey: ['price_variances', organizationId],
     queryFn: () => api.vendors.getFlaggedVendorItems(organizationId),
@@ -1784,10 +1794,15 @@ export default function Products() {
                       newProducts.map((p, idx) => {
                         const confidence = Number(p.match_confidence || 0);
                         const isLowConfidence = confidence < 90;
-                        const isProductCategoryReview = !p.vendor_item_id && Boolean(p.internal_product_id);
-
-                        const globalMatch = null;
-                        const globalCategory = null;
+                        const isProductCategoryReview = !p.vendor_item_id && Boolean(p.internal_product_id);                        const productForNetworkMatch = products.find(item => item.id === p.internal_product_id) || {
+                          id: p.internal_product_id,
+                          name: p.display_product_name || p.display_vendor_item_name || p.product_name || p.vendor_item_name,
+                          product_id: p.display_product_id || p.restops_product_id,
+                          category: p.category,
+                          accounting_category: p.accounting_category,
+                        };
+                        const globalMatch = findTrustedGlobalMatch(productForNetworkMatch, globalVendorItems);
+                        const globalCategory = normalizeGlobalCategory(globalMatch?.most_common_category);
 
                         return (
                           <TableRow key={p.id} className={isLowConfidence ? "bg-resend-yellow/5" : ""}>
@@ -1873,7 +1888,15 @@ export default function Products() {
                                       >
                                         Reject
                                       </Button>
-                                    </>
+                                    </>                                  ) : globalMatch ? (
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90"
+                                      onClick={() => handleReviewNetworkMapping(productForNetworkMatch, globalMatch)}
+                                    >
+                                      Review Network Mapping
+                                    </Button>
                                   ) : (
                                     <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
                                       if (!p.internal_product_id) {

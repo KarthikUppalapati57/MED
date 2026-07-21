@@ -76,7 +76,7 @@ const DEFAULT_REPORT_PREFERENCES = {
   weeklyExecutive: true,
   includeForecasts: true,
   includeEscalations: true,
-  recipientRoles: ['tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager', 'location_manager'],
+  recipientRoles: ['tenant_super_admin', 'org_manager', 'branch_manager', 'location_manager'],
 };
 
 function currency(value) {
@@ -130,8 +130,8 @@ function canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }) {
   if (isPlatformAdmin) return true;
   const role = userProfile?.role;
   if (scope === 'org') return ['org_manager', 'tenant_super_admin'].includes(role);
-  if (scope === 'brand') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager'].includes(role);
-  if (scope === 'location') return ['org_manager', 'tenant_super_admin', 'brand_manager', 'branch_manager', 'location_manager'].includes(role);
+  if (scope === 'brand') return ['org_manager', 'tenant_super_admin', 'branch_manager'].includes(role);
+  if (scope === 'location') return ['org_manager', 'tenant_super_admin', 'branch_manager', 'location_manager'].includes(role);
   return false;
 }
 

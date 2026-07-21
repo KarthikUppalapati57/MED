@@ -138,9 +138,9 @@ function projectSelectedColumns(rows, select = '*') {
   return Array.isArray(rows) ? rows.map(projectRow) : projectRow(rows);
 }
 
-const createEntityClient = (table, useSoftDelete = false) => ({
+const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') => ({
   get: async (id) => {
-    let query = supabase.from(table).select('*').eq('id', id);
+    let query = supabase.from(table).select(defaultSelect).eq('id', id);
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -149,7 +149,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data;
   },
   list: async (orderBy, options = {}) => {
-    let query = supabase.from(table).select(options.select || '*');
+    let query = supabase.from(table).select(options.select || defaultSelect);
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -189,7 +189,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     return data ?? [];
   },
   filter: async (conditions, options = {}) => {
-    let query = supabase.from(table).select(options.select || '*');
+    let query = supabase.from(table).select(options.select || defaultSelect);
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -231,7 +231,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
     const { data, error } = await supabase
       .from(table)
       .insert(payload)
-      .select()
+      .select(defaultSelect)
       .single();
     if (error) throw error;
     return data;
@@ -241,7 +241,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
       .from(table)
       .update(payload)
       .eq('id', id)
-      .select()
+      .select(defaultSelect)
       .single();
     if (error) throw error;
     return data;
@@ -259,7 +259,7 @@ const createEntityClient = (table, useSoftDelete = false) => ({
   createMany: async (payloads) => {
     if (!payloads || payloads.length === 0) return [];
     const scopedPayloads = payloads.map(p => withActiveScope(table, p));
-    const { data, error } = await supabase.from(table).insert(scopedPayloads).select();
+    const { data, error } = await supabase.from(table).insert(scopedPayloads).select(defaultSelect);
     if (error) throw error;
     return data;
   },
@@ -309,7 +309,7 @@ export const api = {
     AuditLog: createEntityClient('audit_logs'),
     Employee: createEntityClient('employees'),
     EmployeeShift: createEntityClient('employee_shifts'),
-    Integration: createEntityClient('integrations'),
+    Integration: createEntityClient('integrations', false, 'id, organization_id, provider, is_active, connected_at, updated_at'),
     ApiKey: createEntityClient('api_keys'),
     AccountingSyncLog: createEntityClient('accounting_sync_logs'),
     OnboardingProgress: createEntityClient('onboarding_progress'),
@@ -580,12 +580,10 @@ export const api = {
           target: normalizedTarget,
         };
       } catch (authError) {
-        const { data, error } = await supabase.rpc('request_onboarding_contact_dev_otp', {
-          p_channel: normalizedChannel,
-          p_target: normalizedTarget,
-        });
-        if (error) throw authError;
-        return data;
+        throw new Error(
+          authError?.message ||
+          'Secure contact verification delivery is not configured. Configure Supabase Auth email/SMS OTP before onboarding can continue.'
+        );
       }
     },
     verifyContactOtp: async ({ channel, target, code }) => {
@@ -619,13 +617,10 @@ export const api = {
         if (error) throw error;
         return data;
       } catch (authError) {
-        const { data, error } = await supabase.rpc('verify_onboarding_contact_dev_otp', {
-          p_channel: normalizedChannel,
-          p_target: normalizedTarget,
-          p_code: token,
-        });
-        if (error) throw authError;
-        return data;
+        throw new Error(
+          authError?.message ||
+          'Contact verification failed. Use the OTP delivered by the configured email/SMS provider.'
+        );
       }
     },
     submitBusinessVerification: async (payload) => {

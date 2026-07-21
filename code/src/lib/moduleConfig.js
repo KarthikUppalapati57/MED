@@ -131,6 +131,9 @@ export const MODULE_DEFINITIONS = {
     pages: ["KDS", "DigitalMenu"],
     minRole: "ground_staff",
     icon: "Monitor",
+    // Unlike other modules, this has no meaningful multi-location view -- a kitchen
+    // display can't show "every location's orders at once". Checked by ProtectedModule.
+    requiresLocation: true,
   },
   integrations: {
     label: "Integrations",
