@@ -63,6 +63,9 @@ export const MODULE_DEFINITIONS = {
     pages: ["Products"],
     minRole: "ground_staff",
     icon: "Package",
+    // Reference catalog, but still requires an active location -- brand-shared rows
+    // resolve against the caller's currently active location's brand. No exceptions.
+    requiresLocation: true,
   },
   inventory: {
     label: "Inventory",
@@ -94,12 +97,14 @@ export const MODULE_DEFINITIONS = {
     pages: ["Recipes", "MenuEngineering", "DeliveryAggregator", "OrderOnline"],
     minRole: "location_manager",
     icon: "ChefHat",
+    requiresLocation: true,
   },
   vendors: {
     label: "Vendors",
     pages: ["Vendors", "VendorBidding"],
     minRole: "location_manager",
     icon: "Store",
+    requiresLocation: true,
   },
   labor: {
     label: "Labor",

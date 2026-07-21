@@ -96,12 +96,11 @@ export default function StripePayPalPayouts() {
           });
         }
 
-        const functionName = payoutMethod === 'dwolla_ach' ? 'process-payout' : 'process-checkbook-payout';
-        const body = payoutMethod === 'dwolla_ach'
-          ? { invoice_id: id }
-          : { invoice_id: id, payout_method: payoutMethod };
-
-        const { data, error } = await supabase.functions.invoke(functionName, { body });
+        // Which rail runs is just a payout_method value now -- one function for all of them,
+        // see _shared/payoutProviders/index.ts.
+        const { data, error } = await supabase.functions.invoke('process-payout', {
+          body: { invoice_id: id, payout_method: payoutMethod },
+        });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
 

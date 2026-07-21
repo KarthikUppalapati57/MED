@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+﻿import { supabase } from '@/lib/supabaseClient';
 
 function normalizeOtpEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -519,7 +519,7 @@ export const api = {
     getVerificationSettings: async () => {
       const { data, error } = await supabase.rpc('get_onboarding_verification_settings');
       if (error) throw error;
-      return data || { ein_verification_enabled: true, ssn_verification_enabled: true, usps_address_validation_enabled: false };
+      return data || { ein_verification_enabled: false, ssn_verification_enabled: false, usps_address_validation_enabled: false };
     },
     isBusinessNameAvailable: async (legalName) => {
       const { data, error } = await supabase.rpc('is_business_name_available', { p_legal_name: legalName });

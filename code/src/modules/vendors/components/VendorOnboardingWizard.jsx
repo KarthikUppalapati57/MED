@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -154,7 +154,9 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
       if (type === 'tax') setStep(3);
       if (type === 'bank') setStep(4);
       
-      console.log(`[DEV URL for ${type}]: `, data.magicLinkUrl);
+      if (import.meta.env.DEV && import.meta.env.VITE_VENDOR_ONBOARDING_DEV_LINKS === 'true') {
+        console.debug(`[DEV URL for ${type}]: `, data.magicLinkUrl);
+      }
     } catch (err) {
       toast.error(err.message || "Failed to send magic link");
     } finally {

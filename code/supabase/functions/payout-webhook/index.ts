@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import crypto from 'node:crypto'
-import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
+import { applyPayoutOutcome } from '../_shared/notifyPaymentFailure.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 
 serve(async (req) => {
@@ -47,37 +47,20 @@ serve(async (req) => {
         newInvoiceStatus = 'scheduled' // Revert invoice status so it can be retried
       }
 
-      // Update the payment record. Async failures used to only touch payout_status, leaving
-      // payments.status stuck at 'pending' -- now set both so Payment History's Retry button
-      // and status badge actually reflect a failure that happens days after release.
-      const { data: payment, error: paymentError } = await supabase
-        .from('payments')
-        .update({
-          payout_status: newPayoutStatus,
-          ...(isFailure ? { status: 'failed', failure_reason: `Dwolla: ${topic}` } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('dwolla_transfer_url', resourceUrl)
-        .select('id, invoice_id')
-        .single()
-
-      if (paymentError || !payment) {
-        console.error('Failed to update payment or payment not found:', paymentError)
-        return new Response('OK', { status: 200 }) // Return 200 so Dwolla doesn't retry
-      }
-
-      // Update the invoice status
-      await supabase
-        .from('invoices')
-        .update({
-          status: newInvoiceStatus,
-          payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
-        })
-        .eq('id', payment.invoice_id)
-
-      if (isFailure) {
-        await notifyPaymentFailure(supabase, { paymentId: payment.id, invoiceId: payment.invoice_id, reason: `Dwolla reported: ${topic}` })
-      }
+      // Async failures used to only touch payout_status, leaving payments.status stuck at
+      // 'pending' -- applyPayoutOutcome sets both so Payment History's Retry button and status
+      // badge actually reflect a failure that happens days after release.
+      await applyPayoutOutcome(supabase, {
+        refColumn: 'dwolla_transfer_url',
+        refValue: resourceUrl,
+        newPayoutStatus,
+        newInvoiceStatus,
+        isFailure,
+        reason: isFailure ? `Dwolla reported: ${topic}` : undefined,
+      })
+      // Note: applyPayoutOutcome silently no-ops if no matching payment is found, so this
+      // always returns 200 to Dwolla either way -- matches the prior behavior of returning
+      // 'OK'/200 on a lookup miss so Dwolla doesn't retry.
 
     } else if (topic === 'customer_verified' || topic === 'customer_suspended') {
       // Vendor Onboarding status updates

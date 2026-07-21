@@ -139,7 +139,7 @@ describe('Intrusion Detection & Prevention (IDS/IPS)', () => {
       
       // Attempt to modify the secure profiles table directly
       const { error: profileError } = await staffClient.from('profiles')
-        .update({ role: 'org_owner' })
+        .update({ role: 'org_manager' })
         .eq('id', user.id);
         
       // The database trigger should block this and throw a 42501 Insufficient Privilege error
@@ -150,7 +150,7 @@ describe('Intrusion Detection & Prevention (IDS/IPS)', () => {
       
       // Role should remain unchanged
       if (profileCheck) {
-         expect(profileCheck.role).not.toBe('org_owner');
+         expect(profileCheck.role).not.toBe('org_manager');
       }
     });
   });

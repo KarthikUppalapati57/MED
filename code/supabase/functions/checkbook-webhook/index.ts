@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import crypto from 'node:crypto'
-import { notifyPaymentFailure } from '../_shared/notifyPaymentFailure.ts'
+import { applyPayoutOutcome } from '../_shared/notifyPaymentFailure.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 
 serve(async (req) => {
@@ -55,37 +55,19 @@ serve(async (req) => {
       newPayoutStatus = 'in_transit'
     }
 
-    // Update the payment record. Async failures used to only touch payout_status, leaving
-    // payments.status stuck at 'pending' -- now set both so Payment History's Retry button
-    // and status badge actually reflect a failure that happens days after release.
-    const { data: payment, error: paymentError } = await supabase
-      .from('payments')
-      .update({
-        payout_status: newPayoutStatus,
-        ...(isFailure ? { status: 'failed', failure_reason: `Checkbook.io: ${status}` } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('checkbook_check_id', checkId)
-      .select('id, invoice_id')
-      .single()
-
-    if (paymentError || !payment) {
-      console.error('Failed to update payment or payment not found:', paymentError)
-      return new Response('OK', { status: 200 })
-    }
-
-    // Update the invoice status
-    await supabase
-      .from('invoices')
-      .update({
-        status: newInvoiceStatus,
-        payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid'
-      })
-      .eq('id', payment.invoice_id)
-
-    if (isFailure) {
-      await notifyPaymentFailure(supabase, { paymentId: payment.id, invoiceId: payment.invoice_id, reason: `Checkbook.io reported: ${status}` })
-    }
+    // Async failures used to only touch payout_status, leaving payments.status stuck at
+    // 'pending' -- applyPayoutOutcome sets both so Payment History's Retry button and status
+    // badge actually reflect a failure that happens days after release. No-ops (logs and
+    // returns) if checkId doesn't match a payment, same as the prior early return -- either way
+    // this handler still responds 200 so Checkbook.io doesn't retry.
+    await applyPayoutOutcome(supabase, {
+      refColumn: 'checkbook_check_id',
+      refValue: checkId,
+      newPayoutStatus,
+      newInvoiceStatus,
+      isFailure,
+      reason: isFailure ? `Checkbook.io reported: ${status}` : undefined,
+    })
 
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

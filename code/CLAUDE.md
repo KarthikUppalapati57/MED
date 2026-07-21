@@ -92,6 +92,9 @@ Hierarchy: **organization → brand → location.**
   `ledger_entries` org-level tier) is still visible on `organization_id` match alone, to
   `org_manager`/`tenant_super_admin`/`platform_admin` — this tier was explicitly NOT part of
   the revision, it's the one deliberate aggregate exception left.
+- **Extended to reference data (2026-07-21), see §4/§7:** the same "no exceptions" rule now
+  also gates `vendors`/`products`/`recipes` via `reference_scope_visible()` — see §4 for how
+  the brand-shared pattern fits into an exact-location-match world.
 
 **Scope source — the most important rule:** an invoice's scope comes ONLY from the
 **uploader's context at upload time**, NEVER from the invoice's printed content. The printed
@@ -127,15 +130,31 @@ Two different scope patterns depending on whether data is shared *definitions* o
 
 **A. REFERENCE (hybrid: brand-shared + location-specific)** — `vendors`, `products`,
 `recipes`:
-- A row stamped at **brand level** (brand set, location NULL) is **brand-shared** — visible to
-  everyone whose accessible brands include that brand (e.g. "US Foods" → all Craven Wings
-  locations).
-- A row stamped at **location level** (location set) is visible only to that location and the
-  managers above it (e.g. "Joe's Corner Market", a one-off local store Choto bought from →
-  Choto only; Seymore never sees it).
-- **Writes:** only `branch_manager` / `org_owner` / `platform_admin` may create or edit a
-  **brand-shared** (location-NULL) row. A `location_manager` may create a **location-specific**
-  row, auto-scoped to their own location. `ground_staff` cannot write reference tables.
+- **Visibility requires an active location, no exceptions (2026-07-21), see §7.** Same rule as
+  invoices/payments/inventory: every role needs a specific location active on
+  `profiles.location_id` or sees **zero** rows here too — `org_manager`/`tenant_super_admin` no
+  longer get an "any brand I have access to" aggregate pass just because that's architecturally
+  a reference table, not a transactional one.
+- A row stamped at **brand level** (brand set, location NULL) is **brand-shared**.
+  ~~Previously: visible to everyone whose accessible brands include that brand.~~ Now: visible
+  when it matches the **brand of the caller's currently active location** — being "at" a
+  location is what unlocks the shared catalog for that location's brand, not a standing
+  role-level brand grant (e.g. "US Foods" is visible while active at any Craven Wings location,
+  invisible with no location selected).
+- A row stamped at **location level** (location set) is visible only when it's the caller's
+  exact active location (e.g. "Joe's Corner Market", a one-off local store Choto bought from →
+  visible only while Choto is the active location; Seymore never sees it, even when active).
+- **Incidental gap fix:** `location_manager` previously could not see brand-shared rows at all
+  (`get_my_accessible_brand_ids()` has no branch for that role). The new rule computes the
+  brand match directly from the caller's own active location instead of that helper, so
+  `location_manager` now sees brand-shared rows too, same as everyone else.
+- **Writes — UNCHANGED:** only `branch_manager` / `org_owner` / `platform_admin` may create or
+  edit a **brand-shared** (location-NULL) row. A `location_manager` may create a
+  **location-specific** row, auto-scoped to their own location. `ground_staff` cannot write
+  reference tables. `reference_scope_writable()` was deliberately not touched by the visibility
+  change above — it already keys off the role plus the *target row's* declared scope, which is
+  orthogonal to "what can I currently see." In practice nobody reaches the create form without
+  an active location either now (page-level gate, see §7), so this rarely comes up in isolation.
 - This is the MarginEdge "Global vs Restricted" model (their Sous-Chef can only create
   unit-restricted entries; making something global requires Restaurant Admin).
 
@@ -311,9 +330,11 @@ the Phase 3 redesign.
     `sendTransactionalEmail`) explaining the miss instead. A new `useRequireLocation()` hook
     (`code/src/hooks/useRequireLocation.js`) gates every transactional write button behind a
     selected location — greyed out, toast on click if missing — across Invoices, Payments,
-    Inventory (counts, wastage, transfers), and AutoOrdering; reference-data creation
+    Inventory (counts, wastage, transfers), and AutoOrdering; ~~reference-data creation
     (vendors/products/recipes, §4) is deliberately exempt since brand-level (no location) is
-    valid there. Finally, `organization_id`/`tenant_id`/`brand_id`/`location_id` are all
+    valid there~~ — superseded 2026-07-21, see the "Require active location for reference data"
+    entry below: reference data now requires an active location too, no exemption. Finally,
+    `organization_id`/`tenant_id`/`brand_id`/`location_id` are all
     `NOT NULL` on `invoices` and `payments` now (see §2, §3) — the null-scope state is
     schema-impossible, not just guarded in application code.
   - **`InventoryTransfers.jsx`**: the "From" location field seeded from context once, then a
@@ -353,6 +374,28 @@ the Phase 3 redesign.
   location (zero rows) and at a specific location (only that location, not a sibling one in
   the same org/brand), the `ledger_entries` exception, and both unaffected roles confirmed
   unchanged.
+
+- **Require active location for reference data (Products/Vendors/Recipes)** (2026-07-21,
+  `20260721191500_require_active_location_for_reference_data.sql`) — extends the entry above to
+  `reference_scope_visible()`, on the same explicit, twice-confirmed instruction ("no exceptions
+  anywhere" — the strictest of three offered options, chosen after being told this was
+  genuinely different data ). Collapsed the same way: every role except `platform_admin` needs
+  an active `profiles.location_id` or sees zero rows; a location-specific row needs an exact
+  match; a brand-shared row (location NULL) is visible when its brand matches the brand of the
+  caller's *currently active location* (one extra lookup vs. the transactional version, since a
+  brand-shared row has no location of its own to compare against directly). Incidental gap fix,
+  not the point of the change: `get_my_accessible_brand_ids()` never had a `location_manager`
+  branch, so that role could never see brand-shared rows before this — the new rule is computed
+  from the caller's own active location instead of that helper, so it now works identically for
+  every role. `reference_scope_writable()` untouched — see §4. Frontend: `moduleConfig.js`'s
+  `products`/`vendors`/`recipes` modules now carry `requiresLocation: true`, same reused
+  `ProtectedModule.jsx` gate, three more lines. Acceptance test:
+  `require_active_location_for_reference_data_acceptance.sql` — 7 cases: `org_manager` /
+  `tenant_super_admin` / `branch_manager` each at null location (zero rows); `org_manager` and
+  `branch_manager` at Location A (see both the Location-A-specific product and the brand-shared
+  one); `tenant_super_admin` at Location B — a different location, same brand — (sees the
+  brand-shared product, not Location A's specific one); `location_manager` (sees both, proving
+  the gap fix). All 7 passed.
 
 ---
 
@@ -471,3 +514,12 @@ the Phase 3 redesign.
       gated by `tenant_scope_visible()`) unless they have a specific location actively selected
       via the switcher — no more org-wide/tenant-wide/brand-wide aggregate view. See §3, §7.
       `location_manager`/`ground_staff` unaffected. Not yet committed to git as of this writing.
+- [x] Require active location for reference data — Products/Vendors/Recipes (2026-07-21) —
+      extends the line above to `reference_scope_visible()`: the same roles need an active
+      location for vendors/products/recipes too, and a brand-shared (location-NULL) row now
+      resolves against the *brand of the caller's active location* instead of a standing
+      role-level brand grant. Incidental fix: `location_manager` previously couldn't see
+      brand-shared rows at all — now can, like everyone else. `reference_scope_writable()`
+      (who may create/edit) is unchanged. Frontend: `requiresLocation: true` added to
+      `products`/`vendors`/`recipes` in `moduleConfig.js`. See §4, §7. Not yet committed to git
+      as of this writing.

@@ -187,7 +187,7 @@ async function dashboardRpcCheck() {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('organization_id,brand_id,location_id,role')
-    .in('role', ['org_owner', 'branch_manager', 'location_manager'])
+    .in('role', ['org_manager', 'branch_manager', 'location_manager'])
     .not('organization_id', 'is', null)
     .limit(1)
     .maybeSingle();

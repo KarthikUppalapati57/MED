@@ -124,7 +124,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       }).select('id').single();
       if (invoiceError) throw invoiceError;
 
-      const { data, error } = await supabase.functions.invoke('process-checkbook-payout', {
+      const { data, error } = await supabase.functions.invoke('process-payout', {
         body: { invoice_id: invoice.id, payout_method: payoutMethod, payment_account_id: paymentAccountId },
       });
       if (error) throw error;
@@ -755,11 +755,12 @@ export default function Payments() {
     if (!payment.invoice_id) return toast.error('No invoice linked to this payment.');
     setRetryingPaymentId(payment.id);
     try {
-      const functionName = payment.payment_method === 'check' ? 'process-checkbook-payout' : 'process-payout';
-      const body = payment.payment_method === 'check'
-        ? { invoice_id: payment.invoice_id, payout_method: 'checkbook_digital' }
-        : { invoice_id: payment.invoice_id };
-      const { data, error } = await supabase.functions.invoke(functionName, { body });
+      // Retrying always retries a 'check' payment as a digital check, never re-derives
+      // physical vs. digital -- existing behavior, unchanged here.
+      const payoutMethod = payment.payment_method === 'check' ? 'checkbook_digital' : 'dwolla_ach';
+      const { data, error } = await supabase.functions.invoke('process-payout', {
+        body: { invoice_id: payment.invoice_id, payout_method: payoutMethod },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success('Payment retried successfully');

@@ -1,9 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
 import { corsHeaders } from '../_shared/cors.ts'
-import { getDwollaAccessToken, createDwollaResource } from '../_shared/dwolla.ts'
+import { getPayoutProvider } from '../_shared/payoutProviders/index.ts'
 import { revertPayoutOnFailure } from '../_shared/notifyPaymentFailure.ts'
 
+// Single dispatcher for every payout rail. Which rail runs is a `payout_method` value
+// (dwolla_ach / checkbook_digital / checkbook_physical), not a different function -- see
+// _shared/payoutProviders/index.ts. Adding a rail means adding an adapter there, not touching
+// this file or any caller.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -18,10 +22,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
     }
 
-    const { invoice_id, payment_account_id } = await req.json()
+    const { invoice_id, payout_method = 'dwolla_ach', payment_account_id } = await req.json()
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: 'invoice_id is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
+    let provider
+    try {
+      provider = getPayoutProvider(payout_method)
+    } catch (methodError) {
+      return new Response(JSON.stringify({ error: methodError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
     const supabase = createClient(
@@ -35,10 +46,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Preflight Dwolla routing before mutating invoice/payment state.
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
-      .select('id, total_amount, paid_amount, vendor_id, payment_account_id')
+      .select(`
+        id, invoice_number, total_amount, paid_amount, vendor_id, payment_account_id,
+        vendor:vendor_id ( name, email, phone, mailing_address_line1, mailing_city, mailing_state, mailing_zip_code )
+      `)
       .eq('id', invoice_id)
       .single()
 
@@ -51,49 +64,34 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'A payment account is required to release funds.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    const { data: paymentAccount, error: accountError } = await serviceSupabase
-      .from('payment_accounts')
-      .select('dwolla_funding_source_url')
-      .eq('id', finalPaymentAccountId)
-      .maybeSingle()
+    const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0)
 
-    if (accountError) {
-      console.error('Payment account lookup error:', accountError)
-      return new Response(JSON.stringify({ error: 'Unable to resolve Dwolla source funding information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
+    const ctx = {
+      serviceSupabase,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      vendorId: invoice.vendor_id,
+      vendor: invoice.vendor,
+      transferAmount,
+      paymentAccountId: finalPaymentAccountId,
+      payoutMethod: payout_method,
     }
 
-    if (!paymentAccount?.dwolla_funding_source_url) {
-      return new Response(JSON.stringify({ error: 'Missing Dwolla source funding information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    // Preflight before release_invoice_funds mutates payment state -- providers with a
+    // destination to validate up front (Dwolla) fail closed here; providers with nothing to
+    // check yet (Checkbook) no-op and validate inside initiate() instead.
+    let state
+    try {
+      state = await provider.preflight(ctx)
+    } catch (preflightError) {
+      return new Response(JSON.stringify({ error: preflightError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
     }
 
-    const { data: dwollaLink, error: linkError } = await serviceSupabase
-      .rpc('get_vendor_provider_link', {
-        p_vendor_id: invoice.vendor_id,
-        p_provider: 'dwolla'
-      })
-      .maybeSingle()
-
-    if (linkError) {
-      console.error('Dwolla provider link lookup error:', linkError)
-      return new Response(JSON.stringify({ error: 'Unable to resolve Dwolla vendor routing information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
-    }
-
-    // ponytail: fail closed before release_invoice_funds mutates payment state.
-    if (!dwollaLink?.provider_funding_ref) {
-       return new Response(JSON.stringify({ error: 'Missing Dwolla vendor funding source. Vendor must submit bank details first.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
-
-    // 'unverified' funding sources can still receive real transfers at Dwolla's own
-    // (lower) transaction limits -- Dwolla's API enforces that ceiling itself, we don't
-    // need to duplicate it here. Only block statuses that mean the link is unusable.
-    if (dwollaLink.provider_status === 'suspended') {
-       return new Response(JSON.stringify({ error: 'Vendor Dwolla account is suspended.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
-    }
-
-    // 1. Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Manager).
+    // Call the secure RPC to release funds. This enforces RBAC (Location Manager / Org Manager).
     const { data: releaseData, error: releaseError } = await supabase.rpc('release_invoice_funds', {
       p_invoice_id: invoice_id,
-      p_payment_account_id: payment_account_id || null
+      p_payout_method: payout_method,
+      p_payment_account_id: payment_account_id || null,
     })
 
     if (releaseError) {
@@ -101,41 +99,23 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: releaseError.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 })
     }
 
-    const transferAmount = (invoice.total_amount || 0) - (invoice.paid_amount || 0);
-
     try {
-      // 2. Initiate Dwolla Transfer -- reuses the same fetch-based token/resource helpers
-      // every other Dwolla call site in this repo uses (_shared/dwolla.ts), instead of the
-      // heavier dwolla-v2 SDK. This also fixes a real bug: the SDK client here was hardcoded
-      // to 'sandbox' regardless of DWOLLA_ENVIRONMENT, so a production deploy would have kept
-      // sending transfers to Dwolla's sandbox.
-      const accessToken = await getDwollaAccessToken()
-      const requestBody = {
-        _links: {
-          source: { href: paymentAccount.dwolla_funding_source_url },
-          destination: { href: dwollaLink.provider_funding_ref }
-        },
-        amount: { currency: "USD", value: transferAmount.toFixed(2) },
-        metadata: { invoiceId: invoice_id }
-      };
+      const { providerRef } = await provider.initiate(ctx, state)
 
-      const transferUrl = await createDwollaResource('/transfers', requestBody, accessToken);
-
-      // 3. Update the payment record with the Dwolla transfer URL
-      // We use a service role client to bypass RLS for this internal system update
+      // Service role client bypasses RLS for this internal system update.
       await serviceSupabase
         .from('payments')
-        .update({ dwolla_transfer_url: transferUrl })
+        .update({ [provider.refColumn]: providerRef })
         .eq('id', releaseData.payment_id)
         .eq('organization_id', releaseData.organization_id)
 
-      return new Response(JSON.stringify({ success: true, transferUrl }), {
+      return new Response(JSON.stringify({ success: true, providerRef }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
-    } catch (transferError) {
-      console.error('Dwolla transfer failed, reverting:', transferError)
-      const reason = transferError.message || 'Dwolla transfer failed'
+    } catch (initiateError) {
+      console.error(`${payout_method} payout failed, reverting:`, initiateError)
+      const reason = initiateError.message || 'Payout failed'
       await revertPayoutOnFailure(serviceSupabase, {
         paymentId: releaseData.payment_id,
         invoiceId: invoice_id,
