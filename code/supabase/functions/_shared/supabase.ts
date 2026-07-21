@@ -131,4 +131,15 @@ export const getSupabaseAuthAdminClient = () => {
     }
   });
 };
+// Client for trusted server-side data operations that must bypass RLS.
+export const getSupabaseServiceRoleClient = () => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
+};
