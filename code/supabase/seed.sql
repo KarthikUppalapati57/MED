@@ -4,7 +4,7 @@ BEGIN;
 
 -- Insert a demo organization
 INSERT INTO public.organizations (id, name, timezone, plan_id)
-VALUES ('10000000-0000-0000-0000-000000000001', 'Demo Restaurant Group', 'America/New_York', 'enterprise_annual')
+VALUES ('10000000-0000-0000-0000-000000000001', 'Demo Restaurant Group', 'America/New_York', 'starter')
 ON CONFLICT DO NOTHING;
 
 -- Insert a demo location

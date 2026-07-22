@@ -10,6 +10,8 @@ import { MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
+
 
 export default function Billing() {
   const { user, organization } = useAuth();
@@ -19,7 +21,7 @@ export default function Billing() {
   const { data: plans = [], isLoading: isLoadingPlans } = useAuthQuery({
     queryKey: ['active_plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').eq('is_active', true).order('price_monthly', { ascending: true });
+      const { data, error } = await supabase.from('plans').select('*').in('id', CURRENT_PLAN_IDS).eq('is_active', true).order('price_monthly', { ascending: true });
       if (error) throw error;
       return data || [];
     }
