@@ -218,6 +218,25 @@ function getStockCountItemKey(item = {}) {
   return item.id;
 }
 
+function getCountSheetProductKey(item = {}) {
+  return String(item.inventory_id || item.internal_product_id || item.product_id || item.product_name || '').trim().toLowerCase();
+}
+
+function collapseCountSheetUnitRows(items = []) {
+  const byProduct = new Map();
+  items.forEach((item, index) => {
+    const productKey = getCountSheetProductKey(item) || `${item.product_name || 'item'}-${index}`;
+    const current = byProduct.get(productKey);
+    if (!current || (!current.product_count_unit_id && item.product_count_unit_id)) {
+      byProduct.set(productKey, item);
+    }
+  });
+  return [...byProduct.values()].map((item, index) => ({
+    ...item,
+    sort_order: index + 1,
+  }));
+}
+
 function csvValue(value) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
@@ -1288,7 +1307,7 @@ export default function Inventory() {
     if (selectedSheet) {
       const inventoryById = new Map(inventory.map(item => [item.id, item]));
       const inventoryByName = new Map(inventory.map(item => [String(item.product_name || '').toLowerCase(), item]));
-      const sheetItems = (Array.isArray(selectedSheet.items) ? selectedSheet.items : [])
+      const sheetItems = collapseCountSheetUnitRows(Array.isArray(selectedSheet.items) ? selectedSheet.items : [])
         .map(sheetItem => {
           const inventoryItem = inventoryById.get(sheetItem.inventory_id)
             || inventoryByName.get(String(sheetItem.product_name || '').toLowerCase());
@@ -1468,9 +1487,11 @@ export default function Inventory() {
   }, [countSheetDraftItems]);
 
   const { data: countSheetDraftCountUnits = [] } = useAuthQuery({
-    queryKey: ['count-sheet-draft-count-units', countSheetDraftProductIds.join(',')],
+    queryKey: ['count-sheet-draft-count-units', editingCountSheetId, countSheetDraftProductIds.join(',')],
     queryFn: () => api.products.listCountUnitsForProducts(countSheetDraftProductIds),
     enabled: !!editingCountSheetId && countSheetDraftProductIds.length > 0,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const countSheetDraftCountUnitsByProductId = React.useMemo(() => {
@@ -1545,7 +1566,7 @@ export default function Inventory() {
   };
 
   const openCountSheetEditor = (sheet) => {
-    const sheetItems = Array.isArray(sheet.items) ? sheet.items : [];
+    const sheetItems = collapseCountSheetUnitRows(Array.isArray(sheet.items) ? sheet.items : []);
     setEditingCountSheetId(sheet.id);
     setCountSheetDraft({
       id: sheet.id,
@@ -1643,7 +1664,9 @@ export default function Inventory() {
       return;
     }
     if (inventoryItem.internal_product_id) {
-      navigate(`/Products/product/${inventoryItem.internal_product_id}${window.location.search}`);
+      navigate(`/Products/product/${inventoryItem.internal_product_id}${window.location.search}`, {
+        state: { from: `${routerLocation.pathname}${routerLocation.search}` },
+      });
       return;
     }
     handleEdit(inventoryItem);
@@ -1674,7 +1697,7 @@ export default function Inventory() {
         description: countSheetDraft.organizeBy === 'auto_category' ? 'Auto organized by product group' : 'Manual shelf order',
         organize_by: countSheetDraft.organizeBy,
         auto_add_product_groups: countSheetDraft.buckets || [],
-        items: (countSheetDraft.items || []).map((item, index) => ({
+        items: collapseCountSheetUnitRows(countSheetDraft.items || []).map((item, index) => ({
           inventory_id: item.inventory_id,
           internal_product_id: item.internal_product_id || null,
           product_id: item.product_id || null,

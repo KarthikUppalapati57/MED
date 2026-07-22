@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -239,6 +239,7 @@ function Section({ title, children, action }) {
 
 export default function ProductDetail({ initialProduct = null, categoryOptions = [], productId: suppliedProductId = null }) {
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const { '*': splat } = useParams();
   const productId = suppliedProductId || splat?.split('/')[1] || initialProduct?.id;
   const queryClient = useQueryClient();
@@ -257,6 +258,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const [packageReportUnit, setPackageReportUnit] = useState(initialProduct?.report_by_unit || 'Case');
   const [sourcePackagePrice, setSourcePackagePrice] = useState(Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0));
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
+  const backTarget = routerLocation.state?.from || `/Products/all-products${window.location.search}`;
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
     queryKey: ['product-detail', productId],
@@ -400,60 +402,6 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     onError: (error) => toast.error(error?.message || 'Unable to update count sheet'),
   });
 
-  const countUnitCountSheetMutation = useMutation({
-    mutationFn: async (row) => {
-      if (!row?.id || String(row.id).startsWith('draft-unit:')) {
-        throw new Error('Save the count unit before adding it to count sheets');
-      }
-
-      const assignedSheets = countSheetRows.filter(sheet => sheet.assigned);
-      if (assignedSheets.length === 0) {
-        throw new Error('Add this product to a count sheet first');
-      }
-
-      const inventoryItem = primaryInventoryItem;
-      const countUnitKey = `count-unit:${row.id}`;
-      let changedCount = 0;
-
-      await Promise.all(assignedSheets.map(async (sheet) => {
-        const items = Array.isArray(sheet.items) ? sheet.items : [];
-        if (items.some(item => countSheetItemKey(item) === countUnitKey)) return null;
-
-        const nextItems = [
-          ...items,
-          {
-            inventory_id: inventoryItem?.id || product.id,
-            internal_product_id: product.id,
-            product_id: inventoryItem?.product_id || product.product_id || product.id,
-            product_name: inventoryItem?.product_name || product.name,
-            expected_quantity: 0,
-            unit: row.unit || 'Each',
-            unit_cost: Number(row.price || 0),
-            product_count_unit_id: row.id,
-            count_unit_name: row.name || buildReportUnitLabel(row.quantity, row.unit),
-            sort_order: items.length + 1,
-          },
-        ];
-
-        const { error } = await api.client
-          .from('count_sheets')
-          .update({ items: nextItems, updated_at: new Date().toISOString() })
-          .eq('id', sheet.id);
-        if (error) throw error;
-        changedCount += 1;
-        return null;
-      }));
-
-      return changedCount;
-    },
-    onSuccess: (changedCount) => {
-      queryClient.invalidateQueries({ queryKey: ['product-detail-count-sheets'] });
-      queryClient.invalidateQueries({ queryKey: ['count_sheets'] });
-      toast.success(changedCount > 0 ? 'Count unit added to count sheets' : 'Count unit is already in count sheets');
-    },
-    onError: (error) => toast.error(error?.message || 'Unable to add count unit to count sheets'),
-  });
-
   useEffect(() => {
     if (!product) return;
     const nextForm = buildForm(product);
@@ -589,19 +537,9 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const handleReportUnitChange = (value) => {
     const option = reportUnitOptions.find(row => row.value === value);
     const nextOption = option || { value, label: value, reportUnit: value };
-    const currentSignature = [
-      form.report_by_unit,
-      form.base_unit,
-      Number(form.report_unit_quantity || 1),
-      Number(form.latest_price || 0),
-    ].join('|');
-    const nextSignature = [
-      nextOption.reportUnit || nextOption.value || nextOption.label,
-      nextOption.unit || form.base_unit,
-      Number(nextOption.quantity || form.report_unit_quantity || 1),
-      Number(nextOption.price ?? form.latest_price ?? 0),
-    ].join('|');
-    if (currentSignature === nextSignature) {
+    const currentValue = String(form.report_by_unit || '').trim().toLowerCase();
+    const nextValue = String(nextOption.reportUnit || nextOption.value || nextOption.label || '').trim().toLowerCase();
+    if (currentValue === nextValue) {
       return;
     }
     setPendingReportUnitOption(nextOption);
@@ -686,6 +624,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['count-sheet-draft-count-units'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Count unit saved');
       setUnitDialogOpen(false);
@@ -697,6 +636,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     mutationFn: (row) => api.products.removeCountUnit(row.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['count-sheet-draft-count-units'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Count unit removed');
     },
@@ -738,7 +678,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   if (!product) {
     return (
       <div className="space-y-4 p-8">
-        <Button variant="ghost" onClick={() => navigate(`/Products/all-products${window.location.search}`)}>
+        <Button variant="ghost" onClick={() => navigate(backTarget)}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
         <p className="text-muted-foreground">Product not found.</p>
@@ -750,14 +690,14 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background pb-4">
         <div className="min-w-0">
-          <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate(`/Products/all-products${window.location.search}`)}>
+          <Button variant="ghost" className="mb-2 px-0" onClick={() => navigate(backTarget)}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
           <h1 className="truncate text-3xl font-bold tracking-normal text-foreground">{form.name || 'Edit Product'}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{form.product_id || 'No Product ID'} - Master product management</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate(`/Products/all-products${window.location.search}`)}>
+          <Button variant="outline" onClick={() => navigate(backTarget)}>
             <X className="mr-2 h-4 w-4" /> Cancel
           </Button>
           <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
@@ -1094,14 +1034,6 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                         <TableCell className="space-x-2">
                           <Button variant="link" className="h-auto px-0" onClick={() => navigate(`/Inventory${window.location.search}`)}>
                             View Inventory
-                          </Button>
-                          <Button
-                            variant="link"
-                            className="h-auto px-0"
-                            disabled={countUnitCountSheetMutation.isPending}
-                            onClick={() => countUnitCountSheetMutation.mutate(row)}
-                          >
-                            Add to Count Sheets
                           </Button>
                           <Button
                             variant="link"
