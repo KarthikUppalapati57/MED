@@ -154,17 +154,47 @@ export default function PlatformOrganizations() {
 
       const profilesById = new Map((profilesResult.data || []).map((profile) => [profile.id, profile]));
       const hierarchyByUserId = new Map((hierarchyResult.data || []).map((row) => [row.user_id, row]));
-      return (verificationsResult.data || []).map((verification) => {
+      const reviewItemsByUserId = new Map();
+
+      for (const verification of verificationsResult.data || []) {
         const profile = profilesById.get(verification.user_id) || null;
-        return {
+        reviewItemsByUserId.set(verification.user_id, {
           verification,
           profile,
           addresses: (addressesResult.data || []).filter((address) => address.user_id === verification.user_id),
           events: (eventsResult.data || []).filter((event) => event.user_id === verification.user_id).slice(0, 5),
           invites: (invitesResult.data || []).filter((invite) => invite.email?.toLowerCase() === profile?.email?.toLowerCase()),
           hierarchySubmission: hierarchyByUserId.get(verification.user_id) || null,
-        };
-      });
+          hasBusinessVerification: true,
+        });
+      }
+
+      for (const hierarchySubmission of hierarchyResult.data || []) {
+        if (reviewItemsByUserId.has(hierarchySubmission.user_id)) continue;
+        const profile = profilesById.get(hierarchySubmission.user_id) || null;
+        if (!profile) continue;
+        reviewItemsByUserId.set(hierarchySubmission.user_id, {
+          verification: {
+            id: 'hierarchy-' + hierarchySubmission.id,
+            user_id: hierarchySubmission.user_id,
+            organization_id: profile.organization_id,
+            verification_status: 'verified',
+            legal_business_name: profile.full_name || profile.email || 'Tenant',
+            business_type: null,
+            identifier_last4: null,
+            identifier_type: null,
+            metadata: { email: profile.email },
+          },
+          profile,
+          addresses: (addressesResult.data || []).filter((address) => address.user_id === hierarchySubmission.user_id),
+          events: (eventsResult.data || []).filter((event) => event.user_id === hierarchySubmission.user_id).slice(0, 5),
+          invites: (invitesResult.data || []).filter((invite) => invite.email?.toLowerCase() === profile.email?.toLowerCase()),
+          hierarchySubmission,
+          hasBusinessVerification: false,
+        });
+      }
+
+      return Array.from(reviewItemsByUserId.values());
     }
   });
   const { data: verificationSettings } = useAuthQuery({
@@ -522,7 +552,7 @@ export default function PlatformOrganizations() {
   );
   const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const isBusinessReviewMode = searchParams.get('review') === 'business';
-  const businessReviewItems = onboardingReviews.filter((item) => item.verification.verification_status !== 'verified');
+  const businessReviewItems = onboardingReviews.filter((item) => item.hasBusinessVerification && item.verification.verification_status !== 'verified');
   const tenantReviewItems = onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
   const selectedOrgReviewItems = isBusinessReviewMode
     ? businessReviewItems
@@ -1070,11 +1100,13 @@ export default function PlatformOrganizations() {
                             </div>
                           )}
 
-                          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                            <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
-                            <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
-                          </div>
+                          {item.hasBusinessVerification && (
+                              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                                <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                                <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
+                              </div>
+                          )}
                         </CardContent>
                       </Card>
                     );
@@ -1420,11 +1452,13 @@ export default function PlatformOrganizations() {
                               </div>
                             )}
 
-                            <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                              <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
-                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
-                              <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
-                            </div>
+                            {item.hasBusinessVerification && (
+                              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                                <Button size="sm" variant="outline" onClick={() => openReviewActionDialog(item, 'more_info')}><AlertTriangle className="mr-2 h-3.5 w-3.5" /> Request Info</Button>
+                                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => openReviewActionDialog(item, 'reject')}><XCircle className="mr-2 h-3.5 w-3.5" /> Reject</Button>
+                                <Button size="sm" onClick={() => openReviewActionDialog(item, 'approve')}><CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Approve</Button>
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                       );
