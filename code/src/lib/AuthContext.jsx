@@ -107,6 +107,13 @@ function setCachedProfile(profile) {
 function clearCachedProfile() {
   try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch {}
 }
+function withTimeout(promise, timeoutMs, message) {
+  let timerId;
+  const timeout = new Promise((_, reject) => {
+    timerId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timerId));
+}
 
 // Dashboard data prefetch 
 // Fires common dashboard queries while auth is still finalizing,
@@ -686,7 +693,11 @@ export const AuthProvider = ({ children }) => {
   const loginWithEmail = useCallback(async (email, password) => {
     setAuthError(null);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000,
+        'Sign in timed out. Please check your connection and try again.'
+      );
       if (error) {
         setAuthError(error);
         return { data: null, error };
