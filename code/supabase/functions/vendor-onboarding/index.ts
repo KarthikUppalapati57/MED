@@ -359,7 +359,7 @@ serve(async (req) => {
       try {
         const { data: vendor } = await supabase
           .from("vendors")
-          .select("id, organization_id, name, contact_name, email, dwolla_customer_url")
+          .select("id, organization_id, name, contact_name, email")
           .eq("id", data.vendor_id)
           .maybeSingle();
 
@@ -368,11 +368,17 @@ serve(async (req) => {
         });
 
         if (vendor && banking?.account && banking?.routing) {
+          const { data: existingLinks } = await supabase.rpc("get_vendor_provider_link", {
+            p_vendor_id: vendor.id,
+            p_provider: "dwolla",
+          });
+          const existingCustomerUrl = existingLinks?.[0]?.provider_customer_ref;
+
           const holderName = vendor.contact_name || vendor.name;
           const [firstName, ...lastNameParts] = holderName.split(/\s+/);
 
           const { customerUrl, fundingSourceUrl } = await ensureDwollaCustomerAndFundingSource({
-            existingCustomerUrl: vendor.dwolla_customer_url,
+            existingCustomerUrl,
             firstName: firstName || "Vendor",
             lastName: lastNameParts.join(" ") || vendor.name,
             email: vendor.email,
@@ -382,10 +388,6 @@ serve(async (req) => {
             bankAccountType: "checking",
             fundingSourceName: vendor.name,
           });
-
-          if (!vendor.dwolla_customer_url) {
-            await supabase.from("vendors").update({ dwolla_customer_url: customerUrl, dwolla_onboarding_status: "unverified" }).eq("id", vendor.id);
-          }
 
           await supabase.from("vendor_payment_provider_links").upsert({
             vendor_id: vendor.id,

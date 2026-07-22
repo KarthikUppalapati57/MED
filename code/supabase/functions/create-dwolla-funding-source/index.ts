@@ -112,7 +112,7 @@ serve(async (req) => {
 
       const { data: vendor, error: vendorError } = await serviceSupabase
         .from('vendors')
-        .select('id, organization_id, name, contact_name, email, dwolla_customer_url')
+        .select('id, organization_id, name, contact_name, email')
         .eq('id', vendor_id)
         .maybeSingle()
 
@@ -127,11 +127,17 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Vendor banking details not found' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 })
       }
 
+      const { data: existingLinks } = await serviceSupabase.rpc('get_vendor_provider_link', {
+        p_vendor_id: vendor_id,
+        p_provider: 'dwolla',
+      })
+      const existingCustomerUrl = existingLinks?.[0]?.provider_customer_ref
+
       const holderName = vendor.contact_name || vendor.name
       const [firstName, ...lastNameParts] = holderName.split(/\s+/)
 
       const { customerUrl, fundingSourceUrl } = await ensureDwollaCustomerAndFundingSource({
-        existingCustomerUrl: vendor.dwolla_customer_url,
+        existingCustomerUrl,
         firstName: firstName || 'Vendor',
         lastName: lastNameParts.join(' ') || vendor.name,
         email: vendor.email,
@@ -141,10 +147,6 @@ serve(async (req) => {
         bankAccountType: 'checking',
         fundingSourceName: vendor.name,
       })
-
-      if (!vendor.dwolla_customer_url) {
-        await serviceSupabase.from('vendors').update({ dwolla_customer_url: customerUrl, dwolla_onboarding_status: 'unverified' }).eq('id', vendor_id)
-      }
 
       await serviceSupabase.from('vendor_payment_provider_links').upsert({
         vendor_id,

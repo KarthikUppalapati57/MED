@@ -91,6 +91,10 @@ const schema = await runCommand('schema_connectivity', 'npm', ['run', 'check:sch
 steps.push(compactStep(schema));
 if (!schema.ok) exitCode = 1;
 
+const edgeRewire = await runCommand('edge_rewire_self_check', 'npm', ['run', 'check:edge-rewire']);
+steps.push(compactStep(edgeRewire));
+if (!edgeRewire.ok) exitCode = 1;
+
 const build = await runCommand('production_build', 'npm', ['run', 'build']);
 steps.push(compactStep(build));
 if (!build.ok) exitCode = 1;

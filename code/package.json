@@ -16,6 +16,7 @@
     "check:staging-sandbox": "node scripts/check-staging-sandbox-env.mjs",
     "check:latency": "node scripts/supabase-latency-check.mjs",
     "check:bundles": "node scripts/check-bundle-budgets.mjs",
+    "check:edge-rewire": "node scripts/v1cb-edge-rewire-self-check.mjs",
     "check:release-gate": "node scripts/release-gate.mjs",
     "check:release-gate:ui": "node scripts/release-gate.mjs --ui-smoke",
     "check:release-gate:ui:report": "node scripts/release-gate.mjs --ui-smoke --output=reports/release-gate-latest.json",
