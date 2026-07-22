@@ -134,12 +134,12 @@ const custom = {
     ],
     decision: 'Variance threshold?', yes: 'explain + action', no: 'publish'
   },
-  'Inbox': {
+  'Notifications': {
     stages: ['Event', 'Notify', 'Filter', 'Open', 'Resolve'],
     steps: [
       ['Workflow event', 'invoice, approval, system, alert'],
       ['Notification row', 'notifications insert/realtime'],
-      ['Inbox filtering', 'unread and approval filters'],
+      ['Notifications filtering', 'unread and approval filters'],
       ['Deep link', 'open source workflow'],
       ['Resolve', 'mark read or complete approval']
     ],

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/AuthContext';
@@ -131,6 +131,7 @@ const websiteError = (value) => {
 const HIERARCHY_TEMPLATE_COLUMNS = [
   'organization_name',
   'organization_slug',
+  'organization_address_source',
   'organization_address_line1',
   'organization_address_line2',
   'organization_city',
@@ -145,6 +146,7 @@ const HIERARCHY_TEMPLATE_COLUMNS = [
   'organization_mailing_postal_code',
   'organization_mailing_country',
   'brand_name',
+  'brand_address_source',
   'brand_address_line1',
   'brand_address_line2',
   'brand_city',
@@ -152,6 +154,7 @@ const HIERARCHY_TEMPLATE_COLUMNS = [
   'brand_postal_code',
   'brand_country',
   'location_name',
+  'location_address_source',
   'location_address_line1',
   'location_address_line2',
   'location_city',
@@ -171,32 +174,38 @@ const HIERARCHY_TEMPLATE_ROWS = [
   {
     organization_name: 'Karthik Restaurant Group',
     organization_slug: 'karthik-restaurant-group',
-    organization_address_line1: '100 Corporate Center Dr',
-    organization_city: 'Knoxville',
-    organization_state: 'TN',
-    organization_postal_code: '37902',
-    organization_country: 'United States',
+    organization_address_source: 'same_as_tenant',
+    organization_address_line1: '',
+    organization_city: '',
+    organization_state: '',
+    organization_postal_code: '',
+    organization_country: '',
     organization_mailing_same_as_business: 'yes',
     brand_name: 'Downtown Grill',
+    brand_address_source: 'same_as_organization',
     location_name: 'Downtown Knoxville',
-    location_address_line1: '123 Main St',
-    location_city: 'Knoxville',
-    location_state: 'TN',
-    location_postal_code: '37902',
-    location_country: 'United States',
+    location_address_source: 'same_as_brand',
+    location_address_line1: '',
+    location_city: '',
+    location_state: '',
+    location_postal_code: '',
+    location_country: '',
     location_mailing_same_as_business: 'yes',
   },
   {
     organization_name: 'Karthik Restaurant Group',
     organization_slug: 'karthik-restaurant-group',
-    organization_address_line1: '100 Corporate Center Dr',
-    organization_city: 'Knoxville',
-    organization_state: 'TN',
-    organization_postal_code: '37902',
-    organization_country: 'United States',
+    organization_address_source: 'same_as_tenant',
+    organization_address_line1: '',
+    organization_city: '',
+    organization_state: '',
+    organization_postal_code: '',
+    organization_country: '',
     organization_mailing_same_as_business: 'yes',
     brand_name: 'Downtown Grill',
+    brand_address_source: 'same_as_organization',
     location_name: 'West Knoxville',
+    location_address_source: 'custom',
     location_address_line1: '500 Park Ave',
     location_city: 'Knoxville',
     location_state: 'TN',
@@ -207,6 +216,33 @@ const HIERARCHY_TEMPLATE_ROWS = [
 ];
 
 const valueFor = (row, key) => String(row?.[key] || '').trim();
+const normalizeAddressSourceToken = (value, allowedSources = []) => {
+  const normalized = normalizeKey(value).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!normalized) return '';
+  const aliases = {
+    tenant: 'tenant',
+    same_as_tenant: 'tenant',
+    organization: 'organization',
+    org: 'organization',
+    same_as_organization: 'organization',
+    same_as_org: 'organization',
+    brand: 'brand',
+    same_as_brand: 'brand',
+    business: 'custom',
+    custom: 'custom',
+    custom_address: 'custom',
+  };
+  const source = aliases[normalized] || normalized;
+  if (!allowedSources.includes(source)) {
+    throw new Error(`Address source "${value}" is not supported. Use ${allowedSources.map((item) => item === 'tenant' ? 'same_as_tenant' : item === 'organization' ? 'same_as_organization' : item === 'brand' ? 'same_as_brand' : 'custom').join(', ')}.`);
+  }
+  return source;
+};
+const sourceLabel = (source) => source === 'tenant' ? 'tenant business address' : source === 'organization' ? 'organization address' : source === 'brand' ? 'brand address' : 'custom address';
+const requireSourceAddress = (address, source, label) => {
+  const error = addressError(address, label);
+  if (error) throw new Error(`${label} uses ${sourceLabel(source)}, but that address is incomplete.`);
+};
 const hasAddressValues = (row, prefix) => ['line1', 'line2', 'city', 'state', 'postal_code', 'country'].some((field) => valueFor(row, `${prefix}_${field}`));
 const addressFromRow = (row, prefix) => ({
   line1: valueFor(row, `${prefix}_line1`),
@@ -670,11 +706,16 @@ export default function OnboardingPage() {
       if (!brandName) throw new Error(`Row ${rowIdx + 2}: brand_name is required.`);
       if (!locationName) throw new Error(`Row ${rowIdx + 2}: location_name is required.`);
 
-      const orgAddressEnabled = hasAddressValues(row, 'organization_address');
-      const orgBusinessAddress = orgAddressEnabled ? addressFromRow(row, 'organization_address') : emptyAddress();
+      const orgAddressSource = normalizeAddressSourceToken(valueFor(row, 'organization_address_source'), ['tenant', 'custom']) || (hasAddressValues(row, 'organization_address') ? 'custom' : '');
+      const orgAddressEnabled = Boolean(orgAddressSource);
+      const orgBusinessAddress = orgAddressSource === 'tenant' ? normalizeAddress(businessIdentity.businessAddress) : orgAddressSource === 'custom' ? addressFromRow(row, 'organization_address') : emptyAddress();
       if (orgAddressEnabled) {
-        const orgAddressError = addressError(orgBusinessAddress, `Row ${rowIdx + 2} organization business/service address`);
-        if (orgAddressError) throw new Error(orgAddressError);
+        if (orgAddressSource === 'tenant') {
+          requireSourceAddress(orgBusinessAddress, orgAddressSource, `Row ${rowIdx + 2} organization business/service address`);
+        } else {
+          const orgAddressError = addressError(orgBusinessAddress, `Row ${rowIdx + 2} organization business/service address`);
+          if (orgAddressError) throw new Error(orgAddressError);
+        }
       }
 
       const orgMailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'organization_mailing_same_as_business'), true);
@@ -683,9 +724,6 @@ export default function OnboardingPage() {
         const orgMailingAddressError = addressError(orgMailingAddress, `Row ${rowIdx + 2} organization mailing address`);
         if (orgMailingAddressError) throw new Error(orgMailingAddressError);
       }
-      const locationAddress = addressFromRow(row, 'location_address');
-      const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
-      if (locationAddressError) throw new Error(locationAddressError);
 
       const orgKey = normalizeKey(valueFor(row, 'organization_slug') || orgName);
       if (!orgMap.has(orgKey)) {
@@ -706,15 +744,47 @@ export default function OnboardingPage() {
       const brandKey = normalizeKey(brandName);
       let brand = org.brands.find((item) => normalizeKey(item.name) === brandKey);
       if (!brand) {
-        const brandAddressEnabled = hasAddressValues(row, 'brand_address');
+        const brandAddressSource = normalizeAddressSourceToken(valueFor(row, 'brand_address_source'), ['tenant', 'organization', 'custom']) || (hasAddressValues(row, 'brand_address') ? 'custom' : '');
+        const brandAddressEnabled = Boolean(brandAddressSource);
+        const brandAddress = brandAddressSource === 'tenant'
+          ? normalizeAddress(businessIdentity.businessAddress)
+          : brandAddressSource === 'organization'
+          ? normalizeAddress(org.businessAddress)
+          : brandAddressSource === 'custom'
+          ? addressFromRow(row, 'brand_address')
+          : emptyAddress();
+        if (brandAddressEnabled) {
+          if (brandAddressSource === 'custom') {
+            const brandAddressError = addressError(brandAddress, `Row ${rowIdx + 2} brand address`);
+            if (brandAddressError) throw new Error(brandAddressError);
+          } else {
+            requireSourceAddress(brandAddress, brandAddressSource, `Row ${rowIdx + 2} brand address`);
+          }
+        }
         brand = {
           ...createBrand(),
           name: brandName,
           addressEnabled: brandAddressEnabled,
-          address: brandAddressEnabled ? addressFromRow(row, 'brand_address') : emptyAddress(),
+          addressSource: brandAddressSource || 'custom',
+          address: brandAddress,
           locations: [],
         };
         org.brands.push(brand);
+      }
+
+      const locationAddressSource = normalizeAddressSourceToken(valueFor(row, 'location_address_source'), ['tenant', 'organization', 'brand', 'custom']) || 'custom';
+      const locationAddress = locationAddressSource === 'tenant'
+        ? normalizeAddress(businessIdentity.businessAddress)
+        : locationAddressSource === 'organization'
+        ? normalizeAddress(org.businessAddress)
+        : locationAddressSource === 'brand'
+        ? normalizeAddress(brand.address)
+        : addressFromRow(row, 'location_address');
+      if (locationAddressSource === 'custom') {
+        const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
+        if (locationAddressError) throw new Error(locationAddressError);
+      } else {
+        requireSourceAddress(locationAddress, locationAddressSource, `Row ${rowIdx + 2} location business/service address`);
       }
 
       const mailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'location_mailing_same_as_business'), true);
@@ -726,6 +796,7 @@ export default function OnboardingPage() {
 
       brand.locations.push({
         name: locationName,
+        businessAddressSource: locationAddressSource,
         businessAddress: locationAddress,
         mailingSameAsBusiness,
         mailingAddress,
@@ -1180,7 +1251,7 @@ export default function OnboardingPage() {
                 <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={downloadHierarchyTemplate}><Download className="mr-2 h-4 w-4" /> Download blank template</Button><Button type="button" onClick={() => hierarchyImportInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload CSV</Button><input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" /></div>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2"><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Required columns</h4><p className="text-sm text-muted-foreground">organization_name, brand_name, location_name, location_address_line1, location_city, location_state, location_postal_code</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Optional columns</h4><p className="text-sm text-muted-foreground">Organization address, brand address, location mailing address, and every standard line2/postal/country companion.</p></div></div>
+            <div className="grid gap-4 md:grid-cols-2"><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Required columns</h4><p className="text-sm text-muted-foreground">organization_name, brand_name, location_name. Location address fields are required only when location_address_source is custom.</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Optional columns</h4><p className="text-sm text-muted-foreground">Address source columns support same_as_tenant, same_as_organization, same_as_brand, or custom. Use custom when entering address fields manually.</p></div></div>
             <div className="rounded-md border bg-card p-4"><div className="mb-3 flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-foreground">Import preview</h4><span className="text-xs text-muted-foreground">{totals.locationCount} parsed location rows in the current tree</span></div><div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Brand</th><th>Location</th><th>City</th><th>Postal code</th></tr></thead><tbody>{organizations.flatMap((org) => org.brands.flatMap((brand) => brand.locations.map((location) => { const issue = !addressComplete(location.businessAddress); return <tr key={`${org.name}-${brand.name}-${location.name}`} className={issue ? 'bg-destructive/10 text-destructive' : 'border-t'}><td className="py-2">{org.name || '- missing'}</td><td>{brand.name || '- missing'}</td><td>{location.name || '- missing'}</td><td>{location.businessAddress.city || '- missing'}</td><td>{location.businessAddress.postalCode || '- missing'}</td></tr>; })))}</tbody></table></div></div>
           </div>
         ) : (

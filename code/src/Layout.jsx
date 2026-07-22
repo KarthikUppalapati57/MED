@@ -73,7 +73,7 @@ const navigation = [
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
   { name: 'Food Safety (HACCP)', href: 'FoodSafety', icon: ShieldCheck, minRole: 'manager' },
-  { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
+  { name: 'Notifications', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { 
     name: 'Platform Console', 
     icon: Shield, 

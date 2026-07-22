@@ -166,7 +166,7 @@ export default function Notifications() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
-            Inbox
+            Notifications
             {unreadCount > 0 && (
               <Badge className="bg-brand text-primary-foreground border-0 px-2 py-0.5 text-sm rounded-full">
                 {unreadCount} new
@@ -205,7 +205,7 @@ export default function Notifications() {
           {isLoading ? (
             <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
               <div className="w-8 h-8 border-4 border-border border-t-brand rounded-full animate-spin mb-4" />
-              Loading your inbox...
+              Loading your notifications...
             </div>
           ) : visibleNotifications.length === 0 ? (
             <div className="p-24 text-center">
