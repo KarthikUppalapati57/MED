@@ -797,17 +797,25 @@ export default function OnboardingPage() {
         org.brands.push(brand);
       }
 
-      const locationAddressSource = normalizeAddressSourceToken(valueFor(row, 'location_address_source'), ['tenant', 'organization', 'brand', 'custom']) || 'custom';
-      const locationAddress = locationAddressSource === 'tenant'
+      const requestedLocationAddressSource = normalizeAddressSourceToken(valueFor(row, 'location_address_source'), ['tenant', 'organization', 'brand', 'custom']) || 'custom';
+      const customLocationAddress = addressFromRow(row, 'location_address');
+      let locationAddressSource = requestedLocationAddressSource;
+      let locationAddress = locationAddressSource === 'tenant'
         ? normalizeAddress(businessIdentity.businessAddress)
         : locationAddressSource === 'organization'
         ? normalizeAddress(org.businessAddress)
         : locationAddressSource === 'brand'
         ? normalizeAddress(brand.address)
-        : addressFromRow(row, 'location_address');
+        : customLocationAddress;
+
+      if (locationAddressSource !== 'custom' && !addressComplete(locationAddress) && hasAddressValues(row, 'location_address')) {
+        locationAddressSource = 'custom';
+        locationAddress = customLocationAddress;
+      }
+
       if (locationAddressSource === 'custom') {
         const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
-        if (locationAddressError) throw new Error(locationAddressError);
+        if (locationAddressError) throw new Error(`${locationAddressError} Fill the location address columns, or set location_address_source to same_as_tenant, same_as_organization, or same_as_brand after that source address exists.`);
       } else {
         requireSourceAddress(locationAddress, locationAddressSource, `Row ${rowIdx + 2} location business/service address`);
       }
