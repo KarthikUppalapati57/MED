@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
+import { useAuth } from '@/lib/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { api } from '@/lib/apiClient';
 import { format } from 'date-fns';
@@ -18,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const AUDIT_ROW_HEIGHT = 72;
 const AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
@@ -30,6 +33,66 @@ export default function AuditLogs() {
   const tableRef = React.useRef(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
 
+  const { accessTree } = useAuth();
+  const { isTenantSuperAdmin } = usePermissions();
+
+  const [filterOrgId, setFilterOrgId] = useState('all');
+  const [filterBrandId, setFilterBrandId] = useState('all');
+  const [filterLocationId, setFilterLocationId] = useState('all');
+
+  // Org list: tenant_super_admin gets every org in their tenant directly (mirrors
+  // ContextSwitcher.jsx); everyone else's accessible orgs come from their own accessTree.
+  const { data: tenantOrgs = [] } = useAuthQuery({
+    queryKey: ['audit-logs-filter-orgs', 'tenant'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('organizations').select('id, name').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isTenantSuperAdmin,
+  });
+  const orgOptions = isTenantSuperAdmin
+    ? tenantOrgs
+    : (accessTree || []).map((node) => node.organization).filter(Boolean);
+
+  const { data: brandOptions = [] } = useAuthQuery({
+    queryKey: ['audit-logs-filter-brands', filterOrgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('brand_id, name')
+        .eq('organization_id', filterOrgId)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: filterOrgId !== 'all',
+  });
+
+  const { data: locationOptions = [] } = useAuthQuery({
+    queryKey: ['audit-logs-filter-locations', filterBrandId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('brand_id', filterBrandId)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: filterBrandId !== 'all',
+  });
+
+  const handleOrgFilterChange = (value) => {
+    setFilterOrgId(value);
+    setFilterBrandId('all');
+    setFilterLocationId('all');
+  };
+  const handleBrandFilterChange = (value) => {
+    setFilterBrandId(value);
+    setFilterLocationId('all');
+  };
+
   const queryClient = useQueryClient();
 
   const {
@@ -40,14 +103,20 @@ export default function AuditLogs() {
     isLoading,
     isError
   } = useAuthInfiniteQuery({
-    queryKey: ['audit_logs', debouncedSearch, sortBy],
+    queryKey: ['audit_logs', debouncedSearch, sortBy, filterOrgId, filterBrandId, filterLocationId],
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        return await api.entities.AuditLog.list(sortBy, {
+        const conditions = {};
+        if (filterOrgId !== 'all') conditions.organization_id = filterOrgId;
+        if (filterBrandId !== 'all') conditions.brand_id = filterBrandId;
+        if (filterLocationId !== 'all') conditions.location_id = filterLocationId;
+        return await api.entities.AuditLog.filter(conditions, {
+          select: '*, profiles:user_id(email, full_name)',
+          orderBy: sortBy,
           page: pageParam,
           pageSize: 50,
           search: debouncedSearch || undefined,
-          searchColumn: 'action'
+          searchColumn: 'action',
         });
       } catch (err) {
         console.error('Error fetching audit logs:', err);
@@ -80,7 +149,7 @@ export default function AuditLogs() {
   useEffect(() => {
     setTableScrollTop(0);
     if (tableRef.current) tableRef.current.scrollTop = 0;
-  }, [debouncedSearch, sortBy]);
+  }, [debouncedSearch, sortBy, filterOrgId, filterBrandId, filterLocationId]);
 
   const logWindow = React.useMemo(() => {
     const total = filteredLogs.length;
@@ -129,15 +198,50 @@ export default function AuditLogs() {
       </div>
 
       <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by action, table, or user ID..."
+              placeholder="Search by action..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Select value={filterOrgId} onValueChange={handleOrgFilterChange}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="All Organizations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Organizations</SelectItem>
+                {orgOptions.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterBrandId} onValueChange={handleBrandFilterChange}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brandOptions.map((b) => (
+                  <SelectItem key={b.brand_id} value={b.brand_id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterLocationId} onValueChange={setFilterLocationId}>
+              <SelectTrigger className="w-full sm:w-56">
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locationOptions.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -185,7 +289,7 @@ export default function AuditLogs() {
                       </span>
                     </div>
                   </TableHead>
-                  <TableHead>User ID</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Details</TableHead>
                 </TableRow>
               </TableHeader>
@@ -238,9 +342,11 @@ export default function AuditLogs() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono text-xs">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <User className="h-3 w-3 text-muted-foreground" />
-                          <span className="truncate max-w-[120px]">{log.user_id}</span>
+                          <span className="truncate max-w-[120px]">
+                            {log.profiles?.full_name || log.profiles?.email || log.user_id}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -289,4 +395,3 @@ export default function AuditLogs() {
     </div>
   );
 }
-

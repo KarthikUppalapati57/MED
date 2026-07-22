@@ -267,6 +267,9 @@ function UserDetailDrawer({ member, orgId, onClose }) {
           action: 'update_user_role',
           entityType: 'User',
           entityId: member.user_id || member.id,
+          organization_id: orgId,
+          brand_id: member.brand_id || member.profiles?.brand_id || null,
+          location_id: member.location_id || member.profiles?.location_id || null,
           details: { role: form.role, status: form.status },
         });
       } catch { /* audit is non-critical */ }
@@ -541,6 +544,7 @@ function InviteDialog({ open, onClose, orgId }) {
           action: 'invite_user',
           entityType: 'User',
           entityId: email,
+          organization_id: orgId || userProfile?.organization_id,
           details: { role, org_id: orgId },
         });
       } catch { /* audit non-critical */ }

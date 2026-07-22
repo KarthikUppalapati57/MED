@@ -345,6 +345,8 @@ function useDashboardRules({ brand, location, organization, scope, userProfile }
         entityType: 'dashboard_escalation_rules',
         module: AUDIT_MODULES.SYSTEM,
         orgId: scopeContext.orgId,
+        brandId: scopeContext.brandId,
+        locationId: scopeContext.locationId,
         userId: userProfile?.id,
         details: { scope, rules: normalized },
       });
@@ -431,6 +433,8 @@ function useDashboardReportPreferences({ brand, location, organization, scope, u
         entityType: 'dashboard_report_preferences',
         module: AUDIT_MODULES.SYSTEM,
         orgId: scopeContext.orgId,
+        brandId: scopeContext.brandId,
+        locationId: scopeContext.locationId,
         userId: userProfile?.id,
         details: { scope, preferences: normalized },
       });
@@ -690,6 +694,8 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
         entityType: 'dashboard_action_status',
         module: AUDIT_MODULES.SYSTEM,
         orgId: scopeContext.orgId,
+        brandId: scopeContext.brandId,
+        locationId: scopeContext.locationId,
         userId: userProfile?.id,
         details: { scope, scopeKey: scopeContext.scopeKey, title },
       });
@@ -769,6 +775,8 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           entityType: 'dashboard_review_log',
           module: AUDIT_MODULES.SYSTEM,
           orgId: scopeContext.orgId,
+          brandId: scopeContext.brandId,
+          locationId: scopeContext.locationId,
           userId: userProfile?.id,
           details: { scope, completed: snapshot.completedCount, open: snapshot.openActions.length },
         });
@@ -797,6 +805,8 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
           entityType: 'dashboard_review_log',
           module: AUDIT_MODULES.SYSTEM,
           orgId: scopeContext.orgId,
+          brandId: scopeContext.brandId,
+          locationId: scopeContext.locationId,
           userId: userProfile?.id,
           details: { scope, scopeKey: scopeContext.scopeKey },
         });
@@ -815,6 +825,8 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
       entityType: 'dashboard_handoff_note',
       module: AUDIT_MODULES.SYSTEM,
       orgId: scopeContext.orgId,
+      brandId: scopeContext.brandId,
+      locationId: scopeContext.locationId,
       userId: userProfile?.id,
       details: { scope, scopeKey: scopeContext.scopeKey },
     });
@@ -2410,7 +2422,7 @@ function RoleActionPlanPanel({ actions: providedActions, metrics, scope, canAcce
   );
 }
 
-function EscalationPanel({ escalations, organization, scope, userProfile }) {
+function EscalationPanel({ escalations, organization, brand, location, scope, userProfile }) {
   const [notifyingKey, setNotifyingKey] = React.useState(null);
 
   const notifyEscalation = async (item) => {
@@ -2442,6 +2454,8 @@ function EscalationPanel({ escalations, organization, scope, userProfile }) {
         entityType: 'dashboard_escalation',
         module: AUDIT_MODULES.SYSTEM,
         orgId: organization.id,
+        brandId: brand?.brand_id || brand?.id || null,
+        locationId: location?.id || null,
         userId: userProfile?.id,
         details: { scope, title: item.title, notified: result.notified || 0 },
       });
@@ -2861,8 +2875,10 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
       <React.Suspense fallback={<DashboardPanelFallback />}>
         <ExecutiveReportPanel
           actions={roleActions}
+          brand={brand}
           dataHealthScore={dataHealthScore}
           escalations={escalations}
+          location={location}
           metrics={metrics}
           organization={organization}
           rules={dashboardRules.rules}
@@ -2923,7 +2939,7 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         onActionStatusChange={dashboardPersistence.persistActionStatus}
         onResetActions={dashboardPersistence.resetActions}
       />
-      <EscalationPanel escalations={escalations} organization={organization} scope={scope} userProfile={userProfile} />
+      <EscalationPanel escalations={escalations} organization={organization} brand={brand} location={location} scope={scope} userProfile={userProfile} />
       <HandoffBriefPanel
         actions={roleActions}
         metrics={metrics}

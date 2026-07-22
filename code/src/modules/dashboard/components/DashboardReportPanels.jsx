@@ -201,7 +201,7 @@ async function sendDashboardReportNotifications({ brand, location, organization,
   return { notified: notificationResults.filter((result) => result?.success).length };
 }
 
-export function ExecutiveReportPanel({ actions, dataHealthScore, escalations, metrics, organization, rules, scope, statusMap = {}, userProfile }) {
+export function ExecutiveReportPanel({ actions, brand, dataHealthScore, escalations, location, metrics, organization, rules, scope, statusMap = {}, userProfile }) {
   const reportText = React.useMemo(
     () => createExecutiveReportText({ actions, dataHealthScore, escalations, metrics, rules, scope, statusMap }),
     [actions, dataHealthScore, escalations, metrics, rules, scope, statusMap]
@@ -222,6 +222,8 @@ export function ExecutiveReportPanel({ actions, dataHealthScore, escalations, me
       entityType: 'dashboard_executive_report',
       module: AUDIT_MODULES.SYSTEM,
       orgId: organization?.id,
+      brandId: brand?.brand_id || brand?.id || null,
+      locationId: location?.id || null,
       userId: userProfile?.id,
       details: { scope, escalations: escalations.length, openActions: openActions.length },
     });
@@ -350,6 +352,8 @@ export function ScheduledReportsPanel({
         entityType: 'dashboard_scheduled_report',
         module: AUDIT_MODULES.SYSTEM,
         orgId: organization?.id,
+        brandId: brand?.brand_id || brand?.id || null,
+        locationId: location?.id || null,
         userId: userProfile?.id,
         details: { scope, notified: result.notified, recipientRoles: normalized.recipientRoles },
       });
@@ -509,6 +513,8 @@ export function DashboardReportHistoryPanel({
         entityType: 'dashboard_report_delivery',
         module: AUDIT_MODULES.SYSTEM,
         orgId: organization?.id,
+        brandId: brand?.brand_id || brand?.id || null,
+        locationId: location?.id || null,
         userId: userProfile?.id,
         details: { reportType: delivery.reportType, reportDate: delivery.reportDate, notified: result.notified },
       });

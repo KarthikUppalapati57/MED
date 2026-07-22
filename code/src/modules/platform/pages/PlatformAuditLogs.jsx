@@ -22,14 +22,14 @@ const PLATFORM_AUDIT_ROW_HEIGHT = 72;
 const PLATFORM_AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
 const PLATFORM_AUDIT_ROW_OVERSCAN = 8;
 
+// Every table actually wired to write into audit_logs (traced live: process_audit_log() and
+// process_onboarding_audit_log() trigger bindings) -- 'organizations'/'plans'/'webhook_events'/
+// 'brands'/'locations' were listed here before but no trigger ever populates audit_logs for
+// them, so selecting those always showed zero rows; invoices/payments/inventory/auto_orders
+// do get logged but were missing from this list entirely.
 const PLATFORM_AUDIT_TABLES = [
-  'organizations',
   'profiles',
-  'plans',
-  'webhook_events',
   'invitations',
-  'brands',
-  'locations',
   'business_verifications',
   'organization_addresses',
   'onboarding_workflow_runs',
@@ -40,6 +40,10 @@ const PLATFORM_AUDIT_TABLES = [
   'tenant_payment_authorizations',
   'onboarding_admin_actions',
   'platform_onboarding_settings',
+  'invoices',
+  'payments',
+  'inventory',
+  'auto_orders',
 ];
 export default function PlatformAuditLogs() {
   const { user, role: userRole } = useAuth();
@@ -69,19 +73,22 @@ export default function PlatformAuditLogs() {
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
 
-  const { data: logsData, isLoading: isLoadingLogs } = useAuthQuery({
+  const { data: logsData, isLoading: isLoadingLogs, isError: isLogsError } = useAuthQuery({
     queryKey: ['platform-wide-audit-logs', logModuleFilter, page, debouncedSearchQuery],
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
         .select('*, profiles:user_id(email, full_name)', { count: 'exact' });
-        
+
       if (logModuleFilter !== 'All') {
         q = q.eq('table_name', logModuleFilter.toLowerCase());
       }
-      
+
       if (debouncedSearchQuery) {
-        q = q.or(`action.ilike.%${debouncedSearchQuery}%,table_name.ilike.%${debouncedSearchQuery}%,record_id.ilike.%${debouncedSearchQuery}%`);
+        // record_id is a uuid column -- ilike isn't defined for it, only search the real
+        // text columns (searching it used to throw "operator does not exist: uuid ~~* unknown"
+        // on every keystroke, silently, since this query has no error UI before this fix).
+        q = q.or(`action.ilike.%${debouncedSearchQuery}%,table_name.ilike.%${debouncedSearchQuery}%`);
       }
 
       const { data, error, count } = await q
@@ -303,6 +310,8 @@ export default function PlatformAuditLogs() {
 
           {isLoadingLogs ? (
             <div className="text-center py-12"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></div>
+          ) : isLogsError ? (
+            <div className="text-center py-12 text-resend-red">Failed to load audit logs. Verify permissions.</div>
           ) : filteredLogs.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

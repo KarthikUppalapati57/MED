@@ -29,6 +29,8 @@ function normalizeAuditEntry(entry = {}) {
     action: entry.action || 'audit',
     module: entry.module || null,
     organization_id: entry.organization_id || entry.orgId || entry.org_id || null,
+    brand_id: entry.brandId || entry.brand_id || null,
+    location_id: entry.locationId || entry.location_id || null,
     field_changed: entry.fieldChanged || entry.field_changed || null,
     old_value: entry.oldValue != null ? String(entry.oldValue) : entry.old_value ?? null,
     new_value: entry.newValue != null ? String(entry.newValue) : entry.new_value ?? null,
