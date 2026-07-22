@@ -470,7 +470,10 @@ export default function Payments() {
           )
         };
       });
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
     },
+    onError: (error) => toast.error(error.message || 'Failed to update invoice'),
   });
 
   const savePaymentSettings = useMutation({
@@ -598,17 +601,32 @@ export default function Payments() {
 
   const handleApprove = async (invoice) => {
     if (!(await runApprovalGate(confirm, invoice))) return;
-    await updateInvoice.mutateAsync({
-      id: invoice.id,
-      data: { status: 'approved', ap_status: 'approved', action_required_reason: null, action_required_details: null },
-    });
-    await ensureLedgerBill({ ...invoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
-    toast.success('Invoice approved');
+    try {
+      const approvedInvoice = await updateInvoice.mutateAsync({
+        id: invoice.id,
+        data: {
+          status: 'approved',
+          ap_status: 'approved',
+          approved_by: userProfile?.id || null,
+          approved_date: new Date().toISOString(),
+          action_required_reason: null,
+          action_required_details: null,
+        },
+      });
+      await ensureLedgerBill({ ...invoice, ...approvedInvoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
+      toast.success('Invoice approved');
+    } catch (error) {
+      console.error('Payment queue approve failed:', error);
+    }
   };
 
   const handleReject = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
-    toast.success('Invoice rejected');
+    try {
+      await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
+      toast.success('Invoice rejected');
+    } catch (error) {
+      console.error('Payment queue reject failed:', error);
+    }
   };
 
   // Stats
