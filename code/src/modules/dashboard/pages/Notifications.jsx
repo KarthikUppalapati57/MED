@@ -29,6 +29,10 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = React.useState('all');
+  const invalidateNotifications = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+  }, [queryClient, user?.id]);
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications_page', user?.id],
@@ -53,12 +57,12 @@ export default function Notifications() {
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user?.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      invalidateNotifications();
     }
   });
 
@@ -73,8 +77,7 @@ export default function Notifications() {
     },
     onSuccess: () => {
       toast.success('All notifications marked as read');
-      queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      invalidateNotifications();
     }
   });
 
@@ -83,13 +86,36 @@ export default function Notifications() {
       const { error } = await supabase
         .from('notifications')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user?.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
+      invalidateNotifications();
     }
   });
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`notifications-page-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        invalidateNotifications
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [invalidateNotifications, user?.id]);
 
   const getIcon = (type) => {
     switch (type) {
