@@ -11,6 +11,9 @@ import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { calculateAlternateYieldCosts } from '@/modules/recipes/lib/recipeCosting';
 import { calculateMenuItemAuthoringCosts, parseIngredientText, recalculateAuthoringIngredient, validateMenuItemAuthoring } from '@/modules/recipes/lib/menuItemAuthoring';
 import { validateBarItem } from '@/modules/recipes/lib/barItemsDomain';
+import { RECIPE_UNIT_OPTIONS } from '@/modules/recipes/lib/recipeUnits';
+import UnitConversionDialog from '@/modules/recipes/components/UnitConversionDialog';
+import { buildMissingConversionDefaults } from '@/modules/recipes/components/UnitConversionsManager';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +26,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
-const UNITS = ['serving', 'each', 'count', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'cup', 'tbsp', 'tsp'];
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 const newIngredient = () => ({ product_id: null, sub_recipe_id: null, product_name: '', quantity: 1, unit: 'each', cost_unit: 'each', unit_cost: 0, yield_percentage: 100, total_cost: 0, notes: '' });
@@ -51,6 +53,8 @@ export default function BarItemAuthoringPage({ products = [], preparedItems = []
   const [equipmentDraft, setEquipmentDraft] = useState('');
   const [aiText, setAiText] = useState('');
   const [importPreview, setImportPreview] = useState(null);
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
+  const [conversionDefaults, setConversionDefaults] = useState(null);
   const baselineRef = useRef(JSON.stringify(initialRef.current));
 
   const { data: authoringSchema = { supported: true, equipment: [] } } = useAuthQuery({
@@ -111,6 +115,18 @@ export default function BarItemAuthoringPage({ products = [], preparedItems = []
   }, [recipe?.id]);
 
   const dirty = JSON.stringify(form) !== baselineRef.current;
+  useEffect(() => {
+    setForm((current) => {
+      if (!current.ingredients.length) return current;
+      const nextIngredients = current.ingredients.map((row) => recalculateAuthoringIngredient(row, conversions));
+      const unchanged = nextIngredients.every((row, index) => (
+        row.total_cost === current.ingredients[index].total_cost
+        && row.missing_conversion === current.ingredients[index].missing_conversion
+      ));
+      if (unchanged) return current;
+      return { ...current, ingredients: nextIngredients };
+    });
+  }, [conversions]);
   useEffect(() => {
     const beforeUnload = (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -252,7 +268,7 @@ export default function BarItemAuthoringPage({ products = [], preparedItems = []
       <div className="space-y-6">
         <Section title="Item details" description="Identity and operating status for this restaurant-owned Bar Item."><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label htmlFor="menu-name">Name *</Label><Input id="menu-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div><div className="space-y-2"><Label>Beverage recipe type</Label><Select value={form.recipeTypeId || 'unclassified'} onValueChange={(value) => setForm({ ...form, recipeTypeId: value === 'unclassified' ? '' : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unclassified">Other beverage</SelectItem>{recipeTypes.filter((type) => type.kind === 'beverage').map((type) => <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Status</Label><Select value={form.status} onValueChange={(status) => setForm({ ...form, status })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem><SelectItem value="seasonal">Seasonal</SelectItem></SelectContent></Select></div><div className="space-y-2 md:col-span-2"><Label htmlFor="description">Description</Label><Textarea id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div><div className="space-y-2"><Label>Shelf life</Label><Input type="number" min="0.1" step="0.1" placeholder="Optional" value={form.shelfLifeQuantity} onChange={(e) => setForm({ ...form, shelfLifeQuantity: e.target.value })} /></div><div className="space-y-2"><Label>Shelf-life unit</Label><Select value={form.shelfLifeUnit} onValueChange={(shelfLifeUnit) => setForm({ ...form, shelfLifeUnit })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hours">Hours</SelectItem><SelectItem value="days">Days</SelectItem><SelectItem value="weeks">Weeks</SelectItem></SelectContent></Select></div></div></Section>
 
-        <Section title="Yields" description="The first row is the primary serving used for live costing.">{form.yields.map((row, index) => <div key={row.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto]"><div className="space-y-2"><Label>Quantity</Label><Input type="number" min="0.0001" step="0.01" value={row.quantity} onChange={(e) => setForm((current) => ({ ...current, yields: current.yields.map((item, i) => i === index ? { ...item, quantity: e.target.value } : item) }))} /></div><div className="space-y-2"><Label>Unit</Label><Select value={row.unit} onValueChange={(unit) => setForm((current) => ({ ...current, yields: current.yields.map((item, i) => i === index ? { ...item, unit } : item) }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{UNITS.map((unit) => <SelectItem value={unit} key={unit}>{unit}</SelectItem>)}</SelectContent></Select></div><div className="flex items-end gap-2"><Badge variant={index === 0 ? 'default' : 'outline'}>{index === 0 ? 'Primary' : money.format(yieldCosts[index]?.cost_per_unit || 0)}</Badge><Button size="icon" variant="ghost" disabled={form.yields.length === 1} onClick={() => setForm({ ...form, yields: form.yields.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button></div></div>)}<Button variant="outline" onClick={() => setForm({ ...form, yields: [...form.yields, { id: crypto.randomUUID(), quantity: 1, unit: 'each' }] })}><Plus className="mr-2 h-4 w-4" /> Add yield</Button></Section>
+        <Section title="Yields" description="The first row is the primary serving used for live costing.">{form.yields.map((row, index) => <div key={row.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto]"><div className="space-y-2"><Label>Quantity</Label><Input type="number" min="0.0001" step="0.01" value={row.quantity} onChange={(e) => setForm((current) => ({ ...current, yields: current.yields.map((item, i) => i === index ? { ...item, quantity: e.target.value } : item) }))} /></div><div className="space-y-2"><Label>Unit</Label><Select value={row.unit} onValueChange={(unit) => setForm((current) => ({ ...current, yields: current.yields.map((item, i) => i === index ? { ...item, unit } : item) }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{RECIPE_UNIT_OPTIONS.map((unit) => <SelectItem value={unit} key={unit}>{unit}</SelectItem>)}</SelectContent></Select></div><div className="flex items-end gap-2"><Badge variant={index === 0 ? 'default' : 'outline'}>{index === 0 ? 'Primary' : money.format(yieldCosts[index]?.cost_per_unit || 0)}</Badge><Button size="icon" variant="ghost" disabled={form.yields.length === 1} onClick={() => setForm({ ...form, yields: form.yields.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button></div></div>)}<Button variant="outline" onClick={() => setForm({ ...form, yields: [...form.yields, { id: crypto.randomUUID(), quantity: 1, unit: 'each' }] })}><Plus className="mr-2 h-4 w-4" /> Add yield</Button></Section>
 
         <Section title="Restaurant visibility" description="The organization always owns the recipe; optionally limit its availability to selected locations."><div className="flex gap-2"><Button type="button" variant={form.visibilityMode === 'all' ? 'default' : 'outline'} onClick={() => setForm({ ...form, visibilityMode: 'all', visibleLocationIds: [] })}>All locations</Button><Button type="button" variant={form.visibilityMode === 'selected' ? 'default' : 'outline'} onClick={() => setForm({ ...form, visibilityMode: 'selected' })}>Selected locations</Button></div>{form.visibilityMode === 'selected' && <div className="grid gap-2 sm:grid-cols-2">{locations.map((entry) => <label key={entry.id} className="flex items-center gap-2 rounded-md border p-3 text-sm"><Checkbox checked={form.visibleLocationIds.includes(entry.id)} onCheckedChange={(checked) => setForm({ ...form, visibleLocationIds: checked ? [...new Set([...form.visibleLocationIds, entry.id])] : form.visibleLocationIds.filter((id) => id !== entry.id) })} />{entry.name}</label>)}</div>}<p className="text-xs text-muted-foreground">Inventory integration is intentionally excluded until the Inventory-owned contract is available.</p></Section>
 
@@ -273,7 +289,7 @@ export default function BarItemAuthoringPage({ products = [], preparedItems = []
                 </SelectContent>
               </Select>
               <Input type="number" min="0.0001" step="0.01" value={ingredient.quantity} onChange={(e) => updateIngredient(index, 'quantity', e.target.value)} placeholder="Quantity" />
-              <Select value={ingredient.unit} onValueChange={(value) => updateIngredient(index, 'unit', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{UNITS.map((unit) => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent></Select>
+              <Select value={ingredient.unit} onValueChange={(value) => updateIngredient(index, 'unit', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{RECIPE_UNIT_OPTIONS.map((unit) => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent></Select>
               <Input type="number" min="0.01" max="100" step="0.1" value={ingredient.yield_percentage} onChange={(e) => updateIngredient(index, 'yield_percentage', e.target.value)} placeholder="Yield %" />
               <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button>
             </div>
@@ -285,8 +301,19 @@ export default function BarItemAuthoringPage({ products = [], preparedItems = []
         <Section title="Location pricing" description="Use the global price everywhere or set explicit overrides for individual locations."><div className="flex items-center gap-2"><Checkbox checked={form.useLocationPrices} onCheckedChange={(checked) => setForm({ ...form, useLocationPrices: Boolean(checked), locationPrices: checked ? locations.map((entry) => ({ location_id: entry.id, name: entry.name, price: '' })) : [] })} /><Label>Set location-specific prices</Label></div>{form.useLocationPrices && <div className="space-y-2">{form.locationPrices.map((row, index) => { const effectivePrice = row.price === '' ? Number(form.globalPrice || 0) : Number(row.price); const locationProfit = effectivePrice - costs.costPerYieldUnit; const locationPlateCost = effectivePrice > 0 ? costs.costPerYieldUnit / effectivePrice * 100 : null; return <div className="grid items-center gap-3 rounded-md border p-3 sm:grid-cols-[1fr_150px_120px_120px]" key={row.location_id}><span className="text-sm font-medium">{row.name}</span><Input type="number" min="0" step="0.01" placeholder="Use global" value={row.price} onChange={(e) => setForm((current) => ({ ...current, locationPrices: current.locationPrices.map((item, i) => i === index ? { ...item, price: e.target.value } : item) }))} /><span className="text-sm text-muted-foreground">Profit {money.format(locationProfit)}</span><span className="text-sm text-muted-foreground">Plate {locationPlateCost == null ? '—' : `${locationPlateCost.toFixed(1)}%`}</span></div>; })}</div>}</Section>
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ChefHat className="h-5 w-5" /> Live beverage economics</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="global-price">Global selling price</Label><Input id="global-price" type="number" min="0" step="0.01" value={form.globalPrice} onChange={(e) => setForm({ ...form, globalPrice: e.target.value })} /></div><div className="grid grid-cols-2 gap-3">{[['Ingredient total', money.format(costs.ingredientCost)], ['Cost per serving', money.format(costs.costPerYieldUnit)], ['Gross profit', Number(form.globalPrice || 0) > 0 ? money.format(costs.netProfit) : 'Set price'], ['Pour cost', costs.plateCostPercent == null ? 'Set price' : `${costs.plateCostPercent.toFixed(1)}%`]].map(([label, value]) => <div key={label} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold">{value}</p></div>)}</div>{costs.missingConversions.length > 0 && <p className="text-xs text-destructive">Resolve {costs.missingConversions.length} missing unit conversion{costs.missingConversions.length === 1 ? '' : 's'} before relying on total cost.</p>}<div className="flex items-center gap-2"><Checkbox checked={form.marginAlertEnabled} onCheckedChange={(checked) => setForm({ ...form, marginAlertEnabled: Boolean(checked) })} /><Label>Enable cost monitoring</Label></div><Button className="w-full" onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? 'Saving...' : 'Save Bar Item'}</Button></CardContent></Card></aside>
+      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ChefHat className="h-5 w-5" /> Live beverage economics</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="global-price">Global selling price</Label><Input id="global-price" type="number" min="0" step="0.01" value={form.globalPrice} onChange={(e) => setForm({ ...form, globalPrice: e.target.value })} /></div><div className="grid grid-cols-2 gap-3">{[['Ingredient total', money.format(costs.ingredientCost)], ['Cost per serving', money.format(costs.costPerYieldUnit)], ['Gross profit', Number(form.globalPrice || 0) > 0 ? money.format(costs.netProfit) : 'Set price'], ['Pour cost', costs.plateCostPercent == null ? 'Set price' : `${costs.plateCostPercent.toFixed(1)}%`]].map(([label, value]) => <div key={label} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold">{value}</p></div>)}</div>{costs.missingConversions.length > 0 && <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3"><p className="text-xs text-destructive">Resolve {costs.missingConversions.length} missing unit conversion{costs.missingConversions.length === 1 ? '' : 's'} before relying on total cost.</p><Button type="button" size="sm" variant="outline" className="w-full" onClick={() => { setConversionDefaults(buildMissingConversionDefaults(costs.missingConversions[0])); setConversionDialogOpen(true); }}>Add conversion rule</Button></div>}<div className="flex items-center gap-2"><Checkbox checked={form.marginAlertEnabled} onCheckedChange={(checked) => setForm({ ...form, marginAlertEnabled: Boolean(checked) })} /><Label>Enable cost monitoring</Label></div><Button className="w-full" onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? 'Saving...' : 'Save Bar Item'}</Button></CardContent></Card></aside>
     </div>
+
+    <UnitConversionDialog
+      open={conversionDialogOpen}
+      onOpenChange={setConversionDialogOpen}
+      products={products}
+      initialValues={conversionDefaults}
+      existing={conversions}
+      onSaved={async () => {
+        await queryClient.invalidateQueries({ queryKey: ['recipe-unit-conversions', organization?.id] });
+      }}
+    />
 
     <Dialog open={Boolean(importPreview)} onOpenChange={(open) => !open && setImportPreview(null)}>
       <DialogContent className="max-w-3xl">

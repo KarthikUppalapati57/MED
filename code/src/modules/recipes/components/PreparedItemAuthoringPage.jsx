@@ -10,6 +10,9 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useConfirmation } from '@/hooks/useConfirmation';
 import { recalculateAuthoringIngredient } from '@/modules/recipes/lib/menuItemAuthoring';
 import { calculatePreparedItemCosts, validatePreparedItem, wouldCreatePreparedItemCycle } from '@/modules/recipes/lib/preparedItemsDomain';
+import { RECIPE_UNIT_OPTIONS } from '@/modules/recipes/lib/recipeUnits';
+import UnitConversionDialog from '@/modules/recipes/components/UnitConversionDialog';
+import { buildMissingConversionDefaults } from '@/modules/recipes/components/UnitConversionsManager';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,49 +23,365 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
-const UNITS = ['each','count','serving','oz','lb','g','kg','ml','l','cup','quart','gallon','tbsp','tsp'];
-const money = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const rowId = () => crypto.randomUUID();
-const emptyIngredient = () => ({ product_id:null,sub_recipe_id:null,product_name:'',quantity:1,unit:'each',cost_unit:'each',unit_cost:0,yield_percentage:100,total_cost:0,notes:'' });
+const emptyIngredient = () => ({ product_id: null, sub_recipe_id: null, product_name: '', quantity: 1, unit: 'each', cost_unit: 'each', unit_cost: 0, yield_percentage: 100, total_cost: 0, notes: '' });
 const initialForm = (recipe) => ({
   id: recipe?.id || null, name: recipe?.name || '', description: recipe?.description || '', recipeTypeId: recipe?.recipe_type_id || '', status: recipe?.status || 'active',
   shelfLifeQuantity: recipe?.shelf_life_quantity || '', shelfLifeUnit: recipe?.shelf_life_unit || 'days',
-  yields:[{id:rowId(),quantity:recipe?.yield_quantity || 1,unit:recipe?.yield_unit || 'each',is_primary:true}], visibilityMode:'all',visibleLocationIds:[],
-  equipmentNames:[],steps:[],ingredients:(recipe?.ingredients || []).map((row)=>({...row,total_cost:Number(row.total_cost || 0)})),
+  yields: [{ id: rowId(), quantity: recipe?.yield_quantity || 1, unit: recipe?.yield_unit || 'each', is_primary: true }], visibilityMode: 'all', visibleLocationIds: [],
+  equipmentNames: [], steps: [], ingredients: (recipe?.ingredients || []).map((row) => ({ ...row, total_cost: Number(row.total_cost || 0) })),
 });
-function Section({title,description,children}) { return <Card><CardHeader><CardTitle className="text-lg">{title}</CardTitle>{description&&<CardDescription>{description}</CardDescription>}</CardHeader><CardContent className="space-y-4">{children}</CardContent></Card>; }
+function Section({ title, description, children }) {
+  return <Card><CardHeader><CardTitle className="text-lg">{title}</CardTitle>{description && <CardDescription>{description}</CardDescription>}</CardHeader><CardContent className="space-y-4">{children}</CardContent></Card>;
+}
 
 export default function PreparedItemAuthoringPage({ recipe, products, preparedItems, recipeTypes, locations, conversions }) {
-  const navigate=useNavigate(); const queryClient=useQueryClient(); const {organization,brand,location}=useAuth(); const {canManageRecipes}=usePermissions(); const {confirm}=useConfirmation();
-  const [form,setForm]=useState(()=>initialForm(recipe)); const [saving,setSaving]=useState(false); const [loading,setLoading]=useState(Boolean(recipe?.id)); const [schemaSupported,setSchemaSupported]=useState(true); const [equipmentDraft,setEquipmentDraft]=useState('');
-  const baseline=useRef(JSON.stringify(initialForm(recipe)));
-  const catalog=useMemo(()=>[
-    ...(products||[]).map((item)=>({kind:'product',id:item.id,name:item.name,unit_cost:Number(item.latest_price||0),cost_unit:item.base_unit||item.report_by_unit||'each'})),
-    ...(preparedItems||[]).filter((item)=>item.id!==recipe?.id).map((item)=>({kind:'prepared',id:item.id,name:item.name,unit_cost:Number(item.cost_per_serving||0),cost_unit:item.yield_unit||'each'})),
-  ],[products,preparedItems,recipe?.id]);
-  useEffect(()=>{let active=true;(async()=>{try{await api.entities.RecipeCostSnapshot.list('-created_at',{limit:1});}catch(error){const missing=error?.code==='PGRST205'||String(error?.message||'').includes('recipe_cost_snapshots');if(active&&missing)setSchemaSupported(false);}})();return()=>{active=false};},[]);
-  useEffect(()=>{ if(!recipe?.id){baseline.current=JSON.stringify(form);return;} let active=true;(async()=>{try{
-    const [yields,visibility,steps,equipment,ingredients]=await Promise.all([
-      api.entities.RecipeYield.filter({recipe_id:recipe.id},{orderBy:'-is_primary',limit:100}),api.entities.RecipeLocationVisibility.filter({recipe_id:recipe.id},{limit:1000}),
-      api.entities.RecipePreparationStep.filter({recipe_id:recipe.id},{orderBy:'step_number',limit:100}),
-      supabase.from('recipe_equipment_assignments').select('recipe_equipment_catalog(name)').eq('recipe_id',recipe.id),api.entities.RecipeIngredient.filter({recipe_id:recipe.id},{orderBy:'sort_order',limit:1000}),
-    ]); if(!active)return; const next={...initialForm(recipe),yields:yields.map((row)=>({...row,id:row.id||rowId()})),visibilityMode:visibility.length?'selected':'all',visibleLocationIds:visibility.map((row)=>row.location_id).filter(Boolean),steps:steps.map((row)=>({...row,id:row.id||rowId()})),equipmentNames:(equipment.data||[]).map((row)=>row.recipe_equipment_catalog?.name).filter(Boolean),ingredients:ingredients.map((row)=>{const selected=catalog.find((item)=>item.id===(row.product_id||row.sub_recipe_id));return recalculateAuthoringIngredient({...row,product_name:selected?.name||'Ingredient',unit_cost:Number(row.unit_cost_snapshot||selected?.unit_cost||0),cost_unit:row.cost_unit||selected?.cost_unit},conversions);})}; setForm(next);baseline.current=JSON.stringify(next);
-  }catch(error){const missing=String(error.message||'').includes('recipe_cost_snapshots')||error.code==='PGRST205';if(missing)setSchemaSupported(false);else toast.error(error.message||'Unable to load Prepared Item');}finally{if(active)setLoading(false);}})();return()=>{active=false};},[recipe?.id]);
-  const dirty=JSON.stringify(form)!==baseline.current;
-  useEffect(()=>{const handler=(event)=>{if(dirty){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',handler);return()=>window.removeEventListener('beforeunload',handler);},[dirty]);
-  const primaryYield=form.yields.find((row)=>row.is_primary)||form.yields[0]; const costs=useMemo(()=>calculatePreparedItemCosts({ingredients:form.ingredients,primaryYield,conversions}),[form.ingredients,primaryYield,conversions]);
-  const cancel=async()=>{if(dirty&&!await confirm({title:'Discard Prepared Item changes?',description:'Your unsaved Prepared Item changes will be lost.',confirmText:'Discard Changes',cancelText:'Keep Editing',variant:'warning',severity:'medium'}))return;navigate(`/Recipes/prepared-items${location?.search||''}`);};
-  const updateIngredient=(index,key,value)=>setForm((current)=>{const rows=[...current.ingredients];if(key==='catalog'){const selected=catalog.find((item)=>`${item.kind}:${item.id}`===value);if(selected?.kind==='prepared'&&wouldCreatePreparedItemCycle(current.id,selected.id,preparedItems)){toast.error('That selection would create a circular dependency.');return current;}rows[index]={...rows[index],product_id:selected?.kind==='product'?selected.id:null,sub_recipe_id:selected?.kind==='prepared'?selected.id:null,product_name:selected?.name||'',unit_cost:selected?.unit_cost||0,cost_unit:selected?.cost_unit||rows[index].unit};}else rows[index]={...rows[index],[key]:value};rows[index]=recalculateAuthoringIngredient(rows[index],conversions);return{...current,ingredients:rows};});
-  const save=async()=>{const errors=validatePreparedItem(form,preparedItems);if(costs.missingConversions?.length)errors.push('Resolve all missing unit conversions before saving.');if(errors.length){toast.error(errors[0]);return;}const ok=await confirm({title:recipe?.id?'Save Prepared Item changes?':`Create Prepared Item "${form.name}"?`,description:'Costs will be recalculated and propagated to recipes that use this component.',confirmText:recipe?.id?'Save Changes':'Create Prepared Item',cancelText:'Cancel',variant:'info',severity:'medium'});if(!ok)return;setSaving(true);try{const ingredients=form.ingredients.map((row,index)=>({...row,sort_order:index,unit_cost:Number(row.unit_cost||0),total_cost:Number(row.total_cost||0),missing_conversion:Boolean(row.missing_conversion)}));const steps=form.steps.filter((row)=>row.instruction.trim()).map((row,index)=>({step_number:index+1,instruction:row.instruction.trim(),notes:row.notes||''}));const saved=await api.recipes.savePreparedItemRelease1({recipe:{id:form.id,organization_id:organization.id,brand_id:(brand?.brand_id||brand?.id)||null,location_id:location?.id||null,name:form.name,description:form.description,status:form.status,recipe_type_id:form.recipeTypeId||null,shelf_life_quantity:form.shelfLifeQuantity,shelf_life_unit:form.shelfLifeUnit,instructions:steps.map((row)=>row.instruction).join('\n')},yields:form.yields.map((row)=>({quantity:Number(row.quantity),unit:row.unit,is_primary:Boolean(row.is_primary)})),visibility:{mode:form.visibilityMode,location_ids:form.visibleLocationIds},equipmentNames:form.equipmentNames,steps,ingredients});baseline.current=JSON.stringify(form);queryClient.invalidateQueries({queryKey:['recipes']});toast.success('Prepared Item saved');navigate(`/Recipes/prepared-items/${saved.id}`);}catch(error){const missing=error.code==='PGRST202'||String(error.message||'').includes('save_prepared_item_release1');if(missing)setSchemaSupported(false);toast.error(missing?'Local Prepared Items migration is required.':error.message||'Unable to save Prepared Item');}finally{setSaving(false);}};
-  if(loading)return <div className="flex min-h-96 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin"/></div>;
-  return <div className="mx-auto max-w-7xl space-y-6 pb-12"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><Button variant="ghost" className="px-0" onClick={cancel}><ArrowLeft className="mr-2 h-4 w-4"/>Prepared Items</Button><h1 className="text-3xl font-semibold">{recipe?'Edit':'Create'} a Prepared Item</h1><p className="text-muted-foreground">Build a reusable tenant-scoped batch recipe.</p></div><div className="flex gap-2"><Button variant="outline" onClick={cancel}>Cancel</Button><Button onClick={save} disabled={saving||!canManageRecipes||!schemaSupported}>{saving&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Prepared Item</Button></div></div>
-  {!schemaSupported&&<Alert><AlertTitle>Local Recipe migration required</AlertTitle><AlertDescription>Saving requires `20260715000005_prepared_items_release1.sql`. Hosted Supabase remains unchanged.</AlertDescription></Alert>}
-  <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]"><div className="space-y-6">
-    <Section title="Item details" description="Identity and operating status."><div className="grid gap-4 md:grid-cols-2"><div><Label>Name *</Label><Input value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})}/></div><div><Label>Prepared Item type</Label><Select value={form.recipeTypeId||'none'} onValueChange={(value)=>setForm({...form,recipeTypeId:value==='none'?'':value})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="none">Unclassified component</SelectItem>{(recipeTypes||[]).filter((row)=>row.kind==='component').map((row)=><SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>)}</SelectContent></Select></div><div><Label>Status</Label><Select value={form.status} onValueChange={(status)=>setForm({...form,status})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div><div className="grid grid-cols-[1fr_140px] gap-2"><div><Label>Shelf life</Label><Input type="number" min="0.1" value={form.shelfLifeQuantity} onChange={(e)=>setForm({...form,shelfLifeQuantity:e.target.value})}/></div><div><Label>Unit</Label><Select value={form.shelfLifeUnit} onValueChange={(shelfLifeUnit)=>setForm({...form,shelfLifeUnit})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="hours">Hours</SelectItem><SelectItem value="days">Days</SelectItem><SelectItem value="weeks">Weeks</SelectItem></SelectContent></Select></div></div><div className="md:col-span-2"><Label>Description</Label><Textarea value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})}/></div></div></Section>
-    <Section title="Yields" description="Select one primary yield for batch costing.">{form.yields.map((row,index)=><div key={row.id} className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_1fr_auto_auto]"><Input type="number" min="0.0001" value={row.quantity} onChange={(e)=>setForm({...form,yields:form.yields.map((item,i)=>i===index?{...item,quantity:e.target.value}:item)})}/><Select value={row.unit} onValueChange={(unit)=>setForm({...form,yields:form.yields.map((item,i)=>i===index?{...item,unit}:item)})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{UNITS.map((unit)=><SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent></Select><Button variant={row.is_primary?'default':'outline'} onClick={()=>setForm({...form,yields:form.yields.map((item,i)=>({...item,is_primary:i===index}))})}>{row.is_primary?'Primary':'Make primary'}</Button><Button size="icon" variant="ghost" disabled={form.yields.length===1} onClick={()=>setForm({...form,yields:form.yields.filter((_,i)=>i!==index)})}><Trash2 className="h-4 w-4"/></Button></div>)}<Button variant="outline" onClick={()=>setForm({...form,yields:[...form.yields,{id:rowId(),quantity:1,unit:'each',is_primary:false}]})}><Plus className="mr-2 h-4 w-4"/>Add yield</Button></Section>
-    <Section title="Restaurant visibility" description="Keep organization ownership and optionally limit locations."><div className="flex gap-2"><Button variant={form.visibilityMode==='all'?'default':'outline'} onClick={()=>setForm({...form,visibilityMode:'all',visibleLocationIds:[]})}>All locations</Button><Button variant={form.visibilityMode==='selected'?'default':'outline'} onClick={()=>setForm({...form,visibilityMode:'selected'})}>Selected locations</Button></div>{form.visibilityMode==='selected'&&<div className="grid gap-2 sm:grid-cols-2">{(locations||[]).map((row)=><label key={row.id} className="flex gap-2 rounded-md border p-3"><Checkbox checked={form.visibleLocationIds.includes(row.id)} onCheckedChange={(checked)=>setForm({...form,visibleLocationIds:checked?[...new Set([...form.visibleLocationIds,row.id])]:form.visibleLocationIds.filter((id)=>id!==row.id)})}/>{row.name}</label>)}</div>}<p className="text-xs text-muted-foreground">Inventory integration is intentionally deferred.</p></Section>
-    <Section title="Equipment"><div className="flex gap-2"><Input value={equipmentDraft} placeholder="e.g. immersion blender" onChange={(e)=>setEquipmentDraft(e.target.value)}/><Button variant="outline" onClick={()=>{const name=equipmentDraft.trim();if(name){setForm({...form,equipmentNames:[...new Set([...form.equipmentNames,name])]});setEquipmentDraft('');}}}>Add</Button></div><div className="flex flex-wrap gap-2">{form.equipmentNames.map((name)=><Badge key={name} className="cursor-pointer" onClick={()=>setForm({...form,equipmentNames:form.equipmentNames.filter((item)=>item!==name)})}>{name} ×</Badge>)}</div></Section>
-    <Section title="Preparation" description="Ordered repeatable instructions.">{form.steps.map((step,index)=><div key={step.id} className="grid gap-2 rounded-md border p-3 md:grid-cols-[36px_1fr_auto]"><span className="pt-2 text-center font-medium">{index+1}</span><div className="space-y-2"><Textarea value={step.instruction} placeholder="Preparation instruction" onChange={(e)=>setForm({...form,steps:form.steps.map((row,i)=>i===index?{...row,instruction:e.target.value}:row)})}/><Input value={step.notes||''} placeholder="Optional notes" onChange={(e)=>setForm({...form,steps:form.steps.map((row,i)=>i===index?{...row,notes:e.target.value}:row)})}/></div><div><Button size="icon" variant="ghost" disabled={index===0} onClick={()=>setForm((current)=>{const steps=[...current.steps];[steps[index-1],steps[index]]=[steps[index],steps[index-1]];return{...current,steps};})}><ArrowUp className="h-4 w-4"/></Button><Button size="icon" variant="ghost" disabled={index===form.steps.length-1} onClick={()=>setForm((current)=>{const steps=[...current.steps];[steps[index+1],steps[index]]=[steps[index],steps[index+1]];return{...current,steps};})}><ArrowDown className="h-4 w-4"/></Button><Button size="icon" variant="ghost" onClick={()=>setForm({...form,steps:form.steps.filter((_,i)=>i!==index)})}><Trash2 className="h-4 w-4"/></Button></div></div>)}<Button variant="outline" onClick={()=>setForm({...form,steps:[...form.steps,{id:rowId(),instruction:'',notes:''}]})}><Plus className="mr-2 h-4 w-4"/>Add step</Button></Section>
-    <Section title="Ingredients" description="Purchased products and nested Prepared Items.">{form.ingredients.map((ingredient,index)=><div key={ingredient.id||index} className="space-y-3 rounded-md border p-3"><div className="grid gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]"><Select value={ingredient.product_id?`product:${ingredient.product_id}`:ingredient.sub_recipe_id?`prepared:${ingredient.sub_recipe_id}`:''} onValueChange={(value)=>updateIngredient(index,'catalog',value)}><SelectTrigger><SelectValue placeholder="Select product or Prepared Item"/></SelectTrigger><SelectContent><SelectGroup><SelectLabel>Purchased products</SelectLabel>{(products||[]).map((row)=><SelectItem key={row.id} value={`product:${row.id}`}>{row.name}</SelectItem>)}</SelectGroup><SelectGroup><SelectLabel>Prepared Items</SelectLabel>{(preparedItems||[]).filter((row)=>row.id!==form.id).map((row)=><SelectItem key={row.id} value={`prepared:${row.id}`}>{row.name}</SelectItem>)}</SelectGroup></SelectContent></Select><Input type="number" min="0.0001" value={ingredient.quantity} onChange={(e)=>updateIngredient(index,'quantity',e.target.value)}/><Select value={ingredient.unit} onValueChange={(value)=>updateIngredient(index,'unit',value)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{UNITS.map((unit)=><SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent></Select><Input type="number" min="0.01" max="100" value={ingredient.yield_percentage} onChange={(e)=>updateIngredient(index,'yield_percentage',e.target.value)}/><Button size="icon" variant="ghost" onClick={()=>setForm({...form,ingredients:form.ingredients.filter((_,i)=>i!==index)})}><Trash2 className="h-4 w-4"/></Button></div><div className="grid gap-3 sm:grid-cols-[1fr_auto]"><Input value={ingredient.notes||''} placeholder="Ingredient notes" onChange={(e)=>updateIngredient(index,'notes',e.target.value)}/><Badge variant={ingredient.missing_conversion?'destructive':'outline'}>{ingredient.missing_conversion?'Conversion required':money.format(Number(ingredient.total_cost||0))}</Badge></div></div>)}<Button variant="outline" onClick={()=>setForm({...form,ingredients:[...form.ingredients,emptyIngredient()]})}><Plus className="mr-2 h-4 w-4"/>Add ingredient</Button></Section>
-  </div><aside className="xl:sticky xl:top-4 xl:self-start"><Card><CardHeader><CardTitle>Live batch cost</CardTitle></CardHeader><CardContent className="space-y-3"><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Ingredient / batch total</p><p className="text-xl font-semibold">{money.format(costs.batchCost||0)}</p></div><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Cost per primary yield</p><p className="text-xl font-semibold">{money.format(costs.costPerYieldUnit||0)}</p><p className="text-xs text-muted-foreground">per {primaryYield?.unit||'unit'}</p></div>{costs.missingConversions?.length>0&&<p className="text-sm text-destructive">Resolve {costs.missingConversions.length} unit conversion{costs.missingConversions.length===1?'':'s'} before saving.</p>}<Button className="w-full" onClick={save} disabled={saving||!canManageRecipes||!schemaSupported}>Save Prepared Item</Button></CardContent></Card></aside></div></div>;
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { organization, brand, location } = useAuth();
+  const { canManageRecipes } = usePermissions();
+  const { confirm } = useConfirmation();
+  const [form, setForm] = useState(() => initialForm(recipe));
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(Boolean(recipe?.id));
+  const [schemaSupported, setSchemaSupported] = useState(true);
+  const [equipmentDraft, setEquipmentDraft] = useState('');
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
+  const [conversionDefaults, setConversionDefaults] = useState(null);
+  const baseline = useRef(JSON.stringify(initialForm(recipe)));
+  const catalog = useMemo(() => [
+    ...(products || []).map((item) => ({ kind: 'product', id: item.id, name: item.name, unit_cost: Number(item.latest_price || 0), cost_unit: item.base_unit || item.report_by_unit || 'each' })),
+    ...(preparedItems || []).filter((item) => item.id !== recipe?.id).map((item) => ({ kind: 'prepared', id: item.id, name: item.name, unit_cost: Number(item.cost_per_serving || 0), cost_unit: item.yield_unit || 'each' })),
+  ], [products, preparedItems, recipe?.id]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try { await api.entities.RecipeCostSnapshot.list('-created_at', { limit: 1 }); }
+      catch (error) {
+        const missing = error?.code === 'PGRST205' || String(error?.message || '').includes('recipe_cost_snapshots');
+        if (active && missing) setSchemaSupported(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!recipe?.id) { baseline.current = JSON.stringify(form); return; }
+    let active = true;
+    (async () => {
+      try {
+        const [yields, visibility, steps, equipment, ingredients] = await Promise.all([
+          api.entities.RecipeYield.filter({ recipe_id: recipe.id }, { orderBy: '-is_primary', limit: 100 }),
+          api.entities.RecipeLocationVisibility.filter({ recipe_id: recipe.id }, { limit: 1000 }),
+          api.entities.RecipePreparationStep.filter({ recipe_id: recipe.id }, { orderBy: 'step_number', limit: 100 }),
+          supabase.from('recipe_equipment_assignments').select('recipe_equipment_catalog(name)').eq('recipe_id', recipe.id),
+          api.entities.RecipeIngredient.filter({ recipe_id: recipe.id }, { orderBy: 'sort_order', limit: 1000 }),
+        ]);
+        if (!active) return;
+        const next = {
+          ...initialForm(recipe),
+          yields: yields.map((row) => ({ ...row, id: row.id || rowId() })),
+          visibilityMode: visibility.length ? 'selected' : 'all',
+          visibleLocationIds: visibility.map((row) => row.location_id).filter(Boolean),
+          steps: steps.map((row) => ({ ...row, id: row.id || rowId() })),
+          equipmentNames: (equipment.data || []).map((row) => row.recipe_equipment_catalog?.name).filter(Boolean),
+          ingredients: ingredients.map((row) => {
+            const selected = catalog.find((item) => item.id === (row.product_id || row.sub_recipe_id));
+            return recalculateAuthoringIngredient({
+              ...row,
+              product_name: selected?.name || 'Ingredient',
+              unit_cost: Number(row.unit_cost_snapshot || selected?.unit_cost || 0),
+              cost_unit: row.cost_unit || selected?.cost_unit,
+            }, conversions);
+          }),
+        };
+        setForm(next);
+        baseline.current = JSON.stringify(next);
+      } catch (error) {
+        const missing = String(error.message || '').includes('recipe_cost_snapshots') || error.code === 'PGRST205';
+        if (missing) setSchemaSupported(false);
+        else toast.error(error.message || 'Unable to load Prepared Item');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [recipe?.id]);
+
+  const dirty = JSON.stringify(form) !== baseline.current;
+  useEffect(() => {
+    setForm((current) => {
+      if (!current.ingredients.length) return current;
+      const next = current.ingredients.map((row) => recalculateAuthoringIngredient(row, conversions));
+      const unchanged = next.every((row, index) => row.total_cost === current.ingredients[index].total_cost && row.missing_conversion === current.ingredients[index].missing_conversion);
+      return unchanged ? current : { ...current, ingredients: next };
+    });
+  }, [conversions]);
+  useEffect(() => {
+    const handler = (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const primaryYield = form.yields.find((row) => row.is_primary) || form.yields[0];
+  const costs = useMemo(() => calculatePreparedItemCosts({ ingredients: form.ingredients, primaryYield, conversions }), [form.ingredients, primaryYield, conversions]);
+
+  const cancel = async () => {
+    if (dirty && !await confirm({ title: 'Discard Prepared Item changes?', description: 'Your unsaved Prepared Item changes will be lost.', confirmText: 'Discard Changes', cancelText: 'Keep Editing', variant: 'warning', severity: 'medium' })) return;
+    navigate(`/Recipes/prepared-items${location?.search || ''}`);
+  };
+
+  const updateIngredient = (index, key, value) => setForm((current) => {
+    const rows = [...current.ingredients];
+    if (key === 'catalog') {
+      const selected = catalog.find((item) => `${item.kind}:${item.id}` === value);
+      if (selected?.kind === 'prepared' && wouldCreatePreparedItemCycle(current.id, selected.id, preparedItems)) {
+        toast.error('That selection would create a circular dependency.');
+        return current;
+      }
+      rows[index] = {
+        ...rows[index],
+        product_id: selected?.kind === 'product' ? selected.id : null,
+        sub_recipe_id: selected?.kind === 'prepared' ? selected.id : null,
+        product_name: selected?.name || '',
+        unit_cost: selected?.unit_cost || 0,
+        cost_unit: selected?.cost_unit || rows[index].unit,
+      };
+    } else rows[index] = { ...rows[index], [key]: value };
+    rows[index] = recalculateAuthoringIngredient(rows[index], conversions);
+    return { ...current, ingredients: rows };
+  });
+
+  const save = async () => {
+    const errors = validatePreparedItem(form, preparedItems);
+    if (costs.missingConversions?.length) errors.push('Resolve all missing unit conversions before saving.');
+    if (errors.length) { toast.error(errors[0]); return; }
+    const ok = await confirm({
+      title: recipe?.id ? 'Save Prepared Item changes?' : `Create Prepared Item "${form.name}"?`,
+      description: 'Costs will be recalculated and propagated to recipes that use this component.',
+      confirmText: recipe?.id ? 'Save Changes' : 'Create Prepared Item',
+      cancelText: 'Cancel',
+      variant: 'info',
+      severity: 'medium',
+    });
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const ingredients = form.ingredients.map((row, index) => ({
+        ...row,
+        sort_order: index,
+        unit_cost: Number(row.unit_cost || 0),
+        total_cost: Number(row.total_cost || 0),
+        missing_conversion: Boolean(row.missing_conversion),
+      }));
+      const steps = form.steps.filter((row) => row.instruction.trim()).map((row, index) => ({
+        step_number: index + 1,
+        instruction: row.instruction.trim(),
+        notes: row.notes || '',
+      }));
+      const saved = await api.recipes.savePreparedItemRelease1({
+        recipe: {
+          id: form.id,
+          organization_id: organization.id,
+          brand_id: (brand?.brand_id || brand?.id) || null,
+          location_id: location?.id || null,
+          name: form.name,
+          description: form.description,
+          status: form.status,
+          recipe_type_id: form.recipeTypeId || null,
+          shelf_life_quantity: form.shelfLifeQuantity,
+          shelf_life_unit: form.shelfLifeUnit,
+          instructions: steps.map((row) => row.instruction).join('\n'),
+        },
+        yields: form.yields.map((row) => ({ quantity: Number(row.quantity), unit: row.unit, is_primary: Boolean(row.is_primary) })),
+        visibility: { mode: form.visibilityMode, location_ids: form.visibleLocationIds },
+        equipmentNames: form.equipmentNames,
+        steps,
+        ingredients,
+      });
+      baseline.current = JSON.stringify(form);
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      toast.success('Prepared Item saved');
+      navigate(`/Recipes/prepared-items/${saved.id}`);
+    } catch (error) {
+      const missing = error.code === 'PGRST202' || String(error.message || '').includes('save_prepared_item_release1');
+      if (missing) setSchemaSupported(false);
+      toast.error(missing ? 'Local Prepared Items migration is required.' : error.message || 'Unable to save Prepared Item');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex min-h-96 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div>;
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 pb-12">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <Button variant="ghost" className="px-0" onClick={cancel}><ArrowLeft className="mr-2 h-4 w-4" />Prepared Items</Button>
+          <h1 className="text-3xl font-semibold">{recipe ? 'Edit' : 'Create'} a Prepared Item</h1>
+          <p className="text-muted-foreground">Build a reusable tenant-scoped batch recipe.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={cancel}>Cancel</Button>
+          <Button onClick={save} disabled={saving || !canManageRecipes || !schemaSupported}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Prepared Item</Button>
+        </div>
+      </div>
+      {!schemaSupported && <Alert><AlertTitle>Local Recipe migration required</AlertTitle><AlertDescription>Saving requires `20260715000005_prepared_items_release1.sql`. Hosted Supabase remains unchanged.</AlertDescription></Alert>}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-6">
+          <Section title="Item details" description="Identity and operating status.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div>
+                <Label>Prepared Item type</Label>
+                <Select value={form.recipeTypeId || 'none'} onValueChange={(value) => setForm({ ...form, recipeTypeId: value === 'none' ? '' : value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Unclassified component</SelectItem>
+                    {(recipeTypes || []).filter((row) => row.kind === 'component').map((row) => <SelectItem key={row.id} value={row.id}>{row.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(status) => setForm({ ...form, status })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-[1fr_140px] gap-2">
+                <div><Label>Shelf life</Label><Input type="number" min="0.1" value={form.shelfLifeQuantity} onChange={(e) => setForm({ ...form, shelfLifeQuantity: e.target.value })} /></div>
+                <div>
+                  <Label>Unit</Label>
+                  <Select value={form.shelfLifeUnit} onValueChange={(shelfLifeUnit) => setForm({ ...form, shelfLifeUnit })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hours">Hours</SelectItem>
+                      <SelectItem value="days">Days</SelectItem>
+                      <SelectItem value="weeks">Weeks</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="md:col-span-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            </div>
+          </Section>
+          <Section title="Yields" description="Select one primary yield for batch costing.">
+            {form.yields.map((row, index) => (
+              <div key={row.id} className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_1fr_auto_auto]">
+                <Input type="number" min="0.0001" value={row.quantity} onChange={(e) => setForm({ ...form, yields: form.yields.map((item, i) => i === index ? { ...item, quantity: e.target.value } : item) })} />
+                <Select value={row.unit} onValueChange={(unit) => setForm({ ...form, yields: form.yields.map((item, i) => i === index ? { ...item, unit } : item) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{RECIPE_UNIT_OPTIONS.map((unit) => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button variant={row.is_primary ? 'default' : 'outline'} onClick={() => setForm({ ...form, yields: form.yields.map((item, i) => ({ ...item, is_primary: i === index })) })}>{row.is_primary ? 'Primary' : 'Make primary'}</Button>
+                <Button size="icon" variant="ghost" disabled={form.yields.length === 1} onClick={() => setForm({ ...form, yields: form.yields.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            ))}
+            <Button variant="outline" onClick={() => setForm({ ...form, yields: [...form.yields, { id: rowId(), quantity: 1, unit: 'each', is_primary: false }] })}><Plus className="mr-2 h-4 w-4" />Add yield</Button>
+          </Section>
+          <Section title="Restaurant visibility" description="Keep organization ownership and optionally limit locations.">
+            <div className="flex gap-2">
+              <Button variant={form.visibilityMode === 'all' ? 'default' : 'outline'} onClick={() => setForm({ ...form, visibilityMode: 'all', visibleLocationIds: [] })}>All locations</Button>
+              <Button variant={form.visibilityMode === 'selected' ? 'default' : 'outline'} onClick={() => setForm({ ...form, visibilityMode: 'selected' })}>Selected locations</Button>
+            </div>
+            {form.visibilityMode === 'selected' && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(locations || []).map((row) => (
+                  <label key={row.id} className="flex gap-2 rounded-md border p-3">
+                    <Checkbox checked={form.visibleLocationIds.includes(row.id)} onCheckedChange={(checked) => setForm({ ...form, visibleLocationIds: checked ? [...new Set([...form.visibleLocationIds, row.id])] : form.visibleLocationIds.filter((id) => id !== row.id) })} />
+                    {row.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Inventory integration is intentionally deferred.</p>
+          </Section>
+          <Section title="Equipment">
+            <div className="flex gap-2">
+              <Input value={equipmentDraft} placeholder="e.g. immersion blender" onChange={(e) => setEquipmentDraft(e.target.value)} />
+              <Button variant="outline" onClick={() => { const name = equipmentDraft.trim(); if (name) { setForm({ ...form, equipmentNames: [...new Set([...form.equipmentNames, name])] }); setEquipmentDraft(''); } }}>Add</Button>
+            </div>
+            <div className="flex flex-wrap gap-2">{form.equipmentNames.map((name) => <Badge key={name} className="cursor-pointer" onClick={() => setForm({ ...form, equipmentNames: form.equipmentNames.filter((item) => item !== name) })}>{name} ×</Badge>)}</div>
+          </Section>
+          <Section title="Preparation" description="Ordered repeatable instructions.">
+            {form.steps.map((step, index) => (
+              <div key={step.id} className="grid gap-2 rounded-md border p-3 md:grid-cols-[36px_1fr_auto]">
+                <span className="pt-2 text-center font-medium">{index + 1}</span>
+                <div className="space-y-2">
+                  <Textarea value={step.instruction} placeholder="Preparation instruction" onChange={(e) => setForm({ ...form, steps: form.steps.map((row, i) => i === index ? { ...row, instruction: e.target.value } : row) })} />
+                  <Input value={step.notes || ''} placeholder="Optional notes" onChange={(e) => setForm({ ...form, steps: form.steps.map((row, i) => i === index ? { ...row, notes: e.target.value } : row) })} />
+                </div>
+                <div>
+                  <Button size="icon" variant="ghost" disabled={index === 0} onClick={() => setForm((current) => { const steps = [...current.steps]; [steps[index - 1], steps[index]] = [steps[index], steps[index - 1]]; return { ...current, steps }; })}><ArrowUp className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" disabled={index === form.steps.length - 1} onClick={() => setForm((current) => { const steps = [...current.steps]; [steps[index + 1], steps[index]] = [steps[index], steps[index + 1]]; return { ...current, steps }; })}><ArrowDown className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, steps: form.steps.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            ))}
+            <Button variant="outline" onClick={() => setForm({ ...form, steps: [...form.steps, { id: rowId(), instruction: '', notes: '' }] })}><Plus className="mr-2 h-4 w-4" />Add step</Button>
+          </Section>
+          <Section title="Ingredients" description="Purchased products and nested Prepared Items.">
+            {form.ingredients.map((ingredient, index) => (
+              <div key={ingredient.id || index} className="space-y-3 rounded-md border p-3">
+                <div className="grid gap-3 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                  <Select value={ingredient.product_id ? `product:${ingredient.product_id}` : ingredient.sub_recipe_id ? `prepared:${ingredient.sub_recipe_id}` : ''} onValueChange={(value) => updateIngredient(index, 'catalog', value)}>
+                    <SelectTrigger><SelectValue placeholder="Select product or Prepared Item" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup><SelectLabel>Purchased products</SelectLabel>{(products || []).map((row) => <SelectItem key={row.id} value={`product:${row.id}`}>{row.name}</SelectItem>)}</SelectGroup>
+                      <SelectGroup><SelectLabel>Prepared Items</SelectLabel>{(preparedItems || []).filter((row) => row.id !== form.id).map((row) => <SelectItem key={row.id} value={`prepared:${row.id}`}>{row.name}</SelectItem>)}</SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Input type="number" min="0.0001" value={ingredient.quantity} onChange={(e) => updateIngredient(index, 'quantity', e.target.value)} />
+                  <Select value={ingredient.unit} onValueChange={(value) => updateIngredient(index, 'unit', value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{RECIPE_UNIT_OPTIONS.map((unit) => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Input type="number" min="0.01" max="100" value={ingredient.yield_percentage} onChange={(e) => updateIngredient(index, 'yield_percentage', e.target.value)} />
+                  <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, i) => i !== index) })}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                  <Input value={ingredient.notes || ''} placeholder="Ingredient notes" onChange={(e) => updateIngredient(index, 'notes', e.target.value)} />
+                  <Badge variant={ingredient.missing_conversion ? 'destructive' : 'outline'}>{ingredient.missing_conversion ? 'Conversion required' : money.format(Number(ingredient.total_cost || 0))}</Badge>
+                </div>
+              </div>
+            ))}
+            <Button variant="outline" onClick={() => setForm({ ...form, ingredients: [...form.ingredients, emptyIngredient()] })}><Plus className="mr-2 h-4 w-4" />Add ingredient</Button>
+          </Section>
+        </div>
+        <aside className="xl:sticky xl:top-4 xl:self-start">
+          <Card>
+            <CardHeader><CardTitle>Live batch cost</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Ingredient / batch total</p><p className="text-xl font-semibold">{money.format(costs.batchCost || 0)}</p></div>
+              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Cost per primary yield</p><p className="text-xl font-semibold">{money.format(costs.costPerYieldUnit || 0)}</p><p className="text-xs text-muted-foreground">per {primaryYield?.unit || 'unit'}</p></div>
+              {costs.missingConversions?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive">Resolve {costs.missingConversions.length} unit conversion{costs.missingConversions.length === 1 ? '' : 's'} before saving.</p>
+                  <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => { setConversionDefaults(buildMissingConversionDefaults(costs.missingConversions[0])); setConversionDialogOpen(true); }}>Add conversion rule</Button>
+                </div>
+              )}
+              <Button className="w-full" onClick={save} disabled={saving || !canManageRecipes || !schemaSupported}>Save Prepared Item</Button>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+      <UnitConversionDialog
+        open={conversionDialogOpen}
+        onOpenChange={setConversionDialogOpen}
+        products={products || []}
+        initialValues={conversionDefaults}
+        existing={conversions || []}
+      onSaved={async () => {
+        await queryClient.invalidateQueries({ queryKey: ['recipe-unit-conversions', organization?.id] });
+      }}
+    />
+    </div>
+  );
 }

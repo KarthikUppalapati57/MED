@@ -164,9 +164,9 @@ export default function EmailIngestionDialog({ open, onClose }) {
           <Button 
             className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary text-primary-foreground shadow-lg shadow-primary/10" 
             onClick={handleSave}
-            disabled={saveMutation.isPending || isLoading}
+            disabled={saveMutation.isLoading || isLoading}
           >
-            {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            {saveMutation.isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Save Config
           </Button>
         </DialogFooter>

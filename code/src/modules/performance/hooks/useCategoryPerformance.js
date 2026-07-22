@@ -1,9 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/apiClient';
+import {
+  fetchCategoryPerformanceReport,
+  fetchCategoryPerformanceDrilldown,
+  isCategoryPerformanceDemoEnabled,
+} from '@/modules/performance/services/categoryPerformanceService';
 import { buildInsights } from '@/modules/performance/services/categoryPerformanceCalculations';
 
 /**
  * Fetches consolidated Category Performance report for current filters.
+ * Source (demo vs RPC) is decided in the service layer.
  */
 export function useCategoryPerformance({
   organizationId,
@@ -13,9 +18,12 @@ export function useCategoryPerformance({
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
+  const demo = isCategoryPerformanceDemoEnabled();
+
   const query = useQuery({
     queryKey: [
       'category_performance_report',
+      demo ? 'demo' : 'rpc',
       organizationId,
       filters?.dateFrom,
       filters?.dateTo,
@@ -29,7 +37,7 @@ export function useCategoryPerformance({
       timezone,
     ],
     queryFn: () =>
-      api.reports.getCategoryPerformanceReport({
+      fetchCategoryPerformanceReport({
         organizationId,
         locationIds: filters?.locationIds?.length ? filters.locationIds : null,
         dateFrom: filters.dateFrom,
@@ -42,7 +50,13 @@ export function useCategoryPerformance({
         selectedCategory,
         trendCategories,
       }),
-    enabled: Boolean(enabled && organizationId && filters?.dateFrom && filters?.dateTo),
+    // Demo mode can render without a real organization id.
+    enabled: Boolean(
+      enabled &&
+        filters?.dateFrom &&
+        filters?.dateTo &&
+        (demo || organizationId)
+    ),
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });
@@ -85,9 +99,12 @@ export function useCategoryPerformanceDrilldown({
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
+  const demo = isCategoryPerformanceDemoEnabled();
+
   return useQuery({
     queryKey: [
       'category_performance_drilldown',
+      demo ? 'demo' : 'rpc',
       organizationId,
       category,
       filters?.dateFrom,
@@ -99,7 +116,7 @@ export function useCategoryPerformanceDrilldown({
       timezone,
     ],
     queryFn: () =>
-      api.reports.getCategoryPerformanceDrilldown({
+      fetchCategoryPerformanceDrilldown({
         organizationId,
         category,
         locationIds: filters?.locationIds?.length ? filters.locationIds : null,
@@ -110,7 +127,13 @@ export function useCategoryPerformanceDrilldown({
         vendorIds: filters?.vendorIds?.length ? filters.vendorIds : null,
         timezone,
       }),
-    enabled: Boolean(enabled && organizationId && category && filters?.dateFrom && filters?.dateTo),
+    enabled: Boolean(
+      enabled &&
+        category &&
+        filters?.dateFrom &&
+        filters?.dateTo &&
+        (demo || organizationId)
+    ),
     staleTime: 30_000,
   });
 }

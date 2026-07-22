@@ -34,5 +34,11 @@ SET name = EXCLUDED.name,
     features = EXCLUDED.features,
     is_active = EXCLUDED.is_active;
 
+-- Remap orgs off retired plan ids before deleting catalog rows.
+UPDATE public.organizations
+SET plan_id = 'starter'
+WHERE plan_id IS NOT NULL
+  AND plan_id NOT IN ('starter', 'starter-ai', 'advanced');
+
 DELETE FROM public.plans
 WHERE id NOT IN ('starter', 'starter-ai', 'advanced');

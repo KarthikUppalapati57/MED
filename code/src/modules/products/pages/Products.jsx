@@ -18,10 +18,10 @@ import {
   MoreVertical,
   X,
   CalendarDays,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Wand2,
+  AlertTriangle,
   TrendingUp,
   ArrowUpRight,
   CheckCircle2,
@@ -52,14 +52,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -82,7 +74,6 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getFlattenedCOA, getCOALabel } from '@/lib/accountingConfig';
-import ProductDetail from './ProductDetail';
 
 function ProductsScrollableTable({ children, className = '' }) {
   return (
@@ -222,33 +213,6 @@ const formatNumber = (value) => Number(value || 0).toLocaleString();
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
 const formatShortDate = (value) => value ? new Date(value).toLocaleDateString('en-US') : '-';
 const CATEGORY_TYPE_OPTIONS = ['Food', 'Beer', 'Wine', 'Liquor', 'N/A Bev', 'Retail', 'Other'];
-const CATEGORY_ACCOUNTING_CODES = {
-  'Paper and Packaging': '5110',
-  'Cleaning Supplies': '5110',
-  'Restaurant Supplies': '5110',
-  Bakery: '5110',
-  Meat: '5110',
-  Poultry: '5120',
-  Seafood: '5130',
-  Dairy: '5140',
-  Produce: '5150',
-  Frozen: '5160',
-  'Grocery and Dry Goods': '5170',
-  Beer: '5230',
-  Wine: '5240',
-  Liquor: '5220',
-  'N/A Beverage': '5210',
-  'N/A Bev': '5210',
-  Retail: '5300',
-};
-const SUPPLY_CATEGORY_PATTERN = /(paper|packaging|container|cup|lid|straw|napkin|towel|bag|box|plate|foil|wrap|cleaning|cleaner|soap|detergent|sanitizer|bleach|sponge|scrubber|glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer|restaurant supplies)/;
-
-const getAccountingCategoryForCategory = (category, fallback = '5110') => {
-  const normalized = String(category || '').trim().toLowerCase();
-  const match = Object.entries(CATEGORY_ACCOUNTING_CODES)
-    .find(([label]) => label.toLowerCase() === normalized);
-  return match?.[1] || fallback;
-};
 
 const getProductAccountingCode = (product) => {
   const value = product?.accounting_category || '';
@@ -260,11 +224,10 @@ const getProductCategoryType = (product) => {
   const category = String(product?.category || '').toLowerCase();
   const name = String(product?.name || product?.product_name || '').toLowerCase();
   const text = `${accounting} ${category} ${name}`;
-  if (SUPPLY_CATEGORY_PATTERN.test(`${category} ${name}`)) return 'Other';
-  if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer|blue moon|modelo|corona|budweiser|bud light|coors|miller|heineken)/.test(`${category} ${name}`) || accounting === '5230') return 'Beer';
-  if (/(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel|rose\b|rosé)/.test(`${category} ${name}`) || accounting === '5240') return 'Wine';
-  if (/(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur|triple sec)/.test(`${category} ${name}`) || accounting === '5220') return 'Liquor';
-  if (/(n\/a bev|na beverage|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|energy drink|water|syrup, fontn|fountain|bib)/.test(`${category} ${name}`) || accounting === '5210') return 'N/A Bev';
+  if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer|blue moon|modelo|corona|budweiser|bud light|coors|miller|heineken)/.test(text)) return 'Beer';
+  if (/(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel|rose\b|rosé)/.test(text)) return 'Wine';
+  if (/(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur|triple sec)/.test(text)) return 'Liquor';
+  if (/(n\/a bev|na beverage|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|energy drink|water|syrup, fontn|fountain|bib)/.test(text) || accounting.startsWith('52')) return 'N/A Bev';
   if (/(retail|merchandise|gift card|giftcard|apparel|shirt|hat|merch)/.test(text)) return 'Retail';
   if (accounting.startsWith('51') || accounting.includes('food') || category.includes('dairy') || category.includes('produce') || category.includes('poultry') || category.includes('grocery')) return 'Food';
   return 'Other';
@@ -275,13 +238,13 @@ const getProductItemCount = (product) => Number(product?.item_count || product?.
 const suggestProductFields = (name) => {
   const text = String(name || '').toLowerCase();
   if (/(paper|napkin|towel|cup|lid|straw|foil|wrap|bag|container|box|plate|packaging)/.test(text)) {
-    return { category: 'Paper and Packaging', accounting_category: getAccountingCategoryForCategory('Paper and Packaging') };
+    return { category: 'Paper and Packaging', accounting_category: '5110' };
   }
   if (/(cleaner|cleaning|soap|detergent|sanitizer|bleach|sponge|scrubber)/.test(text)) {
-    return { category: 'Cleaning Supplies', accounting_category: getAccountingCategoryForCategory('Cleaning Supplies') };
+    return { category: 'Cleaning Supplies', accounting_category: '5110' };
   }
   if (/(glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer)/.test(text)) {
-    return { category: 'Restaurant Supplies', accounting_category: getAccountingCategoryForCategory('Restaurant Supplies') };
+    return { category: 'Restaurant Supplies', accounting_category: '5110' };
   }
   if (/(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer)/.test(text)) {
     return { category: 'Beer', accounting_category: '5230' };
@@ -547,7 +510,6 @@ export default function Products() {
   const currentSubPath = pathParts.length > 1 ? pathParts[1] : '';
 
   const activeTab = currentSubPath || 'all-products';
-  const productDetailId = currentSubPath === 'product' ? pathParts[2] : null;
 
   const setActiveTab = (tab) => {
     navigate(`/Products/${tab}${routerLocation.search}`);
@@ -566,8 +528,6 @@ export default function Products() {
   const [reportCategory, setReportCategory] = useState('all');
   const [reportSortBy, setReportSortBy] = useState('product_name');
   const [verificationStatus, setVerificationStatus] = useState('all');
-  const [categoryComboboxOpen, setCategoryComboboxOpen] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const toggleSelect = (id) => setSelectedIds(prev => {
@@ -667,6 +627,7 @@ export default function Products() {
     },
     getNextPageParam: (lastPage, allPages) => lastPage?.length === 50 ? allPages.length : undefined,
     enabled: !!organizationId,
+    // Catalog is required — keep default throwOnError so genuine failures surface.
   });
 
   const products = React.useMemo(() => data.pages ? data.pages.flat() : [], [data.pages]);
@@ -708,6 +669,7 @@ export default function Products() {
       locationId
     }),
     enabled: !!organizationId,
+    throwOnError: false,
   });
 
   const { data: purchaseReport = [], isLoading: loadingPurchaseReport } = useAuthQuery({
@@ -723,6 +685,7 @@ export default function Products() {
       search: debouncedSearch || null,
     }),
     enabled: !!organizationId && activeTab === 'purchase-report',
+    throwOnError: false,
   });
 
   const { data: verificationQueue = [], isLoading: loadingVerificationQueue } = useAuthQuery({
@@ -735,28 +698,21 @@ export default function Products() {
       search: debouncedSearch || null,
     }),
     enabled: !!organizationId && activeTab === 'ai-verification',
-  });
-
-  const { data: globalVendorItems = [] } = useAuthQuery({
-    queryKey: ['trusted_global_vendor_item_suggestions', organizationId],
-    queryFn: async () => {
-      const { data: rows, error } = await supabase.rpc('get_trusted_global_vendor_item_suggestions');
-      if (error) throw error;
-      return rows || [];
-    },
-    enabled: !!organizationId && activeTab === 'ai-verification',
+    throwOnError: false,
   });
 
   const { data: priceVariances = [], isLoading: loadingVariances } = useAuthQuery({
     queryKey: ['price_variances', organizationId],
     queryFn: () => api.vendors.getFlaggedVendorItems(organizationId),
     enabled: !!organizationId && (activeTab === 'price-variances' || activeTab === 'all-products'),
+    throwOnError: false,
   });
 
   const { data: vendorsForProductForm = [] } = useAuthQuery({
     queryKey: ['vendors-for-product-form', organizationId],
     queryFn: () => api.entities.Vendor.filter({ organization_id: organizationId }, { orderBy: 'name' }),
     enabled: !!organizationId && dialogOpen,
+    throwOnError: false,
   });
 
   const resolveVarianceMutation = useMutation({
@@ -895,6 +851,8 @@ export default function Products() {
     queryKey: ['product_approval_setting', organizationId],
     queryFn: () => api.products.getApprovalSetting(organizationId),
     enabled: !!organizationId && isOrgManagerOrAbove,
+    // Optional settings RPC — missing locally must not crash Master Catalog.
+    throwOnError: false,
   });
 
   const approvalSettingMutation = useMutation({
@@ -988,47 +946,6 @@ export default function Products() {
       location_specific: product.location_specific ?? false,
     });
     setDialogOpen(true);
-  };
-
-  const handleCategoryChange = (category) => {
-    setFormData(current => ({
-      ...current,
-      category,
-      accounting_category: getAccountingCategoryForCategory(category, current.accounting_category),
-    }));
-  };
-
-  const handleReviewCategorySuggestion = (queueItem) => {
-    const product = products.find(item => item.id === queueItem.internal_product_id) || {};
-    const category = queueItem.category || product.suggested_category || product.category || '';
-    const displayName = product.name
-      || queueItem.product_name
-      || queueItem.vendor_item_name
-      || queueItem.display_product_name
-      || queueItem.display_vendor_item_name
-      || '';
-
-    setEditingProduct({
-      ...product,
-      id: queueItem.internal_product_id,
-      name: displayName,
-      product_id: product.product_id || queueItem.restops_product_id || '',
-    });
-    setFormData({
-      name: displayName,
-      product_id: product.product_id || queueItem.restops_product_id || '',
-      description: product.description || '',
-      category,
-      accounting_category: getAccountingCategoryForCategory(category, product.accounting_category || '5110'),
-      is_inventoried: product.is_inventoried ?? true,
-      is_tax_exempt: product.is_tax_exempt ?? false,
-      report_by_unit: product.report_by_unit || 'ea',
-      base_unit: product.base_unit || 'ea',
-      latest_price: product.latest_price || 0,
-      location_specific: product.location_specific ?? false,
-    });
-    setDialogOpen(true);
-    toast.info('AI suggestion loaded for review. Adjust the category, then save.');
   };
 
   const handleDelete = async (product) => {
@@ -1184,20 +1101,12 @@ export default function Products() {
     return [...categories].sort((a, b) => a.localeCompare(b));
   }, [products]);
 
-  const editableCategoryOptions = React.useMemo(() => {
-    const categories = new Set([
-      ...Object.keys(CATEGORY_ACCOUNTING_CODES),
-      ...products.map(product => product.category).filter(Boolean),
-    ]);
-    return [...categories].sort((a, b) => a.localeCompare(b));
-  }, [products]);
-
   const { totalProducts, inventoriedCount, taxExemptCount, categoriesCount } = React.useMemo(() => {
     return {
-      totalProducts: productSummary.total_products ?? products.length,
-      inventoriedCount: productSummary.inventoried_count ?? products.filter(p => p.is_inventoried).length,
-      taxExemptCount: productSummary.tax_exempt_count ?? products.filter(p => p.is_tax_exempt).length,
-      categoriesCount: productSummary.category_count ?? new Set(products.map(p => p.accounting_category)).size
+      totalProducts: productSummary?.total_products ?? products.length,
+      inventoriedCount: productSummary?.inventoried_count ?? products.filter(p => p.is_inventoried).length,
+      taxExemptCount: productSummary?.tax_exempt_count ?? products.filter(p => p.is_tax_exempt).length,
+      categoriesCount: productSummary?.category_count ?? new Set(products.map(p => p.accounting_category)).size
     };
   }, [productSummary, products]);
 
@@ -1297,17 +1206,6 @@ export default function Products() {
     setReportCategory('all');
     setSearch('');
   };
-
-  if (productDetailId) {
-    const detailProduct = products.find(product => product.id === productDetailId) || null;
-    return (
-      <ProductDetail
-        productId={productDetailId}
-        initialProduct={detailProduct}
-        categoryOptions={editableCategoryOptions}
-      />
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -1507,13 +1405,7 @@ export default function Products() {
                     </TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="min-w-0">
-                        <button
-                          type="button"
-                          className="block max-w-full truncate text-left font-semibold text-foreground hover:text-primary hover:underline"
-                          onClick={() => navigate(`/Products/product/${product.id}${routerLocation.search}`)}
-                        >
-                          {product.description || product.name}
-                        </button>
+                        <p className="truncate font-semibold text-foreground">{product.description || product.name}</p>
                         <p className="text-xs text-muted-foreground">{product.product_id || 'No Product ID'}</p>
                       </div>
                     </TableCell>
@@ -1562,7 +1454,7 @@ export default function Products() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/Products/product/${product.id}${routerLocation.search}`)}>
+                            <DropdownMenuItem onClick={() => handleEdit(product)}>
                               <Edit2 className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
@@ -1825,32 +1717,13 @@ export default function Products() {
                 </TableHeader>
                 <TableBody>
                   {(() => {
-                    const newProducts = verificationQueue.map(item => {
-                      const isCatalogReview = !item.vendor_item_id && Boolean(item.internal_product_id);
-                      const catalogProduct = item.internal_product_id
-                        ? products.find(product => product.id === item.internal_product_id)
-                        : null;
-                      const displayProductName = item.product_name
-                        || catalogProduct?.name
-                        || item.vendor_item_name
-                        || catalogProduct?.product_id
-                        || item.restops_product_id
-                        || 'Unnamed product';
-                      const displayProductId = item.restops_product_id || catalogProduct?.product_id || '';
-
-                      return {
-                        ...item,
-                        id: item.internal_product_id || item.vendor_item_id,
-                        name: item.vendor_item_name || displayProductName,
-                        created_at: item.last_purchased_at,
-                        accounting_category: item.category_type,
-                        display_vendor_name: item.vendor_name || (isCatalogReview ? 'Product Catalog' : '-'),
-                        display_vendor_item_name: item.vendor_item_name || displayProductName,
-                        display_product_name: item.product_name || (isCatalogReview ? displayProductName : ''),
-                        display_product_id: displayProductId,
-                        display_status_label: isCatalogReview ? 'Category review' : 'Needs verification',
-                      };
-                    });
+                    const newProducts = verificationQueue.map(item => ({
+                      ...item,
+                      id: item.internal_product_id || item.vendor_item_id,
+                      name: item.vendor_item_name,
+                      created_at: item.last_purchased_at,
+                      accounting_category: item.category_type,
+                    }));
                     return loadingVerificationQueue ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
@@ -1868,39 +1741,30 @@ export default function Products() {
                       newProducts.map((p, idx) => {
                         const confidence = Number(p.match_confidence || 0);
                         const isLowConfidence = confidence < 90;
-                        const isProductCategoryReview = !p.vendor_item_id && Boolean(p.internal_product_id);                        const productForNetworkMatch = products.find(item => item.id === p.internal_product_id) || {
-                          id: p.internal_product_id,
-                          name: p.display_product_name || p.display_vendor_item_name || p.product_name || p.vendor_item_name,
-                          product_id: p.display_product_id || p.restops_product_id,
-                          category: p.category,
-                          accounting_category: p.accounting_category,
-                        };
-                        const globalMatch = findTrustedGlobalMatch(productForNetworkMatch, globalVendorItems);
-                        const globalCategory = normalizeGlobalCategory(globalMatch?.most_common_category);
+                        const isProductCategoryReview = !p.vendor_item_id && Boolean(p.internal_product_id);
+
+                        const globalMatch = null;
+                        const globalCategory = null;
 
                         return (
                           <TableRow key={p.id} className={isLowConfidence ? "bg-resend-yellow/5" : ""}>
                             <TableCell className="text-sm text-muted-foreground">
                               {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{p.display_vendor_name}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.vendor_name || '-'}</TableCell>
                             <TableCell className="font-medium text-foreground">
-                              <div>{p.display_vendor_item_name}</div>
+                              {p.vendor_item_name || p.name}
                               {p.vendor_item_code && (
                                 <div className="text-xs text-muted-foreground">Vendor code: {p.vendor_item_code}</div>
                               )}
-                              {isLowConfidence && (
-                                <div className="text-xs text-resend-yellow font-medium italic">
-                                  {p.display_status_label}
-                                </div>
-                              )}
+                              {isLowConfidence && <span className="ml-2 text-xs text-resend-yellow font-medium italic">Needs Verification</span>}
                             </TableCell>
                             <TableCell>
-                              {p.display_product_name ? (
+                              {p.product_name ? (
                                 <div className="space-y-1">
-                                  <Badge variant="outline" className="font-medium">{p.display_product_name}</Badge>
-                                  {p.display_product_id && (
-                                    <div className="text-xs text-muted-foreground">{p.display_product_id}</div>
+                                  <Badge variant="outline" className="font-medium">{p.product_name}</Badge>
+                                  {p.restops_product_id && (
+                                    <div className="text-xs text-muted-foreground">{p.restops_product_id}</div>
                                   )}
                                 </div>
                               ) : (
@@ -1937,15 +1801,6 @@ export default function Products() {
                                     <>
                                       <Button
                                         size="sm"
-                                        variant="outline"
-                                        className="h-7 text-xs"
-                                        onClick={() => handleReviewCategorySuggestion(p)}
-                                        disabled={applyCategorySuggestionMutation.isPending || rejectCategorySuggestionMutation.isPending}
-                                      >
-                                        Edit
-                                      </Button>
-                                      <Button
-                                        size="sm"
                                         variant="default"
                                         className="h-7 bg-primary text-xs text-primary-foreground hover:bg-primary/90"
                                         onClick={() => applyCategorySuggestionMutation.mutate(p.internal_product_id)}
@@ -1962,15 +1817,7 @@ export default function Products() {
                                       >
                                         Reject
                                       </Button>
-                                    </>                                  ) : globalMatch ? (
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90"
-                                      onClick={() => handleReviewNetworkMapping(productForNetworkMatch, globalMatch)}
-                                    >
-                                      Review Network Mapping
-                                    </Button>
+                                    </>
                                   ) : (
                                     <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
                                       if (!p.internal_product_id) {
@@ -2331,74 +2178,11 @@ export default function Products() {
                    </Button>
                 )}
               </div>
-              <div className="flex overflow-hidden rounded-md border border-input bg-background shadow-sm focus-within:ring-1 focus-within:ring-ring">
-                <Input
-                  value={formData.category}
-                  onChange={(event) => handleCategoryChange(event.target.value)}
-                  placeholder="Type a category"
-                  className="h-12 flex-1 rounded-none border-0 shadow-none focus-visible:ring-0"
-                />
-                <Popover
-                  open={categoryComboboxOpen}
-                  onOpenChange={(open) => {
-                    setCategoryComboboxOpen(open);
-                    if (open) setCategorySearch('');
-                  }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Select category"
-                      aria-expanded={categoryComboboxOpen}
-                      className="h-12 w-12 shrink-0 rounded-none border-l"
-                    >
-                      <ChevronDown className="h-4 w-4 opacity-70" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[min(640px,calc(100vw-3rem))] p-0" align="end">
-                    <Command>
-                      <CommandInput
-                        value={categorySearch}
-                        onValueChange={setCategorySearch}
-                        placeholder="Search or type category..."
-                      />
-                      <CommandList>
-                        <CommandEmpty>No categories found.</CommandEmpty>
-                        <CommandGroup>
-                          {categorySearch.trim()
-                            && !editableCategoryOptions.some(category => category.toLowerCase() === categorySearch.trim().toLowerCase()) && (
-                            <CommandItem
-                              value={`custom-${categorySearch.trim()}`}
-                              onSelect={() => {
-                                handleCategoryChange(categorySearch.trim());
-                                setCategoryComboboxOpen(false);
-                              }}
-                              className="whitespace-normal font-medium"
-                            >
-                              Use "{categorySearch.trim()}"
-                            </CommandItem>
-                          )}
-                          {editableCategoryOptions.slice(0, 75).map(category => (
-                            <CommandItem
-                              key={category}
-                              value={category}
-                              onSelect={() => {
-                                handleCategoryChange(category);
-                                setCategoryComboboxOpen(false);
-                              }}
-                              className="whitespace-normal"
-                            >
-                              {category}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              <Input
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                placeholder="e.g., Produce, Dairy, Meat"
+              />
             </div>
 
             <div className="space-y-2">

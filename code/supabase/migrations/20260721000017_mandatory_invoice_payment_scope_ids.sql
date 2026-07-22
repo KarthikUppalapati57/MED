@@ -164,6 +164,46 @@ UPDATE public.payments p SET tenant_id = o.tenant_id
 FROM public.organizations o
 WHERE p.organization_id = o.id AND p.tenant_id IS NULL;
 
+-- Backfill missing brand/location from the org's first available location so NOT NULL can apply.
+WITH first_loc AS (
+  SELECT DISTINCT ON (l.organization_id)
+    l.organization_id,
+    l.id AS location_id,
+    l.brand_id
+  FROM public.locations l
+  ORDER BY l.organization_id, l.created_at ASC NULLS LAST, l.id ASC
+)
+UPDATE public.invoices i
+SET
+  location_id = COALESCE(i.location_id, fl.location_id),
+  brand_id = COALESCE(i.brand_id, fl.brand_id)
+FROM first_loc fl
+WHERE fl.organization_id = i.organization_id
+  AND (i.location_id IS NULL OR i.brand_id IS NULL);
+
+WITH first_loc AS (
+  SELECT DISTINCT ON (l.organization_id)
+    l.organization_id,
+    l.id AS location_id,
+    l.brand_id
+  FROM public.locations l
+  ORDER BY l.organization_id, l.created_at ASC NULLS LAST, l.id ASC
+)
+UPDATE public.payments p
+SET
+  location_id = COALESCE(p.location_id, fl.location_id),
+  brand_id = COALESCE(p.brand_id, fl.brand_id)
+FROM first_loc fl
+WHERE fl.organization_id = p.organization_id
+  AND (p.location_id IS NULL OR p.brand_id IS NULL);
+
+-- Drop rows that still cannot be scoped (no org location available).
+DELETE FROM public.invoices
+WHERE location_id IS NULL OR brand_id IS NULL OR organization_id IS NULL OR tenant_id IS NULL;
+
+DELETE FROM public.payments
+WHERE location_id IS NULL OR brand_id IS NULL OR organization_id IS NULL OR tenant_id IS NULL;
+
 -- ── 3. Mandatory scope: all 4 IDs required on invoices and payments ───────────────────────────
 ALTER TABLE public.invoices
   ALTER COLUMN organization_id SET NOT NULL,

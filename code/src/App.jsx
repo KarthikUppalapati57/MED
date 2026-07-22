@@ -403,6 +403,7 @@ function SignupPage() {
               ? `You've been invited as ${
                   ['owner', 'org_manager'].includes(inviteInfo.role) ? 'organization manager' :
                   inviteInfo.role === 'tenant_super_admin' ? 'tenant super admin' : inviteInfo.role === 'admin' || inviteInfo.role === 'platform_admin' ? 'platform admin' :
+                  inviteInfo.role === 'brand_manager' ? 'brand manager' :
                   inviteInfo.role === 'manager' || inviteInfo.role === 'branch_manager' ? 'branch manager' :
                   inviteInfo.role?.replace('_', ' ')
                 }`
@@ -1136,7 +1137,7 @@ const AuthenticatedApp = () => {
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
   const isEnrolled = verifiedFactors.length > 0;
   
-  const highPrivilegeRoles = ['platform_admin', 'tenant_super_admin', 'org_manager', 'branch_manager'];
+  const highPrivilegeRoles = ['platform_admin', 'tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager'];
   // Platform admins, tenant super admins, org managers, and branch managers MUST set up MFA
   const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled;
   
@@ -1194,7 +1195,10 @@ const AuthenticatedApp = () => {
   // Post-hierarchy, post-subscription-payment step: the org's own operating bank account for
   // AP/vendor bill-pay (separate from payment_verified, which is the RestOps subscription
   // payment method and is required BEFORE hierarchy setup, not after).
+  // Dev-only: skip the /complete-onboarding route guard so local QA can reach the app.
+  // Production builds keep the full banking onboarding gate (import.meta.env.DEV is false).
   const needsBankingSetup =
+    !import.meta.env.DEV &&
     isTenantOnboardingOwner &&
     !isPlatformAdmin &&
     mfaResolved &&

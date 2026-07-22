@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const Restops_ROLES = {
   tenant_super_admin: { label: "Tenant Super Admin", color: "indigo", description: "Full access across all tenant organizations", icon: ShieldCheck },
   org_manager:        { label: "Organization Manager", color: "rose",   description: "Full access to organization, users, and accounting", icon: ShieldCheck },
+  brand_manager:    { label: "Brand Manager",      color: "cyan",   description: "Manages brand-level operations and locations", icon: Building2 },
   branch_manager:   { label: "Branch Manager",     color: "purple", description: "Manages multiple locations and local team members", icon: Building2 },
   location_manager: { label: "Location Manager",   color: "blue",   description: "Manages daily operations, inventory, and approvals", icon: UserCheck },
   ground_staff:     { label: "Ground Staff",       color: "teal",   description: "Can upload invoices and perform inventory counts",     icon: Users },

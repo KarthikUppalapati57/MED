@@ -4,6 +4,11 @@ BEGIN;
 -- This migration is intentionally additive: it reuses existing product,
 -- invoice, vendor item, and mapping tables.
 
+-- DROP first when return types / defaults may differ from earlier workflow RPCs.
+DROP FUNCTION IF EXISTS public.get_product_dashboard_summary(uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.get_product_purchase_report(uuid, uuid, uuid, date, date, text, text, text);
+DROP FUNCTION IF EXISTS public.get_product_verification_queue(uuid, uuid, uuid, text, text);
+
 CREATE OR REPLACE FUNCTION public.normalize_product_report_unit(p_unit text)
 RETURNS text
 LANGUAGE sql

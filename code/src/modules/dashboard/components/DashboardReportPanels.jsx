@@ -72,13 +72,13 @@ function normalizeReportPreferences(value = {}) {
     ? value.recipientRoles
     : Array.isArray(value.recipient_roles)
       ? value.recipient_roles
-      : ['tenant_super_admin', 'org_manager', 'branch_manager', 'location_manager'];
+      : ['tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager', 'location_manager'];
   return {
     dailyHandoff: Boolean(value.dailyHandoff ?? value.daily_handoff ?? true),
     weeklyExecutive: Boolean(value.weeklyExecutive ?? value.weekly_executive ?? true),
     includeForecasts: Boolean(value.includeForecasts ?? value.include_forecasts ?? true),
     includeEscalations: Boolean(value.includeEscalations ?? value.include_escalations ?? true),
-    recipientRoles: recipientRoles.length ? recipientRoles : ['tenant_super_admin', 'org_manager', 'branch_manager', 'location_manager'],
+    recipientRoles: recipientRoles.length ? recipientRoles : ['tenant_super_admin', 'org_manager', 'brand_manager', 'branch_manager', 'location_manager'],
   };
 }
 
@@ -178,7 +178,7 @@ async function sendDashboardReportNotifications({ brand, location, organization,
     if (scope === 'brand') return !profile.brand_id || !(brand?.brand_id || brand?.id) || profile.brand_id === (brand.brand_id || brand.id) || ['org_manager', 'tenant_super_admin'].includes(profile.role);
     if (scope === 'location') {
       if (['org_manager', 'tenant_super_admin'].includes(profile.role)) return true;
-      if (profile.role === 'branch_manager') return !profile.brand_id || !(brand?.brand_id || brand?.id) || profile.brand_id === (brand.brand_id || brand.id);
+      if (profile.role === 'brand_manager' || profile.role === 'branch_manager') return !profile.brand_id || !(brand?.brand_id || brand?.id) || profile.brand_id === (brand.brand_id || brand.id);
       if (profile.role === 'location_manager') return !profile.location_id || !location?.id || profile.location_id === location.id;
       return false;
     }
@@ -305,6 +305,7 @@ export function ScheduledReportsPanel({
   const roleOptions = [
     { value: 'tenant_super_admin', label: 'Tenant super admins' },
     { value: 'org_manager', label: 'Org managers' },
+    { value: 'brand_manager', label: 'Brand managers' },
     { value: 'branch_manager', label: 'Branch managers' },
     { value: 'location_manager', label: 'Location managers' },
   ];

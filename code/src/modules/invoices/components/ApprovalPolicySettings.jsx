@@ -24,7 +24,7 @@ export default function ApprovalPolicySettings() {
   const [newPolicy, setNewPolicy] = useState({
     min_amount: '',
     max_amount: '',
-    required_role: 'location_manager'
+    required_role: 'org_admin'
   });
 
   const { data: policies = [], isLoading } = useQuery({
@@ -142,9 +142,9 @@ export default function ApprovalPolicySettings() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="location_manager">Location Manager</SelectItem>
-                    <SelectItem value="branch_manager">Branch Manager</SelectItem>
+                    <SelectItem value="manager">General Manager</SelectItem>
+                    <SelectItem value="org_admin">Org Admin</SelectItem>
                     <SelectItem value="org_manager">Org Manager</SelectItem>
-                    <SelectItem value="tenant_super_admin">Tenant Super Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
@@ -116,7 +115,6 @@ export default function AutoOrdering() {
 
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
-  const { hasLocation, warnIfMissing } = useRequireLocation();
   const needsOrderList = ['all-orders', 'place-order', 'invoice-approval', 'receiving'].includes(activeTab);
   const needsInventory = ['all-orders', 'place-order', 'transfers'].includes(activeTab) || newTransferOpen;
   const needsVendors = ['all-orders', 'place-order'].includes(activeTab);
@@ -307,7 +305,6 @@ export default function AutoOrdering() {
 
   const createTransferMutation = useMutation({
     mutationFn: () => {
-      if (!hasLocation) throw new Error('Please select a location to continue');
       const inventoryItem = inventory.find((item) => item.id === transferForm.inventoryId);
       return createTransferWorkflow({
         organizationId: organization?.id,
@@ -346,7 +343,6 @@ export default function AutoOrdering() {
     mutationFn: async () => {
       const order = orders.find((item) => item.id === receivingOrderId);
       if (!order) throw new Error('Select an order to receive');
-      if (!hasLocation) throw new Error('Please select a location to continue');
       const receivedQuantities = Object.fromEntries((order.items || []).map((item) => [
         item.product_id || item.inventory_id || item.product_name,
         item.approved_quantity ?? item.suggested_quantity ?? item.quantity ?? 0,
@@ -373,7 +369,6 @@ export default function AutoOrdering() {
 
   // Generate order based on inventory levels
   const generateOrder = async () => {
-    if (!warnIfMissing()) return;
     setGenerating(true);
     try {
       // Find items at or below reorder point (threshold)
@@ -575,16 +570,6 @@ export default function AutoOrdering() {
     });
   }, [invoices, orders, receivings]);
 
-  const openNewTransferDialog = () => {
-    if (!warnIfMissing()) return;
-    setNewTransferOpen(true);
-  };
-
-  const openReceiveOrderDialog = () => {
-    if (!warnIfMissing()) return;
-    setReceiveOrderOpen(true);
-  };
-
   const approveInvoiceMutation = useMutation({
     mutationFn: ({ invoice, order }) => approveInvoiceWorkflow({
       invoice,
@@ -611,7 +596,7 @@ export default function AutoOrdering() {
         <Button
           onClick={generateOrder}
           disabled={generating}
-          className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")}
+          className="bg-primary hover:bg-primary"
         >
           {generating ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1154,7 +1139,7 @@ export default function AutoOrdering() {
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">Move inventory between your store locations</p>
               </div>
-              <Button size="sm" className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")} onClick={openNewTransferDialog}>New Transfer</Button>
+              <Button size="sm" className="bg-primary hover:bg-primary" onClick={() => setNewTransferOpen(true)}>New Transfer</Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -1233,7 +1218,7 @@ export default function AutoOrdering() {
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">Track physical deliveries against Purchase Orders</p>
               </div>
-              <Button size="sm" className={cn("bg-primary hover:bg-primary", !hasLocation && "opacity-50 cursor-not-allowed")} onClick={openReceiveOrderDialog}>Receive Order</Button>
+              <Button size="sm" className="bg-primary hover:bg-primary" onClick={() => setReceiveOrderOpen(true)}>Receive Order</Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -1411,9 +1396,9 @@ export default function AutoOrdering() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewTransferOpen(false)}>Cancel</Button>
             <Button
-              className={cn("bg-primary hover:bg-primary text-primary-foreground", !hasLocation && "opacity-50 cursor-not-allowed")}
+              className="bg-primary hover:bg-primary text-primary-foreground"
               disabled={createTransferMutation.isPending || !transferForm.inventoryId || !transferForm.toLocationId || Number(transferForm.quantity || 0) <= 0}
-              onClick={() => { if (!warnIfMissing()) return; createTransferMutation.mutate(); }}
+              onClick={() => createTransferMutation.mutate()}
             >
               {createTransferMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Initiate Transfer
@@ -1445,7 +1430,7 @@ export default function AutoOrdering() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReceiveOrderOpen(false)}>Cancel</Button>
-            <Button className={cn("bg-primary hover:bg-primary text-primary-foreground", !hasLocation && "opacity-50 cursor-not-allowed")} disabled={createReceivingMutation.isPending || !receivingOrderId} onClick={() => { if (!warnIfMissing()) return; createReceivingMutation.mutate(); }}>
+            <Button className="bg-primary hover:bg-primary text-primary-foreground" disabled={createReceivingMutation.isPending || !receivingOrderId} onClick={() => createReceivingMutation.mutate()}>
               {createReceivingMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Log Receiving
             </Button>

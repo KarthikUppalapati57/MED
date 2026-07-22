@@ -54,8 +54,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabaseClient';
-import { isPageInEnabledModules, getModuleForPage } from '@/lib/moduleConfig';
-import { useRequireLocation } from '@/hooks/useRequireLocation';
+import { isPageInEnabledModules } from '@/lib/moduleConfig';
 import ContextSwitcher from '@/components/ContextSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import RestopsLogo from '@/components/RestopsLogo';
@@ -159,6 +158,7 @@ const navigation = [
       { name: 'Recipes List', href: 'Recipes/recipes-list', icon: ChefHat },
       { name: 'Prepared Items', href: 'Recipes/prepared-items', icon: Plus },
       { name: 'Bar Items', href: 'Recipes/bar-items', icon: Wine },
+      { name: 'Unit Conversions', href: 'Recipes/unit-conversions', icon: ArrowRightLeft },
       { name: 'Menu Engineering', href: 'MenuEngineering', icon: Activity },
       { name: 'Setup', href: 'Recipes/setup', icon: Settings }
     ]
@@ -237,6 +237,7 @@ const roleBadgeColors = {
   ground_staff: 'bg-secondary text-muted-foreground',
   location_manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
   manager: 'bg-blue-500/10 text-blue-400 dark:bg-blue-500/20 dark:text-blue-300',
+  brand_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
   branch_manager: 'bg-cyan-500/10 text-cyan-500 dark:bg-cyan-500/20 dark:text-cyan-300',
   org_manager: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
   owner: 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-300',
@@ -250,7 +251,6 @@ export default function Layout({ children, currentPageName }) {
   const { user, userProfile, logout, role, organization } = useAuth();
   const { isOnline } = useOfflineSync();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
-  const { hasLocation, warnIfMissing } = useRequireLocation();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -426,6 +426,26 @@ export default function Layout({ children, currentPageName }) {
   const displayRole = role || 'loading';
   const canUseAiInsights = !isPlatformAdmin && hasMinRole('location_manager') && isPageInEnabledModules('AiInsights', enabledModules, userRole);
 
+  // Prefer explicit parent/dashboard navigation over history.back().
+  // Sidebar hops and ?company= URL sync often leave history stacks that
+  // make navigate(-1) stay on the same Recipes tab or leave the app.
+  const handleBack = () => {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const search = location.search || '';
+
+    if (parts.length > 2) {
+      navigate(`/${parts.slice(0, 2).join('/')}${search}`);
+      return;
+    }
+
+    if (parts.length >= 1 && parts[0].toLowerCase() !== 'dashboard') {
+      navigate(`${createPageUrl('Dashboard')}${search}`);
+      return;
+    }
+
+    navigate(-1);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar backdrop */}
@@ -503,24 +523,16 @@ export default function Layout({ children, currentPageName }) {
                               return location.pathname.toLowerCase().includes(sub.href.toLowerCase());
                           }
                         })();
-                        const needsLocation = getModuleForPage(sub.href)?.requiresLocation;
                         return (
                           <Link
                             key={sub.name}
                             to={createPageUrl(sub.href)}
-                            onClick={(e) => {
-                              if (needsLocation && !warnIfMissing()) {
-                                e.preventDefault();
-                                return;
-                              }
-                              setSidebarOpen(false);
-                            }}
+                            onClick={() => setSidebarOpen(false)}
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                               isSubActive
                                 ? "bg-brand/10 text-brand shadow-[0_0_8px_rgba(20,198,203,0.1)] border-l-2 border-brand pl-2"
-                                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground hover:translate-x-1 duration-200",
-                              needsLocation && !hasLocation && "opacity-50 cursor-not-allowed"
+                                : "text-muted-foreground hover:bg-secondary/40 hover:text-foreground hover:translate-x-1 duration-200"
                             )}
                           >
                             <sub.icon className="h-4 w-4" />
@@ -706,7 +718,7 @@ export default function Layout({ children, currentPageName }) {
               variant="ghost" 
               size="sm" 
               className="mb-4 text-muted-foreground hover:text-foreground group -ml-2"
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
             >
               <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back

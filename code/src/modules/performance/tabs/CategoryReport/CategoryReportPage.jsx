@@ -91,8 +91,6 @@ export default function CategoryReportPage() {
       },
     ],
   });
-  const locations = locationsQuery[0]?.data || [];
-
   const {
     report,
     summary,
@@ -116,6 +114,10 @@ export default function CategoryReportPage() {
     selectedCategory,
     trendCategories: trendCats.length ? trendCats : null,
   });
+
+  const locations = metadata?.filterOptions?.locations?.length
+    ? metadata.filterOptions.locations
+    : (locationsQuery[0]?.data || []);
 
   const drilldown = useCategoryPerformanceDrilldown({
     organizationId: organization?.id,

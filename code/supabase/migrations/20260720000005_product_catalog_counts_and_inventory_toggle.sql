@@ -1,5 +1,7 @@
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.get_product_catalog(uuid, uuid, uuid, text, text, integer, integer);
+
 CREATE OR REPLACE FUNCTION public.get_product_catalog(
   p_organization_id uuid DEFAULT NULL,
   p_brand_id uuid DEFAULT NULL,

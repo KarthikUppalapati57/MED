@@ -15,6 +15,13 @@
 
 BEGIN;
 
+-- DROP first: CREATE OR REPLACE cannot change parameter defaults
+-- (earlier workflow RPC used DEFAULT NULL; this version uses true/false/0).
+DROP FUNCTION IF EXISTS public.create_product_details(text, text, text, text, text, boolean, boolean, text, text, numeric, boolean, uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.update_product_details(uuid, text, text, text, text, text, boolean, boolean, text, text, numeric, boolean);
+DROP FUNCTION IF EXISTS public.set_product_inventory_tracking(uuid, boolean);
+DROP FUNCTION IF EXISTS public.soft_delete_product_safe(uuid);
+
 CREATE OR REPLACE FUNCTION public.create_product_details(
   p_name text,
   p_restops_product_id text DEFAULT NULL,

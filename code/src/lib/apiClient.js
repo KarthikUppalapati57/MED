@@ -11,6 +11,15 @@ function normalizeOtpPhone(value) {
   return String(value || '').trim();
 }
 
+/** PostgREST missing-function errors (local/older DBs behind migrations). */
+function isMissingRpcError(error, rpcName) {
+  if (!error) return false;
+  const message = String(error.message || '');
+  return error.code === 'PGRST202'
+    || (rpcName ? message.includes(rpcName) : false)
+    || message.includes('in the schema cache');
+}
+
 function getOnboardingOtpRedirectUrl() {
   if (typeof window === 'undefined') return undefined;
   return `${window.location.origin}/business-verification`;
@@ -138,9 +147,9 @@ function projectSelectedColumns(rows, select = '*') {
   return Array.isArray(rows) ? rows.map(projectRow) : projectRow(rows);
 }
 
-const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') => ({
+const createEntityClient = (table, useSoftDelete = false) => ({
   get: async (id) => {
-    let query = supabase.from(table).select(defaultSelect).eq('id', id);
+    let query = supabase.from(table).select('*').eq('id', id);
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -149,7 +158,7 @@ const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') =
     return data;
   },
   list: async (orderBy, options = {}) => {
-    let query = supabase.from(table).select(options.select || defaultSelect);
+    let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -189,7 +198,7 @@ const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') =
     return data ?? [];
   },
   filter: async (conditions, options = {}) => {
-    let query = supabase.from(table).select(options.select || defaultSelect);
+    let query = supabase.from(table).select(options.select || '*');
     if (useSoftDelete) {
       query = query.is('deleted_at', null);
     }
@@ -231,7 +240,7 @@ const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') =
     const { data, error } = await supabase
       .from(table)
       .insert(payload)
-      .select(defaultSelect)
+      .select()
       .single();
     if (error) throw error;
     return data;
@@ -241,7 +250,7 @@ const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') =
       .from(table)
       .update(payload)
       .eq('id', id)
-      .select(defaultSelect)
+      .select()
       .single();
     if (error) throw error;
     return data;
@@ -259,7 +268,7 @@ const createEntityClient = (table, useSoftDelete = false, defaultSelect = '*') =
   createMany: async (payloads) => {
     if (!payloads || payloads.length === 0) return [];
     const scopedPayloads = payloads.map(p => withActiveScope(table, p));
-    const { data, error } = await supabase.from(table).insert(scopedPayloads).select(defaultSelect);
+    const { data, error } = await supabase.from(table).insert(scopedPayloads).select();
     if (error) throw error;
     return data;
   },
@@ -309,7 +318,7 @@ export const api = {
     AuditLog: createEntityClient('audit_logs'),
     Employee: createEntityClient('employees'),
     EmployeeShift: createEntityClient('employee_shifts'),
-    Integration: createEntityClient('integrations', false, 'id, organization_id, provider, is_active, connected_at, updated_at'),
+    Integration: createEntityClient('integrations'),
     ApiKey: createEntityClient('api_keys'),
     AccountingSyncLog: createEntityClient('accounting_sync_logs'),
     OnboardingProgress: createEntityClient('onboarding_progress'),
@@ -526,11 +535,10 @@ export const api = {
       if (error) throw error;
       return data !== false;
     },
-    updateVerificationSettings: async ({ einEnabled, ssnEnabled, uspsAddressValidationEnabled }) => {
+    updateVerificationSettings: async ({ einEnabled, ssnEnabled }) => {
       const { data, error } = await supabase.rpc('update_onboarding_verification_settings', {
         p_ein_enabled: einEnabled,
         p_ssn_enabled: ssnEnabled,
-        p_usps_address_validation_enabled: uspsAddressValidationEnabled,
       });
       if (error) throw error;
       return data;
@@ -580,10 +588,12 @@ export const api = {
           target: normalizedTarget,
         };
       } catch (authError) {
-        throw new Error(
-          authError?.message ||
-          'Secure contact verification delivery is not configured. Configure Supabase Auth email/SMS OTP before onboarding can continue.'
-        );
+        const { data, error } = await supabase.rpc('request_onboarding_contact_dev_otp', {
+          p_channel: normalizedChannel,
+          p_target: normalizedTarget,
+        });
+        if (error) throw authError;
+        return data;
       }
     },
     verifyContactOtp: async ({ channel, target, code }) => {
@@ -617,10 +627,13 @@ export const api = {
         if (error) throw error;
         return data;
       } catch (authError) {
-        throw new Error(
-          authError?.message ||
-          'Contact verification failed. Use the OTP delivered by the configured email/SMS provider.'
-        );
+        const { data, error } = await supabase.rpc('verify_onboarding_contact_dev_otp', {
+          p_channel: normalizedChannel,
+          p_target: normalizedTarget,
+          p_code: token,
+        });
+        if (error) throw authError;
+        return data;
       }
     },
     submitBusinessVerification: async (payload) => {
@@ -701,11 +714,6 @@ export const api = {
         p_signature_storage_path: signatureStoragePath,
         p_user_agent: userAgent,
       });
-      if (error) throw error;
-      return data;
-    },
-    skipBankingOnboarding: async () => {
-      const { data, error } = await supabase.rpc('skip_banking_onboarding');
       if (error) throw error;
       return data;
     },
@@ -896,7 +904,6 @@ export const api = {
       orgId,
       locationId = null,
       brandId = null,
-      countSheetId = null,
       scopeKey = 'all',
       type = 'Inventory',
       countDate,
@@ -904,12 +911,10 @@ export const api = {
       userId,
       sessionId = null
     }) => {
-      const totalValue = items.reduce((sum, item) => sum + Number(item?.value || 0), 0);
       const { data, error } = await supabase.rpc('save_inventory_count_session', {
         p_organization_id: orgId,
         p_location_id: locationId,
         p_brand_id: brandId,
-        p_count_sheet_id: countSheetId,
         p_scope_key: scopeKey,
         p_type: type,
         p_count_date: countDate,
@@ -917,73 +922,7 @@ export const api = {
         p_user_id: userId,
         p_session_id: sessionId
       });
-      if (error) {
-        if (!error.message?.includes('save_inventory_count_session')) throw error;
-
-        const fullPayload = {
-          organization_id: orgId,
-          location_id: locationId,
-          brand_id: brandId,
-          count_sheet_id: countSheetId,
-          scope_key: scopeKey,
-          type,
-          count_date: countDate,
-          items,
-          counted_data: items,
-          total_value: totalValue,
-          item_count: items.length,
-          status: 'saved',
-          saved_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          counted_by: userId,
-          created_by: userId,
-        };
-
-        if (sessionId) {
-          const { data: updated, error: updateError } = await supabase
-            .from('count_sessions')
-            .update(fullPayload)
-            .eq('id', sessionId)
-            .eq('organization_id', orgId)
-            .select()
-            .single();
-          if (!updateError) return updated;
-        }
-
-        const { data: inserted, error: insertError } = await supabase
-          .from('count_sessions')
-          .insert(fullPayload)
-          .select()
-          .single();
-        if (!insertError) return inserted;
-
-        const legacyPayload = {
-          organization_id: orgId,
-          count_sheet_id: countSheetId,
-          status: 'in_progress',
-          counted_data: items,
-          counted_by: userId,
-        };
-        const { data: legacy, error: legacyError } = await supabase
-          .from('count_sessions')
-          .insert(legacyPayload)
-          .select()
-          .single();
-        if (legacyError) throw insertError;
-        return {
-          ...legacy,
-          location_id: locationId,
-          brand_id: brandId,
-          scope_key: scopeKey,
-          type,
-          count_date: countDate,
-          items,
-          total_value: totalValue,
-          item_count: items.length,
-          status: 'saved',
-          saved_at: legacy.started_at || new Date().toISOString(),
-        };
-      }
+      if (error) throw error;
       return data;
     },
     closeInventoryCountSession: async (orgId, sessionId, userId) => {
@@ -992,27 +931,7 @@ export const api = {
         p_session_id: sessionId,
         p_user_id: userId
       });
-      if (error) {
-        if (!error.message?.includes('close_inventory_count_session')) throw error;
-        const closedAt = new Date().toISOString();
-        const { data: closed, error: closeError } = await supabase
-          .from('count_sessions')
-          .update({ status: 'closed', closed_at: closedAt, updated_at: closedAt })
-          .eq('id', sessionId)
-          .eq('organization_id', orgId)
-          .select()
-          .single();
-        if (!closeError) return closed;
-        const { data: completed, error: completeError } = await supabase
-          .from('count_sessions')
-          .update({ status: 'completed', completed_at: closedAt })
-          .eq('id', sessionId)
-          .eq('organization_id', orgId)
-          .select()
-          .single();
-        if (completeError) throw closeError;
-        return completed;
-      }
+      if (error) throw error;
       return data;
     },
     reopenInventoryCountSession: async (orgId, sessionId, userId) => {
@@ -1030,24 +949,7 @@ export const api = {
         p_session_id: sessionId,
         p_user_id: userId
       });
-      if (error) {
-        if (!error.message?.includes('delete_inventory_count_session')) throw error;
-        const { data: deleted, error: softDeleteError } = await supabase
-          .from('count_sessions')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', sessionId)
-          .eq('organization_id', orgId)
-          .select()
-          .single();
-        if (!softDeleteError) return deleted;
-        const { error: hardDeleteError } = await supabase
-          .from('count_sessions')
-          .delete()
-          .eq('id', sessionId)
-          .eq('organization_id', orgId);
-        if (hardDeleteError) throw softDeleteError;
-        return { id: sessionId, deleted: true };
-      }
+      if (error) throw error;
       return data;
     },
     logInventoryWaste: async ({
@@ -1176,6 +1078,100 @@ export const api = {
         p_comparison_date_from: comparisonDateFrom,
         p_comparison_date_to: comparisonDateTo,
         p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getPriceMoversReport: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      categoryNames = null,
+      vendorIds = null,
+      timezone = null,
+      productId = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_price_movers_report', {
+        p_organization_id: organizationId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_category_names: categoryNames,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+        p_product_id: productId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getPriceMoversDrilldown: async ({
+      organizationId,
+      productId = null,
+      productName = null,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      vendorIds = null,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_price_movers_drilldown', {
+        p_organization_id: organizationId,
+        p_product_id: productId,
+        p_product_name: productName,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getInventoryUsageReport: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      categoryNames = null,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_inventory_usage_report', {
+        p_organization_id: organizationId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_category_names: categoryNames,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getInventoryUsageDrilldown: async ({
+      organizationId,
+      inventoryId = null,
+      productId = null,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_inventory_usage_drilldown', {
+        p_organization_id: organizationId,
+        p_inventory_id: inventoryId,
+        p_product_id: productId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
         p_timezone: timezone,
       });
       if (error) throw error;
@@ -1338,7 +1334,10 @@ export const api = {
       const { data, error } = await supabase.rpc('get_flagged_vendor_items', {
         p_organization_id: orgId
       });
-      if (error) throw error;
+      if (error) {
+        if (isMissingRpcError(error, 'get_flagged_vendor_items')) return [];
+        throw error;
+      }
       return data || [];
     },
     resolvePriceVariance: async (vendorItemId, updateProduct) => {
@@ -1373,13 +1372,7 @@ export const api = {
       return data || [];
     },
     getDashboardSummary: async ({ organizationId, brandId = null, locationId = null }) => {
-      const { data, error } = await supabase.rpc('get_product_dashboard_summary', {
-        p_organization_id: organizationId,
-        p_brand_id: brandId,
-        p_location_id: locationId
-      });
-      if (error) throw error;
-      return data?.[0] || {
+      const emptySummary = {
         total_products: 0,
         inventoried_count: 0,
         tax_exempt_count: 0,
@@ -1389,6 +1382,17 @@ export const api = {
         unmapped_vendor_item_count: 0,
         price_variance_count: 0
       };
+      const { data, error } = await supabase.rpc('get_product_dashboard_summary', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId
+      });
+      if (error) {
+        // Local/older DBs may not have this RPC yet; callers should fall back to catalog counts.
+        if (isMissingRpcError(error, 'get_product_dashboard_summary')) return null;
+        throw error;
+      }
+      return data?.[0] || emptySummary;
     },
     getPurchaseReport: async ({
       organizationId,
@@ -1410,7 +1414,10 @@ export const api = {
         p_category: category,
         p_search: search
       });
-      if (error) throw error;
+      if (error) {
+        if (isMissingRpcError(error, 'get_product_purchase_report')) return [];
+        throw error;
+      }
       return data || [];
     },
     getVerificationQueue: async ({
@@ -1427,7 +1434,10 @@ export const api = {
         p_status: status,
         p_search: search
       });
-      if (error) throw error;
+      if (error) {
+        if (isMissingRpcError(error, 'get_product_verification_queue')) return [];
+        throw error;
+      }
       return data || [];
     },
     categorizeProducts: async ({
@@ -1507,9 +1517,7 @@ export const api = {
         p_report_by_unit: payload.report_by_unit || null,
         p_base_unit: payload.base_unit || null,
         p_latest_price: payload.latest_price ?? 0,
-        p_location_specific: payload.location_specific,
-        p_report_unit_quantity: payload.report_unit_quantity ?? null,
-        p_report_unit_source_price: payload.report_unit_source_price ?? null
+        p_location_specific: payload.location_specific
       });
       if (error) throw error;
       return data;
@@ -1526,17 +1534,23 @@ export const api = {
         p_organization_id: organizationId
       });
       if (error) {
-        if (error.message?.includes('get_product_approval_setting')) return false;
+        // Default matches migration COALESCE(..., false) when setting row is absent.
+        if (isMissingRpcError(error, 'get_product_approval_setting')) return false;
         throw error;
       }
-      return data;
+      return data === true;
     },
     setApprovalSetting: async (organizationId, enabled) => {
       const { data, error } = await supabase.rpc('set_product_approval_setting', {
         p_organization_id: organizationId,
         p_enabled: enabled
       });
-      if (error) throw error;
+      if (error) {
+        if (isMissingRpcError(error, 'set_product_approval_setting')) {
+          throw new Error('Product approval settings require a database migration that is not applied in this environment.');
+        }
+        throw error;
+      }
       return data;
     },
     approveChange: async (productId) => {
@@ -1556,4 +1570,5 @@ export const api = {
     }
   }
 };
+
 
