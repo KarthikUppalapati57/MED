@@ -170,37 +170,29 @@ const HIERARCHY_TEMPLATE_COLUMNS = [
   'location_mailing_country',
 ];
 
-const HIERARCHY_TEMPLATE_ROWS = [
+const HIERARCHY_TEMPLATE_BLANK_ROWS = [Object.fromEntries(HIERARCHY_TEMPLATE_COLUMNS.map((column) => [column, '']))];
+
+const HIERARCHY_TEMPLATE_EXAMPLE_ROWS = [
   {
-    organization_name: 'Karthik Restaurant Group',
-    organization_slug: 'karthik-restaurant-group',
+    organization_name: 'North Region Operations',
+    organization_slug: 'north-region-operations',
     organization_address_source: 'same_as_tenant',
-    organization_address_line1: '',
-    organization_city: '',
-    organization_state: '',
-    organization_postal_code: '',
-    organization_country: '',
     organization_mailing_same_as_business: 'yes',
     brand_name: 'Downtown Grill',
     brand_address_source: 'same_as_organization',
     location_name: 'Downtown Knoxville',
-    location_address_source: 'same_as_brand',
-    location_address_line1: '',
-    location_city: '',
-    location_state: '',
-    location_postal_code: '',
-    location_country: '',
+    location_address_source: 'custom',
+    location_address_line1: '123 Main St',
+    location_city: 'Knoxville',
+    location_state: 'TN',
+    location_postal_code: '37902',
+    location_country: 'United States',
     location_mailing_same_as_business: 'yes',
   },
   {
-    organization_name: 'Karthik Restaurant Group',
-    organization_slug: 'karthik-restaurant-group',
+    organization_name: 'North Region Operations',
+    organization_slug: 'north-region-operations',
     organization_address_source: 'same_as_tenant',
-    organization_address_line1: '',
-    organization_city: '',
-    organization_state: '',
-    organization_postal_code: '',
-    organization_country: '',
     organization_mailing_same_as_business: 'yes',
     brand_name: 'Downtown Grill',
     brand_address_source: 'same_as_organization',
@@ -211,6 +203,38 @@ const HIERARCHY_TEMPLATE_ROWS = [
     location_state: 'TN',
     location_postal_code: '37919',
     location_country: 'United States',
+    location_mailing_same_as_business: 'yes',
+  },
+  {
+    organization_name: 'North Region Operations',
+    organization_slug: 'north-region-operations',
+    organization_address_source: 'same_as_tenant',
+    organization_mailing_same_as_business: 'yes',
+    brand_name: 'Market Cafe',
+    brand_address_source: 'same_as_organization',
+    location_name: 'Market Cafe Oak Ridge',
+    location_address_source: 'custom',
+    location_address_line1: '210 Oak Ave',
+    location_city: 'Oak Ridge',
+    location_state: 'TN',
+    location_postal_code: '37830',
+    location_country: 'United States',
+    location_mailing_same_as_business: 'yes',
+  },
+  {
+    organization_name: 'South Region Operations',
+    organization_slug: 'south-region-operations',
+    organization_address_source: 'custom',
+    organization_address_line1: '900 Regional Way',
+    organization_city: 'Chattanooga',
+    organization_state: 'TN',
+    organization_postal_code: '37402',
+    organization_country: 'United States',
+    organization_mailing_same_as_business: 'yes',
+    brand_name: 'River Bistro',
+    brand_address_source: 'same_as_organization',
+    location_name: 'River Bistro Chattanooga',
+    location_address_source: 'same_as_brand',
     location_mailing_same_as_business: 'yes',
   },
 ];
@@ -676,13 +700,14 @@ export default function OnboardingPage() {
   const removeBrand = (orgIdx, brandIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx && org.brands.length > 1 ? { ...org, brands: org.brands.filter((_, nextIndex) => nextIndex !== brandIdx) } : org));
   const removeLocation = (orgIdx, brandIdx, locIdx) => setOrganizations((prev) => prev.map((org, index) => index === orgIdx ? { ...org, brands: org.brands.map((brand, nextBrandIdx) => nextBrandIdx === brandIdx && brand.locations.length > 1 ? { ...brand, locations: brand.locations.filter((_, nextLocIdx) => nextLocIdx !== locIdx) } : brand) } : org));
 
-  const downloadHierarchyTemplate = () => {
-    const csv = Papa.unparse({ fields: HIERARCHY_TEMPLATE_COLUMNS, data: HIERARCHY_TEMPLATE_ROWS });
+  const downloadHierarchyTemplate = (mode = 'blank') => {
+    const isExample = mode === 'example';
+    const csv = Papa.unparse({ fields: HIERARCHY_TEMPLATE_COLUMNS, data: isExample ? HIERARCHY_TEMPLATE_EXAMPLE_ROWS : HIERARCHY_TEMPLATE_BLANK_ROWS });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'restops-organization-hierarchy-template.csv';
+    link.download = isExample ? 'restops-organization-hierarchy-example.csv' : 'restops-organization-hierarchy-template.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1248,10 +1273,10 @@ export default function OnboardingPage() {
             <div className="rounded-md border border-dashed bg-muted/20 p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><h3 className="font-semibold text-foreground">Upload hierarchy template</h3><p className="mt-1 text-sm text-muted-foreground">Upload does not create records immediately. A valid file merges into the manual tree for review and editing.</p></div>
-                <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={downloadHierarchyTemplate}><Download className="mr-2 h-4 w-4" /> Download blank template</Button><Button type="button" onClick={() => hierarchyImportInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload CSV</Button><input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" /></div>
+                <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => downloadHierarchyTemplate('blank')}><Download className="mr-2 h-4 w-4" /> Blank CSV</Button><Button type="button" variant="outline" onClick={() => downloadHierarchyTemplate('example')}><Download className="mr-2 h-4 w-4" /> Example CSV</Button><Button type="button" onClick={() => hierarchyImportInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload CSV</Button><input ref={hierarchyImportInputRef} type="file" accept=".csv,text/csv" onChange={handleHierarchyTemplateUpload} className="hidden" /></div>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2"><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Required columns</h4><p className="text-sm text-muted-foreground">organization_name, brand_name, location_name. Location address fields are required only when location_address_source is custom.</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Optional columns</h4><p className="text-sm text-muted-foreground">Address source columns support same_as_tenant, same_as_organization, same_as_brand, or custom. Use custom when entering address fields manually.</p></div></div>
+            <div className="grid gap-4 lg:grid-cols-3"><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">How rows become hierarchy</h4><p className="text-sm text-muted-foreground">Use one row per location. Repeat the same organization_name and brand_name to place multiple locations under the same brand. Change brand_name for a new brand. Change organization_name for a new organization.</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Required columns</h4><p className="text-sm text-muted-foreground">organization_name, brand_name, location_name. Location address fields are required only when location_address_source is custom.</p></div><div className="rounded-md border bg-card p-4"><h4 className="mb-2 text-sm font-semibold text-foreground">Address shortcuts</h4><p className="text-sm text-muted-foreground">Use same_as_tenant, same_as_organization, same_as_brand, or custom in the address_source columns. The example CSV shows multiple organizations, brands, and locations.</p></div></div>
             <div className="rounded-md border bg-card p-4"><div className="mb-3 flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-foreground">Import preview</h4><span className="text-xs text-muted-foreground">{totals.locationCount} parsed location rows in the current tree</span></div><div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead className="text-xs uppercase text-muted-foreground"><tr><th className="py-2">Organization</th><th>Brand</th><th>Location</th><th>City</th><th>Postal code</th></tr></thead><tbody>{organizations.flatMap((org) => org.brands.flatMap((brand) => brand.locations.map((location) => { const issue = !addressComplete(location.businessAddress); return <tr key={`${org.name}-${brand.name}-${location.name}`} className={issue ? 'bg-destructive/10 text-destructive' : 'border-t'}><td className="py-2">{org.name || '- missing'}</td><td>{brand.name || '- missing'}</td><td>{location.name || '- missing'}</td><td>{location.businessAddress.city || '- missing'}</td><td>{location.businessAddress.postalCode || '- missing'}</td></tr>; })))}</tbody></table></div></div>
           </div>
         ) : (

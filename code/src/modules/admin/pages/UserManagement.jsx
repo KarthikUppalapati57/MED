@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, FileText, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key
+  UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key, Store, MapPin
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -94,7 +94,120 @@ function RoleBadges({ member, maxVisible = 2 }) {
 }
 
 
-// UserDetailDrawer 
+// MemberRow — single member, rendered inside a brand/location hierarchy group
+function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
+  const queryClient = useQueryClient();
+  const memberRole = member.role || member.capabilities?.role || 'ground_staff';
+  const roleDef = Restops_ROLES[memberRole] || Restops_ROLES.ground_staff;
+  const status = member.status || 'active';
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
+  const StatusIcon = statusCfg.icon;
+
+  return (
+    <div
+      className={cn("group flex items-center gap-4 px-5 py-3 transition-colors", canEditRow && "cursor-pointer hover:bg-secondary/50")}
+      onClick={() => canEditRow && onSelect(member)}
+    >
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
+        style={{ backgroundColor: avatarColor(member.profiles?.email || member.email || '') }}>
+        {(member.profiles?.full_name || member.full_name || member.profiles?.email || member.email || '?').charAt(0)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-foreground text-sm leading-tight truncate">
+          {member.profiles?.full_name || member.full_name || 'Verification Pending'}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{member.profiles?.email || member.email}</p>
+      </div>
+      <RoleBadges member={member} />
+      <span className={cn("hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold shrink-0", statusCfg.badgeClass)}>
+        <StatusIcon className="w-3 h-3" />{statusCfg.label}
+      </span>
+      <span className="hidden md:inline text-xs text-muted-foreground w-20 shrink-0 text-right">
+        {formatLastActive(member.profiles?.updated_at || member.updated_at)}
+      </span>
+      <div onClick={e => e.stopPropagation()} className="shrink-0">
+        {canEditRow && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="group-hover:bg-card rounded-xl">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl border-border shadow-xl p-2 w-48">
+              <DropdownMenuItem onClick={() => onSelect(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-foreground">
+                <Edit2 className="h-4 w-4 mr-3 text-primary" /> Edit Member
+              </DropdownMenuItem>
+              {member.token && (
+                <>
+                  <DropdownMenuItem
+                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-blue hover:bg-resend-blue/5"
+                    onClick={() => {
+                      const link = `${window.location.origin}/signup/${member.token}`;
+                      navigator.clipboard.writeText(link);
+                      toast.success("Invite link copied to clipboard!");
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-primary hover:bg-primary/5"
+                    onClick={async () => {
+                      toast.loading("Resending invite...", { id: 'resend-invite' });
+                      const { error } = await supabase.functions.invoke('invite-user', {
+                        body: {
+                          email: member.email || member.profiles?.email,
+                          full_name: member.full_name || member.profiles?.full_name,
+                          role: member.role || member.profiles?.role,
+                          organization_id: activeOrgId,
+                          resend: true
+                        }
+                      });
+                      if (error) {
+                        toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
+                      } else {
+                        toast.success("Invite resent successfully!", { id: 'resend-invite' });
+                      }
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-3" /> Resend Invite
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-red hover:bg-resend-red/5"
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
+                  const userId = member.user_id || member.id;
+
+                  // Optimistic update
+                  await queryClient.cancelQueries({ queryKey: ['team-members'] });
+                  const previousMembers = queryClient.getQueryData(['team-members']);
+                  queryClient.setQueryData(['team-members'], (old) =>
+                    old ? old.filter(m => (m.user_id || m.id) !== userId) : []
+                  );
+
+                  try {
+                    const { error } = await supabase.rpc('org_remove_member', { target_user_id: userId });
+                    if (error) throw error;
+                    posthog.capture('team_member_removed');
+                    toast.success('User removed from organization');
+                    queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                  } catch (e) {
+                    if (previousMembers) queryClient.setQueryData(['team-members'], previousMembers);
+                    toast.error(e.message || 'Failed to remove user');
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-3" /> Remove User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// UserDetailDrawer
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
   const { role: currentUserRole, userProfile } = useAuth();
@@ -780,9 +893,6 @@ export default function UserManagement() {
     enabled: !!activeOrgId,
   });
 
-  const brandNameById = useMemo(() => new Map(orgBrands.map(b => [b.brand_id, b.name])), [orgBrands]);
-  const locationNameById = useMemo(() => new Map(orgLocations.map(l => [l.id, l.name])), [orgLocations]);
-
   // Merge Restops_ROLES and customRoles
   const ALL_ROLES = useMemo(() => {
     const merged = { ...Restops_ROLES };
@@ -871,7 +981,37 @@ export default function UserManagement() {
     });
   }, [scopedMembers, search, roleFilter]);
 
- // Stats 
+  // Group filtered members into the org's brand/location hierarchy
+  const membersByLocation = useMemo(() => {
+    const map = new Map();
+    filteredMembers.forEach(m => {
+      const locId = m.location_id || m.profiles?.location_id;
+      if (!locId) return;
+      if (!map.has(locId)) map.set(locId, []);
+      map.get(locId).push(m);
+    });
+    return map;
+  }, [filteredMembers]);
+
+  const membersByBrandOnly = useMemo(() => {
+    const map = new Map();
+    filteredMembers.forEach(m => {
+      const locId = m.location_id || m.profiles?.location_id;
+      const brandId = m.brand_id || m.profiles?.brand_id;
+      if (locId || !brandId) return;
+      if (!map.has(brandId)) map.set(brandId, []);
+      map.get(brandId).push(m);
+    });
+    return map;
+  }, [filteredMembers]);
+
+  const orgWideMembers = useMemo(() => filteredMembers.filter(m => {
+    const locId = m.location_id || m.profiles?.location_id;
+    const brandId = m.brand_id || m.profiles?.brand_id;
+    return !locId && !brandId;
+  }), [filteredMembers]);
+
+ // Stats
   const stats = useMemo(() => {
     const total = scopedMembers.length;
     const active = scopedMembers.filter(m => m.status === 'active').length;
