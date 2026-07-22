@@ -174,6 +174,7 @@ function buildSourcePackageLabel(quantity, unit) {
 
 function countSheetItemKey(item = {}) {
   const safeItem = item || {};
+  if (safeItem.product_count_unit_id) return `count-unit:${safeItem.product_count_unit_id}`;
   return String(safeItem.inventory_id || safeItem.product_id || safeItem.product_name || '').trim().toLowerCase();
 }
 
@@ -187,6 +188,15 @@ function productInventoryKey(product = {}, inventoryItem = {}) {
     safeProduct.name ||
     ''
   ).trim().toLowerCase();
+}
+
+function isCountSheetItemForProduct(item = {}, product = {}, inventoryItem = {}) {
+  const itemKey = countSheetItemKey(item);
+  if (itemKey === productInventoryKey(product, inventoryItem)) return true;
+  if (item.internal_product_id && item.internal_product_id === product?.id) return true;
+  if (item.product_id && [product?.id, product?.product_id, inventoryItem?.product_id].filter(Boolean).includes(item.product_id)) return true;
+  if (item.inventory_id && inventoryItem?.id && item.inventory_id === inventoryItem.id) return true;
+  return false;
 }
 
 function getAccountingForCategory(category, fallback = '5110') {
@@ -359,11 +369,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       const items = Array.isArray(sheet.items) ? sheet.items : [];
       const inventoryItem = primaryInventoryItem;
       const nextItems = action === 'remove'
-        ? items.filter(item => countSheetItemKey(item) !== productCountSheetKey)
+        ? items.filter(item => !isCountSheetItemForProduct(item, product, inventoryItem))
         : [
             ...items.filter(item => countSheetItemKey(item) !== productCountSheetKey),
             {
               inventory_id: inventoryItem?.id || product.id,
+              internal_product_id: product.id,
               product_id: inventoryItem?.product_id || product.product_id || product.id,
               product_name: inventoryItem?.product_name || product.name,
               expected_quantity: inventoryItem?.current_quantity || 0,
@@ -387,6 +398,60 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       setSelectedCountSheetId('');
     },
     onError: (error) => toast.error(error?.message || 'Unable to update count sheet'),
+  });
+
+  const countUnitCountSheetMutation = useMutation({
+    mutationFn: async (row) => {
+      if (!row?.id || String(row.id).startsWith('draft-unit:')) {
+        throw new Error('Save the count unit before adding it to count sheets');
+      }
+
+      const assignedSheets = countSheetRows.filter(sheet => sheet.assigned);
+      if (assignedSheets.length === 0) {
+        throw new Error('Add this product to a count sheet first');
+      }
+
+      const inventoryItem = primaryInventoryItem;
+      const countUnitKey = `count-unit:${row.id}`;
+      let changedCount = 0;
+
+      await Promise.all(assignedSheets.map(async (sheet) => {
+        const items = Array.isArray(sheet.items) ? sheet.items : [];
+        if (items.some(item => countSheetItemKey(item) === countUnitKey)) return null;
+
+        const nextItems = [
+          ...items,
+          {
+            inventory_id: inventoryItem?.id || product.id,
+            internal_product_id: product.id,
+            product_id: inventoryItem?.product_id || product.product_id || product.id,
+            product_name: inventoryItem?.product_name || product.name,
+            expected_quantity: 0,
+            unit: row.unit || 'Each',
+            unit_cost: Number(row.price || 0),
+            product_count_unit_id: row.id,
+            count_unit_name: row.name || buildReportUnitLabel(row.quantity, row.unit),
+            sort_order: items.length + 1,
+          },
+        ];
+
+        const { error } = await api.client
+          .from('count_sheets')
+          .update({ items: nextItems, updated_at: new Date().toISOString() })
+          .eq('id', sheet.id);
+        if (error) throw error;
+        changedCount += 1;
+        return null;
+      }));
+
+      return changedCount;
+    },
+    onSuccess: (changedCount) => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-count-sheets'] });
+      queryClient.invalidateQueries({ queryKey: ['count_sheets'] });
+      toast.success(changedCount > 0 ? 'Count unit added to count sheets' : 'Count unit is already in count sheets');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to add count unit to count sheets'),
   });
 
   useEffect(() => {
@@ -1028,7 +1093,15 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                         <TableCell>No</TableCell>
                         <TableCell className="space-x-2">
                           <Button variant="link" className="h-auto px-0" onClick={() => navigate(`/Inventory${window.location.search}`)}>
-                            Add in Inventory
+                            View Inventory
+                          </Button>
+                          <Button
+                            variant="link"
+                            className="h-auto px-0"
+                            disabled={countUnitCountSheetMutation.isPending}
+                            onClick={() => countUnitCountSheetMutation.mutate(row)}
+                          >
+                            Add to Count Sheets
                           </Button>
                           <Button
                             variant="link"

@@ -207,6 +207,17 @@ function getInventoryItemValue(item = {}) {
   return Number.isFinite(storedValue) ? storedValue : 0;
 }
 
+function getCountSheetItemRowId(item = {}, index = 0) {
+  if (item.product_count_unit_id) return `count-unit:${item.product_count_unit_id}`;
+  return item.inventory_id || item.id || `${item.product_name}-${index}`;
+}
+
+function getStockCountItemKey(item = {}) {
+  if (item.count_row_id) return item.count_row_id;
+  if (item.product_count_unit_id) return `${item.id || item.inventory_id}:count-unit:${item.product_count_unit_id}`;
+  return item.id;
+}
+
 function csvValue(value) {
   const text = String(value ?? '');
   return `"${text.replace(/"/g, '""')}"`;
@@ -1285,6 +1296,7 @@ export default function Inventory() {
             ? {
                 ...inventoryItem,
                 sheet_sort_order: sheetItem.sort_order || 0,
+                count_row_id: getCountSheetItemRowId(sheetItem),
                 current_unit: sheetItem.unit || inventoryItem.current_unit || 'ea',
                 unit_cost: Number(sheetItem.unit_cost ?? inventoryItem.unit_cost ?? 0),
                 product_count_unit_id: sheetItem.product_count_unit_id || null,
@@ -1429,7 +1441,7 @@ export default function Inventory() {
       const unitCost = Number(item.unit_cost ?? inventoryItem.unit_cost ?? 0);
       return {
         ...item,
-        rowId: item.inventory_id || item.id || `${item.product_name}-${index}`,
+        rowId: getCountSheetItemRowId(item, index),
         product_id: inventoryItem.product_id || item.product_id || null,
         internal_product_id: inventoryItem.internal_product_id || item.internal_product_id || null,
         product_name: inventoryItem.product_name || item.product_name || 'Unnamed item',
@@ -1450,6 +1462,87 @@ export default function Inventory() {
     }, {});
     return Object.entries(grouped).map(([label, items]) => ({ label, items }));
   }, [countSheetDraftItems]);
+
+  const countSheetDraftProductIds = React.useMemo(() => {
+    return [...new Set(countSheetDraftItems.map(item => item.internal_product_id).filter(Boolean))];
+  }, [countSheetDraftItems]);
+
+  const { data: countSheetDraftCountUnits = [] } = useAuthQuery({
+    queryKey: ['count-sheet-draft-count-units', countSheetDraftProductIds.join(',')],
+    queryFn: () => api.products.listCountUnitsForProducts(countSheetDraftProductIds),
+    enabled: !!editingCountSheetId && countSheetDraftProductIds.length > 0,
+  });
+
+  const countSheetDraftCountUnitsByProductId = React.useMemo(() => {
+    return countSheetDraftCountUnits.reduce((acc, unit) => {
+      const productId = unit.product_id;
+      if (!productId) return acc;
+      if (!acc[productId]) acc[productId] = [];
+      acc[productId].push(unit);
+      return acc;
+    }, {});
+  }, [countSheetDraftCountUnits]);
+
+  const getCountSheetUnitOptions = React.useCallback((item) => {
+    const inventoryItem = inventory.find(row => row.id === item.inventory_id) || {};
+    const masterUnit = inventoryItem.current_unit || item.unit || 'ea';
+    const masterPrice = Number(inventoryItem.unit_cost ?? item.unit_cost ?? 0);
+    const options = [{
+      value: 'master',
+      label: masterUnit,
+      unit: masterUnit,
+      unitCost: masterPrice,
+      countUnitName: masterUnit,
+      productCountUnitId: null,
+    }];
+
+    const savedUnits = countSheetDraftCountUnitsByProductId[item.internal_product_id] || [];
+    savedUnits.forEach(unit => {
+      options.push({
+        value: `count-unit:${unit.id}`,
+        label: unit.name || unit.unit || 'Count unit',
+        unit: unit.unit || unit.name || 'ea',
+        unitCost: Number(unit.unit_price || 0),
+        countUnitName: unit.name || unit.unit || 'Count unit',
+        productCountUnitId: unit.id,
+      });
+    });
+
+    if (item.product_count_unit_id && !options.some(option => option.productCountUnitId === item.product_count_unit_id)) {
+      options.push({
+        value: `count-unit:${item.product_count_unit_id}`,
+        label: item.count_unit_name || item.unit || 'Saved unit',
+        unit: item.unit || 'ea',
+        unitCost: Number(item.unit_cost || 0),
+        countUnitName: item.count_unit_name || item.unit || 'Saved unit',
+        productCountUnitId: item.product_count_unit_id,
+      });
+    }
+
+    return options;
+  }, [countSheetDraftCountUnitsByProductId, inventory]);
+
+  const updateCountSheetDraftItemUnit = (rowId, value) => {
+    setCountSheetDraft(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: (prev.items || []).map((item, index) => {
+          if (getCountSheetItemRowId(item, index) !== rowId) return item;
+          const normalizedItem = countSheetDraftItems.find(draftItem => draftItem.rowId === rowId) || item;
+          const option = getCountSheetUnitOptions(normalizedItem).find(entry => entry.value === value);
+          if (!option) return item;
+          return {
+            ...item,
+            unit: option.unit,
+            unit_cost: option.unitCost,
+            product_count_unit_id: option.productCountUnitId,
+            count_unit_name: option.countUnitName,
+          };
+        }),
+      };
+    });
+  };
 
   const openCountSheetEditor = (sheet) => {
     const sheetItems = Array.isArray(sheet.items) ? sheet.items : [];
@@ -1522,7 +1615,7 @@ export default function Inventory() {
 
   const removeProductFromCountSheetDraft = (rowId) => {
     setCountSheetDraft(prev => prev
-      ? { ...prev, items: (prev.items || []).filter((item, index) => (item.inventory_id || item.id || `${item.product_name}-${index}`) !== rowId) }
+      ? { ...prev, items: (prev.items || []).filter((item, index) => getCountSheetItemRowId(item, index) !== rowId) }
       : prev
     );
   };
@@ -1531,7 +1624,7 @@ export default function Inventory() {
     setCountSheetDraft(prev => {
       if (!prev) return prev;
       const items = [...(prev.items || [])];
-      const index = items.findIndex((item, itemIndex) => (item.inventory_id || item.id || `${item.product_name}-${itemIndex}`) === rowId);
+      const index = items.findIndex((item, itemIndex) => getCountSheetItemRowId(item, itemIndex) === rowId);
       const nextIndex = index + direction;
       if (index < 0 || nextIndex < 0 || nextIndex >= items.length) return prev;
       [items[index], items[nextIndex]] = [items[nextIndex], items[index]];
@@ -1605,12 +1698,16 @@ export default function Inventory() {
 
   const currentStockCountItems = React.useMemo(() => {
     return stockCountSections.flatMap(section => section.items.map(item => {
-      const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, item.id);
-      const count = Number(hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || 0);
+      const rowKey = getStockCountItemKey(item);
+      const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, rowKey);
+      const count = Number(hasEnteredCount ? stockCountValues[rowKey] : item.current_quantity || 0);
       const unitCost = Number(item.unit_cost || 0);
       const bucket = getSummaryBucketLabel(getCountSheetBucket(item));
       return {
-        id: item.id,
+        id: rowKey,
+        inventory_id: item.id || item.inventory_id || null,
+        product_count_unit_id: item.product_count_unit_id || null,
+        count_unit_name: item.count_unit_name || item.current_unit || item.unit || 'ea',
         product_name: item.product_name,
         accounting_category: item.accounting_category,
         category: getCOALabel(item.accounting_category),
@@ -1839,7 +1936,7 @@ export default function Inventory() {
     setStockCountDate(record.date || new Date().toISOString().split('T')[0]);
     setStockCountSheetId(record.countSheetId || record.count_sheet_id || '');
     setStockCountScopes(String(record.scopeKey || 'all').split(',').filter(Boolean));
-    setStockCountValues(Object.fromEntries((record.items || []).map(item => [item.id, String(item.count || '')])));
+    setStockCountValues(Object.fromEntries((record.items || []).map(item => [getStockCountItemKey(item), String(item.count || '')])));
     setStockCountDetailRecord(null);
     toast.success('Count opened for editing');
   };
@@ -2006,7 +2103,7 @@ export default function Inventory() {
     const items = Array.isArray(record?.items) ? record.items : [];
 
     items.forEach(item => {
-      const inventoryItem = inventoryById.get(item.id) || {};
+      const inventoryItem = inventoryById.get(item.inventory_id || item.id) || {};
       const bucket = item.bucket || getCountSheetBucket({ ...inventoryItem, ...item });
       if (!groups[bucket]) groups[bucket] = { label: bucket, items: [], previousValue: 0, countValue: 0 };
       const previousCount = Number(inventoryItem.previous_quantity ?? inventoryItem.current_quantity ?? 0);
@@ -3777,14 +3874,15 @@ export default function Inventory() {
                           {section.items
                             .filter(item => !debouncedSearch || String(item.product_name || '').toLowerCase().includes(debouncedSearch.toLowerCase()))
                             .map(item => {
-                            const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, item.id);
-                            const count = Number(hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || 0);
+                            const rowKey = getStockCountItemKey(item);
+                            const hasEnteredCount = Object.prototype.hasOwnProperty.call(stockCountValues, rowKey);
+                            const count = Number(hasEnteredCount ? stockCountValues[rowKey] : item.current_quantity || 0);
                             const unitCost = Number(item.unit_cost || 0);
                             const countedValue = count * unitCost;
                             const lastPurchased = item.last_purchased_at || item.last_counted_date || item.updated_at || item.created_at;
 
                             return (
-                          <TableRow key={item.id}>
+                          <TableRow key={rowKey}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2">
                                     {item.product_name}
@@ -3807,10 +3905,10 @@ export default function Inventory() {
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      value={hasEnteredCount ? stockCountValues[item.id] : item.current_quantity || ''}
+                                      value={hasEnteredCount ? stockCountValues[rowKey] : item.current_quantity || ''}
                                       onChange={(event) => setStockCountValues(prev => ({
                                         ...prev,
-                                        [item.id]: event.target.value,
+                                        [rowKey]: event.target.value,
                                       }))}
                                       className="h-10 max-w-32 bg-background"
                                     />
@@ -3971,6 +4069,8 @@ export default function Inventory() {
                           <TableBody>
                             {section.items.map(item => {
                               const draftIndex = countSheetDraftItems.findIndex(draftItem => draftItem.rowId === item.rowId);
+                              const unitOptions = getCountSheetUnitOptions(item);
+                              const selectedUnitValue = item.product_count_unit_id ? `count-unit:${item.product_count_unit_id}` : 'master';
                               return (
                                   <TableRow key={item.rowId}>
                                     <TableCell className="tabular-nums">{draftIndex + 1}</TableCell>
@@ -3987,7 +4087,23 @@ export default function Inventory() {
                                   <TableCell className="text-muted-foreground">
                                     {item.last_purchased_at ? format(new Date(item.last_purchased_at), 'MM/dd/yyyy') : '-'}
                                   </TableCell>
-                                  <TableCell>{item.count_unit_name || item.unit}</TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={selectedUnitValue}
+                                      onValueChange={(value) => updateCountSheetDraftItemUnit(item.rowId, value)}
+                                    >
+                                      <SelectTrigger className="h-9 w-44">
+                                        <SelectValue placeholder={item.count_unit_name || item.unit || 'Count unit'} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {unitOptions.map(option => (
+                                          <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
                                   <TableCell className="text-right tabular-nums">${Number(item.unit_cost || 0).toFixed(2)}</TableCell>
                                   <TableCell>
                                     <div className="flex justify-end gap-1">
