@@ -474,6 +474,10 @@ export default function Payments() {
       });
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
     },
     onError: (error) => toast.error(error.message || 'Failed to update invoice'),
   });
@@ -561,6 +565,10 @@ export default function Payments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
       setScheduleDialogInvoice(null);
       toast.success('Payment scheduled');
     },
