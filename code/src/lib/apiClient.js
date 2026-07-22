@@ -1640,58 +1640,23 @@ export const api = {
       return data || [];
     },
     upsertCountUnit: async (payload) => {
-      const normalizedName = String(payload.name || '').trim().toLowerCase();
-      const writePayload = {
-        organization_id: payload.organization_id,
-        brand_id: payload.brand_id || null,
-        location_id: payload.location_id || null,
-        product_id: payload.product_id,
-        name: payload.name,
-        normalized_name: normalizedName,
-        quantity: payload.quantity,
-        unit: payload.unit,
-        unit_price: payload.unit_price,
-        source_quantity: payload.source_quantity,
-        source_unit: payload.source_unit,
-        source_price: payload.source_price,
-        is_active: payload.is_active ?? true,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data: existing, error: existingError } = await supabase
-        .from('product_count_units')
-        .select('id')
-        .eq('organization_id', payload.organization_id)
-        .eq('product_id', payload.product_id)
-        .eq('normalized_name', normalizedName)
-        .is('deleted_at', null)
-        .maybeSingle();
-      if (existingError) throw existingError;
-
-      if (existing?.id) {
-        const { data, error } = await supabase
-          .from('product_count_units')
-          .update(writePayload)
-          .eq('id', existing.id)
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
-      }
-
-      const { data, error } = await supabase
-        .from('product_count_units')
-        .insert(writePayload)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('upsert_product_count_unit', {
+        p_product_id: payload.product_id,
+        p_name: payload.name,
+        p_quantity: payload.quantity,
+        p_unit: payload.unit,
+        p_unit_price: payload.unit_price,
+        p_source_quantity: payload.source_quantity,
+        p_source_unit: payload.source_unit,
+        p_source_price: payload.source_price,
+      });
       if (error) throw error;
       return data;
     },
     removeCountUnit: async (countUnitId) => {
-      const { error } = await supabase
-        .from('product_count_units')
-        .update({ deleted_at: new Date().toISOString(), is_active: false })
-        .eq('id', countUnitId);
+      const { error } = await supabase.rpc('remove_product_count_unit', {
+        p_count_unit_id: countUnitId
+      });
       if (error) throw error;
       return true;
     },
