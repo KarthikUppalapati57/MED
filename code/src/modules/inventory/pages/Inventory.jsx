@@ -1282,7 +1282,14 @@ export default function Inventory() {
           const inventoryItem = inventoryById.get(sheetItem.inventory_id)
             || inventoryByName.get(String(sheetItem.product_name || '').toLowerCase());
           return inventoryItem
-            ? { ...inventoryItem, sheet_sort_order: sheetItem.sort_order || 0 }
+            ? {
+                ...inventoryItem,
+                sheet_sort_order: sheetItem.sort_order || 0,
+                current_unit: sheetItem.unit || inventoryItem.current_unit || 'ea',
+                unit_cost: Number(sheetItem.unit_cost ?? inventoryItem.unit_cost ?? 0),
+                product_count_unit_id: sheetItem.product_count_unit_id || null,
+                count_unit_name: sheetItem.count_unit_name || sheetItem.unit || inventoryItem.current_unit || 'ea',
+              }
             : null;
         })
         .filter(Boolean)
@@ -1419,14 +1426,15 @@ export default function Inventory() {
     const inventoryById = new Map(inventory.map(item => [item.id, item]));
     return (countSheetDraft.items || []).map((item, index) => {
       const inventoryItem = inventoryById.get(item.inventory_id) || {};
-      const unitCost = Number(inventoryItem.unit_cost ?? item.unit_cost ?? 0);
+      const unitCost = Number(item.unit_cost ?? inventoryItem.unit_cost ?? 0);
       return {
         ...item,
         rowId: item.inventory_id || item.id || `${item.product_name}-${index}`,
         product_id: inventoryItem.product_id || item.product_id || null,
+        internal_product_id: inventoryItem.internal_product_id || item.internal_product_id || null,
         product_name: inventoryItem.product_name || item.product_name || 'Unnamed item',
         last_purchased_at: inventoryItem.last_purchased_at || inventoryItem.updated_at || inventoryItem.created_at || item.last_purchased_at,
-        unit: inventoryItem.current_unit || item.unit || 'ea',
+        unit: item.unit || inventoryItem.current_unit || 'ea',
         unit_cost: unitCost,
         bucket: getCountSheetBucket(inventoryItem.id ? inventoryItem : item),
       };
@@ -1470,8 +1478,11 @@ export default function Inventory() {
             .filter(item => getCountSheetBucket(item) === bucketLabel && !existingIds.has(item.id))
             .map((item, index) => ({
               inventory_id: item.id,
+              internal_product_id: item.internal_product_id || null,
+              product_id: item.product_id || null,
               product_name: item.product_name,
               unit: item.current_unit || 'ea',
+              unit_cost: Number(item.unit_cost || 0),
               expected_quantity: item.current_quantity || 0,
               sort_order: (prev.items || []).length + index + 1,
             }))
@@ -1495,8 +1506,11 @@ export default function Inventory() {
           ...(prev.items || []),
           {
             inventory_id: product.id,
+            internal_product_id: product.internal_product_id || null,
             product_name: product.product_name,
+            product_id: product.product_id || null,
             unit: product.current_unit || 'ea',
+            unit_cost: Number(product.unit_cost || 0),
             expected_quantity: product.current_quantity || 0,
             sort_order: (prev.items || []).length + 1,
           },
@@ -1535,6 +1549,10 @@ export default function Inventory() {
       toast.error('This product is not available in inventory yet');
       return;
     }
+    if (inventoryItem.internal_product_id) {
+      navigate(`/Products/product/${inventoryItem.internal_product_id}${window.location.search}`);
+      return;
+    }
     handleEdit(inventoryItem);
   };
 
@@ -1565,9 +1583,14 @@ export default function Inventory() {
         auto_add_product_groups: countSheetDraft.buckets || [],
         items: (countSheetDraft.items || []).map((item, index) => ({
           inventory_id: item.inventory_id,
+          internal_product_id: item.internal_product_id || null,
+          product_id: item.product_id || null,
           product_name: item.product_name,
           expected_quantity: item.expected_quantity || 0,
           unit: item.unit || 'ea',
+          unit_cost: Number(item.unit_cost || 0),
+          product_count_unit_id: item.product_count_unit_id || null,
+          count_unit_name: item.count_unit_name || item.unit || 'ea',
           sort_order: index + 1,
         })),
       });
@@ -3964,7 +3987,7 @@ export default function Inventory() {
                                   <TableCell className="text-muted-foreground">
                                     {item.last_purchased_at ? format(new Date(item.last_purchased_at), 'MM/dd/yyyy') : '-'}
                                   </TableCell>
-                                  <TableCell>{item.unit}</TableCell>
+                                  <TableCell>{item.count_unit_name || item.unit}</TableCell>
                                   <TableCell className="text-right tabular-nums">${Number(item.unit_cost || 0).toFixed(2)}</TableCell>
                                   <TableCell>
                                     <div className="flex justify-end gap-1">

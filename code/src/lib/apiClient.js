@@ -45,6 +45,7 @@ const TABLE_SCOPE_COLUMNS = {
   pos_menu_mapping: ['organization_id'],
   pos_sales_data: ['organization_id', 'location_id'],
   products: ['organization_id', 'brand_id', 'location_id'],
+  product_count_units: ['organization_id', 'brand_id', 'location_id'],
 
   purchase_orders: ['organization_id', 'location_id'],
   purchase_order_items: ['organization_id'],
@@ -325,6 +326,7 @@ export const api = {
     RecipeLocationPrice: createEntityClient('recipe_location_prices'),
     RecipeCostSnapshot: createEntityClient('recipe_cost_snapshots'),
     RecipeCategory: createEntityClient('recipe_categories'),
+    ProductCountUnit: createEntityClient('product_count_units', true),
     InventoryMovement: createEntityClient('inventory_movements'),
     PurchaseOrder: createEntityClient('purchase_orders'),
     PurchaseOrderItem: createEntityClient('purchase_order_items'),
@@ -1607,6 +1609,91 @@ export const api = {
       });
       if (error) throw error;
       return data;
+    },
+    listCountUnits: async (productId) => {
+      if (!productId) return [];
+      const { data, error } = await supabase
+        .from('product_count_units')
+        .select('*')
+        .eq('product_id', productId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+      if (error) {
+        if (error.message?.includes('product_count_units')) return [];
+        throw error;
+      }
+      return data || [];
+    },
+    listCountUnitsForProducts: async (productIds = []) => {
+      const ids = [...new Set((productIds || []).filter(Boolean))];
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('product_count_units')
+        .select('*')
+        .in('product_id', ids)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+      if (error) {
+        if (error.message?.includes('product_count_units')) return [];
+        throw error;
+      }
+      return data || [];
+    },
+    upsertCountUnit: async (payload) => {
+      const normalizedName = String(payload.name || '').trim().toLowerCase();
+      const writePayload = {
+        organization_id: payload.organization_id,
+        brand_id: payload.brand_id || null,
+        location_id: payload.location_id || null,
+        product_id: payload.product_id,
+        name: payload.name,
+        normalized_name: normalizedName,
+        quantity: payload.quantity,
+        unit: payload.unit,
+        unit_price: payload.unit_price,
+        source_quantity: payload.source_quantity,
+        source_unit: payload.source_unit,
+        source_price: payload.source_price,
+        is_active: payload.is_active ?? true,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: existing, error: existingError } = await supabase
+        .from('product_count_units')
+        .select('id')
+        .eq('organization_id', payload.organization_id)
+        .eq('product_id', payload.product_id)
+        .eq('normalized_name', normalizedName)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (existingError) throw existingError;
+
+      if (existing?.id) {
+        const { data, error } = await supabase
+          .from('product_count_units')
+          .update(writePayload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
+      const { data, error } = await supabase
+        .from('product_count_units')
+        .insert(writePayload)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    removeCountUnit: async (countUnitId) => {
+      const { error } = await supabase
+        .from('product_count_units')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', countUnitId);
+      if (error) throw error;
+      return true;
     },
     deleteProduct: async (productId) => {
       const { data, error } = await supabase.rpc('soft_delete_product_safe', {

@@ -317,6 +317,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     enabled: !!product?.organization_id && !!product?.id,
   });
 
+  const { data: savedCountUnits = [] } = useAuthQuery({
+    queryKey: ['product-detail-count-units', product?.id],
+    queryFn: () => api.products.listCountUnits(product.id),
+    enabled: !!product?.id,
+  });
+
   const { data: countSheets = [] } = useAuthQuery({
     queryKey: ['product-detail-count-sheets', product?.organization_id, product?.location_id],
     queryFn: async () => {
@@ -400,8 +406,20 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       targetUnit: sourcePackage.unit,
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
     });
-    setCountUnitRows([]);
   }, [product]);
+
+  useEffect(() => {
+    setCountUnitRows((savedCountUnits || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      quantity: Number(row.quantity || 1),
+      unit: row.unit,
+      price: Number(row.unit_price || 0),
+      sourceLabel: `${formatQuantity(row.source_quantity || 1)} ${row.source_unit || 'unit'}`,
+      sourcePrice: Number(row.source_price || 0),
+      persisted: true,
+    })));
+  }, [savedCountUnits]);
 
   const allCategoryOptions = useMemo(() => {
     const categories = new Set([
@@ -500,6 +518,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       report_unit_source_price: option.sourcePrice,
       latest_price: option.price,
     }));
+    toast.info('Master unit changed. Save the product to apply it everywhere.');
   };
 
   const handleReportUnitChange = (value) => {
@@ -581,6 +600,44 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     onError: (error) => toast.error(error?.message || 'Failed to delete product'),
   });
 
+  const countUnitMutation = useMutation({
+    mutationFn: (row) => {
+      if (!product?.id || !product?.organization_id) {
+        throw new Error('Save the product before adding count units');
+      }
+      return api.products.upsertCountUnit({
+        organization_id: product.organization_id,
+        brand_id: product.brand_id || null,
+        location_id: product.location_id || null,
+        product_id: product.id,
+        name: row.name,
+        quantity: row.quantity,
+        unit: row.unit,
+        unit_price: row.price,
+        source_quantity: row.sourceQuantity,
+        source_unit: row.sourceUnit,
+        source_price: row.sourcePrice,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Count unit saved');
+      setUnitDialogOpen(false);
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to save count unit'),
+  });
+
+  const removeCountUnitMutation = useMutation({
+    mutationFn: (row) => api.products.removeCountUnit(row.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      toast.success('Count unit removed');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to remove count unit'),
+  });
+
   const updateCategory = (category) => {
     setForm(current => ({
       ...current,
@@ -601,14 +658,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       quantity: Number(unitDraft.targetQuantity || 1),
       unit: unitDraft.targetUnit,
       price: convertedPrice,
+      sourceQuantity: Number(unitDraft.sourceQuantity || 1),
+      sourceUnit: unitDraft.sourceUnit,
       sourceLabel: `${formatQuantity(unitDraft.sourceQuantity)} ${unitDraft.sourceUnit}`,
       sourcePrice: Number(unitDraft.sourcePrice || 0),
     };
-    setCountUnitRows(current => [
-      ...current.filter(row => String(row.name).toLowerCase() !== String(label).toLowerCase()),
-      nextRow,
-    ]);
-    setUnitDialogOpen(false);
+    countUnitMutation.mutate(nextRow);
   };
 
   if (isLoading && !product) {
@@ -634,7 +689,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
           <h1 className="truncate text-3xl font-bold tracking-normal text-foreground">{form.name || 'Edit Product'}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{form.product_id || 'No Product ID'} · Master product management</p>
+          <p className="mt-1 text-sm text-muted-foreground">{form.product_id || 'No Product ID'} - Master product management</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate(`/Products/all-products${window.location.search}`)}>
@@ -971,9 +1026,17 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                         <TableCell>{formatQuantity(row.quantity)} {row.unit}</TableCell>
                         <TableCell className="text-right">{money(row.price)}</TableCell>
                         <TableCell>No</TableCell>
-                        <TableCell>
+                        <TableCell className="space-x-2">
                           <Button variant="link" className="h-auto px-0" onClick={() => navigate(`/Inventory${window.location.search}`)}>
                             Add in Inventory
+                          </Button>
+                          <Button
+                            variant="link"
+                            className="h-auto px-0 text-destructive"
+                            disabled={removeCountUnitMutation.isPending}
+                            onClick={() => removeCountUnitMutation.mutate(row)}
+                          >
+                            Remove
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -1157,7 +1220,9 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>Cancel</Button>
-            <Button onClick={applyUnitDraft}>Add Unit</Button>
+            <Button onClick={applyUnitDraft} disabled={countUnitMutation.isPending}>
+              {countUnitMutation.isPending ? 'Saving...' : 'Add Unit'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
