@@ -54,6 +54,7 @@ const UNIT_DEFINITIONS = {
   gram: { label: 'Gram', family: 'weight', factor: 1 },
   grams: { label: 'Gram', family: 'weight', factor: 1 },
   gal: { label: 'Gallon', family: 'volume', factor: 3785.411784 },
+  ga: { label: 'Gallon', family: 'volume', factor: 3785.411784 },
   gallon: { label: 'Gallon', family: 'volume', factor: 3785.411784 },
   gallons: { label: 'Gallon', family: 'volume', factor: 3785.411784 },
   qt: { label: 'Quart', family: 'volume', factor: 946.352946 },
