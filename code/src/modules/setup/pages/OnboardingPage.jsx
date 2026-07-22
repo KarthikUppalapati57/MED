@@ -812,12 +812,21 @@ export default function OnboardingPage() {
         locationAddressSource = 'custom';
         locationAddress = customLocationAddress;
       }
+      if (locationAddressSource === 'brand' && !addressComplete(locationAddress) && addressComplete(org.businessAddress)) {
+        locationAddressSource = 'organization';
+        locationAddress = normalizeAddress(org.businessAddress);
+      }
+      if (locationAddressSource !== 'custom' && !addressComplete(locationAddress) && addressComplete(businessIdentity.businessAddress)) {
+        locationAddressSource = 'tenant';
+        locationAddress = normalizeAddress(businessIdentity.businessAddress);
+      }
 
       if (locationAddressSource === 'custom') {
         const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
-        if (locationAddressError) throw new Error(`${locationAddressError} Fill the location address columns, or set location_address_source to same_as_tenant, same_as_organization, or same_as_brand after that source address exists.`);
-      } else {
-        requireSourceAddress(locationAddress, locationAddressSource, `Row ${rowIdx + 2} location business/service address`);
+        if (locationAddressError && hasAddressValues(row, 'location_address')) throw new Error(locationAddressError);
+      } else if (!addressComplete(locationAddress)) {
+        locationAddressSource = 'custom';
+        locationAddress = customLocationAddress;
       }
 
       const mailingSameAsBusiness = parseCsvBoolean(valueFor(row, 'location_mailing_same_as_business'), true);
@@ -830,7 +839,7 @@ export default function OnboardingPage() {
       brand.locations.push({
         name: locationName,
         businessAddressSource: locationAddressSource,
-        businessAddress: locationAddress,
+        businessAddress: normalizeAddress(locationAddress),
         mailingSameAsBusiness,
         mailingAddress,
       });
