@@ -593,45 +593,51 @@ function LoginPage() {
     e.preventDefault();
     setLocalError('');
     setIsSubmitting(true);
-    const identifier = email.trim();
-    let loginEmail = identifier;
-    if (identifier && !identifier.includes('@')) {
-      const { data: resolvedEmail, error: resolveError } = await supabase.rpc('resolve_username_email', { p_username: identifier });
-      if (resolveError || !resolvedEmail) {
-        setLocalError('No account found for that username.');
-        setIsSubmitting(false);
+
+    try {
+      const identifier = email.trim();
+      let loginEmail = identifier;
+      if (identifier && !identifier.includes('@')) {
+        const { data: resolvedEmail, error: resolveError } = await withTimeout(
+          supabase.rpc('resolve_username_email', { p_username: identifier }),
+          10000,
+          'Username lookup timed out. Please try your email address instead.'
+        );
+        if (resolveError || !resolvedEmail) {
+          setLocalError('No account found for that username.');
+          return;
+        }
+        loginEmail = resolvedEmail;
+      }
+      const { error: loginError } = await loginWithEmail(loginEmail, password);
+      if (loginError) {
+        setLocalError(loginError.message || 'Unable to sign in.');
         return;
       }
-      loginEmail = resolvedEmail;
-    }
-    const { error: loginError } = await loginWithEmail(loginEmail, password);
-    if (loginError) {
-      setIsSubmitting(false);
-      return;
-    }
 
-    if (inviteToken) {
-      try {
+      if (inviteToken) {
         setPendingInviteToken(inviteToken);
-        const { error: inviteError } = await supabase.rpc('accept_invitation', { p_token: inviteToken });
+        const { error: inviteError } = await withTimeout(
+          supabase.rpc('accept_invitation', { p_token: inviteToken }),
+          10000,
+          'Invitation acceptance timed out. Please try signing in again.'
+        );
         if (inviteError && !String(inviteError.message || '').toLowerCase().includes('already-accepted')) {
           setLocalError(inviteError.message || 'Unable to accept this invitation.');
-          setIsSubmitting(false);
           return;
         }
         try { localStorage.removeItem(PENDING_INVITE_TOKEN_KEY); } catch {}
         await supabase.auth.refreshSession();
         window.location.assign('/business-verification');
         return;
-      } catch (err) {
-        setLocalError(err.message || 'Unable to accept this invitation.');
-        setIsSubmitting(false);
-        return;
       }
-    }
 
-    navigate('/', { replace: true });
-    setIsSubmitting(false);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setLocalError(err.message || 'Unable to sign in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = async (e) => {

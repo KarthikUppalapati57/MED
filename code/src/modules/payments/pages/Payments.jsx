@@ -268,6 +268,8 @@ export default function Payments() {
     autoPayApprovedInvoices: false,
     defaultPaymentMethod: 'cheque',
     approvalThreshold: 1000,
+    requireSeparateApprover: false,
+    enforceApprovalLimits: false,
     confirmationEmail: true,
     overdueAlerts: true,
     weeklySummary: false,
@@ -331,6 +333,10 @@ export default function Payments() {
     queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, invoiceSortBy],
     queryFn: async ({ pageParam = 0 }) => {
       const filters = {};
+      if (organization?.id) filters.organization_id = organization.id;
+      const selectedBrandId = (brand?.brand_id || brand?.id) || null;
+      if (selectedBrandId) filters.brand_id = selectedBrandId;
+      if (location?.id) filters.location_id = location.id;
       if (statusFilter !== 'all') {
         if (statusFilter === 'partial') {
            filters.payment_status = 'partial';
@@ -472,6 +478,10 @@ export default function Payments() {
       });
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
     },
     onError: (error) => toast.error(error.message || 'Failed to update invoice'),
   });
@@ -559,6 +569,10 @@ export default function Payments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
       setScheduleDialogInvoice(null);
       toast.success('Payment scheduled');
     },
@@ -1648,6 +1662,26 @@ export default function Payments() {
                     step="100"
                     value={paymentSettings.approvalThreshold}
                     onChange={(e) => setPaymentSettings({ ...paymentSettings, approvalThreshold: Number(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">Require Separate Approver</p>
+                    <p className="text-sm text-muted-foreground">Block users from approving invoices they uploaded.</p>
+                  </div>
+                  <Switch
+                    checked={paymentSettings.requireSeparateApprover}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, requireSeparateApprover: checked })}
+                  />
+                </div>
+                <div className="p-4 bg-secondary rounded-lg flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">Enforce Per-User Approval Limits</p>
+                    <p className="text-sm text-muted-foreground">Use each user&apos;s invoice approval limit from User Management.</p>
+                  </div>
+                  <Switch
+                    checked={paymentSettings.enforceApprovalLimits}
+                    onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, enforceApprovalLimits: checked })}
                   />
                 </div>
                 <Button onClick={() => savePaymentSettings.mutate()} disabled={savePaymentSettings.isPending} className="w-full bg-primary hover:bg-primary text-primary-foreground">
