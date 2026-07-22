@@ -55,6 +55,7 @@ import { getFlattenedCOA } from '@/lib/accountingConfig';
 import {
   PRODUCT_UNIT_OPTIONS,
   calculateConvertedInventoryUnit,
+  getProductUnitDefinition,
   parsePackageContents,
 } from '@/modules/products/utils/productUnits';
 import UnitConversionsManager from '@/modules/recipes/components/UnitConversionsManager';
@@ -109,6 +110,41 @@ function formatQuantity(value) {
 function buildReportUnitLabel(quantity, unit) {
   const trimmedUnit = String(unit || '').trim() || 'Each';
   return `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
+}
+
+function compactUnitLabel(unit) {
+  const normalized = String(unit || '').trim().toLowerCase();
+  const labels = {
+    pound: 'lb',
+    pounds: 'lb',
+    ounce: 'oz',
+    ounces: 'oz',
+    'fluid ounce': 'fl oz',
+    'fluid ounces': 'fl oz',
+    gallon: 'gal',
+    gallons: 'gal',
+    quart: 'qt',
+    quarts: 'qt',
+    liter: 'l',
+    litre: 'l',
+    milliliter: 'ml',
+    millilitre: 'ml',
+    kilogram: 'kg',
+    gram: 'g',
+    each: 'ea',
+  };
+  return labels[normalized] || String(unit || 'unit').trim() || 'unit';
+}
+
+function buildMasterUnitLabel(reportUnit, quantity, contentsUnit) {
+  const masterUnit = String(reportUnit || '').trim() || 'Each';
+  const amount = Number(quantity || 1);
+  const innerUnit = String(contentsUnit || '').trim();
+  const sameUnit = masterUnit.toLowerCase() === innerUnit.toLowerCase();
+  if (!innerUnit || (sameUnit && amount === 1) || /\([^)]*\)/.test(masterUnit)) {
+    return masterUnit;
+  }
+  return `${masterUnit} (${formatQuantity(amount)} ${compactUnitLabel(innerUnit)})`;
 }
 
 function getDefaultSourcePackage(form) {
@@ -208,6 +244,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   });
   const [countUnitRows, setCountUnitRows] = useState([]);
   const [sourcePackLabel, setSourcePackLabel] = useState('');
+  const [packageReportUnit, setPackageReportUnit] = useState(initialProduct?.report_by_unit || 'Case');
+  const [sourcePackagePrice, setSourcePackagePrice] = useState(Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0));
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
@@ -351,6 +389,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     const sourcePackage = getDefaultSourcePackage(nextForm);
     setForm(nextForm);
     setSourcePackLabel(buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
+    if (getProductUnitDefinition(nextForm.report_by_unit).family === 'package') {
+      setPackageReportUnit(nextForm.report_by_unit);
+    }
+    setSourcePackagePrice(nextForm.report_unit_source_price || nextForm.latest_price || 0);
     setUnitDraft({
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
@@ -391,36 +433,68 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     };
   }, [form.base_unit, sourcePackLabel, unitDraft.sourceQuantity, unitDraft.sourceUnit]);
 
+  const masterDisplayPackage = useMemo(() => {
+    const masterUnit = form.report_by_unit || form.base_unit || 'Each';
+    const masterDefinition = getProductUnitDefinition(masterUnit);
+    if (masterDefinition.family === 'package' && sourcePackage.quantity > 0 && sourcePackage.unit) {
+      return sourcePackage;
+    }
+    return {
+      quantity: Number(form.report_unit_quantity || 1),
+      unit: form.base_unit || masterUnit,
+    };
+  }, [form.base_unit, form.report_by_unit, form.report_unit_quantity, sourcePackage]);
+
   const reportUnitOptions = useMemo(() => {
-    const sourcePrice = Number(form.report_unit_source_price || form.latest_price || 0);
+    const sourcePrice = Number(sourcePackagePrice || form.report_unit_source_price || form.latest_price || 0);
+    const contentUnitPrice = calculateConvertedInventoryUnit({
+      sourcePrice,
+      sourceQuantity: sourcePackage.quantity,
+      sourceUnit: sourcePackage.unit,
+      targetQuantity: 1,
+      targetUnit: sourcePackage.unit,
+    });
     const options = [
-      {
-        label: buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit),
+      packageReportUnit ? {
+        value: packageReportUnit,
+        label: buildMasterUnitLabel(packageReportUnit, sourcePackage.quantity, sourcePackage.unit),
+        reportUnit: packageReportUnit,
         quantity: sourcePackage.quantity,
         unit: sourcePackage.unit,
         price: sourcePrice,
         sourcePrice,
-      },
-      {
-        label: form.report_by_unit,
+      } : null,
+      getProductUnitDefinition(form.report_by_unit).family === 'package' ? null : {
+        value: form.report_by_unit || 'Each',
+        label: buildMasterUnitLabel(form.report_by_unit, masterDisplayPackage.quantity, masterDisplayPackage.unit),
+        reportUnit: form.report_by_unit || 'Each',
         quantity: Number(form.report_unit_quantity || 1),
         unit: form.base_unit || form.report_by_unit || 'Each',
         price: Number(form.latest_price || 0),
-        sourcePrice,
+        sourcePrice: Number(form.report_unit_source_price || form.latest_price || 0),
+      },
+      {
+        value: sourcePackage.unit,
+        label: sourcePackage.unit,
+        reportUnit: sourcePackage.unit,
+        quantity: 1,
+        unit: sourcePackage.unit,
+        price: contentUnitPrice.canConvert ? contentUnitPrice.price : Number(form.latest_price || 0),
+        sourcePrice: contentUnitPrice.canConvert ? contentUnitPrice.price : Number(form.latest_price || 0),
       },
     ];
-    return [...new Map(options.filter(option => option.label).map(option => [String(option.label).toLowerCase(), option])).values()];
-  }, [form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, sourcePackage.quantity, sourcePackage.unit]);
+    return [...new Map(options.filter(option => option?.value).map(option => [String(option.value).toLowerCase(), option])).values()];
+  }, [form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, masterDisplayPackage.quantity, masterDisplayPackage.unit, packageReportUnit, sourcePackage.quantity, sourcePackage.unit, sourcePackagePrice]);
 
   const applyReportUnitChange = (option) => {
     if (!option) return;
     if (!option.quantity || !option.unit) {
-      setForm(current => ({ ...current, report_by_unit: option.label }));
+      setForm(current => ({ ...current, report_by_unit: option.reportUnit || option.value || option.label }));
       return;
     }
     setForm(current => ({
       ...current,
-      report_by_unit: option.label,
+      report_by_unit: option.reportUnit || option.value || option.label,
       base_unit: option.unit,
       report_unit_quantity: option.quantity,
       report_unit_source_price: option.sourcePrice,
@@ -429,8 +503,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   };
 
   const handleReportUnitChange = (value) => {
-    const option = reportUnitOptions.find(row => row.label === value);
-    const nextOption = option || { label: value };
+    const option = reportUnitOptions.find(row => row.value === value);
+    const nextOption = option || { value, label: value, reportUnit: value };
     const currentSignature = [
       form.report_by_unit,
       form.base_unit,
@@ -438,7 +512,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       Number(form.latest_price || 0),
     ].join('|');
     const nextSignature = [
-      nextOption.label,
+      nextOption.reportUnit || nextOption.value || nextOption.label,
       nextOption.unit || form.base_unit,
       Number(nextOption.quantity || form.report_unit_quantity || 1),
       Number(nextOption.price ?? form.latest_price ?? 0),
@@ -713,7 +787,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               <Select value={form.report_by_unit} onValueChange={handleReportUnitChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {reportUnitOptions.map(unit => <SelectItem key={unit.label} value={unit.label}>{unit.label}</SelectItem>)}
+                  {reportUnitOptions.map(unit => <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               <div className="flex overflow-hidden rounded-md border border-input bg-background">
@@ -722,11 +796,17 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   type="number"
                   step="0.01"
                   value={form.latest_price}
-                  onChange={(event) => setForm({
-                    ...form,
-                    latest_price: Number(event.target.value || 0),
-                    report_unit_source_price: Number(event.target.value || 0) * Number(form.report_unit_quantity || 1),
-                  })}
+                  onChange={(event) => {
+                    const nextPrice = Number(event.target.value || 0);
+                    if (getProductUnitDefinition(form.report_by_unit).family === 'package') {
+                      setSourcePackagePrice(nextPrice);
+                    }
+                    setForm({
+                      ...form,
+                      latest_price: nextPrice,
+                      report_unit_source_price: nextPrice,
+                    });
+                  }}
                   className="rounded-none border-0 text-right shadow-none focus-visible:ring-0"
                 />
               </div>
@@ -736,7 +816,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-primary" />
-              Report price: {money(form.latest_price)} from {money(form.report_unit_source_price)} / {formatQuantity(form.report_unit_quantity)} {form.base_unit || 'unit'}
+              Report price: {money(form.latest_price)} per {buildMasterUnitLabel(form.report_by_unit, masterDisplayPackage.quantity, masterDisplayPackage.unit)}
             </div>
             <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-[220px_1fr] md:items-end">
               <div className="space-y-2">
@@ -914,10 +994,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   <Input value={form.base_unit || 'Each'} readOnly />
                   <span className="font-medium">in</span>
                   <Input type="number" value="1" readOnly />
-                  <Input value={form.report_by_unit || 'Each'} readOnly />
+                  <Input value={buildMasterUnitLabel(form.report_by_unit, masterDisplayPackage.quantity, masterDisplayPackage.unit)} readOnly />
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  {form.report_by_unit || 'Unit'} currently costs {money(form.latest_price)}
+                  {buildMasterUnitLabel(form.report_by_unit, masterDisplayPackage.quantity, masterDisplayPackage.unit)} currently costs {money(form.latest_price)}
                 </div>
               </div>
               {countUnitRows.length > 0 && (
