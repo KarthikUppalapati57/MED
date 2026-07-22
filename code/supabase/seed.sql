@@ -3,13 +3,18 @@
 BEGIN;
 
 -- Insert a demo organization
-INSERT INTO public.organizations (id, name, timezone, plan_id)
-VALUES ('10000000-0000-0000-0000-000000000001', 'Demo Restaurant Group', 'America/New_York', 'starter')
+INSERT INTO public.organizations (id, name, slug, plan_id)
+VALUES ('10000000-0000-0000-0000-000000000001', 'Demo Restaurant Group', 'demo-restaurant-group', 'starter')
+ON CONFLICT DO NOTHING;
+
+-- Insert a demo brand
+INSERT INTO public.brands (brand_id, organization_id, name)
+VALUES ('15000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Demo Brand')
 ON CONFLICT DO NOTHING;
 
 -- Insert a demo location
-INSERT INTO public.locations (id, organization_id, name, type)
-VALUES ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Downtown Flagship', 'restaurant')
+INSERT INTO public.locations (id, organization_id, brand_id, name)
+VALUES ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', '15000000-0000-0000-0000-000000000001', 'Downtown Flagship')
 ON CONFLICT DO NOTHING;
 
 -- Insert global items (ingredients) when the legacy global_items table exists.
