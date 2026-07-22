@@ -1181,6 +1181,100 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    getPriceMoversReport: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      categoryNames = null,
+      vendorIds = null,
+      timezone = null,
+      productId = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_price_movers_report', {
+        p_organization_id: organizationId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_category_names: categoryNames,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+        p_product_id: productId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getPriceMoversDrilldown: async ({
+      organizationId,
+      productId = null,
+      productName = null,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      comparisonDateFrom = null,
+      comparisonDateTo = null,
+      vendorIds = null,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_price_movers_drilldown', {
+        p_organization_id: organizationId,
+        p_product_id: productId,
+        p_product_name: productName,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_comparison_date_from: comparisonDateFrom,
+        p_comparison_date_to: comparisonDateTo,
+        p_vendor_ids: vendorIds,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getInventoryUsageReport: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      categoryNames = null,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_inventory_usage_report', {
+        p_organization_id: organizationId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_category_names: categoryNames,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
+    getInventoryUsageDrilldown: async ({
+      organizationId,
+      inventoryId = null,
+      productId = null,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+      timezone = null,
+    }) => {
+      const { data, error } = await supabase.rpc('get_inventory_usage_drilldown', {
+        p_organization_id: organizationId,
+        p_inventory_id: inventoryId,
+        p_product_id: productId,
+        p_location_ids: locationIds,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_timezone: timezone,
+      });
+      if (error) throw error;
+      return data;
+    },
     getPnlSummary: async (orgId, startDate, endDate, brandId = null, locationId = null) => {
       const { data, error } = await supabase.rpc('get_pnl_summary', {
         p_org_id: orgId,
@@ -1556,4 +1650,3 @@ export const api = {
     }
   }
 };
-

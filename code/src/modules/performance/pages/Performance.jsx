@@ -4,10 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DollarSign, TrendingUp, AlertTriangle, Package, Users } from "lucide-react";
+import { DollarSign, TrendingUp, Package, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -18,7 +17,7 @@ import { format } from 'date-fns';
 const AvTCosting = React.lazy(() => import('@/modules/inventory/pages/AvTCosting'));
 const SalesReportWidget = React.lazy(() => import('@/modules/performance/components/SalesReportWidget').then((module) => ({ default: module.SalesReportWidget })));
 const SalesForecastWidget = React.lazy(() => import('@/modules/performance/components/SalesForecastWidget').then((module) => ({ default: module.SalesForecastWidget })));
-const UsageReportWidget = React.lazy(() => import('@/modules/performance/components/UsageReportWidget').then((module) => ({ default: module.UsageReportWidget })));
+const UsageReportPage = React.lazy(() => import('@/modules/performance/tabs/UsageReport/UsageReportPage'));
 const ActionCenterWidget = React.lazy(() => import('@/modules/performance/components/ActionCenterWidget').then((module) => ({ default: module.ActionCenterWidget })));
 const ExplainableVarianceWidget = React.lazy(() => import('@/modules/performance/components/ExplainableVarianceWidget').then((module) => ({ default: module.ExplainableVarianceWidget })));
 const PredictiveAlerts = React.lazy(() => import('@/modules/labor/components/PredictiveAlerts'));
@@ -26,6 +25,8 @@ const DailyPnLTab = React.lazy(() => import('@/modules/performance/components/Da
 const CrossLocationBenchmarking = React.lazy(() => import('@/modules/performance/components/CrossLocationBenchmarking'));
 const PerformanceTrendChart = React.lazy(() => import('@/modules/performance/components/PerformanceCharts').then((module) => ({ default: module.PerformanceTrendChart })));
 const CategoryReportPage = React.lazy(() => import('@/modules/performance/tabs/CategoryReport/CategoryReportPage'));
+const PriceMoversPage = React.lazy(() => import('@/modules/performance/tabs/PriceMovers/PriceMoversPage'));
+const BudgetSetupPage = React.lazy(() => import('@/modules/performance/tabs/BudgetSetup/BudgetSetupPage'));
 
 function ChartFallback() {
   return (
@@ -60,10 +61,8 @@ const sameDate = (value, target) => {
 export default function Performance() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [budgetDrafts, setBudgetDrafts] = useState({});
-  const queryClient = useQueryClient();
 
-  const { organization, brand, location, userProfile } = useAuth();
+  const { organization, brand, location } = useAuth();
   const now = new Date();
 
   const [periodStart, setPeriodStart] = useState(
@@ -116,31 +115,6 @@ export default function Performance() {
     });
     return map;
   }, [budgetTargets]);
-
-  const saveBudgetTarget = useMutation({
-    mutationFn: async ({ category, targetAmount, targetPercent = null }) => {
-      const existing = budgetByCategory[category];
-      const payload = {
-        organization_id: organization?.id,
-        brand_id: (brand?.brand_id || brand?.id) || null,
-        location_id: location?.id || null,
-        period_start: periodStart,
-        period_end: periodEnd,
-        category,
-        target_amount: Number(targetAmount || 0),
-        target_percent: targetPercent == null ? null : Number(targetPercent),
-        created_by: userProfile?.id || null,
-        updated_by: userProfile?.id || null,
-      };
-      if (existing) return api.entities.BudgetTarget.update(existing.id, payload);
-      return api.entities.BudgetTarget.create(payload);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budget_targets'] });
-      toast.success('Budget target saved');
-    },
-    onError: (error) => toast.error(error.message || 'Failed to save budget target'),
-  });
 
   // --- CORE CALCULATIONS ---
   const totalSales = Number(metricsData.total_sales || 0);
@@ -500,110 +474,15 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="movers" className="space-y-6 m-0">
-            <Card className="glass-card shadow-sm border-border/50">
-              <CardHeader>
-                <CardTitle>Price Movers & Alerts</CardTitle>
-                <CardDescription>Tracking all ingredient price changes across recent invoices</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto w-full">
-                  <Table className="w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Ingredient</TableHead>
-                        <TableHead className="text-right">Current Price</TableHead>
-                        <TableHead className="text-right">Previous Price</TableHead>
-                        <TableHead className="text-right">Change</TableHead>
-                        <TableHead className="text-right">Impact</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {moversData.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No price movements recorded yet.</TableCell>
-                        </TableRow>
-                      ) : (
-                        moversData.map((item, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium whitespace-nowrap flex items-center gap-2">
-                              {item.status === 'critical' && <AlertTriangle className="w-4 h-4 text-resend-red shrink-0" />}
-                              <span className="truncate max-w-[150px] sm:max-w-xs">{item.item}</span>
-                            </TableCell>
-                            <TableCell className="text-right whitespace-nowrap">${item.currentPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right text-muted-foreground whitespace-nowrap">${item.previousPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right whitespace-nowrap">
-                              <span className={item.change > 0 ? 'text-resend-red' : item.change < 0 ? 'text-resend-green' : 'text-muted-foreground'}>
-                                {item.change > 0 ? '+' : ''}{item.change}%
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right whitespace-nowrap">
-                              {item.status === 'critical' && <Badge className="bg-resend-red/10 text-resend-red">High</Badge>}
-                              {item.status === 'warning' && <Badge className="bg-resend-yellow/10 text-resend-yellow">Medium</Badge>}
-                              {item.status === 'positive' && <Badge className="bg-resend-green/10 text-resend-green">Favorable</Badge>}
-                              {item.status === 'neutral' && <Badge variant="outline">Low</Badge>}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <React.Suspense fallback={<TabFallback />}>
+              <PriceMoversPage />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="budget" className="space-y-6 m-0">
-            <Card className="glass-card shadow-sm border-border/50 max-w-4xl">
-              <CardHeader>
-                <CardTitle>Budget Setup</CardTitle>
-                <CardDescription>Set current-period targets used by sales pacing and controllable P&L.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto w-full">
-                  <Table className="w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Current Target</TableHead>
-                        <TableHead>New Target</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {['Sales', 'COGS', 'Labor', 'Controllables', 'Prime Cost'].map((category) => (
-                        <TableRow key={category}>
-                          <TableCell className="font-medium whitespace-nowrap">{category}</TableCell>
-                          <TableCell className="whitespace-nowrap">${Number(budgetByCategory[category]?.target_amount || 0).toLocaleString()}</TableCell>
-                          <TableCell className="min-w-[120px]">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="100"
-                              value={budgetDrafts[category] ?? budgetByCategory[category]?.target_amount ?? ''}
-                              onChange={(event) => setBudgetDrafts((prev) => ({ ...prev, [category]: event.target.value }))}
-                              className="w-full sm:max-w-40"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={saveBudgetTarget.isPending}
-                              onClick={() => saveBudgetTarget.mutate({
-                                category,
-                                targetAmount: budgetDrafts[category] ?? budgetByCategory[category]?.target_amount ?? 0,
-                              })}
-                            >
-                              Save
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <React.Suspense fallback={<TabFallback />}>
+              <BudgetSetupPage />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="sales_report" className="space-y-6 m-0">
@@ -623,11 +502,9 @@ export default function Performance() {
           </TabsContent>
 
           <TabsContent value="usage_report" className="space-y-6 m-0">
-            {activeTab === 'usage_report' && (
-              <React.Suspense fallback={<TabFallback />}>
-                <UsageReportWidget />
-              </React.Suspense>
-            )}
+            <React.Suspense fallback={<TabFallback />}>
+              <UsageReportPage />
+            </React.Suspense>
           </TabsContent>
 
           <TabsContent value="avt" className="space-y-0 m-0">
