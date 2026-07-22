@@ -205,17 +205,17 @@ const navigation = [
       { name: 'Close Books', href: 'Accounting/close-books', icon: Check }
     ]
   },
-  { 
-    name: 'Organization Settings', 
-    icon: Building2, 
+  {
+    name: 'Organization Settings',
+    icon: Building2,
     minRole: 'org_manager',
     subItems: [
       { name: 'Hierarchy', href: 'OrgManagement/hierarchy', icon: Building2 },
+      { name: 'Team Members', href: 'UserManagement', icon: Users },
       { name: 'Franchisor Console', href: 'FranchisorConsole', icon: Building2 },
       { name: 'Security & MFA', href: 'OrgManagement/security', icon: ShieldCheck }
     ]
   },
-  { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_manager' },
   { name: 'Billing & Plans', href: 'Billing', icon: CreditCard, minRole: 'org_manager' },
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_manager' },
