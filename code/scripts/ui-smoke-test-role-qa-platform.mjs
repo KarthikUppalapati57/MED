@@ -31,7 +31,7 @@ const accounts = [
   },
   {
     email: 'qa.owner.bistro@restops.test',
-    role: 'org_owner',
+    role: 'org_manager',
     dashboardText: 'QA Bistro Group Dashboard',
     routes: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'OrgManagement', 'UserManagement', 'RestaurantSetup', 'Integrations', 'AuditLogs'],
     forbiddenRoutes: ['PlatformAdmin', 'PlatformUsers', 'PlatformOrganizations', 'PlatformPlans', 'PlatformInvoices', 'PlatformUserManagement', 'PlatformAuditLogs'],

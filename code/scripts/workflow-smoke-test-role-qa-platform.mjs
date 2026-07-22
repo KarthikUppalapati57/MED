@@ -19,7 +19,7 @@ if (!password) {
 }
 
 const accounts = [
-  { email: 'qa.owner.bistro@restops.test', role: 'org_owner', scope: 'org' },
+  { email: 'qa.owner.bistro@restops.test', role: 'org_manager', scope: 'org' },
   { email: 'qa.brand.northfork@restops.test', role: 'branch_manager', scope: 'brand' },
   { email: 'qa.location.northfork@restops.test', role: 'location_manager', scope: 'location' },
   { email: 'qa.staff.northfork@restops.test', role: 'ground_staff', scope: 'staff' },

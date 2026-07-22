@@ -501,15 +501,30 @@ export default function Inventory() {
       ids: new Set(),
       productIds: new Set(),
       names: new Set(),
+      byId: new Map(),
+      byProductId: new Map(),
+      byName: new Map(),
     };
 
     inventoriedProductData
       .filter(product => product?.is_inventoried)
       .forEach(product => {
-        if (product.id) lookup.ids.add(String(product.id));
-        if (product.product_id) lookup.productIds.add(String(product.product_id).trim().toLowerCase());
+        if (product.id) {
+          const id = String(product.id);
+          lookup.ids.add(id);
+          lookup.byId.set(id, product);
+        }
+        if (product.product_id) {
+          const productId = String(product.product_id).trim().toLowerCase();
+          lookup.productIds.add(productId);
+          lookup.byProductId.set(productId, product);
+        }
         const productName = product.name || product.product_name;
-        if (productName) lookup.names.add(String(productName).trim().toLowerCase());
+        if (productName) {
+          const name = String(productName).trim().toLowerCase();
+          lookup.names.add(name);
+          lookup.byName.set(name, product);
+        }
       });
 
     return lookup;
@@ -530,12 +545,37 @@ export default function Inventory() {
       names: new Set(),
     };
 
-    const trackedInventoryRows = rawInventory.filter(item => {
-      if (item.internal_product_id && inventoriedProductLookup.ids.has(String(item.internal_product_id))) return true;
-      if (item.product_id && inventoriedProductLookup.productIds.has(String(item.product_id).trim().toLowerCase())) return true;
-      if (item.product_name && inventoriedProductLookup.names.has(String(item.product_name).trim().toLowerCase())) return true;
-      return false;
-    });
+    const findInventoriedProduct = (item) => {
+      if (item.internal_product_id) {
+        const product = inventoriedProductLookup.byId.get(String(item.internal_product_id));
+        if (product) return product;
+      }
+      if (item.product_id) {
+        const product = inventoriedProductLookup.byProductId.get(String(item.product_id).trim().toLowerCase());
+        if (product) return product;
+      }
+      if (item.product_name) {
+        const product = inventoriedProductLookup.byName.get(String(item.product_name).trim().toLowerCase());
+        if (product) return product;
+      }
+      return null;
+    };
+
+    const trackedInventoryRows = rawInventory
+      .map(item => {
+        const product = findInventoriedProduct(item);
+        if (!product) return null;
+        const productName = product.name || product.product_name;
+        return {
+          ...item,
+          internal_product_id: item.internal_product_id || product.id || null,
+          product_id: item.product_id || product.product_id || null,
+          product_name: item.product_name || productName || 'Unnamed item',
+          category: product.category || item.category,
+          accounting_category: product.accounting_category || item.accounting_category,
+        };
+      })
+      .filter(Boolean);
 
     trackedInventoryRows.forEach(item => {
       if (item.internal_product_id) matchedInventoryKeys.ids.add(String(item.internal_product_id));
@@ -655,6 +695,8 @@ export default function Inventory() {
           quantity: 1,
           unit: 'invoice',
           value: Number(invoice.total_amount || 0),
+          location_id: invoice.location_id,
+          brand_id: invoice.brand_id,
         });
         return;
       }
@@ -671,6 +713,8 @@ export default function Inventory() {
           quantity: getInvoiceLineQuantity(line),
           unit: line.vendor_unit || line.unit || line.uom || 'ea',
           value: getInvoiceLineValue(line),
+          location_id: invoice.location_id,
+          brand_id: invoice.brand_id,
         });
       });
     });
@@ -2364,13 +2408,13 @@ export default function Inventory() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
           <p className="text-muted-foreground mt-1">Track and manage stock levels</p>
         </div>
-        {!isGroundStaff && (
-          <div className="flex gap-2">
+        {activeTab === 'inventory' && !isGroundStaff && (
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" /> Export
             </Button>
@@ -2427,69 +2471,68 @@ export default function Inventory() {
         );
       })()}
 
-      {/* Stats */}
-      {!['wastage', 'waste-summary'].includes(activeTab) && (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+      {activeTab === 'inventory' && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Items</p>
+                  <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+                </div>
+                <Warehouse className="h-8 w-8 text-primary" />
               </div>
-              <Warehouse className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Value</p>
+                  <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString()}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-resend-green" />
               </div>
-              <TrendingUp className="h-8 w-8 text-resend-green" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold text-resend-red">{lowStock}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Low Stock</p>
+                  <p className="text-2xl font-bold text-resend-red">{lowStock}</p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-resend-red" />
               </div>
-              <AlertTriangle className="h-8 w-8 text-resend-red" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Wastage (MTD)</p>
-                <p className="text-2xl font-bold text-resend-orange">${displayedMtdWastageValue.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Wastage (MTD)</p>
+                  <p className="text-2xl font-bold text-resend-orange">${displayedMtdWastageValue.toLocaleString()}</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-resend-orange" />
               </div>
-              <TrendingDown className="h-8 w-8 text-resend-orange" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-10 mb-6">
-          <TabsTrigger value="inventory">Inventory List</TabsTrigger>
-          <TabsTrigger value="receiving" className="text-primary font-bold">Receiving</TabsTrigger>
-          <TabsTrigger value="avt" className="data-[state=active]:text-resend-green">Actual vs Theoretical</TabsTrigger>
-          <TabsTrigger value="pos-sync" className="text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
-          <TabsTrigger value="transfers" className="text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="wastage">Wastage Log</TabsTrigger>
-          <TabsTrigger value="counts">Stock Counts</TabsTrigger>
-          <TabsTrigger value="count-sheets">Count Sheets</TabsTrigger>
-          <TabsTrigger value="daily-snapshot">Daily Snapshot</TabsTrigger>
-          <TabsTrigger value="hardware-setup">Hardware & Scales</TabsTrigger>
+        <TabsList className="flex h-auto w-full flex-wrap items-center gap-1 rounded-lg bg-muted/60 p-1">
+          <TabsTrigger value="inventory" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Inventory List</TabsTrigger>
+          <TabsTrigger value="receiving" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-primary font-bold">Receiving</TabsTrigger>
+          <TabsTrigger value="avt" className="min-w-44 flex-1 whitespace-nowrap px-3 py-2 data-[state=active]:text-resend-green">Actual vs Theoretical</TabsTrigger>
+          <TabsTrigger value="pos-sync" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-indigo-600 font-bold border-b-2 border-transparent data-[state=active]:border-indigo-600">POS Sync</TabsTrigger>
+          <TabsTrigger value="transfers" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-amber-600 font-bold border-b-2 border-transparent data-[state=active]:border-amber-600">Transfers</TabsTrigger>
+          <TabsTrigger value="summary" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2">Summary</TabsTrigger>
+          <TabsTrigger value="wastage" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Wastage Log</TabsTrigger>
+          <TabsTrigger value="counts" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Stock Counts</TabsTrigger>
+          <TabsTrigger value="count-sheets" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Count Sheets</TabsTrigger>
+          <TabsTrigger value="daily-snapshot" className="min-w-36 flex-1 whitespace-nowrap px-3 py-2">Daily Snapshot</TabsTrigger>
+          <TabsTrigger value="hardware-setup" className="min-w-40 flex-1 whitespace-nowrap px-3 py-2">Hardware & Scales</TabsTrigger>
         </TabsList>
 
         <TabsContent value="receiving" className="space-y-4">
@@ -2898,7 +2941,10 @@ export default function Inventory() {
                               <TableBody>
                                 {rows.map(item => (
                                   <TableRow key={item.id || `${data.category}-${item.product_name}`}>
-                                    <TableCell className="max-w-72 truncate font-medium">{item.product_name || 'Unnamed item'}</TableCell>
+                                    <TableCell className="max-w-72 truncate font-medium">
+                                      {item.product_name || 'Unnamed item'}
+                                      <div className="text-[10px] font-normal text-muted-foreground">{locationNameById.get(item.location_id) || 'Unknown location'}</div>
+                                    </TableCell>
                                     <TableCell className="text-right tabular-nums">
                                       {Number(item.current_quantity || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} {item.current_unit || ''}
                                     </TableCell>
@@ -3177,6 +3223,7 @@ export default function Inventory() {
                         </span>
                       </div>
                     </TableHead>
+                    <TableHead>Location</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead
                       className="cursor-pointer hover:text-foreground group"
@@ -3197,7 +3244,7 @@ export default function Inventory() {
                 <TableBody>
                   {wasteHistoryRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No wastage logged for the selected date range
                       </TableCell>
                     </TableRow>
@@ -3206,6 +3253,10 @@ export default function Inventory() {
                       <TableRow key={log.id}>
                         <TableCell>{format(new Date(log.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="font-medium">{log.product_name}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">{locationNameById.get(log.location_id) || 'Unknown location'}</div>
+                          <div className="text-xs text-muted-foreground">{brandNameById.get(log.brand_id) || ''}</div>
+                        </TableCell>
                         <TableCell>{log.quantity} {log.unit}</TableCell>
                         <TableCell className="text-resend-red font-semibold">${log.value?.toFixed(2)}</TableCell>
                         <TableCell>
@@ -3470,6 +3521,7 @@ export default function Inventory() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[82px]">Date</TableHead>
+                          <TableHead className="w-[100px]">Location</TableHead>
                           <TableHead className="w-[120px]">Type</TableHead>
                           <TableHead className="w-[78px]">Status</TableHead>
                           {summaryBuckets.map(bucket => (
@@ -3482,7 +3534,7 @@ export default function Inventory() {
                       <TableBody>
                         {filteredStockCountHistoryRows.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={summaryBuckets.length + 5} className="h-20 text-center text-muted-foreground">
+                            <TableCell colSpan={summaryBuckets.length + 6} className="h-20 text-center text-muted-foreground">
                               No saved counts found for the selected range.
                             </TableCell>
                           </TableRow>
@@ -3493,6 +3545,7 @@ export default function Inventory() {
                             onClick={() => setStockCountDetailRecord(record)}
                           >
                             <TableCell className="font-medium tabular-nums">{format(new Date(`${record.date}T00:00:00`), 'MM/dd/yy')}</TableCell>
+                            <TableCell className="truncate">{locationNameById.get(record.location_id) || 'Unknown location'}</TableCell>
                             <TableCell className="truncate">{record.type || record.scope}</TableCell>
                             <TableCell>
                               <Badge className={cn("px-2 py-0 text-[11px]", record.status === 'Closed' ? 'bg-secondary text-foreground' : 'bg-resend-green/10 text-resend-green')}>
@@ -4275,6 +4328,7 @@ export default function Inventory() {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Product</TableHead>
+                        <TableHead>Location</TableHead>
                         <TableHead>Quantity</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead>Value</TableHead>
@@ -4285,7 +4339,7 @@ export default function Inventory() {
                     <TableBody>
                       {wasteHistoryRows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                             No waste history yet
                           </TableCell>
                         </TableRow>
@@ -4294,6 +4348,10 @@ export default function Inventory() {
                           <TableRow key={`summary-${log.id}`}>
                             <TableCell>{format(new Date(log.created_at), 'MM/dd/yyyy')}</TableCell>
                             <TableCell className="font-medium">{log.product_name}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">{locationNameById.get(log.location_id) || 'Unknown location'}</div>
+                              <div className="text-xs text-muted-foreground">{brandNameById.get(log.brand_id) || ''}</div>
+                            </TableCell>
                             <TableCell>{log.quantity} {log.unit}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className="capitalize">{log.reason?.replace(/_/g, ' ') || 'Other'}</Badge>
@@ -4341,6 +4399,7 @@ export default function Inventory() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Count</TableHead>
                       <TableHead>Unit</TableHead>
@@ -4350,7 +4409,7 @@ export default function Inventory() {
                   <TableBody>
                     {todaySnapshotRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No items received today
                         </TableCell>
                       </TableRow>
@@ -4363,6 +4422,7 @@ export default function Inventory() {
                               {item.vendor_name}{item.invoice_number ? ` - ${item.invoice_number}` : ''}
                             </div>
                           </TableCell>
+                          <TableCell>{locationNameById.get(item.location_id) || 'Unknown location'}</TableCell>
                           <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                           <TableCell>{item.quantity}</TableCell>
                           <TableCell>{item.unit}</TableCell>
@@ -4386,6 +4446,7 @@ export default function Inventory() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Vendor</TableHead>
                       <TableHead>Qty</TableHead>
@@ -4395,7 +4456,7 @@ export default function Inventory() {
                   <TableBody>
                     {previousSnapshotRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No previous received items yet
                         </TableCell>
                       </TableRow>
@@ -4408,6 +4469,7 @@ export default function Inventory() {
                               {item.invoice_number ? `Invoice ${item.invoice_number}` : 'Invoice upload'}
                             </div>
                           </TableCell>
+                          <TableCell>{locationNameById.get(item.location_id) || 'Unknown location'}</TableCell>
                           <TableCell>{format(parseLocalDate(item.received_date), 'MMM d, yyyy')}</TableCell>
                           <TableCell className="max-w-40 truncate">{item.vendor_name}</TableCell>
                           <TableCell>{item.quantity} {item.unit}</TableCell>

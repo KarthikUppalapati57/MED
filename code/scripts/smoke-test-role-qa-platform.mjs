@@ -24,7 +24,7 @@ const accounts = [
   },
   {
     email: 'qa.owner.bistro@restops.test',
-    role: 'org_owner',
+    role: 'org_manager',
     expectedContext: ['organization_id'],
     expectedPages: ['Dashboard', 'Performance', 'Notifications', 'AiInsights', 'Invoices', 'Payments', 'Products', 'Inventory', 'AutoOrdering', 'SmartPrep', 'Recipes', 'Vendors', 'Labor', 'Accounting', 'OrgManagement', 'UserManagement', 'RestaurantSetup', 'Integrations', 'AuditLogs'],
   },
@@ -49,29 +49,29 @@ const accounts = [
 ];
 
 const tableChecks = [
-  { name: 'organizations', select: 'id,name', roles: ['platform_admin', 'org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'brands', select: 'brand_id,name,organization_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'locations', select: 'id,name,organization_id,brand_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'invoices', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'payments', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'products', select: 'id,organization_id,location_id,name', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'inventory', select: 'id,organization_id,location_id,product_id', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'auto_orders', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'recipes', select: 'id,organization_id,location_id,name', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'vendors', select: 'id,organization_id,location_id,name', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'employee_shifts', select: 'id,organization_id,location_id,status', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'notifications', select: 'id,user_id,type,is_read', roles: ['platform_admin', 'org_owner', 'branch_manager', 'location_manager', 'ground_staff'] },
-  { name: 'dashboard_report_preferences', select: 'id,organization_id,scope,daily_handoff,weekly_executive', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'dashboard_report_deliveries', select: 'id,organization_id,scope,report_type,status', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'dashboard_action_status', select: 'id,organization_id,scope,status', roles: ['org_owner', 'branch_manager', 'location_manager'] },
-  { name: 'dashboard_escalation_rules', select: 'id,organization_id,scope', roles: ['org_owner', 'branch_manager', 'location_manager'] },
+  { name: 'organizations', select: 'id,name', roles: ['platform_admin', 'org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'brands', select: 'brand_id,name,organization_id', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'locations', select: 'id,name,organization_id,brand_id', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'invoices', select: 'id,organization_id,location_id,status', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'payments', select: 'id,organization_id,location_id,status', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'products', select: 'id,organization_id,location_id,name', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'inventory', select: 'id,organization_id,location_id,product_id', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'auto_orders', select: 'id,organization_id,location_id,status', roles: ['org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'recipes', select: 'id,organization_id,location_id,name', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'vendors', select: 'id,organization_id,location_id,name', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'employee_shifts', select: 'id,organization_id,location_id,status', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'notifications', select: 'id,user_id,type,is_read', roles: ['platform_admin', 'org_manager', 'branch_manager', 'location_manager', 'ground_staff'] },
+  { name: 'dashboard_report_preferences', select: 'id,organization_id,scope,daily_handoff,weekly_executive', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'dashboard_report_deliveries', select: 'id,organization_id,scope,report_type,status', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'dashboard_action_status', select: 'id,organization_id,scope,status', roles: ['org_manager', 'branch_manager', 'location_manager'] },
+  { name: 'dashboard_escalation_rules', select: 'id,organization_id,scope', roles: ['org_manager', 'branch_manager', 'location_manager'] },
 ];
 
 const roleOrder = {
   ground_staff: 0,
   location_manager: 1,
   branch_manager: 2,
-  org_owner: 3,
+  org_manager: 3,
   platform_admin: 4,
 };
 

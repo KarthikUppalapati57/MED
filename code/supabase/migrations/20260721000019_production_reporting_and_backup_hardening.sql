@@ -1,4 +1,4 @@
-﻿BEGIN;
+BEGIN;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES ('db-backups', 'db-backups', false, 104857600, ARRAY['application/json'])

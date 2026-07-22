@@ -62,7 +62,7 @@ const moduleDefinitions = [
     submodules: ['Performance dashboard', 'Executive BI', 'Custom reports', 'Cross-location benchmarking'],
   },
   {
-    name: 'Inbox',
+    name: 'Notifications',
     aliases: ['notifications', 'inbox', 'notification'],
     moduleDirs: ['dashboard'],
     pages: ['Notifications'],

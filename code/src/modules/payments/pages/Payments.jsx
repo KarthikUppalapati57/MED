@@ -124,7 +124,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       }).select('id').single();
       if (invoiceError) throw invoiceError;
 
-      const { data, error } = await supabase.functions.invoke('process-checkbook-payout', {
+      const { data, error } = await supabase.functions.invoke('process-payout', {
         body: { invoice_id: invoice.id, payout_method: payoutMethod, payment_account_id: paymentAccountId },
       });
       if (error) throw error;
@@ -470,7 +470,10 @@ export default function Payments() {
           )
         };
       });
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
     },
+    onError: (error) => toast.error(error.message || 'Failed to update invoice'),
   });
 
   const savePaymentSettings = useMutation({
@@ -598,17 +601,32 @@ export default function Payments() {
 
   const handleApprove = async (invoice) => {
     if (!(await runApprovalGate(confirm, invoice))) return;
-    await updateInvoice.mutateAsync({
-      id: invoice.id,
-      data: { status: 'approved', ap_status: 'approved', action_required_reason: null, action_required_details: null },
-    });
-    await ensureLedgerBill({ ...invoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
-    toast.success('Invoice approved');
+    try {
+      const approvedInvoice = await updateInvoice.mutateAsync({
+        id: invoice.id,
+        data: {
+          status: 'approved',
+          ap_status: 'approved',
+          approved_by: userProfile?.id || null,
+          approved_date: new Date().toISOString(),
+          action_required_reason: null,
+          action_required_details: null,
+        },
+      });
+      await ensureLedgerBill({ ...invoice, ...approvedInvoice, organization_id: invoice.organization_id || organization?.id }, { status: 'pending' });
+      toast.success('Invoice approved');
+    } catch (error) {
+      console.error('Payment queue approve failed:', error);
+    }
   };
 
   const handleReject = async (invoice) => {
-    await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
-    toast.success('Invoice rejected');
+    try {
+      await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
+      toast.success('Invoice rejected');
+    } catch (error) {
+      console.error('Payment queue reject failed:', error);
+    }
   };
 
   // Stats
@@ -755,11 +773,12 @@ export default function Payments() {
     if (!payment.invoice_id) return toast.error('No invoice linked to this payment.');
     setRetryingPaymentId(payment.id);
     try {
-      const functionName = payment.payment_method === 'check' ? 'process-checkbook-payout' : 'process-payout';
-      const body = payment.payment_method === 'check'
-        ? { invoice_id: payment.invoice_id, payout_method: 'checkbook_digital' }
-        : { invoice_id: payment.invoice_id };
-      const { data, error } = await supabase.functions.invoke(functionName, { body });
+      // Retrying always retries a 'check' payment as a digital check, never re-derives
+      // physical vs. digital -- existing behavior, unchanged here.
+      const payoutMethod = payment.payment_method === 'check' ? 'checkbook_digital' : 'dwolla_ach';
+      const { data, error } = await supabase.functions.invoke('process-payout', {
+        body: { invoice_id: payment.invoice_id, payout_method: payoutMethod },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success('Payment retried successfully');

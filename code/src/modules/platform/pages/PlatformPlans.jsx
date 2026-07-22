@@ -16,6 +16,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
+
+function normalizeCurrentPlanId(name) {
+  const slug = String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (slug === 'advanced-modules') return 'advanced';
+  return slug;
+}
+
 export default function PlatformPlans() {
   const { user, role: userRole } = useAuth();
   const authChecked = !!user;
@@ -36,7 +44,7 @@ export default function PlatformPlans() {
   const { data: plans = [], isLoading: isLoadingPlans } = useAuthQuery({
     queryKey: ['plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').order('price_monthly', { ascending: true });
+      const { data, error } = await supabase.from('plans').select('*').in('id', CURRENT_PLAN_IDS).order('price_monthly', { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -72,7 +80,11 @@ export default function PlatformPlans() {
         if (error) throw error;
         toast.success("Plan updated successfully", { id: toastId });
       } else {
-        const { error } = await supabase.from('plans').insert([payload]);
+        const planId = normalizeCurrentPlanId(planForm.name);
+        if (!CURRENT_PLAN_IDS.includes(planId)) {
+          throw new Error('Only Starter, Starter + AI, and Advanced modules plans are supported.');
+        }
+        const { error } = await supabase.from('plans').insert([{ id: planId, ...payload }]);
         if (error) throw error;
         toast.success("Plan created successfully", { id: toastId });
       }
@@ -124,7 +136,7 @@ export default function PlatformPlans() {
         </div>
         <Button onClick={openNewPlan} className="bg-brand hover:bg-brand/90 text-primary-foreground font-bold rounded-xl h-10 px-6">
           <Plus className="w-4 h-4 mr-2" />
-          Create Plan
+          Restore Plan
         </Button>
       </div>
 
@@ -223,12 +235,12 @@ export default function PlatformPlans() {
         </CardContent>
       </Card>
 
-      {/* Edit/Create Plan Dialog */}
+      {/* Edit/Restore Plan Dialog */}
       <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
         <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">{editingPlan ? 'Edit Plan' : 'Create New Plan'}</DialogTitle>
-            <DialogDescription>Configure the SaaS subscription tier</DialogDescription>
+            <DialogTitle className="text-2xl font-black">{editingPlan ? 'Edit Plan' : 'Restore Plan'}</DialogTitle>
+            <DialogDescription>Configure one of the three current SaaS subscription tiers.</DialogDescription>
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">

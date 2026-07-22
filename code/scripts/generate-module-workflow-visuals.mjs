@@ -11,7 +11,7 @@ const csvPath = path.join(workspaceRoot, 'outputs', 'module-wise-live-artifacts.
 const modules = [
   { name: 'Dashboard', steps: ['Load tenant context', 'Aggregate KPIs', 'Render role dashboard', 'Schedule dashboard reports'], keywords: ['dashboard', 'report', 'summary', 'notification', 'budget'] },
   { name: 'Performance', steps: ['Select performance view', 'Read sales/labor/inventory facts', 'Compute variance and forecasts', 'Show BI widgets'], keywords: ['performance', 'benchmark', 'forecast', 'variance', 'pnl', 'sales'] },
-  { name: 'Inbox', steps: ['Listen for notifications', 'Filter unread approvals', 'Open target workflow', 'Mark read or resolve'], keywords: ['notification', 'inbox', 'approval'] },
+  { name: 'Notifications', steps: ['Listen for notifications', 'Filter unread approvals', 'Open target workflow', 'Mark read or resolve'], keywords: ['notification', 'inbox', 'approval'] },
   { name: 'Invoices', steps: ['Upload or ingest invoice', 'Run extraction', 'Review and validate', 'Approve and route AP', 'Sync ledger/payment state'], keywords: ['invoice', 'approval', 'three_way', 'extraction', 'ledger'] },
   { name: 'Payments', steps: ['Open payable queue', 'Schedule or pay invoice', 'Record payment history', 'Reconcile payout', 'Update gateway/accounting'], keywords: ['payment', 'payable', 'scheduled', 'gateway', 'payout', 'bill'] },
   { name: 'Products', steps: ['Open product catalog', 'Map vendor items', 'Run AI verification', 'Review purchases', 'Update product master'], keywords: ['product', 'catalog', 'vendor_item', 'global_vendor', 'purchase'] },

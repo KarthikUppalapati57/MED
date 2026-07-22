@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
@@ -10,7 +10,6 @@ const ROLE_RANK = {
   location_manager: 1,
   manager: 1,
   branch_manager: 2,
-  brand_manager: 2,
   org_manager: 3,
   tenant_super_admin: 4,
   owner: 3,

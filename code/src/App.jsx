@@ -53,6 +53,7 @@ const VendorOnboardingBank = React.lazy(() => import('./pages/vendor-portal/Vend
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
 const INVITE_VALIDATION_TIMEOUT_MS = 15000;
+const PENDING_INVITE_TOKEN_KEY = 'restops_pending_invite_token';
 const PASSWORD_RECOVERY_ACTIVE_KEY = 'restops_password_recovery_active';
 
 const withTimeout = (promise, timeoutMs, message) => {
@@ -64,6 +65,23 @@ const withTimeout = (promise, timeoutMs, message) => {
 };
 
 const normalizeInviteToken = (value) => String(value || '').replace(/[\n\r.,!?>\]]+$/, '').trim();
+
+const isAlreadyRegisteredError = (error) => /already registered|already exists|user exists/i.test(String(error?.message || error || ''));
+
+const setPendingInviteToken = (token) => {
+  const cleanToken = normalizeInviteToken(token);
+  if (!cleanToken) return;
+  try { localStorage.setItem(PENDING_INVITE_TOKEN_KEY, cleanToken); } catch {}
+};
+
+const buildInviteLoginPath = (token, email) => {
+  const params = new URLSearchParams();
+  const cleanToken = normalizeInviteToken(token);
+  if (cleanToken) params.set('invite', cleanToken);
+  if (email) params.set('email', email);
+  const query = params.toString();
+  return query ? `/login?${query}` : '/login';
+};
 
 const isExpiredInvite = (invite) => {
   if (!invite?.expires_at) return false;
@@ -188,6 +206,7 @@ function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [ssoProvider, setSsoProvider] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [existingAccountInvite, setExistingAccountInvite] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState('idle'); // idle | checking | available | taken | invalid
 
   useEffect(() => {
@@ -281,6 +300,7 @@ function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setExistingAccountInvite(false);
     const password = sanitizePasswordInput(form.password);
     const confirmation = sanitizePasswordInput(form.confirm);
     if (password !== form.password || confirmation !== form.confirm) {
@@ -327,6 +347,12 @@ function SignupPage() {
     });
     setLoading(false);
     if (signUpError) {
+      if (isAlreadyRegisteredError(signUpError)) {
+        setPendingInviteToken(cleanToken);
+        setExistingAccountInvite(true);
+        setError('This email already has an account. Sign in with that account to accept this invitation.');
+        return;
+      }
       setError(signUpError.message);
     } else {
       setSuccess(true);
@@ -337,6 +363,11 @@ function SignupPage() {
     }
   };
 
+
+  const handleExistingAccountSignIn = () => {
+    setPendingInviteToken(token);
+    navigate(buildInviteLoginPath(token, form.email));
+  };
 
   const handleSSOSignup = async (provider) => {
     setError('');
@@ -469,7 +500,18 @@ function SignupPage() {
               />
             </div>
             {error && (inviteInfo || inviteLoading) && (
-              <p className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20">{error}</p>
+              <div className="text-sm text-resend-red bg-resend-red/10 p-3 rounded-lg border border-resend-red/20 space-y-3">
+                <p>{error}</p>
+                {existingAccountInvite && (
+                  <button
+                    type="button"
+                    onClick={handleExistingAccountSignIn}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-95 transition-opacity"
+                  >
+                    Sign in to accept invitation
+                  </button>
+                )}
+              </div>
             )}
             <button
               type="submit"
@@ -518,7 +560,7 @@ function SignupPage() {
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={handleExistingAccountSignIn}
                   className="text-foreground hover:text-brand font-medium transition-colors duration-200"
                 >
                   Sign In
@@ -535,7 +577,12 @@ function SignupPage() {
 // Login Page 
 function LoginPage() {
   const { loginWithEmail, loginWithSSO, resetPassword, authError } = useAuth();
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const loginParams = new URLSearchParams(location.search);
+  const inviteToken = normalizeInviteToken(loginParams.get('invite'));
+  const invitedEmail = loginParams.get('email') || '';
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
@@ -557,7 +604,33 @@ function LoginPage() {
       }
       loginEmail = resolvedEmail;
     }
-    await loginWithEmail(loginEmail, password);
+    const { error: loginError } = await loginWithEmail(loginEmail, password);
+    if (loginError) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (inviteToken) {
+      try {
+        setPendingInviteToken(inviteToken);
+        const { error: inviteError } = await supabase.rpc('accept_invitation', { p_token: inviteToken });
+        if (inviteError && !String(inviteError.message || '').toLowerCase().includes('already-accepted')) {
+          setLocalError(inviteError.message || 'Unable to accept this invitation.');
+          setIsSubmitting(false);
+          return;
+        }
+        try { localStorage.removeItem(PENDING_INVITE_TOKEN_KEY); } catch {}
+        await supabase.auth.refreshSession();
+        window.location.assign('/business-verification');
+        return;
+      } catch (err) {
+        setLocalError(err.message || 'Unable to accept this invitation.');
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    navigate('/', { replace: true });
     setIsSubmitting(false);
   };
 
@@ -580,6 +653,11 @@ function LoginPage() {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (inviteToken) setPendingInviteToken(inviteToken);
+    if (invitedEmail) setEmail(invitedEmail);
+  }, [inviteToken, invitedEmail]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -671,9 +749,15 @@ function LoginPage() {
             Welcome Back
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Sign in with your credentials
+            {inviteToken ? 'Sign in to accept your invitation' : 'Sign in with your credentials'}
           </p>
         </div>
+
+        {inviteToken && (
+          <div className="text-sm text-resend-green bg-resend-green/10 p-3 rounded-lg border border-resend-green/20">
+            This invitation is saved. After you sign in, RestOps will attach it to your account.
+          </div>
+        )}
 
         <form className="space-y-4" onSubmit={handleLogin}>
           <div className="space-y-1">
@@ -733,7 +817,7 @@ function LoginPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => loginWithSSO('google')}
+              onClick={() => loginWithSSO('google', inviteToken ? { inviteToken } : {})}
               disabled={isSubmitting}
               className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
             >
@@ -741,7 +825,7 @@ function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => loginWithSSO('azure')}
+              onClick={() => loginWithSSO('azure', inviteToken ? { inviteToken } : {})}
               disabled={isSubmitting}
               className="inline-flex items-center justify-center rounded-lg border border-border/60 bg-secondary/40 hover:bg-secondary/80 font-bold px-4 py-3 text-sm disabled:opacity-50 transition-all duration-200"
             >

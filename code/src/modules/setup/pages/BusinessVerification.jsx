@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -90,7 +90,7 @@ export default function BusinessVerification() {
   const [revealedTaxId, setRevealedTaxId] = useState(null);
   const [revealingTaxId, setRevealingTaxId] = useState(false);
   const [nameAvailable, setNameAvailable] = useState(true);
-  const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: true, ssn_verification_enabled: true });
+  const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: false, ssn_verification_enabled: false });
   const [contactOtp, setContactOtp] = useState({
     email: {
       otpId: null,
@@ -143,12 +143,12 @@ export default function BusinessVerification() {
       try {
         const [draftState, settings] = await Promise.all([
           api.onboarding.getBusinessVerificationDraft().catch(() => null),
-          api.onboarding.getVerificationSettings().catch(() => ({ ein_verification_enabled: true, ssn_verification_enabled: true })),
+          api.onboarding.getVerificationSettings().catch(() => ({ ein_verification_enabled: false, ssn_verification_enabled: false })),
         ]);
         if (cancelled) return;
         setVerificationSettings({
-          ein_verification_enabled: settings?.ein_verification_enabled !== false,
-          ssn_verification_enabled: settings?.ssn_verification_enabled !== false,
+          ein_verification_enabled: settings?.ein_verification_enabled === true,
+          ssn_verification_enabled: settings?.ssn_verification_enabled === true,
         });
         const draft = draftState?.draft || {};
         if (draft.form) {
@@ -650,7 +650,7 @@ export default function BusinessVerification() {
                         <FileCheck2 className="h-4 w-4 text-primary" />
                         Estimated Trust Score: {trustScore}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{isTaxVerificationEnabled ? 'Provider calls are represented by a local simulation until EIN/SSN API keys are configured.' : 'Tax ID verification is disabled for this identifier type. Contact verification still applies.'}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{isTaxVerificationEnabled ? 'Tax ID verification is enabled for this identifier type. Contact verification and admin review still apply.' : 'Tax ID verification is disabled for this identifier type. Contact verification still applies.'}</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm"><b>Business:</b> {form.legalName || 'Not entered'}<br /><span className="text-muted-foreground">{form.businessType} / {requiredIdentifierType.toUpperCase()}</span></div>
@@ -660,7 +660,7 @@ export default function BusinessVerification() {
                     {userProfile?.tax_identifier_last4 && (
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm">
                         <b>{(userProfile?.tax_identifier_type || requiredIdentifierType).toUpperCase()} on file:</b>{' '}
-                        <span className="font-mono">{revealedTaxId || `•••••${userProfile.tax_identifier_last4}`}</span>
+                        <span className="font-mono">{revealedTaxId || `â€¢â€¢â€¢â€¢â€¢${userProfile.tax_identifier_last4}`}</span>
                         <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={handleToggleRevealTaxId} disabled={revealingTaxId}>
                           {revealingTaxId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : revealedTaxId ? 'Hide' : 'Show'}
                         </Button>

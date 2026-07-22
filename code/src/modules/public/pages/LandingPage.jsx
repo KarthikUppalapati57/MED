@@ -33,6 +33,32 @@ import { toast } from "sonner";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 
+const LANDING_PLANS = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    badge: 'Available now',
+    price: 149,
+    description: 'Core location operations for one restaurant, store, or service location.',
+    features: ['Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
+  },
+  {
+    id: 'starter-ai',
+    name: 'Starter + AI',
+    badge: 'Coming soon',
+    price: 249,
+    description: 'Starter modules plus AI-assisted operating intelligence.',
+    features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
+  },
+  {
+    id: 'advanced',
+    name: 'Advanced modules',
+    badge: 'Coming soon',
+    price: 349,
+    description: 'Expanded controls for larger teams and advanced operating workflows.',
+    features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
+  },
+];
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -297,36 +323,41 @@ export default function LandingPage() {
               <p className="text-black/70 dark:text-white/85 text-lg font-bold tracking-widest uppercase">Select your tier</p>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="max-w-md mx-auto"
-            >
-              <div className="p-12 bg-[#F2EEE8] dark:bg-white/5 dark:border dark:border-white/10 mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
-                <div className="absolute top-0 right-0 p-8">
-                  <span className="text-[10px] font-bold px-3 py-1 bg-black text-white uppercase tracking-[4px]">Private Beta</span>
-                </div>
-                <div className="mb-16">
-                  <h3 className="text-2xl font-bold tracking-tight mb-8 text-black dark:text-white">Platform Complete</h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-8xl font-bold tracking-tighter text-black dark:text-white">$149</span>
-                    <span className="text-black/70 dark:text-white/80 font-bold text-sm uppercase tracking-[4px]">USD / Location / Mo</span>
+            <div className="grid gap-8 lg:grid-cols-3">
+              {LANDING_PLANS.map((plan, index) => (
+                <motion.div
+                  key={plan.id}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.08 }}
+                  viewport={{ once: true }}
+                  className="h-full"
+                >
+                  <div className="flex h-full flex-col p-10 bg-[#F2EEE8] dark:bg-white/5 dark:border dark:border-white/10 mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
+                    <div className="mb-10 flex items-center justify-between gap-4">
+                      <h3 className="text-2xl font-bold tracking-tight text-black dark:text-white">{plan.name}</h3>
+                      <span className="shrink-0 text-[9px] font-bold px-3 py-1 bg-black text-white uppercase tracking-[3px]">{plan.badge}</span>
+                    </div>
+                    <p className="min-h-[60px] text-sm font-semibold leading-relaxed text-black/65 dark:text-white/80">{plan.description}</p>
+                    <div className="my-10 flex items-baseline gap-2">
+                      <span className="text-7xl font-bold tracking-tighter text-black dark:text-white">${plan.price}</span>
+                      <span className="text-black/70 dark:text-white/80 font-bold text-xs uppercase tracking-[3px]">USD / Location / Mo</span>
+                    </div>
+                    <ul className="mb-12 flex-1 space-y-5">
+                      {plan.features.map((item) => (
+                        <li key={item} className="flex items-center gap-4 text-black/60 dark:text-white/85 text-xs font-bold uppercase tracking-widest">
+                          <div className="h-1 w-1 bg-[#b83316]" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                    <Button className="w-full h-14 bg-black text-white hover:bg-[#b83316] font-bold text-[10px] tracking-[5px] rounded-sm uppercase transition-all shadow-2xl" onClick={() => setIsDemoModalOpen(true)}>
+                      {plan.id === 'starter' ? 'JOIN NOW' : 'REQUEST ACCESS'}
+                    </Button>
                   </div>
-                </div>
-                <ul className="space-y-6 mb-16">
-                  {["Unlimited visual extractions", "Universal user access", "Full-stack telemetry", "Dedicated API instance", "24/7 technical escort"].map((item, i) => (
-                    <li key={i} className="flex items-center gap-4 text-black/60 dark:text-white/85 text-xs font-bold uppercase tracking-widest">
-                      <div className="h-1 w-1 bg-[#b83316]" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-                <Button className="w-full h-16 bg-black text-white hover:bg-[#b83316] font-bold text-[10px] tracking-[5px] rounded-sm uppercase transition-all shadow-2xl" onClick={() => setIsDemoModalOpen(true)}>
-                  JOIN NOW
-                </Button>
-              </div>
-            </motion.div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
       </div>
@@ -359,7 +390,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
-            <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">© 2026 RestOps INC. BUILT FOR SCALE.</p>
+            <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">(c) 2026 RestOps INC. BUILT FOR SCALE.</p>
             <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80">
                 <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Privacy</a>
                 <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Terms</a>
@@ -449,4 +480,3 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     </div>
   </motion.div>
 );
-

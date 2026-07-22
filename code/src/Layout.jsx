@@ -73,7 +73,7 @@ const navigation = [
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
   { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
   { name: 'Food Safety (HACCP)', href: 'FoodSafety', icon: ShieldCheck, minRole: 'manager' },
-  { name: 'Inbox', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
+  { name: 'Notifications', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
   { 
     name: 'Platform Console', 
     icon: Shield, 
@@ -205,17 +205,17 @@ const navigation = [
       { name: 'Close Books', href: 'Accounting/close-books', icon: Check }
     ]
   },
-  { 
-    name: 'Organization Settings', 
-    icon: Building2, 
+  {
+    name: 'Organization Settings',
+    icon: Building2,
     minRole: 'org_manager',
     subItems: [
       { name: 'Hierarchy', href: 'OrgManagement/hierarchy', icon: Building2 },
+      { name: 'Team Members', href: 'UserManagement', icon: Users },
       { name: 'Franchisor Console', href: 'FranchisorConsole', icon: Building2 },
       { name: 'Security & MFA', href: 'OrgManagement/security', icon: ShieldCheck }
     ]
   },
-  { name: 'Team Members', href: 'UserManagement', icon: Users, minRole: 'org_manager' },
   { name: 'Billing & Plans', href: 'Billing', icon: CreditCard, minRole: 'org_manager' },
   { name: 'Restaurant Setup', href: 'RestaurantSetup', icon: Settings, minRole: 'location_manager' },
   { name: 'Integrations', href: 'Integrations', icon: Settings, minRole: 'org_manager' },
@@ -285,6 +285,11 @@ export default function Layout({ children, currentPageName }) {
     enabled: !!user?.id,
   });
 
+  const invalidateNotificationQueries = React.useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
+  }, [queryClient, user?.id]);
+
   // Real-time notification subscription
   useEffect(() => {
     if (!user?.id) return;
@@ -293,21 +298,19 @@ export default function Layout({ children, currentPageName }) {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
-        }
+        invalidateNotificationQueries
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, queryClient]);
+  }, [user?.id, invalidateNotificationQueries]);
 
   // Real-time organization update subscription
   useEffect(() => {
@@ -340,8 +343,9 @@ export default function Layout({ children, currentPageName }) {
     await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('id', notifId);
-    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      .eq('id', notifId)
+      .eq('user_id', user?.id);
+    invalidateNotificationQueries();
   };
 
   const handleNotificationClick = async (notif) => {
@@ -358,7 +362,7 @@ export default function Layout({ children, currentPageName }) {
       .update({ is_read: true })
       .eq('user_id', user?.id)
       .eq('is_read', false);
-    queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+    invalidateNotificationQueries();
   };
 
   const handleLogout = () => {

@@ -1,12 +1,10 @@
-// Shared Resend email helper. Factored out of vendor-onboarding/index.ts (the only caller
-// before this), which had its own private copy of this exact function.
+﻿// Shared Resend email helper for Edge Functions.
 export async function sendTransactionalEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("VENDOR_ONBOARDING_FROM_EMAIL") || Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
 
   if (!apiKey) {
-    console.log(`[EMAIL SKIPPED] ${subject} -> ${to}\n${text}`);
-    return { sent: false, skipped: true };
+    throw new Error("RESEND_API_KEY is not configured for transactional email delivery");
   }
 
   const response = await fetch("https://api.resend.com/emails", {

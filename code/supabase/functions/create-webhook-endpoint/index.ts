@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -6,7 +6,6 @@ const ROLE_LEVEL: Record<string, number> = {
   ground_staff: 0,
   location_manager: 1,
   manager: 2,
-  brand_manager: 2,
   branch_manager: 2,
   org_manager: 3,
   tenant_super_admin: 4,

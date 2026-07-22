@@ -70,3 +70,47 @@ export async function revertPayoutOnFailure(
 
   await notifyPaymentFailure(serviceSupabase, { paymentId, invoiceId, reason })
 }
+
+// Shared tail for both payout webhooks (Dwolla's payout-webhook, Checkbook's checkbook-webhook):
+// each webhook does its own signature verification and maps its own provider's status
+// vocabulary to payout_status/newInvoiceStatus, then both call this for the actual DB writes +
+// failure notification so that sequence can't drift out of sync between the two rails.
+export async function applyPayoutOutcome(
+  serviceSupabase: any,
+  { refColumn, refValue, newPayoutStatus, newInvoiceStatus, isFailure, reason }: {
+    refColumn: string
+    refValue: string
+    newPayoutStatus: string
+    newInvoiceStatus: string
+    isFailure: boolean
+    reason?: string
+  }
+) {
+  const { data: payment, error: paymentError } = await serviceSupabase
+    .from('payments')
+    .update({
+      payout_status: newPayoutStatus,
+      ...(isFailure ? { status: 'failed', failure_reason: reason } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq(refColumn, refValue)
+    .select('id, invoice_id')
+    .single()
+
+  if (paymentError || !payment) {
+    console.error('Failed to update payment or payment not found:', paymentError)
+    return
+  }
+
+  await serviceSupabase
+    .from('invoices')
+    .update({
+      status: newInvoiceStatus,
+      payment_status: newInvoiceStatus === 'paid' ? 'paid' : 'unpaid',
+    })
+    .eq('id', payment.invoice_id)
+
+  if (isFailure) {
+    await notifyPaymentFailure(serviceSupabase, { paymentId: payment.id, invoiceId: payment.invoice_id, reason: reason || 'Payout failed' })
+  }
+}

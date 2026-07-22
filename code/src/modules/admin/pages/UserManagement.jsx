@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   CheckCircle2, X, Loader2, Building2, Globe, FileText, ShieldCheck,
-  UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key
+  UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key, Store, MapPin
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -94,7 +94,118 @@ function RoleBadges({ member, maxVisible = 2 }) {
 }
 
 
-// UserDetailDrawer 
+// MemberRow — single member, rendered inside a brand/location hierarchy group
+function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
+  const queryClient = useQueryClient();
+  const status = member.status || 'active';
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
+  const StatusIcon = statusCfg.icon;
+
+  return (
+    <div
+      className={cn("group flex items-center gap-4 px-5 py-3 transition-colors", canEditRow && "cursor-pointer hover:bg-secondary/50")}
+      onClick={() => canEditRow && onSelect(member)}
+    >
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
+        style={{ backgroundColor: avatarColor(member.profiles?.email || member.email || '') }}>
+        {(member.profiles?.full_name || member.full_name || member.profiles?.email || member.email || '?').charAt(0)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-foreground text-sm leading-tight truncate">
+          {member.profiles?.full_name || member.full_name || 'Verification Pending'}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{member.profiles?.email || member.email}</p>
+      </div>
+      <RoleBadges member={member} />
+      <span className={cn("hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold shrink-0", statusCfg.badgeClass)}>
+        <StatusIcon className="w-3 h-3" />{statusCfg.label}
+      </span>
+      <span className="hidden md:inline text-xs text-muted-foreground w-20 shrink-0 text-right">
+        {formatLastActive(member.profiles?.updated_at || member.updated_at)}
+      </span>
+      <div onClick={e => e.stopPropagation()} className="shrink-0">
+        {canEditRow && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="group-hover:bg-card rounded-xl">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl border-border shadow-xl p-2 w-48">
+              <DropdownMenuItem onClick={() => onSelect(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-foreground">
+                <Edit2 className="h-4 w-4 mr-3 text-primary" /> Edit Member
+              </DropdownMenuItem>
+              {member.token && (
+                <>
+                  <DropdownMenuItem
+                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-blue hover:bg-resend-blue/5"
+                    onClick={() => {
+                      const link = `${window.location.origin}/signup/${member.token}`;
+                      navigator.clipboard.writeText(link);
+                      toast.success("Invite link copied to clipboard!");
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-primary hover:bg-primary/5"
+                    onClick={async () => {
+                      toast.loading("Resending invite...", { id: 'resend-invite' });
+                      const { error } = await supabase.functions.invoke('invite-user', {
+                        body: {
+                          email: member.email || member.profiles?.email,
+                          full_name: member.full_name || member.profiles?.full_name,
+                          role: member.role || member.profiles?.role,
+                          organization_id: activeOrgId,
+                          resend: true
+                        }
+                      });
+                      if (error) {
+                        toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
+                      } else {
+                        toast.success("Invite resent successfully!", { id: 'resend-invite' });
+                      }
+                    }}
+                  >
+                    <Mail className="h-4 w-4 mr-3" /> Resend Invite
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-red hover:bg-resend-red/5"
+                onClick={async () => {
+                  if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
+                  const userId = member.user_id || member.id;
+
+                  // Optimistic update
+                  await queryClient.cancelQueries({ queryKey: ['team-members'] });
+                  const previousMembers = queryClient.getQueryData(['team-members']);
+                  queryClient.setQueryData(['team-members'], (old) =>
+                    old ? old.filter(m => (m.user_id || m.id) !== userId) : []
+                  );
+
+                  try {
+                    const { error } = await supabase.rpc('org_remove_member', { target_user_id: userId });
+                    if (error) throw error;
+                    posthog.capture('team_member_removed');
+                    toast.success('User removed from organization');
+                    queryClient.invalidateQueries({ queryKey: ['team-members'] });
+                  } catch (e) {
+                    if (previousMembers) queryClient.setQueryData(['team-members'], previousMembers);
+                    toast.error(e.message || 'Failed to remove user');
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-3" /> Remove User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// UserDetailDrawer
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
   const { role: currentUserRole, userProfile } = useAuth();
@@ -780,9 +891,6 @@ export default function UserManagement() {
     enabled: !!activeOrgId,
   });
 
-  const brandNameById = useMemo(() => new Map(orgBrands.map(b => [b.brand_id, b.name])), [orgBrands]);
-  const locationNameById = useMemo(() => new Map(orgLocations.map(l => [l.id, l.name])), [orgLocations]);
-
   // Merge Restops_ROLES and customRoles
   const ALL_ROLES = useMemo(() => {
     const merged = { ...Restops_ROLES };
@@ -871,7 +979,37 @@ export default function UserManagement() {
     });
   }, [scopedMembers, search, roleFilter]);
 
- // Stats 
+  // Group filtered members into the org's brand/location hierarchy
+  const membersByLocation = useMemo(() => {
+    const map = new Map();
+    filteredMembers.forEach(m => {
+      const locId = m.location_id || m.profiles?.location_id;
+      if (!locId) return;
+      if (!map.has(locId)) map.set(locId, []);
+      map.get(locId).push(m);
+    });
+    return map;
+  }, [filteredMembers]);
+
+  const membersByBrandOnly = useMemo(() => {
+    const map = new Map();
+    filteredMembers.forEach(m => {
+      const locId = m.location_id || m.profiles?.location_id;
+      const brandId = m.brand_id || m.profiles?.brand_id;
+      if (locId || !brandId) return;
+      if (!map.has(brandId)) map.set(brandId, []);
+      map.get(brandId).push(m);
+    });
+    return map;
+  }, [filteredMembers]);
+
+  const orgWideMembers = useMemo(() => filteredMembers.filter(m => {
+    const locId = m.location_id || m.profiles?.location_id;
+    const brandId = m.brand_id || m.profiles?.brand_id;
+    return !locId && !brandId;
+  }), [filteredMembers]);
+
+ // Stats
   const stats = useMemo(() => {
     const total = scopedMembers.length;
     const active = scopedMembers.filter(m => m.status === 'active').length;
@@ -998,187 +1136,98 @@ export default function UserManagement() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-card">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-secondary/50 border-b border-border">
-                <TableRow className="hover:bg-transparent border-0 h-14">
-                  <TableHead className="pl-8 text-xs font-bold text-muted-foreground uppercase">Identity</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Role</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Scope</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Status</TableHead>
-                  <TableHead className="text-xs font-bold text-muted-foreground uppercase">Last Active</TableHead>
-                  <TableHead className="w-20 pr-8"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-64 text-center">
-                      <div className="flex flex-col items-center gap-4">
-                        <div className="w-12 h-12 border-4 border-teal-50 border-t-teal-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-bold text-muted-foreground">Syncing user database...</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredMembers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-64 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="p-4 bg-secondary rounded-full">
-                          <UserX className="w-8 h-8 text-muted-foreground" />
+        {isLoading ? (
+          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] bg-card">
+            <div className="h-64 flex flex-col items-center justify-center gap-4">
+              <div className="w-12 h-12 border-4 border-teal-50 border-t-teal-600 rounded-full animate-spin"></div>
+              <p className="text-sm font-bold text-muted-foreground">Syncing user database...</p>
+            </div>
+          </Card>
+        ) : filteredMembers.length === 0 ? (
+          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] bg-card">
+            <div className="h-64 flex flex-col items-center justify-center gap-3">
+              <div className="p-4 bg-secondary rounded-full">
+                <UserX className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-bold text-muted-foreground">No matching team members found.</p>
+            </div>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {orgBrands.map(brand => {
+              const brandLocations = orgLocations.filter(l => l.brand_id === brand.brand_id);
+              const brandOnlyMembers = membersByBrandOnly.get(brand.brand_id) || [];
+              const brandTotal = brandOnlyMembers.length + brandLocations.reduce((sum, l) => sum + (membersByLocation.get(l.id)?.length || 0), 0);
+              if (brandTotal === 0) return null;
+
+              return (
+                <Card key={brand.brand_id} className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-card">
+                  <div className="p-5 border-b border-border bg-secondary/30 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-card shadow-sm border border-border rounded-xl flex items-center justify-center shrink-0">
+                      <Store className="w-5 h-5 text-foreground/80" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-foreground">{brand.name}</h3>
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} &middot; {brandTotal} member{brandTotal !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {brandOnlyMembers.length > 0 && (
+                      <div className="py-2">
+                        <p className="px-5 pt-2 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Brand-wide</p>
+                        <div className="divide-y divide-slate-50">
+                          {brandOnlyMembers.map(m => (
+                            <MemberRow key={m.membership_id || m.id} member={m} canEditRow={canEdit(m)} onSelect={setDrawerMember} activeOrgId={activeOrgId} />
+                          ))}
                         </div>
-                        <p className="text-sm font-bold text-muted-foreground">No matching team members found.</p>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredMembers.map((member) => {
-                    const memberRole = member.role || member.capabilities?.role || 'ground_staff';
-                    const roleDef = Restops_ROLES[memberRole] || Restops_ROLES.ground_staff;
-                    const status = member.status || 'active';
-                    const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
-                    const StatusIcon = statusCfg.icon;
-
-                    return (
-                      <TableRow 
-                        key={member.membership_id || member.id} 
-                        className="group hover:bg-secondary/50 transition-colors border-slate-50 h-20 cursor-pointer"
-                        onClick={() => canEdit(member) && setDrawerMember(member)}
-                      >
-                        <TableCell className="pl-8">
-                          <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-sm transition-transform group-hover:scale-105"
-                              style={{ backgroundColor: avatarColor(member.profiles?.email || member.email || '') }}>
-                              {(member.profiles?.full_name || member.full_name || member.profiles?.email || member.email || '?').charAt(0)}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-bold text-foreground leading-tight">
-                                {member.profiles?.full_name || member.full_name || 'Verification Pending'}
-                              </span>
-                              <span className="text-xs text-muted-foreground">{member.profiles?.email || member.email}</span>
-                            </div>
+                    )}
+                    {brandLocations.filter(loc => (membersByLocation.get(loc.id)?.length || 0) > 0).map(loc => {
+                      const locMembers = membersByLocation.get(loc.id) || [];
+                      return (
+                        <div key={loc.id} className="py-2">
+                          <div className="flex items-center gap-2 px-5 pt-2 pb-1">
+                            <MapPin className="w-3.5 h-3.5 text-muted-foreground/70" />
+                            <span className="text-xs font-bold text-foreground/80">{loc.name}</span>
+                            <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">
+                              {locMembers.length} {locMembers.length === 1 ? 'Member' : 'Members'}
+                            </Badge>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <RoleBadges member={member} />
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const locId = member.location_id || member.profiles?.location_id;
-                            const brandId = member.brand_id || member.profiles?.brand_id;
-                            const locationName = locId && locationNameById.get(locId);
-                            const brandName = brandId && brandNameById.get(brandId);
-                            if (locationName) {
-                              return (
-                                <div className="flex flex-col leading-tight">
-                                  <span className="text-xs font-semibold text-foreground">{locationName}</span>
-                                  {brandName && <span className="text-[10px] text-muted-foreground">{brandName}</span>}
-                                </div>
-                              );
-                            }
-                            if (brandName) {
-                              return <span className="text-xs font-semibold text-foreground">{brandName} (all locations)</span>;
-                            }
-                            return <span className="text-xs text-muted-foreground italic">Organization-wide</span>;
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${statusCfg.badgeClass}`}>
-                            <StatusIcon className="w-3 h-3" />{statusCfg.label}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">
-                            {formatLastActive(member.profiles?.updated_at || member.updated_at)}
-                          </span>
-                        </TableCell>
-                        <TableCell onClick={e => e.stopPropagation()} className="pr-8">
-                          {canEdit(member) && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="group-hover:bg-card rounded-xl">
-                                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="rounded-2xl border-border shadow-xl p-2 w-48">
-                                <DropdownMenuItem onClick={() => setDrawerMember(member)} className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-foreground">
-                                  <Edit2 className="h-4 w-4 mr-3 text-primary" /> Edit Member
-                                </DropdownMenuItem>
-                                {member.token && (
-                                  <>
-                                    <DropdownMenuItem 
-                                      className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-blue hover:bg-resend-blue/5"
-                                      onClick={() => {
-                                        const link = `${window.location.origin}/signup/${member.token}`;
-                                        navigator.clipboard.writeText(link);
-                                        toast.success("Invite link copied to clipboard!");
-                                      }}
-                                    >
-                                      <FileText className="h-4 w-4 mr-3" /> Copy Invite Link
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-primary hover:bg-primary/5"
-                                      onClick={async () => {
-                                        toast.loading("Resending invite...", { id: 'resend-invite' });
-                                        const { error } = await supabase.functions.invoke('invite-user', {
-                                          body: {
-                                            email: member.email || member.profiles?.email,
-                                            full_name: member.full_name || member.profiles?.full_name,
-                                            role: member.role || member.profiles?.role,
-                                            organization_id: activeOrgId,
-                                            resend: true
-                                          }
-                                        });
-                                        if (error) {
-                                          toast.error(`Failed to resend: ${error.message}`, { id: 'resend-invite' });
-                                        } else {
-                                          toast.success("Invite resent successfully!", { id: 'resend-invite' });
-                                        }
-                                      }}
-                                    >
-                                      <Mail className="h-4 w-4 mr-3" /> Resend Invite
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                                <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-red hover:bg-resend-red/5"
-                                  onClick={async () => {
-                                    if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
-                                    const userId = member.user_id || member.id;
-                                    
-                                    // Optimistic update
-                                    await queryClient.cancelQueries({ queryKey: ['team-members'] });
-                                    const previousMembers = queryClient.getQueryData(['team-members']);
-                                    queryClient.setQueryData(['team-members'], (old) => 
-                                      old ? old.filter(m => (m.user_id || m.id) !== userId) : []
-                                    );
+                          <div className="divide-y divide-slate-50">
+                            {locMembers.map(m => (
+                              <MemberRow key={m.membership_id || m.id} member={m} canEditRow={canEdit(m)} onSelect={setDrawerMember} activeOrgId={activeOrgId} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              );
+            })}
 
-                                    try {
-                                      const { error } = await supabase.rpc('org_remove_member', { target_user_id: userId });
-                                      if (error) throw error;
-                                      posthog.capture('team_member_removed');
-                                      toast.success('User removed from organization');
-                                      queryClient.invalidateQueries({ queryKey: ['team-members'] });
-                                    } catch (e) { 
-                                      if (previousMembers) queryClient.setQueryData(['team-members'], previousMembers);
-                                      toast.error(e.message || 'Failed to remove user'); 
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-3" /> Remove User
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+            {orgWideMembers.length > 0 && (
+              <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-card">
+                <div className="p-5 border-b border-border bg-secondary/30 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-card shadow-sm border border-border rounded-xl flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-foreground/80" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-foreground">Organization-wide</h3>
+                    <p className="text-[10px] text-muted-foreground font-medium">{orgWideMembers.length} member{orgWideMembers.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {orgWideMembers.map(m => (
+                    <MemberRow key={m.membership_id || m.id} member={m} canEditRow={canEdit(m)} onSelect={setDrawerMember} activeOrgId={activeOrgId} />
+                  ))}
+                </div>
+              </Card>
+            )}
           </div>
-        </Card>
+        )}
       </div>
         </TabsContent>
 

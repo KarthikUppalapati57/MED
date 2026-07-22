@@ -74,14 +74,27 @@ strings, org-wide RLS policies that ignore brand/location) across every module.
 
 Hierarchy: **organization → brand → location.**
 
-**Visibility (who can SEE a row):**
-- `org_owner` → all rows in their org.
-- `branch_manager` → all rows under their brand (every location in it).
-- `location_manager` → only their own location's rows.
-- `ground_staff` → only their own (fixed-profile) location's rows.
+**Visibility (who can SEE a row) — REVISED (2026-07-21), see §7:**
+- `org_manager` / `tenant_super_admin` / `branch_manager` → **only the ONE location currently
+  active on their `profiles.location_id`** (written by `switch_user_context` whenever they
+  switch). No org-wide, tenant-wide, or brand-wide aggregate view anymore for `invoices`/
+  `payments`/`inventory` (and the other `tenant_scope_visible()`-gated tables) — if they haven't
+  switched into a specific location, they see **zero** rows there, full stop.
+  ~~Previously: `org_owner` saw all rows in their org; `branch_manager` saw all rows under
+  their brand (every location in it).~~ That aggregate-viewing capability was deliberately
+  removed, not a bug fix — see §7's "Require exact location match" entry for why.
+- `location_manager` / `ground_staff` → only their own (fixed-profile) location's rows.
+  **Unchanged** — this rule already worked this way for them before the revision above.
 - `platform_admin` → everything.
 - **Soft-deleted rows (`deleted_at IS NOT NULL`) are hidden from everyone**, including the
   owner. (Recovery, if ever needed, is a separate admin path — not the default.)
+- **Exception, also unchanged:** a row with NULL `brand_id` AND NULL `location_id` (the
+  `ledger_entries` org-level tier) is still visible on `organization_id` match alone, to
+  `org_manager`/`tenant_super_admin`/`platform_admin` — this tier was explicitly NOT part of
+  the revision, it's the one deliberate aggregate exception left.
+- **Extended to reference data (2026-07-21), see §4/§7:** the same "no exceptions" rule now
+  also gates `vendors`/`products`/`recipes` via `reference_scope_visible()` — see §4 for how
+  the brand-shared pattern fits into an exact-location-match world.
 
 **Scope source — the most important rule:** an invoice's scope comes ONLY from the
 **uploader's context at upload time**, NEVER from the invoice's printed content. The printed
@@ -91,8 +104,10 @@ the Choto address). Every invoice is stamped at insert with `organization_id` + 
 belongs to the uploader's location.
 
 **Context source is role-aware:**
-- `org_owner` / `branch_manager` → context from the **ContextSwitcher** (they can switch
-  within their accessible scope).
+- `org_manager` / `tenant_super_admin` / `branch_manager` → context from the
+  **ContextSwitcher** (they can switch within their accessible scope). As of the visibility
+  revision above, this isn't just where uploads get stamped from anymore — it's now also the
+  ONLY thing that makes any `invoices`/`payments`/`inventory` row visible to them at all.
 - `location_manager` → NO switcher. Context is FIXED to their onboarded
   `profiles.organization_id` / `brand_id` / `location_id`. The upload stamps from their fixed
   profile, never a picker.
@@ -115,15 +130,31 @@ Two different scope patterns depending on whether data is shared *definitions* o
 
 **A. REFERENCE (hybrid: brand-shared + location-specific)** — `vendors`, `products`,
 `recipes`:
-- A row stamped at **brand level** (brand set, location NULL) is **brand-shared** — visible to
-  everyone whose accessible brands include that brand (e.g. "US Foods" → all Craven Wings
-  locations).
-- A row stamped at **location level** (location set) is visible only to that location and the
-  managers above it (e.g. "Joe's Corner Market", a one-off local store Choto bought from →
-  Choto only; Seymore never sees it).
-- **Writes:** only `branch_manager` / `org_owner` / `platform_admin` may create or edit a
-  **brand-shared** (location-NULL) row. A `location_manager` may create a **location-specific**
-  row, auto-scoped to their own location. `ground_staff` cannot write reference tables.
+- **Visibility requires an active location, no exceptions (2026-07-21), see §7.** Same rule as
+  invoices/payments/inventory: every role needs a specific location active on
+  `profiles.location_id` or sees **zero** rows here too — `org_manager`/`tenant_super_admin` no
+  longer get an "any brand I have access to" aggregate pass just because that's architecturally
+  a reference table, not a transactional one.
+- A row stamped at **brand level** (brand set, location NULL) is **brand-shared**.
+  ~~Previously: visible to everyone whose accessible brands include that brand.~~ Now: visible
+  when it matches the **brand of the caller's currently active location** — being "at" a
+  location is what unlocks the shared catalog for that location's brand, not a standing
+  role-level brand grant (e.g. "US Foods" is visible while active at any Craven Wings location,
+  invisible with no location selected).
+- A row stamped at **location level** (location set) is visible only when it's the caller's
+  exact active location (e.g. "Joe's Corner Market", a one-off local store Choto bought from →
+  visible only while Choto is the active location; Seymore never sees it, even when active).
+- **Incidental gap fix:** `location_manager` previously could not see brand-shared rows at all
+  (`get_my_accessible_brand_ids()` has no branch for that role). The new rule computes the
+  brand match directly from the caller's own active location instead of that helper, so
+  `location_manager` now sees brand-shared rows too, same as everyone else.
+- **Writes — UNCHANGED:** only `branch_manager` / `org_owner` / `platform_admin` may create or
+  edit a **brand-shared** (location-NULL) row. A `location_manager` may create a
+  **location-specific** row, auto-scoped to their own location. `ground_staff` cannot write
+  reference tables. `reference_scope_writable()` was deliberately not touched by the visibility
+  change above — it already keys off the role plus the *target row's* declared scope, which is
+  orthogonal to "what can I currently see." In practice nobody reaches the create form without
+  an active location either now (page-level gate, see §7), so this rarely comes up in isolation.
 - This is the MarginEdge "Global vs Restricted" model (their Sous-Chef can only create
   unit-restricted entries; making something global requires Restaurant Admin).
 
@@ -299,9 +330,11 @@ the Phase 3 redesign.
     `sendTransactionalEmail`) explaining the miss instead. A new `useRequireLocation()` hook
     (`code/src/hooks/useRequireLocation.js`) gates every transactional write button behind a
     selected location — greyed out, toast on click if missing — across Invoices, Payments,
-    Inventory (counts, wastage, transfers), and AutoOrdering; reference-data creation
+    Inventory (counts, wastage, transfers), and AutoOrdering; ~~reference-data creation
     (vendors/products/recipes, §4) is deliberately exempt since brand-level (no location) is
-    valid there. Finally, `organization_id`/`tenant_id`/`brand_id`/`location_id` are all
+    valid there~~ — superseded 2026-07-21, see the "Require active location for reference data"
+    entry below: reference data now requires an active location too, no exemption. Finally,
+    `organization_id`/`tenant_id`/`brand_id`/`location_id` are all
     `NOT NULL` on `invoices` and `payments` now (see §2, §3) — the null-scope state is
     schema-impossible, not just guarded in application code.
   - **`InventoryTransfers.jsx`**: the "From" location field seeded from context once, then a
@@ -318,12 +351,67 @@ the Phase 3 redesign.
     duplicate `brand_manager` entry in `AuthContext.jsx`'s `hasPermission` map was left alone
     (harmless, intentional).
 
+- **Require exact location match for org_manager/tenant_super_admin/branch_manager**
+  (2026-07-21, `20260721190000_require_exact_location_match_for_org_wide_roles.sql`) —
+  deliberate product decision, confirmed explicitly (not a bug fix): these three roles no
+  longer get an aggregate view of `invoices`/`payments`/`inventory` (and everything else gated
+  by `tenant_scope_visible()`) across their whole org/tenant/brand. They must have a specific
+  location active on `profiles.location_id` (written by `switch_user_context`, already
+  validated there against `get_my_accessible_location_ids()` for whichever role they are) or
+  they see **zero** rows in those tables — not "their org's rows", zero. Collapsed the
+  function's role-branching into one rule: exact `p_location_id = v_location_id` match for
+  every role except `platform_admin` (unchanged, sees everything) and the `ledger_entries`
+  org-level tier (unchanged, org match alone, see §3). `location_manager`/`ground_staff`
+  behavior is unaffected — their `profiles.location_id` was always fixed and this is exactly
+  how they already worked. Frontend: `moduleConfig.js`'s `invoices`/`payments`/`inventory`
+  modules now carry `requiresLocation: true`, reusing `ProtectedModule.jsx`'s gate built for
+  Kitchen Displays earlier this session — no new frontend code, three lines. **This reverses
+  this session's own earlier tenant_super_admin tenant-wide fix and the original
+  `org_owner`/`branch_manager` visibility rules from §3 — both were correct for what they were
+  solving (a real RLS gap, then a real UX-labeling gap), this is a deliberate, separate,
+  later product decision on top of both, not a correction of either.** Acceptance test:
+  `require_exact_location_match_acceptance.sql` — 9 cases, all three revised roles at null
+  location (zero rows) and at a specific location (only that location, not a sibling one in
+  the same org/brand), the `ledger_entries` exception, and both unaffected roles confirmed
+  unchanged.
+
+- **Require active location for reference data (Products/Vendors/Recipes)** (2026-07-21,
+  `20260721191500_require_active_location_for_reference_data.sql`) — extends the entry above to
+  `reference_scope_visible()`, on the same explicit, twice-confirmed instruction ("no exceptions
+  anywhere" — the strictest of three offered options, chosen after being told this was
+  genuinely different data ). Collapsed the same way: every role except `platform_admin` needs
+  an active `profiles.location_id` or sees zero rows; a location-specific row needs an exact
+  match; a brand-shared row (location NULL) is visible when its brand matches the brand of the
+  caller's *currently active location* (one extra lookup vs. the transactional version, since a
+  brand-shared row has no location of its own to compare against directly). Incidental gap fix,
+  not the point of the change: `get_my_accessible_brand_ids()` never had a `location_manager`
+  branch, so that role could never see brand-shared rows before this — the new rule is computed
+  from the caller's own active location instead of that helper, so it now works identically for
+  every role. `reference_scope_writable()` untouched — see §4. Frontend: `moduleConfig.js`'s
+  `products`/`vendors`/`recipes` modules now carry `requiresLocation: true`, same reused
+  `ProtectedModule.jsx` gate, three more lines. Acceptance test:
+  `require_active_location_for_reference_data_acceptance.sql` — 7 cases: `org_manager` /
+  `tenant_super_admin` / `branch_manager` each at null location (zero rows); `org_manager` and
+  `branch_manager` at Location A (see both the Location-A-specific product and the brand-shared
+  one); `tenant_super_admin` at Location B — a different location, same brand — (sees the
+  brand-shared product, not Location A's specific one); `location_manager` (sees both, proving
+  the gap fix). All 7 passed.
+
 ---
 
 ## 8. PENDING PLAN (in dependency order)
 
-1. **Batch 2 — operational tables RLS** (next; spec fully defined in §4). First do a small
-   helper rename `financial_scope_*` → `tenant_scope_*` (so the name reads honestly for
+1. ~~**Batch 2 — operational tables RLS**~~ **ALREADY DONE, this checklist was stale.**
+   Verified 2026-07-21 by reading live `pg_policy` on all 8 tables directly: `vendors`,
+   `products`, `recipes`, `inventory`, `inventory_movements`, `wastage_logs`, `auto_orders`,
+   `purchase_orders` each already have exactly 3 clean policies (`operational_*`
+   select/insert/update, no leftover stale ones sitting beside them) built on
+   `tenant_scope_visible`/`reference_scope_visible` — the helper rename and the hybrid helper
+   this item describes below were also already done, they're the exact functions in use today.
+   Whoever did this never updated this section — see the "Require exact location match" entry
+   in §7, which further modifies `tenant_scope_visible()` on top of this already-completed work.
+   Original spec (kept for history, not a live to-do): spec fully defined in §4, first do a
+   small helper rename `financial_scope_*` → `tenant_scope_*` (so the name reads honestly for
    non-financial tables) and add a new `reference_scope_visible/writable` helper for the hybrid
    pattern. Then wire `vendors`/`products`/`recipes` (reference hybrid) and
    `inventory`/`inventory_movements`/`wastage_logs`/`auto_orders`/`purchase_orders`
@@ -402,7 +490,9 @@ the Phase 3 redesign.
 - [x] Step 1 — role-gate helpers fixed
 - [x] Step 2 — approval security hotfix (grants locked, cascade limits, enforcement trigger)
 - [x] Step 3 — Batch 1 financial RLS (12 tables)
-- [ ] Batch 2 — operational tables (reference hybrid + location-scoped) ← NEXT
+- [x] Batch 2 — operational tables (reference hybrid + location-scoped). This checklist said
+      "next" but it was already done — verified 2026-07-21 by reading live `pg_policy` state
+      directly, see §8 item 1.
 - [ ] Batch 3 — remaining tenant tables
 - [x] Phase 2c (partial) — `profiles` RLS fixed (see Identity/hierarchy RLS batch above);
       `brands`/`locations`/`organizations` also fixed as part of the same batch (not originally
@@ -418,3 +508,18 @@ the Phase 3 redesign.
       `organization_id`/`tenant_id`/`brand_id`/`location_id` on both tables) — all closed, see
       §7. Coverage gaps and deferred items tracked in §9. Not yet committed to git as of this
       writing.
+- [x] Require exact location match for org_manager/tenant_super_admin/branch_manager
+      (2026-07-21) — deliberate product decision on top of the line above, not a bug fix: those
+      three roles now see zero `invoices`/`payments`/`inventory` rows (and everything else
+      gated by `tenant_scope_visible()`) unless they have a specific location actively selected
+      via the switcher — no more org-wide/tenant-wide/brand-wide aggregate view. See §3, §7.
+      `location_manager`/`ground_staff` unaffected. Not yet committed to git as of this writing.
+- [x] Require active location for reference data — Products/Vendors/Recipes (2026-07-21) —
+      extends the line above to `reference_scope_visible()`: the same roles need an active
+      location for vendors/products/recipes too, and a brand-shared (location-NULL) row now
+      resolves against the *brand of the caller's active location* instead of a standing
+      role-level brand grant. Incidental fix: `location_manager` previously couldn't see
+      brand-shared rows at all — now can, like everyone else. `reference_scope_writable()`
+      (who may create/edit) is unchanged. Frontend: `requiresLocation: true` added to
+      `products`/`vendors`/`recipes` in `moduleConfig.js`. See §4, §7. Not yet committed to git
+      as of this writing.

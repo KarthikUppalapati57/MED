@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utility for generating Zebra Programming Language (ZPL) commands
  * and sending them to networked thermal label printers.
  */
@@ -29,15 +29,25 @@ export const generatePrepLabelZPL = ({ itemName, prepDate, useByDate, employeeNa
 
 export const sendToNetworkPrinter = async (ipAddress, zplString) => {
   try {
-    // In a browser environment, direct raw TCP socket printing to port 9100 isn't possible
-    // without a middleware (like a local print agent or specialized web-print API).
-    // For demo/MVP, we mock the network transmission.
-    console.log(`[PRINT AGENT] Sending to ${ipAddress}:9100...`);
-    console.log(zplString);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+    const printAgentUrl = import.meta.env.VITE_PRINT_AGENT_URL;
+    if (!printAgentUrl) {
+      return {
+        success: false,
+        error: 'Print agent is not configured. Set VITE_PRINT_AGENT_URL to enable network label printing.'
+      };
+    }
+
+    const response = await fetch(`${printAgentUrl.replace(/\/$/, '')}/print/zpl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ipAddress, port: 9100, zpl: zplString })
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(body || `Print agent returned ${response.status}`);
+    }
+
     return { success: true, message: 'Label sent to printer successfully' };
   } catch (error) {
     console.error('Print failed:', error);

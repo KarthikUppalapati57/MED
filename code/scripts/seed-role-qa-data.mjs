@@ -86,15 +86,15 @@ const staffModulePermissions = {
 
 const accounts = [
   { email: 'qa.platform.admin@restops.test', fullName: 'QA Platform Admin', role: 'platform_admin', accessLevel: 'platform' },
-  { email: 'qa.owner.bistro@restops.test', fullName: 'QA Bistro Owner', role: 'org_owner', tenant: 0, accessLevel: 'organization' },
+  { email: 'qa.owner.bistro@restops.test', fullName: 'QA Bistro Owner', role: 'org_manager', tenant: 0, accessLevel: 'organization' },
   { email: 'qa.brand.northfork@restops.test', fullName: 'QA North Fork Brand Manager', role: 'branch_manager', tenant: 0, brand: 0, accessLevel: 'brand' },
   { email: 'qa.location.northfork@restops.test', fullName: 'QA North Fork Location Manager', role: 'location_manager', tenant: 0, brand: 0, location: 0, accessLevel: 'location' },
   { email: 'qa.staff.northfork@restops.test', fullName: 'QA North Fork Staff', role: 'ground_staff', tenant: 0, brand: 0, location: 0, accessLevel: 'location', permissions: staffModulePermissions },
-  { email: 'qa.owner.coastal@restops.test', fullName: 'QA Coastal Owner', role: 'org_owner', tenant: 1, accessLevel: 'organization' },
+  { email: 'qa.owner.coastal@restops.test', fullName: 'QA Coastal Owner', role: 'org_manager', tenant: 1, accessLevel: 'organization' },
   { email: 'qa.brand.harbor@restops.test', fullName: 'QA Harbor Brand Manager', role: 'branch_manager', tenant: 1, brand: 0, accessLevel: 'brand' },
   { email: 'qa.location.harbor@restops.test', fullName: 'QA Harbor Location Manager', role: 'location_manager', tenant: 1, brand: 0, location: 0, accessLevel: 'location' },
   { email: 'qa.staff.harbor@restops.test', fullName: 'QA Harbor Staff', role: 'ground_staff', tenant: 1, brand: 0, location: 0, accessLevel: 'location', permissions: staffModulePermissions },
-  { email: 'qa.owner.basic@restops.test', fullName: 'QA Basic Owner', role: 'org_owner', tenant: 2, accessLevel: 'organization' },
+  { email: 'qa.owner.basic@restops.test', fullName: 'QA Basic Owner', role: 'org_manager', tenant: 2, accessLevel: 'organization' },
   { email: 'qa.brand.basic@restops.test', fullName: 'QA Basic Brand Manager', role: 'branch_manager', tenant: 2, brand: 0, accessLevel: 'brand' },
   { email: 'qa.location.basic@restops.test', fullName: 'QA Basic Location Manager', role: 'location_manager', tenant: 2, brand: 0, location: 0, accessLevel: 'location' },
   { email: 'qa.staff.basic@restops.test', fullName: 'QA Basic Staff', role: 'ground_staff', tenant: 2, brand: 0, location: 0, accessLevel: 'location', permissions: staffModulePermissions },
@@ -259,7 +259,7 @@ async function seedProfile(account, user, context = {}) {
 }
 
 async function seedReportPreferences(userId, tenantContext) {
-  const ownerRoles = ['org_owner', 'branch_manager', 'location_manager'];
+  const ownerRoles = ['org_manager', 'branch_manager', 'location_manager'];
   const orgPayload = {
     brand_id: null,
     created_by: userId,
@@ -335,7 +335,7 @@ for (const account of accounts) {
 }
 
 for (const [index, tenantContext] of tenantContexts.entries()) {
-  const ownerEmail = accounts.find((account) => account.tenant === index && account.role === 'org_owner')?.email;
+  const ownerEmail = accounts.find((account) => account.tenant === index && account.role === 'org_manager')?.email;
   const owner = credentialRows.find((row) => row.email === ownerEmail);
   const ownerUser = ownerEmail ? await findUserByEmail(ownerEmail) : null;
   if (ownerUser) {

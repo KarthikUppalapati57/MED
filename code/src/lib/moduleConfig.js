@@ -41,12 +41,16 @@ export const MODULE_DEFINITIONS = {
     pages: ["Invoices"],
     minRole: "ground_staff",
     icon: "FileText",
+    // org_manager/tenant_super_admin/branch_manager must switch into a specific location --
+    // no org/brand-wide aggregate view. location_manager/ground_staff unaffected (fixed location).
+    requiresLocation: true,
   },
   payments: {
     label: "Bill Pay",
     pages: ["Payments"],
     minRole: "location_manager",
     icon: "CreditCard",
+    requiresLocation: true,
   },
   billing: {
     label: "Platform Subscription",
@@ -59,12 +63,16 @@ export const MODULE_DEFINITIONS = {
     pages: ["Products"],
     minRole: "ground_staff",
     icon: "Package",
+    // Reference catalog, but still requires an active location -- brand-shared rows
+    // resolve against the caller's currently active location's brand. No exceptions.
+    requiresLocation: true,
   },
   inventory: {
     label: "Inventory",
     pages: ["Inventory", "AvTCosting"],
     minRole: "ground_staff",
     icon: "Warehouse",
+    requiresLocation: true,
   },
   orders: {
     label: "Orders",
@@ -89,12 +97,14 @@ export const MODULE_DEFINITIONS = {
     pages: ["Recipes", "MenuEngineering", "DeliveryAggregator", "OrderOnline"],
     minRole: "location_manager",
     icon: "ChefHat",
+    requiresLocation: true,
   },
   vendors: {
     label: "Vendors",
     pages: ["Vendors", "VendorBidding"],
     minRole: "location_manager",
     icon: "Store",
+    requiresLocation: true,
   },
   labor: {
     label: "Labor",
@@ -174,7 +184,7 @@ export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
 // These authenticated setup routes are handled by App.jsx state gates before the
 // normal module router. They are not subscription modules.
-const UNGATED_AUTH_PAGES = new Set(["OnboardingPage"]);
+const UNGATED_AUTH_PAGES = new Set(["BusinessVerification", "CompleteOnboarding", "OnboardingPage"]);
 
 // Core modules that are always accessible regardless of subscription plan.
 const CORE_MODULE_KEYS = ["dashboard", "setup"];

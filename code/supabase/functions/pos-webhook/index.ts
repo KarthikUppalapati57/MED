@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature, x-toast-signature, x-square-signature, x-clover-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature, x-toast-signature, x-square-signature, x-clover-signature, x-7shifts-signature, x-pos-signature, x-webhook-signature',
 }
 
 const encoder = new TextEncoder()
@@ -18,10 +18,32 @@ function normalizeSignature(value: string | null) {
   return (value || '').trim().replace(/^sha256=/i, '').toLowerCase()
 }
 
+function timingSafeEqualHex(left: string, right: string) {
+  if (!/^[0-9a-f]+$/i.test(left) || !/^[0-9a-f]+$/i.test(right)) return false
+  const a = new Uint8Array(left.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || [])
+  const b = new Uint8Array(right.match(/.{1,2}/g)?.map((byte) => parseInt(byte, 16)) || [])
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let index = 0; index < a.length; index += 1) diff |= a[index] ^ b[index]
+  return diff === 0
+}
+
 function providerSignature(req: Request, provider: string) {
   return req.headers.get(`x-${provider}-signature`)
     || req.headers.get('x-pos-signature')
     || req.headers.get('x-webhook-signature')
+}
+
+function providerSecret(provider: string) {
+  const envKey = `${provider.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_WEBHOOK_SECRET`
+  return Deno.env.get(envKey) || Deno.env.get('POS_WEBHOOK_SECRET') || ''
+}
+
+async function verifySignature(req: Request, provider: string, secret: string, rawBody: string) {
+  if (!secret) throw new Error('POS webhook secret is required for this active provider configuration')
+  const expected = await hmacSha256Hex(secret, rawBody)
+  const received = normalizeSignature(providerSignature(req, provider))
+  if (!received || !timingSafeEqualHex(received, expected)) throw new Error('Invalid POS webhook signature')
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -44,7 +66,7 @@ serve(async (req) => {
     )
 
     const url = new URL(req.url)
-    const provider = url.searchParams.get('provider')?.trim()
+    const provider = url.searchParams.get('provider')?.trim().toLowerCase()
     if (!provider) throw new Error("Missing 'provider' query parameter. Expected: toast, square, clover, or 7shifts")
 
     const rawBody = await req.text()
@@ -67,11 +89,7 @@ serve(async (req) => {
     const config = configs?.[0]
     if (!config) throw new Error('Invalid or inactive POS configuration')
 
-    if (config.webhook_secret) {
-      const expected = await hmacSha256Hex(config.webhook_secret, rawBody)
-      const received = normalizeSignature(providerSignature(req, provider))
-      if (!received || received !== expected) throw new Error('Invalid POS webhook signature')
-    }
+    await verifySignature(req, provider, config.webhook_secret || providerSecret(provider), rawBody)
 
     const { error: insertError } = await supabaseClient
       .from('event_logs')

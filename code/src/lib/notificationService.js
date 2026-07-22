@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabaseClient';
  * @param {Object} [params.metadata]    - Any extra JSON metadata (e.g. invoice_id)
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-export async function createNotification({ user_id, organization_id, title, message, type = 'system' }) {
+export async function createNotification({ user_id, organization_id, title, message, type = 'system', metadata = null }) {
   try {
     const { error } = await supabase.from('notifications').insert({
       user_id,
@@ -24,6 +24,7 @@ export async function createNotification({ user_id, organization_id, title, mess
       title,
       message,
       type,
+      metadata,
       is_read: false,
     });
     if (error) {
@@ -50,7 +51,7 @@ export async function createNotification({ user_id, organization_id, title, mess
  * @param {string} [params.exclude_user_id] - User to exclude (e.g. the person who triggered the action)
  * @returns {Promise<{notified: number}>}
  */
-export async function notifyManagers({ organization_id, title, message, type = 'invoice', exclude_user_id }) {
+export async function notifyManagers({ organization_id, title, message, type = 'invoice', metadata = null, exclude_user_id }) {
   if (!organization_id) {
     console.warn('[NotificationService] No organization_id provided, skipping manager notification');
     return { notified: 0 };
@@ -85,6 +86,7 @@ export async function notifyManagers({ organization_id, title, message, type = '
       title,
       message,
       type: normalizedType,
+      metadata,
       is_read: false,
     }));
 

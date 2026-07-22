@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { api } from '@/lib/apiClient';
 
 const PASS = { status: 'pass', message: '' };
 
-// Explicit org/brand/location scope for the invoice being checked — never the
+// Explicit org/brand/location scope for the invoice being checked â€” never the
 // caller's currently-active ContextSwitcher scope. Without this, a branch_manager
 // validating an invoice outside their active context silently compares against
 // the wrong location's data (withActiveScope() falls back to ambient context
@@ -37,7 +37,7 @@ async function checkDuplicate(invoice) {
 // Line-item math vs invoice totals, computed client-side. Deliberately NOT the
 // validate_invoice() RPC: that function persists its result (UPDATE ... SET
 // validation_results, updated_at) on every call, which re-fires the unfiltered
-// trg_invoices_webhook — meaning just opening the confirm dialog (even if the
+// trg_invoices_webhook â€” meaning just opening the confirm dialog (even if the
 // user cancels) silently wrote to the invoice and re-invoked extraction. A
 // read-only check has no business writing to the row it's checking.
 async function checkInvoiceMath(invoice) {
@@ -80,7 +80,7 @@ async function checkInvoiceMath(invoice) {
   }
 }
 
-// Vendor stand-in for "fraud detection" — a blacklisted/suspended vendor is the
+// Vendor stand-in for "fraud detection" â€” a blacklisted/suspended vendor is the
 // one signal we actually have data for; a hardcoded pass was theater, not a check.
 async function checkVendorRisk(invoice) {
   if (!invoice?.vendor_id) return { status: 'warning', message: 'Invoice is not linked to a vendor record.' };
@@ -135,8 +135,8 @@ async function checkPriceDeviation(invoice) {
   }
 }
 
-// Three-way match: reads real reconciliation_variances rows. Only as good as
-// reconcile_invoice_lines() upstream, which is still a stub — flagged separately.
+// Three-way match: reads real reconciliation_variances rows produced by the
+// reconcile_invoice_lines() RPC.
 async function checkDeliveryMatch(invoice) {
   if (!invoice?.id) return PASS;
   try {
@@ -178,7 +178,7 @@ export async function runInvoiceValidationChecks(invoice) {
 export function summarizeValidationIssues(results) {
   return Object.values(results)
     .filter(r => r.status !== 'pass' && r.message)
-    .map(r => `${r.status === 'fail' ? '✗' : '⚠'} ${r.message}`);
+    .map(r => `${r.status === 'fail' ? 'âœ—' : 'âš '} ${r.message}`);
 }
 
 // Shared approve gate: always surfaces the validation outcome (clean or not)
@@ -227,7 +227,7 @@ export async function runBatchApprovalGate(confirm, selected) {
           <React.Fragment key={inv.id}>
             <strong>{inv.vendor_name || 'Unknown vendor'} #{inv.invoice_number || inv.id}</strong>
             <br />
-            {issues.join(' · ')}
+            {issues.join(' Â· ')}
             <br />
             <br />
           </React.Fragment>

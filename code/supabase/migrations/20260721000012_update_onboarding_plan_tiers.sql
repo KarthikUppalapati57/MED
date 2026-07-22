@@ -1,5 +1,5 @@
 -- Align tenant onboarding plans with the public pricing tiers.
--- Starter is available now; AI and Advanced tiers are staged as inactive until launch.
+-- Only the three current onboarding tiers should remain in the catalog.
 
 INSERT INTO public.plans (id, name, description, price_monthly, features, is_active)
 VALUES
@@ -34,6 +34,5 @@ SET name = EXCLUDED.name,
     features = EXCLUDED.features,
     is_active = EXCLUDED.is_active;
 
-UPDATE public.plans
-SET is_active = false
-WHERE id IN ('free', 'pro', 'enterprise');
+DELETE FROM public.plans
+WHERE id NOT IN ('starter', 'starter-ai', 'advanced');

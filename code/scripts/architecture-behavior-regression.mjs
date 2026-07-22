@@ -98,7 +98,7 @@ async function createUser(label, orgId) {
     access_level: 'organization',
     full_name: `Architecture Regression ${label}`,
     organization_id: orgId,
-    role: 'org_owner',
+    role: 'org_manager',
   };
 
   const { data, error } = await admin.auth.admin.createUser({
@@ -118,14 +118,14 @@ async function createUser(label, orgId) {
     full_name: metadata.full_name,
     id: user.id,
     organization_id: orgId,
-    role: 'org_owner',
+    role: 'org_manager',
     status: 'active',
   }, { onConflict: 'id' }, 'id');
   created.profiles.push(user.id);
 
   const membership = await insertOne('organization_members', {
     organization_id: orgId,
-    role: 'org_owner',
+    role: 'org_manager',
     user_id: user.id,
   }, 'id');
   created.organization_members.push(membership.id);

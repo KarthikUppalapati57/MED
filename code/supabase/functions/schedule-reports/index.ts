@@ -1,10 +1,12 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+﻿import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { corsHeaders } from '../_shared/cors.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  });
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,36 +14,49 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !anonKey) {
+      throw new Error('Supabase function environment is not configured');
+    }
 
-    // This function would be invoked by pg_cron
-    // It looks up active `custom_reports`, runs the query, and triggers an email service (Resend)
-    
-    console.log("Evaluating scheduled reports...");
-    
-    // Example: Fetch reports
-    const { data: reports, error } = await supabaseClient
-      .from('custom_reports')
-      .select('id, name, query_config')
-      .limit(10);
-      
-    if (error) throw error;
+    const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const schedulerSecret = Deno.env.get('DASHBOARD_REPORT_SCHEDULER_SECRET');
+    const headers: Record<string, string> = {
+      Authorization: req.headers.get('Authorization') || `Bearer ${anonKey}`,
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    };
+    if (schedulerSecret) headers['x-scheduler-secret'] = schedulerSecret;
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Scheduled reports evaluated',
-      reports_processed: reports?.length || 0
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+    const response = await fetch(`${supabaseUrl}/functions/v1/dashboard-report-scheduler`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        date: body.date,
+        force: Boolean(body.force),
+        report_type: body.report_type || 'both',
+      }),
+    });
+
+    const responseBody = await response.text();
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = responseBody ? JSON.parse(responseBody) : {};
+    } catch {
+      parsed = { raw: responseBody };
+    }
+
+    if (!response.ok) {
+      return jsonResponse({ success: false, error: parsed.error || 'Dashboard report scheduler failed', details: parsed }, response.status);
+    }
+
+    return jsonResponse({
+      success: true,
+      message: 'Scheduled reports evaluated by dashboard-report-scheduler',
+      scheduler: parsed,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    });
+    return jsonResponse({ error: error.message || String(error) }, 500);
   }
 });
