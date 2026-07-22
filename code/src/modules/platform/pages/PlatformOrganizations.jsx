@@ -559,7 +559,7 @@ export default function PlatformOrganizations() {
     : selectedOrgId
     ? onboardingReviews.filter((item) => item.verification.organization_id === selectedOrgId || item.profile?.organization_id === selectedOrgId)
     : tenantReviewItems;
-  const pendingTenantReviewCount = businessReviewItems.length;
+  const pendingTenantReviewCount = tenantReviewItems.length;
   const shouldShowTenantReviewPanel = isBusinessReviewMode || selectedOrgReviewItems.length > 0;
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
 
@@ -1356,20 +1356,20 @@ export default function PlatformOrganizations() {
                       <ClipboardCheck className="h-7 w-7 text-primary" />
                     </div>
                     <h2 className="text-xl font-black text-foreground tracking-tight">Pending Tenant Onboarding Reviews</h2>
-                    <p className="text-sm text-muted-foreground">These tenants have not created an organization yet. Approve business verification here so they can continue to hierarchy setup.</p>
+                    <p className="text-sm text-muted-foreground">These tenants have not created an organization yet. Approve business verification or hierarchy setup here so tenants can continue onboarding.</p>
                   </div>
                   {renderVerificationSettingsCard()}
                   {isLoadingOnboardingReviews ? (
                     <Card className="border-0 bg-card shadow-sm">
                       <CardContent className="flex items-center justify-center gap-3 p-8 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading business reviews...
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading onboarding reviews...
                       </CardContent>
                     </Card>
                   ) : onboardingReviewsError ? (
                     <Card className="border-0 bg-card shadow-sm">
                       <CardContent className="space-y-3 p-6 text-center">
                         <AlertTriangle className="mx-auto h-8 w-8 text-destructive" />
-                        <h3 className="font-black text-foreground">Could not load business reviews</h3>
+                        <h3 className="font-black text-foreground">Could not load onboarding reviews</h3>
                         <p className="text-sm text-muted-foreground">{onboardingReviewsError.message || 'Check the business verification tables and permissions.'}</p>
                         <Button size="sm" variant="outline" onClick={refreshOnboardingReview}>Retry</Button>
                       </CardContent>
@@ -1378,8 +1378,8 @@ export default function PlatformOrganizations() {
                     <Card className="border-0 bg-card shadow-sm">
                       <CardContent className="space-y-3 p-8 text-center">
                         <CheckCircle2 className="mx-auto h-9 w-9 text-emerald-500" />
-                        <h3 className="font-black text-foreground">No pending tenant business reviews</h3>
-                        <p className="text-sm text-muted-foreground">When a tenant submits business verification before hierarchy setup, it will appear here with Approve, Reject, and Request Info actions.</p>
+                        <h3 className="font-black text-foreground">No pending tenant onboarding reviews</h3>
+                        <p className="text-sm text-muted-foreground">When a tenant submits business verification or hierarchy setup, it will appear here with the correct review actions.</p>
                         <Button size="sm" variant="outline" onClick={refreshOnboardingReview}>Refresh</Button>
                       </CardContent>
                     </Card>
