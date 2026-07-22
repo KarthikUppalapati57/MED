@@ -600,7 +600,7 @@ export default function Products() {
 
   const handleBulkExport = () => {
     const selected = products.filter(p => selectedIds.has(p.id));
-    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Latest Price', 'Last Purchased'];
+    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
     const rows = selected.map(p => [
       p.product_id,
       p.name,
@@ -611,6 +611,7 @@ export default function Products() {
       p.is_inventoried ? 'Yes' : 'No',
       p.is_tax_exempt ? 'Yes' : 'No',
       p.report_by_unit,
+      productPackById.get(p.id) || '',
       p.latest_price,
       p.last_purchased_at
     ]);
@@ -669,6 +670,35 @@ export default function Products() {
   });
 
   const products = React.useMemo(() => data.pages ? data.pages.flat() : [], [data.pages]);
+
+  const productIds = React.useMemo(() => products.map(product => product.id).filter(Boolean), [products]);
+
+  const { data: productPackRows = [] } = useAuthQuery({
+    queryKey: ['product-master-pack-values', organizationId, productIds.join(',')],
+    queryFn: async () => {
+      if (!organizationId || productIds.length === 0) return [];
+      const { data: rows, error } = await supabase
+        .from('invoice_line_items')
+        .select('internal_product_id, pack_size, vendor_unit, created_at')
+        .eq('organization_id', organizationId)
+        .in('internal_product_id', productIds)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return rows || [];
+    },
+    enabled: !!organizationId && productIds.length > 0,
+  });
+
+  const productPackById = React.useMemo(() => {
+    const lookup = new Map();
+    productPackRows.forEach(row => {
+      const productId = row.internal_product_id;
+      const pack = String(row.pack_size || row.vendor_unit || '').trim();
+      if (productId && pack && !lookup.has(productId)) lookup.set(productId, pack);
+    });
+    return lookup;
+  }, [productPackRows]);
 
   const { data: productSummary = {}, isLoading: loadingSummary } = useAuthQuery({
     queryKey: ['product_dashboard_summary', organizationId, brandId, locationId],
@@ -1103,7 +1133,7 @@ export default function Products() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Latest Price', 'Last Purchased'];
+    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
     const rows = filteredProducts.map(p => [
       p.product_id,
       p.name,
@@ -1114,6 +1144,7 @@ export default function Products() {
       p.is_inventoried ? 'Yes' : 'No',
       p.is_tax_exempt ? 'Yes' : 'No',
       p.report_by_unit,
+      productPackById.get(p.id) || '',
       p.latest_price,
       p.last_purchased_at
     ]);
@@ -1426,7 +1457,7 @@ export default function Products() {
       {/* Table */}
       <Card className="border-0 shadow-sm">
         <CardContent className="p-0">
-          <ProductsScrollableTable className="min-w-[1540px]">
+          <ProductsScrollableTable className="min-w-[1660px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px] px-4 py-3">
@@ -1444,6 +1475,7 @@ export default function Products() {
                 {renderProductSortHead('On Inventory', 'is_inventoried', 'w-[140px]')}
                 {renderProductSortHead('Tax Exempt', 'is_tax_exempt', 'w-[130px]')}
                 {renderProductSortHead('Report By Unit', 'report_by_unit', 'w-[170px]')}
+                <TableHead className="w-[120px] whitespace-nowrap px-4 py-3">Pack</TableHead>
                 {renderProductSortHead('Latest Price', 'latest_price', 'w-[150px] text-right')}
                 <TableHead className="w-[160px] whitespace-nowrap px-4 py-3 text-right">Last Purchased</TableHead>
                 <TableHead className="w-[60px] px-4 py-3" />
@@ -1452,13 +1484,13 @@ export default function Products() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                     No products found
                   </TableCell>
                 </TableRow>
@@ -1518,6 +1550,7 @@ export default function Products() {
                     </TableCell>
                     <TableCell className="px-4 py-3">{product.is_tax_exempt ? 'Yes' : 'No'}</TableCell>
                     <TableCell className="px-4 py-3">{product.report_by_unit || 'Each'}</TableCell>
+                    <TableCell className="px-4 py-3">{productPackById.get(product.id) || '-'}</TableCell>
                     <TableCell className="px-4 py-3 text-right font-semibold">{formatMoney(product.latest_price)}</TableCell>
                     <TableCell className="px-4 py-3 text-right">{formatShortDate(product.last_purchased_at)}</TableCell>
                     <TableCell className="px-4 py-3">
@@ -1547,7 +1580,7 @@ export default function Products() {
               )}
               {hasNextPage && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center p-4">
+                  <TableCell colSpan={12} className="text-center p-4">
                     <Button
                       variant="outline"
                       onClick={() => fetchNextPage()}

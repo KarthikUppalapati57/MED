@@ -100,8 +100,34 @@ function buildReportUnitLabel(quantity, unit, nickname = '') {
   const trimmedNickname = nickname.trim();
   const trimmedUnit = String(unit || '').trim() || 'Each';
   const unitLabel = `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
+  if (trimmedNickname && /\([^)]*\)/.test(trimmedNickname)) return trimmedNickname;
   if (trimmedNickname) return `${trimmedNickname} (${unitLabel})`;
   return `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
+}
+
+function getDefaultSourcePackage(form) {
+  const quantity = Number(form.report_unit_quantity || 0);
+  const sourcePrice = Number(form.report_unit_source_price || 0);
+  const latestPrice = Number(form.latest_price || 0);
+  if (quantity > 0 && form.base_unit) {
+    return {
+      quantity: quantity < 1 && sourcePrice > latestPrice ? 1 : quantity,
+      unit: form.base_unit,
+    };
+  }
+  const parsed = parsePackageContents(form.report_by_unit) || parsePackageContents(form.base_unit);
+  if (parsed) return parsed;
+  return {
+    quantity: 1,
+    unit: form.base_unit || form.report_by_unit || 'Each',
+  };
+}
+
+function buildSourcePackageLabel(quantity, unit) {
+  const numericQuantity = Number(quantity || 1);
+  const unitLabel = String(unit || 'Each').trim() || 'Each';
+  if (numericQuantity === 1) return unitLabel;
+  return `${formatQuantity(numericQuantity)} ${unitLabel}`;
 }
 
 function countSheetItemKey(item = {}) {
@@ -176,6 +202,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     makePrimary: false,
   });
   const [countUnitRows, setCountUnitRows] = useState([]);
+  const [sourcePackLabel, setSourcePackLabel] = useState('');
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
@@ -229,6 +256,23 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   });
 
   const primaryInventoryItem = productInventoryItems[0] || null;
+
+  const { data: productLineItems = [] } = useAuthQuery({
+    queryKey: ['product-detail-line-packs', product?.organization_id, product?.id],
+    queryFn: async () => {
+      if (!product?.organization_id || !product?.id) return [];
+      const { data, error } = await api.client
+        .from('invoice_line_items')
+        .select('id, item_name, pack_size, vendor_unit, unit_price, total_price, quantity, created_at')
+        .eq('organization_id', product.organization_id)
+        .eq('internal_product_id', product.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!product?.organization_id && !!product?.id,
+  });
 
   const { data: countSheets = [] } = useAuthQuery({
     queryKey: ['product-detail-count-sheets', product?.organization_id, product?.location_id],
@@ -299,14 +343,15 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   useEffect(() => {
     if (!product) return;
     const nextForm = buildForm(product);
-    const parsedPackage = parsePackageContents(nextForm.report_by_unit) || parsePackageContents(nextForm.base_unit);
+    const sourcePackage = getDefaultSourcePackage(nextForm);
     setForm(nextForm);
+    setSourcePackLabel(buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
     setUnitDraft({
       nickname: nextForm.report_by_unit,
-      sourceQuantity: parsedPackage?.quantity || nextForm.report_unit_quantity || 1,
-      sourceUnit: parsedPackage?.unit || nextForm.base_unit || nextForm.report_by_unit || 'Each',
+      sourceQuantity: sourcePackage.quantity,
+      sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
-      targetUnit: parsedPackage?.unit || nextForm.base_unit || nextForm.report_by_unit || 'Each',
+      targetUnit: sourcePackage.unit,
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
       makePrimary: false,
     });
@@ -322,10 +367,70 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     return [...categories].filter(Boolean).sort((a, b) => a.localeCompare(b));
   }, [categoryOptions, form.category]);
 
+  useEffect(() => {
+    const latestPack = productLineItems.find(item => item.pack_size || item.vendor_unit);
+    const packLabel = latestPack?.pack_size || latestPack?.vendor_unit;
+    const parsed = parsePackageContents(packLabel);
+    if (!parsed) return;
+    setSourcePackLabel(packLabel);
+    setUnitDraft(current => ({
+      ...current,
+      sourceQuantity: parsed.quantity,
+      sourceUnit: parsed.unit,
+      targetUnit: current.targetUnit || parsed.unit,
+    }));
+  }, [productLineItems]);
+
+  const sourcePackage = useMemo(() => {
+    return parsePackageContents(sourcePackLabel) || {
+      quantity: Number(unitDraft.sourceQuantity || 1),
+      unit: unitDraft.sourceUnit || form.base_unit || 'Each',
+    };
+  }, [form.base_unit, sourcePackLabel, unitDraft.sourceQuantity, unitDraft.sourceUnit]);
+
   const reportUnitOptions = useMemo(() => {
-    const units = new Set([form.report_by_unit, form.base_unit, ...PRODUCT_UNIT_OPTIONS].filter(Boolean));
-    return [...units];
-  }, [form.report_by_unit, form.base_unit]);
+    const sourcePrice = Number(form.report_unit_source_price || form.latest_price || 0);
+    const options = [
+      {
+        label: buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit),
+        quantity: sourcePackage.quantity,
+        unit: sourcePackage.unit,
+        price: sourcePrice,
+        sourcePrice,
+      },
+      {
+        label: form.report_by_unit,
+        quantity: Number(form.report_unit_quantity || 1),
+        unit: form.base_unit || form.report_by_unit || 'Each',
+        price: Number(form.latest_price || 0),
+        sourcePrice,
+      },
+      ...countUnitRows.map(row => ({
+        label: row.name,
+        quantity: row.quantity,
+        unit: row.unit,
+        price: row.price,
+        sourcePrice: row.sourcePrice,
+      })),
+    ];
+    return [...new Map(options.filter(option => option.label).map(option => [String(option.label).toLowerCase(), option])).values()];
+  }, [countUnitRows, form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, sourcePackage.quantity, sourcePackage.unit]);
+
+  const handleReportUnitChange = (value) => {
+    const option = reportUnitOptions.find(row => row.label === value);
+    if (!option) {
+      setForm(current => ({ ...current, report_by_unit: value }));
+      return;
+    }
+    setForm(current => ({
+      ...current,
+      report_by_unit: option.label,
+      base_unit: option.unit,
+      report_unit_quantity: option.quantity,
+      report_unit_source_price: option.sourcePrice,
+      latest_price: option.price,
+    }));
+  };
 
   const convertedUnit = useMemo(() => calculateConvertedInventoryUnit({
     sourcePrice: unitDraft.sourcePrice,
@@ -598,10 +703,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           <div className="space-y-3">
             <Label>How do you want to see this product on reports? *</Label>
             <div className="grid gap-3 lg:grid-cols-[220px_220px_auto]">
-              <Select value={form.report_by_unit} onValueChange={(value) => setForm({ ...form, report_by_unit: value })}>
+              <Select value={form.report_by_unit} onValueChange={handleReportUnitChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {reportUnitOptions.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
+                  {reportUnitOptions.map(unit => <SelectItem key={unit.label} value={unit.label}>{unit.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               <div className="flex overflow-hidden rounded-md border border-input bg-background">
@@ -625,6 +730,31 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 text-primary" />
               Report price: {money(form.latest_price)} from {money(form.report_unit_source_price)} / {formatQuantity(form.report_unit_quantity)} {form.base_unit || 'unit'}
+            </div>
+            <div className="grid gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-[220px_1fr] md:items-end">
+              <div className="space-y-2">
+                <Label>Pack</Label>
+                <Input
+                  value={sourcePackLabel}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const parsed = parsePackageContents(value);
+                    setSourcePackLabel(value);
+                    if (parsed) {
+                      setUnitDraft(current => ({
+                        ...current,
+                        sourceQuantity: parsed.quantity,
+                        sourceUnit: parsed.unit,
+                        targetUnit: current.targetUnit || parsed.unit,
+                      }));
+                    }
+                  }}
+                  placeholder="e.g. 3 GA, 6/12 EA, Case (40 lb)"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Pack is the source package from invoice extraction. It is used to calculate count units and prices.
+              </p>
             </div>
             <p className="text-sm text-muted-foreground">
               Product price and cost unit live here. If recipes use a different unit (for example count vs case), add a conversion rule below.
@@ -666,16 +796,39 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[1, 2, 3].map((row) => (
-                  <TableRow key={row}>
+                {(productLineItems.length ? productLineItems : [null]).map((line, index) => (
+                  <TableRow key={line?.id || `empty-line-${index}`}>
                     <TableCell>Current location</TableCell>
-                    <TableCell>{row === 1 ? 'Sysco' : row === 2 ? 'US Foods' : 'Gordon Food Service'}</TableCell>
-                    <TableCell>{form.name || 'Vendor item'}</TableCell>
-                    <TableCell>{form.base_unit || form.report_by_unit}</TableCell>
-                    <TableCell className="text-right">{money(form.latest_price)}</TableCell>
-                    <TableCell>-</TableCell>
-                    <TableCell>1</TableCell>
-                    <TableCell className="text-right">{money(form.latest_price)}</TableCell>
+                    <TableCell>{line ? 'Invoice line' : 'No recent vendor lines'}</TableCell>
+                    <TableCell>{line?.item_name || form.name || 'Vendor item'}</TableCell>
+                    <TableCell>
+                      {line?.pack_size || line?.vendor_unit || form.base_unit || form.report_by_unit}
+                      {(line?.pack_size || line?.vendor_unit) && (
+                        <Button
+                          variant="link"
+                          className="ml-2 h-auto px-0 text-xs"
+                          onClick={() => {
+                            const pack = line.pack_size || line.vendor_unit;
+                            const parsed = parsePackageContents(pack);
+                            setSourcePackLabel(pack);
+                            if (parsed) {
+                              setUnitDraft(current => ({
+                                ...current,
+                                sourceQuantity: parsed.quantity,
+                                sourceUnit: parsed.unit,
+                                targetUnit: parsed.unit,
+                              }));
+                            }
+                          }}
+                        >
+                          Use pack
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">{money(line?.unit_price ?? form.latest_price)}</TableCell>
+                    <TableCell>{line?.created_at ? new Date(line.created_at).toLocaleDateString() : '-'}</TableCell>
+                    <TableCell>{formatQuantity(line?.quantity || 1)}</TableCell>
+                    <TableCell className="text-right">{money(line?.unit_price ?? form.latest_price)}</TableCell>
                     <TableCell className="text-right">0.0%</TableCell>
                     <TableCell><Button variant="link" className="px-0">Reassign</Button></TableCell>
                   </TableRow>
@@ -713,21 +866,29 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 ) : (
                   <>
                     {productInventoryItems.map(item => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.product_name || form.name}</TableCell>
-                        <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
-                        <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
-                        <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
-                        <TableCell><Badge variant="outline">Inventory linked</Badge></TableCell>
-                      </TableRow>
-                    ))}
+                  <TableRow key={item.id}>
+                    <TableCell>{item.product_name || form.name}</TableCell>
+                    <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
+                    <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
+                    <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>
+                      <Button variant="link" className="h-auto px-0" onClick={() => navigate(`/Inventory${window.location.search}`)}>
+                        Edit in Inventory
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
                     {countUnitRows.map(row => (
                       <TableRow key={row.id}>
                         <TableCell>{row.name}</TableCell>
                         <TableCell>{formatQuantity(row.quantity)} {row.unit}</TableCell>
                         <TableCell className="text-right">{money(row.price)}</TableCell>
                         <TableCell>No</TableCell>
-                        <TableCell><Badge variant="outline">Added unit</Badge></TableCell>
+                        <TableCell>
+                          <Button variant="link" className="h-auto px-0" onClick={() => navigate(`/Inventory${window.location.search}`)}>
+                            Add in Inventory
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </>
@@ -811,6 +972,26 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               </div>
             </div>
             <div className="space-y-2">
+              <Label>Pack</Label>
+              <Input
+                value={sourcePackLabel}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  const parsed = parsePackageContents(value);
+                  setSourcePackLabel(value);
+                  if (parsed) {
+                    setUnitDraft(current => ({
+                      ...current,
+                      sourceQuantity: parsed.quantity,
+                      sourceUnit: parsed.unit,
+                      targetUnit: current.targetUnit || parsed.unit,
+                    }));
+                  }
+                }}
+                placeholder="e.g. 3 GA, 6/12 EA, Case (40 lb)"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Source package contains</Label>
               <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
                 <Input
@@ -833,7 +1014,15 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               <div className="grid gap-2 md:grid-cols-[1.4fr_0.8fr_1.2fr]">
                 <Input
                   value={unitDraft.nickname}
-                  onChange={(event) => setUnitDraft({ ...unitDraft, nickname: event.target.value })}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    const parsed = parsePackageContents(value);
+                    setUnitDraft({
+                      ...unitDraft,
+                      nickname: value,
+                      ...(parsed ? { targetQuantity: parsed.quantity, targetUnit: parsed.unit } : {}),
+                    });
+                  }}
                   placeholder="Name, e.g. Half Case or 1 lb"
                 />
                 <Input
