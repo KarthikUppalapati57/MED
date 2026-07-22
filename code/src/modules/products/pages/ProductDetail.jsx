@@ -19,6 +19,16 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -188,6 +198,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const queryClient = useQueryClient();
   const [form, setForm] = useState(() => buildForm(initialProduct));
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
+  const [pendingReportUnitOption, setPendingReportUnitOption] = useState(null);
   const [unitDraft, setUnitDraft] = useState({
     sourceQuantity: 1,
     sourceUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
@@ -399,12 +410,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       },
     ];
     return [...new Map(options.filter(option => option.label).map(option => [String(option.label).toLowerCase(), option])).values()];
-  }, [countUnitRows, form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, sourcePackage.quantity, sourcePackage.unit]);
+  }, [form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, sourcePackage.quantity, sourcePackage.unit]);
 
-  const handleReportUnitChange = (value) => {
-    const option = reportUnitOptions.find(row => row.label === value);
-    if (!option) {
-      setForm(current => ({ ...current, report_by_unit: value }));
+  const applyReportUnitChange = (option) => {
+    if (!option) return;
+    if (!option.quantity || !option.unit) {
+      setForm(current => ({ ...current, report_by_unit: option.label }));
       return;
     }
     setForm(current => ({
@@ -415,6 +426,27 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       report_unit_source_price: option.sourcePrice,
       latest_price: option.price,
     }));
+  };
+
+  const handleReportUnitChange = (value) => {
+    const option = reportUnitOptions.find(row => row.label === value);
+    const nextOption = option || { label: value };
+    const currentSignature = [
+      form.report_by_unit,
+      form.base_unit,
+      Number(form.report_unit_quantity || 1),
+      Number(form.latest_price || 0),
+    ].join('|');
+    const nextSignature = [
+      nextOption.label,
+      nextOption.unit || form.base_unit,
+      Number(nextOption.quantity || form.report_unit_quantity || 1),
+      Number(nextOption.price ?? form.latest_price ?? 0),
+    ].join('|');
+    if (currentSignature === nextSignature) {
+      return;
+    }
+    setPendingReportUnitOption(nextOption);
   };
 
   const convertedUnit = useMemo(() => calculateConvertedInventoryUnit({
@@ -923,6 +955,32 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           </div>
         </div>
       </div>
+
+      <AlertDialog open={Boolean(pendingReportUnitOption)} onOpenChange={(open) => {
+        if (!open) setPendingReportUnitOption(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change master report unit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This changes the product's official report unit from {form.report_by_unit || form.base_unit || 'the current unit'} to {pendingReportUnitOption?.label || 'the selected unit'}. It can affect Master Catalog, Purchase Report, product pricing, inventory value, stock counts, and count sheets. Extra inventory count units will stay available.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingReportUnitOption(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                applyReportUnitChange(pendingReportUnitOption);
+                setPendingReportUnitOption(null);
+              }}
+            >
+              Change Master Unit
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
         <DialogContent className="sm:max-w-3xl">
