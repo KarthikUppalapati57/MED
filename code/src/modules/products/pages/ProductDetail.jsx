@@ -96,12 +96,8 @@ function formatQuantity(value) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-function buildReportUnitLabel(quantity, unit, nickname = '') {
-  const trimmedNickname = nickname.trim();
+function buildReportUnitLabel(quantity, unit) {
   const trimmedUnit = String(unit || '').trim() || 'Each';
-  const unitLabel = `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
-  if (trimmedNickname && /\([^)]*\)/.test(trimmedNickname)) return trimmedNickname;
-  if (trimmedNickname) return `${trimmedNickname} (${unitLabel})`;
   return `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
 }
 
@@ -193,13 +189,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const [form, setForm] = useState(() => buildForm(initialProduct));
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [unitDraft, setUnitDraft] = useState({
-    nickname: 'Case',
     sourceQuantity: 1,
     sourceUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
     targetQuantity: 1,
     targetUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
     sourcePrice: Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0),
-    makePrimary: false,
   });
   const [countUnitRows, setCountUnitRows] = useState([]);
   const [sourcePackLabel, setSourcePackLabel] = useState('');
@@ -347,13 +341,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     setForm(nextForm);
     setSourcePackLabel(buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
     setUnitDraft({
-      nickname: nextForm.report_by_unit,
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
       targetUnit: sourcePackage.unit,
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
-      makePrimary: false,
     });
     setCountUnitRows([]);
   }, [product]);
@@ -405,13 +397,6 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
         price: Number(form.latest_price || 0),
         sourcePrice,
       },
-      ...countUnitRows.map(row => ({
-        label: row.name,
-        quantity: row.quantity,
-        unit: row.unit,
-        price: row.price,
-        sourcePrice: row.sourcePrice,
-      })),
     ];
     return [...new Map(options.filter(option => option.label).map(option => [String(option.label).toLowerCase(), option])).values()];
   }, [countUnitRows, form.base_unit, form.latest_price, form.report_by_unit, form.report_unit_quantity, form.report_unit_source_price, sourcePackage.quantity, sourcePackage.unit]);
@@ -503,7 +488,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       toast.error(convertedUnit.reason || 'Unable to calculate this unit conversion');
       return;
     }
-    const label = buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit, unitDraft.nickname);
+    const label = buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit);
     const nextRow = {
       id: `draft-unit:${Date.now()}`,
       name: label,
@@ -517,16 +502,6 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       ...current.filter(row => String(row.name).toLowerCase() !== String(label).toLowerCase()),
       nextRow,
     ]);
-    if (unitDraft.makePrimary) {
-      setForm(current => ({
-        ...current,
-        report_by_unit: label,
-        base_unit: unitDraft.targetUnit,
-        report_unit_quantity: Number(unitDraft.targetQuantity || 1),
-        report_unit_source_price: Number(unitDraft.sourcePrice || 0),
-        latest_price: convertedPrice || current.latest_price,
-      }));
-    }
     setUnitDialogOpen(false);
   };
 
@@ -724,7 +699,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 />
               </div>
               <Button onClick={() => setUnitDialogOpen(true)}>
-                <Utensils className="mr-2 h-4 w-4" /> Add Unit and Price
+                <Utensils className="mr-2 h-4 w-4" /> Add Count Unit
               </Button>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -952,11 +927,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>How do you want to see this product on reports?</DialogTitle>
+            <DialogTitle>Add an inventory count unit</DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Enter the source package price, what that package contains, and the unit you want available for inventory counts.
+              Enter the package price, what the package contains, and the quantity/unit you want available for counting. This does not change the product master report unit.
             </p>
             <div className="space-y-2">
               <Label>Source / Package Price</Label>
@@ -1010,21 +985,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Add count unit</Label>
-              <div className="grid gap-2 md:grid-cols-[1.4fr_0.8fr_1.2fr]">
-                <Input
-                  value={unitDraft.nickname}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    const parsed = parsePackageContents(value);
-                    setUnitDraft({
-                      ...unitDraft,
-                      nickname: value,
-                      ...(parsed ? { targetQuantity: parsed.quantity, targetUnit: parsed.unit } : {}),
-                    });
-                  }}
-                  placeholder="Name, e.g. Half Case or 1 lb"
-                />
+              <Label>Count by</Label>
+              <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
                 <Input
                   type="number"
                   min="0.0001"
@@ -1040,13 +1002,6 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 </Select>
               </div>
             </div>
-            <label className="flex items-center gap-3 rounded-md border p-3 text-sm">
-              <Checkbox
-                checked={unitDraft.makePrimary}
-                onCheckedChange={(checked) => setUnitDraft({ ...unitDraft, makePrimary: Boolean(checked) })}
-              />
-              <span>Also make this the primary report/inventory unit for this product</span>
-            </label>
             <Separator />
             <div className="rounded-md bg-muted/60 p-4">
               <p className="text-sm font-medium text-foreground">
@@ -1057,7 +1012,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 {convertedUnit.canConvert
-                  ? `Added unit label: ${buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit, unitDraft.nickname)}`
+                  ? `Added count unit: ${buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit)}. Master report unit remains ${form.report_by_unit || form.base_unit || 'Each'}.`
                   : convertedUnit.reason}
               </p>
             </div>

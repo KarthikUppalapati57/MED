@@ -134,8 +134,14 @@ export function calculateConvertedInventoryUnit({ sourcePrice, sourceQuantity, s
   const source = getProductUnitDefinition(sourceUnit);
   const target = getProductUnitDefinition(targetUnit);
   const sameUnit = source.label.toLowerCase() === target.label.toLowerCase();
-  if (sameUnit || (source.family === 'package' && target.family === 'package')) {
+  const sourceIsPackage = source.family === 'package';
+  const targetIsPackage = target.family === 'package';
+  if (sameUnit || (sourceIsPackage && targetIsPackage)) {
     return { price: price * (targetQty / sourceQty), canConvert: true, mode: 'package' };
+  }
+
+  if (targetIsPackage && !sourceIsPackage) {
+    return { price: price * targetQty, canConvert: true, mode: 'package' };
   }
 
   if (source.family === target.family && ['weight', 'volume', 'count'].includes(source.family)) {
