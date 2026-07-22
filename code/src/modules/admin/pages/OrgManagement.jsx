@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
-  Building2, Store, MapPin, Plus, Trash2, Pencil, ChevronDown, ChevronRight,
+  Building2, Store, MapPin, Plus, Trash2, Pencil,
   Loader2, ShieldAlert, KeyRound, Smartphone
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,8 +43,6 @@ export default function OrgManagement() {
     navigate(`/OrgManagement/${tab}${location.search}`);
   };
   const [showEnrolling, setShowEnrolling] = useState(false);
-  const [expandedOrgs, setExpandedOrgs] = useState(new Set());
-  const [expandedBrands, setExpandedBrands] = useState(new Set());
 
   // Add Brand state
   const [addBrandDialog, setAddBrandDialog] = useState(null); // org id
@@ -169,24 +167,6 @@ export default function OrgManagement() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
-
-  const toggleOrg = (orgId) => {
-    setExpandedOrgs(prev => {
-      const next = new Set(prev);
-      if (next.has(orgId)) next.delete(orgId);
-      else next.add(orgId);
-      return next;
-    });
-  };
-
-  const toggleBrand = (brandId) => {
-    setExpandedBrands(prev => {
-      const next = new Set(prev);
-      if (next.has(brandId)) next.delete(brandId);
-      else next.add(brandId);
-      return next;
-    });
-  };
 
   const handleAddBrand = async () => {
     if (!newBrandName.trim() || !addBrandDialog) return;
@@ -476,8 +456,7 @@ export default function OrgManagement() {
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="hierarchy" className="space-y-6 mt-6">
-          {/* Hierarchy Tree (Original Content) */}
+        <TabsContent value="hierarchy" className="space-y-8 mt-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -491,141 +470,130 @@ export default function OrgManagement() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {orgs.map(org => {
-                const orgBrands = getOrgBrands(org.id);
-                const isExpanded = expandedOrgs.has(org.id);
-                const staffCount = getOrgStaffCount(org.id);
-                const docStats = getOrgDocStats(org.id);
+            orgs.map(org => {
+              const orgBrands = getOrgBrands(org.id);
+              const staffCount = getOrgStaffCount(org.id);
+              const docStats = getOrgDocStats(org.id);
 
-                return (
-                  <Card key={org.id} className="overflow-hidden border-border shadow-sm">
-                    {/* Organization Row */}
-                    <div
-                      className="flex items-center gap-3 p-4 cursor-pointer hover:bg-secondary transition-colors"
-                      onClick={() => toggleOrg(org.id)}
-                    >
-                      <div className="w-8 h-8 bg-resend-blue/10 rounded-lg flex items-center justify-center shrink-0">
-                        {isExpanded ? <ChevronDown className="w-4 h-4 text-resend-blue" /> : <ChevronRight className="w-4 h-4 text-resend-blue" />}
-                      </div>
+              return (
+                <div key={org.id} className="space-y-4">
+                  {/* Organization header */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 bg-resend-blue/5 rounded-xl flex items-center justify-center shrink-0">
                         <Building2 className="w-5 h-5 text-resend-blue" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-foreground truncate">{org.name}</p>
+                          <p className="text-base font-black text-foreground truncate">{org.name}</p>
                           <Badge className="bg-resend-green/10 text-resend-green border-none text-[9px]">{org.status || 'active'}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {orgBrands.length} brand{orgBrands.length !== 1 ? 's' : ''} / {staffCount} staff / {docStats.file_count} file{docStats.file_count !== 1 ? 's' : ''} ({formatBytes(docStats.total_bytes)}) / Created {org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}
                         </p>
                       </div>
-                      {canManage && (
-                        <Button
-                          size="sm" variant="outline"
-                          className="h-7 text-xs shrink-0"
-                          onClick={e => { e.stopPropagation(); setAddBrandDialog(org.id); setNewBrandName(''); }}
-                        >
-                          <Plus className="w-3 h-3 mr-1" /> Brand
-                        </Button>
-                      )}
                     </div>
-
-                    {/* Expanded: Brands list */}
-                    {isExpanded && (
-                      <div className="border-t border-border bg-secondary/50">
-                        {orgBrands.length === 0 ? (
-                          <div className="p-4 pl-20 text-xs text-muted-foreground italic">No brands yet - add your first brand</div>
-                        ) : (
-                          orgBrands.map(brand => {
-                            const brandLocations = getBrandLocations(brand.brand_id);
-                            const isBrandExpanded = expandedBrands.has(brand.brand_id);
-                            const brandStaff = getBrandStaffCount(brand.brand_id);
-
-                            return (
-                              <div key={brand.brand_id}>
-                                {/* Brand Row */}
-                                <div
-                                  className="flex items-center gap-3 py-3 px-4 pl-12 cursor-pointer hover:bg-secondary/50 transition-colors border-t border-border first:border-t-0"
-                                  onClick={() => toggleBrand(brand.brand_id)}
-                                >
-                                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
-                                    {isBrandExpanded ? <ChevronDown className="w-3.5 h-3.5 text-violet-500" /> : <ChevronRight className="w-3.5 h-3.5 text-violet-500" />}
-                                  </div>
-                                  <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center shrink-0">
-                                    <Store className="w-4 h-4 text-violet-600" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-foreground truncate">{brand.name}</p>
-                                    <p className="text-[10px] text-muted-foreground">
-                                      {brandLocations.length} location{brandLocations.length !== 1 ? 's' : ''} / {brandStaff} staff
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                                    {canManage && (
-                                      <>
-                                        <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 text-violet-600 hover:bg-violet-50"
-                                          onClick={() => { setAddLocationDialog({ orgId: org.id, brandId: brand.brand_id }); setNewLocationName(''); setNewLocationAddress(''); }}>
-                                          <Plus className="w-3 h-3 mr-1" /> Location
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
-                                          onClick={() => { setEditBrand(brand); setEditBrandName(brand.name); }}>
-                                          <Pencil className="w-3 h-3" />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
-                                          onClick={() => handleDeleteBrand(brand)}>
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Expanded: Locations list */}
-                                {isBrandExpanded && (
-                                  <div className="bg-card/50">
-                                    {brandLocations.length === 0 ? (
-                                      <div className="p-3 pl-28 text-[10px] text-muted-foreground italic">No locations yet</div>
-                                    ) : (
-                                      brandLocations.map(loc => {
-                                        const locStaff = getLocationStaffCount(loc.id);
-                                        return (
-                                          <div key={loc.id} className="flex items-center gap-3 py-2.5 px-4 pl-24 border-t border-slate-50 hover:bg-resend-green/5/30 transition-colors">
-                                            <div className="w-7 h-7 bg-resend-green/5 rounded-md flex items-center justify-center shrink-0">
-                                              <MapPin className="w-3.5 h-3.5 text-resend-green" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-xs font-medium text-foreground truncate">{loc.name}</p>
-                                              <p className="text-[10px] text-muted-foreground truncate">{loc.address || 'No address'} / {locStaff} staff</p>
-                                            </div>
-                                            {canManage && (
-                                              <div className="flex items-center gap-1 shrink-0">
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
-                                                  onClick={() => { setEditLocation(loc); setEditLocationName(loc.name); setEditLocationAddress(loc.address || ''); }}>
-                                                  <Pencil className="w-2.5 h-2.5" />
-                                                </Button>
-                                                <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
-                                                  onClick={() => handleDeleteLocation(loc)}>
-                                                  <Trash2 className="w-2.5 h-2.5" />
-                                                </Button>
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                    {canManage && (
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-8 text-xs shrink-0"
+                        onClick={() => { setAddBrandDialog(org.id); setNewBrandName(''); }}
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Brand
+                      </Button>
                     )}
-                  </Card>
-                );
-              })}
-            </div>
+                  </div>
+
+                  {orgBrands.length === 0 ? (
+                    <div className="text-center py-16 bg-card rounded-2xl border border-dashed border-border">
+                      <div className="w-14 h-14 bg-secondary/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Store className="w-7 h-7 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-sm font-bold text-foreground">No Brands Yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Add your first brand to start building out locations.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      {orgBrands.map(brand => {
+                        const brandLocations = getBrandLocations(brand.brand_id);
+                        const brandStaff = getBrandStaffCount(brand.brand_id);
+
+                        return (
+                          <Card key={brand.brand_id} className="border-border shadow-sm overflow-hidden flex flex-col bg-card">
+                            <div className="p-5 border-b border-border/50 bg-secondary/20 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 bg-card shadow-sm border border-border rounded-xl flex items-center justify-center shrink-0">
+                                  <Store className="w-5 h-5 text-foreground/80" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="font-black text-foreground truncate">{brand.name}</h3>
+                                  <p className="text-[10px] text-muted-foreground font-medium">{brandLocations.length} Locations &middot; {brandStaff} Staff</p>
+                                </div>
+                              </div>
+                              {canManage && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 text-violet-600 hover:bg-violet-50"
+                                    onClick={() => { setAddLocationDialog({ orgId: org.id, brandId: brand.brand_id }); setNewLocationName(''); setNewLocationAddress(''); }}>
+                                    <Plus className="w-3 h-3 mr-1" /> Location
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
+                                    onClick={() => { setEditBrand(brand); setEditBrandName(brand.name); }}>
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
+                                    onClick={() => handleDeleteBrand(brand)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 p-0">
+                              {brandLocations.length === 0 ? (
+                                <p className="text-xs text-center py-6 text-muted-foreground italic">No locations under this brand</p>
+                              ) : (
+                                <div className="divide-y divide-slate-100">
+                                  {brandLocations.map(loc => {
+                                    const locStaff = getLocationStaffCount(loc.id);
+                                    return (
+                                      <div key={loc.id} className="p-4 px-5 flex items-center justify-between gap-2 hover:bg-secondary/50 transition-colors group">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                          <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-amber-500 transition-colors shrink-0" />
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-bold text-foreground/80 truncate">{loc.name}</p>
+                                            <p className="text-[10px] text-muted-foreground truncate">{loc.address || 'No address'}</p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">
+                                            {locStaff} Staff
+                                          </Badge>
+                                          {canManage && (
+                                            <div className="flex items-center gap-1">
+                                              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
+                                                onClick={() => { setEditLocation(loc); setEditLocationName(loc.name); setEditLocationAddress(loc.address || ''); }}>
+                                                <Pencil className="w-3 h-3" />
+                                              </Button>
+                                              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground hover:text-resend-red hover:bg-resend-red/5"
+                                                onClick={() => handleDeleteLocation(loc)}>
+                                                <Trash2 className="w-3 h-3" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </TabsContent>
 
