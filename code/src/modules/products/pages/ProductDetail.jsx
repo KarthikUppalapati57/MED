@@ -42,7 +42,11 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { getFlattenedCOA } from '@/lib/accountingConfig';
-import { PRODUCT_UNIT_OPTIONS, calculateConvertedUnitPrice } from '@/modules/products/utils/productUnits';
+import {
+  PRODUCT_UNIT_OPTIONS,
+  calculateConvertedInventoryUnit,
+  parsePackageContents,
+} from '@/modules/products/utils/productUnits';
 
 const DEFAULT_CATEGORIES = [
   'Bakery',
@@ -162,11 +166,15 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const [form, setForm] = useState(() => buildForm(initialProduct));
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [unitDraft, setUnitDraft] = useState({
-    nickname: '',
-    quantity: 1,
-    unit: initialProduct?.report_by_unit || 'Each',
+    nickname: 'Case',
+    sourceQuantity: 1,
+    sourceUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
+    targetQuantity: 1,
+    targetUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
     sourcePrice: Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0),
+    makePrimary: false,
   });
+  const [countUnitRows, setCountUnitRows] = useState([]);
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
@@ -290,13 +298,18 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   useEffect(() => {
     if (!product) return;
     const nextForm = buildForm(product);
+    const parsedPackage = parsePackageContents(nextForm.report_by_unit) || parsePackageContents(nextForm.base_unit);
     setForm(nextForm);
     setUnitDraft({
       nickname: nextForm.report_by_unit,
-      quantity: nextForm.report_unit_quantity || 1,
-      unit: nextForm.base_unit || nextForm.report_by_unit || 'Each',
+      sourceQuantity: parsedPackage?.quantity || nextForm.report_unit_quantity || 1,
+      sourceUnit: parsedPackage?.unit || nextForm.base_unit || nextForm.report_by_unit || 'Each',
+      targetQuantity: 1,
+      targetUnit: parsedPackage?.unit || nextForm.base_unit || nextForm.report_by_unit || 'Each',
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
+      makePrimary: false,
     });
+    setCountUnitRows([]);
   }, [product]);
 
   const allCategoryOptions = useMemo(() => {
@@ -313,7 +326,14 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     return [...units];
   }, [form.report_by_unit, form.base_unit]);
 
-  const convertedPrice = calculateConvertedUnitPrice(unitDraft.sourcePrice, unitDraft.quantity);
+  const convertedUnit = useMemo(() => calculateConvertedInventoryUnit({
+    sourcePrice: unitDraft.sourcePrice,
+    sourceQuantity: unitDraft.sourceQuantity,
+    sourceUnit: unitDraft.sourceUnit,
+    targetQuantity: unitDraft.targetQuantity,
+    targetUnit: unitDraft.targetUnit,
+  }), [unitDraft.sourcePrice, unitDraft.sourceQuantity, unitDraft.sourceUnit, unitDraft.targetQuantity, unitDraft.targetUnit]);
+  const convertedPrice = convertedUnit.price;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -372,15 +392,34 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   };
 
   const applyUnitDraft = () => {
-    const label = buildReportUnitLabel(unitDraft.quantity, unitDraft.unit, unitDraft.nickname);
-    setForm(current => ({
-      ...current,
-      report_by_unit: label,
-      base_unit: unitDraft.unit,
-      report_unit_quantity: Number(unitDraft.quantity || 1),
-      report_unit_source_price: Number(unitDraft.sourcePrice || 0),
-      latest_price: convertedPrice || current.latest_price,
-    }));
+    if (!convertedUnit.canConvert) {
+      toast.error(convertedUnit.reason || 'Unable to calculate this unit conversion');
+      return;
+    }
+    const label = buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit, unitDraft.nickname);
+    const nextRow = {
+      id: `draft-unit:${Date.now()}`,
+      name: label,
+      quantity: Number(unitDraft.targetQuantity || 1),
+      unit: unitDraft.targetUnit,
+      price: convertedPrice,
+      sourceLabel: `${formatQuantity(unitDraft.sourceQuantity)} ${unitDraft.sourceUnit}`,
+      sourcePrice: Number(unitDraft.sourcePrice || 0),
+    };
+    setCountUnitRows(current => [
+      ...current.filter(row => String(row.name).toLowerCase() !== String(label).toLowerCase()),
+      nextRow,
+    ]);
+    if (unitDraft.makePrimary) {
+      setForm(current => ({
+        ...current,
+        report_by_unit: label,
+        base_unit: unitDraft.targetUnit,
+        report_unit_quantity: Number(unitDraft.targetQuantity || 1),
+        report_unit_source_price: Number(unitDraft.sourcePrice || 0),
+        latest_price: convertedPrice || current.latest_price,
+      }));
+    }
     setUnitDialogOpen(false);
   };
 
@@ -578,7 +617,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 />
               </div>
               <Button onClick={() => setUnitDialogOpen(true)}>
-                <Utensils className="mr-2 h-4 w-4" /> Edit Unit and Name
+                <Utensils className="mr-2 h-4 w-4" /> Add Unit and Price
               </Button>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -633,7 +672,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
 
         <Section
           title="Units Counted on Inventory"
-          action={<Button variant="outline"><Plus className="mr-2 h-4 w-4" /> Add Inventory Units</Button>}
+          action={<Button variant="outline" onClick={() => setUnitDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> Add Inventory Units</Button>}
         >
           <div className="overflow-auto rounded-md border">
             <table className="w-full min-w-[720px] text-sm">
@@ -647,21 +686,34 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {productInventoryItems.length === 0 ? (
+                {productInventoryItems.length === 0 && countUnitRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
                       Turn on "Product should be inventoried" and save to create the inventory item.
                     </TableCell>
                   </TableRow>
-                ) : productInventoryItems.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell>{item.product_name || form.name}</TableCell>
-                    <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
-                    <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
-                    <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
-                    <TableCell><Badge variant="outline">Inventory linked</Badge></TableCell>
-                  </TableRow>
-                ))}
+                ) : (
+                  <>
+                    {productInventoryItems.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.product_name || form.name}</TableCell>
+                        <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
+                        <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
+                        <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
+                        <TableCell><Badge variant="outline">Inventory linked</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                    {countUnitRows.map(row => (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell>{formatQuantity(row.quantity)} {row.unit}</TableCell>
+                        <TableCell className="text-right">{money(row.price)}</TableCell>
+                        <TableCell>No</TableCell>
+                        <TableCell><Badge variant="outline">Added unit</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                )}
               </TableBody>
             </table>
           </div>
@@ -682,6 +734,16 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   {form.report_by_unit || 'Unit'} currently costs {money(form.latest_price)}
                 </div>
               </div>
+              {countUnitRows.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {countUnitRows.map(row => (
+                    <div key={`${row.id}:conversion`} className="grid gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+                      <span>{row.name} is calculated from {money(row.sourcePrice)} per {row.sourceLabel}</span>
+                      <span className="font-semibold text-foreground">{money(row.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Section>
@@ -715,7 +777,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           </DialogHeader>
           <div className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              Enter the package/source price and how many report units are inside it. The unit price is source price divided by quantity.
+              Enter the source package price, what that package contains, and the unit you want available for inventory counts.
             </p>
             <div className="space-y-2">
               <Label>Source / Package Price</Label>
@@ -731,21 +793,16 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               </div>
             </div>
             <div className="space-y-2">
-              <Label>New Report / Inventory Unit</Label>
-              <div className="grid gap-2 md:grid-cols-[1.4fr_0.8fr_1.2fr]">
-                <Input
-                  value={unitDraft.nickname}
-                  onChange={(event) => setUnitDraft({ ...unitDraft, nickname: event.target.value })}
-                  placeholder="Optional name, e.g. Case"
-                />
+              <Label>Source package contains</Label>
+              <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr]">
                 <Input
                   type="number"
                   min="0.0001"
                   step="0.0001"
-                  value={unitDraft.quantity}
-                  onChange={(event) => setUnitDraft({ ...unitDraft, quantity: Number(event.target.value || 0) })}
+                  value={unitDraft.sourceQuantity}
+                  onChange={(event) => setUnitDraft({ ...unitDraft, sourceQuantity: Number(event.target.value || 0) })}
                 />
-                <Select value={unitDraft.unit} onValueChange={(value) => setUnitDraft({ ...unitDraft, unit: value })}>
+                <Select value={unitDraft.sourceUnit} onValueChange={(value) => setUnitDraft({ ...unitDraft, sourceUnit: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {PRODUCT_UNIT_OPTIONS.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
@@ -753,22 +810,54 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 </Select>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Add count unit</Label>
+              <div className="grid gap-2 md:grid-cols-[1.4fr_0.8fr_1.2fr]">
+                <Input
+                  value={unitDraft.nickname}
+                  onChange={(event) => setUnitDraft({ ...unitDraft, nickname: event.target.value })}
+                  placeholder="Name, e.g. Half Case or 1 lb"
+                />
+                <Input
+                  type="number"
+                  min="0.0001"
+                  step="0.0001"
+                  value={unitDraft.targetQuantity}
+                  onChange={(event) => setUnitDraft({ ...unitDraft, targetQuantity: Number(event.target.value || 0) })}
+                />
+                <Select value={unitDraft.targetUnit} onValueChange={(value) => setUnitDraft({ ...unitDraft, targetUnit: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {PRODUCT_UNIT_OPTIONS.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <label className="flex items-center gap-3 rounded-md border p-3 text-sm">
+              <Checkbox
+                checked={unitDraft.makePrimary}
+                onCheckedChange={(checked) => setUnitDraft({ ...unitDraft, makePrimary: Boolean(checked) })}
+              />
+              <span>Also make this the primary report/inventory unit for this product</span>
+            </label>
             <Separator />
             <div className="rounded-md bg-muted/60 p-4">
               <p className="text-sm font-medium text-foreground">
-                {money(unitDraft.sourcePrice)} divided by {formatQuantity(unitDraft.quantity)} {unitDraft.unit}
+                {money(unitDraft.sourcePrice)} per {formatQuantity(unitDraft.sourceQuantity)} {unitDraft.sourceUnit}
               </p>
               <p className="mt-1 text-2xl font-bold text-foreground">
-                {money(convertedPrice)} per {unitDraft.unit || 'unit'}
+                {convertedUnit.canConvert ? money(convertedPrice) : 'Cannot convert'} for {formatQuantity(unitDraft.targetQuantity)} {unitDraft.targetUnit || 'unit'}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Saved report label: {buildReportUnitLabel(unitDraft.quantity, unitDraft.unit, unitDraft.nickname)}
+                {convertedUnit.canConvert
+                  ? `Added unit label: ${buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit, unitDraft.nickname)}`
+                  : convertedUnit.reason}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>Cancel</Button>
-            <Button onClick={applyUnitDraft}>Save Unit</Button>
+            <Button onClick={applyUnitDraft}>Add Unit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
