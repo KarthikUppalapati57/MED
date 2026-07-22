@@ -20,6 +20,7 @@ import PreparedItemDetailPage from '@/modules/recipes/components/PreparedItemDet
 import BarItemsOperations from '@/modules/recipes/components/BarItemsOperations';
 import BarItemAuthoringPage from '@/modules/recipes/components/BarItemAuthoringPage';
 import BarItemDetailPage from '@/modules/recipes/components/BarItemDetailPage';
+import UnitConversionsManager from '@/modules/recipes/components/UnitConversionsManager';
 import {
   Plus,
   Search,
@@ -145,7 +146,7 @@ export default function Recipes() {
   const { confirm } = useConfirmation();
   const confirmLockRef = useRef(false);
   const formBaselineRef = useRef(null);
-  const needsProducts = ['recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer'].includes(activeTab) || dialogOpen;
+  const needsProducts = ['recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer', 'unit-conversions', 'setup'].includes(activeTab) || dialogOpen;
 
   const [sortRecipes, setSortRecipes] = useState('-created_at');
   const debouncedSearch = useDebounce(search, 500);
@@ -800,6 +801,15 @@ export default function Recipes() {
     return <BarItemDetailPage recipeId={barItemRouteValue} locations={recipeLocations} onEdit={(item) => navigate(`/Recipes/bar-items/${item.id}/edit${routerLocation.search}`)} />;
   }
 
+  if (activeTab === 'unit-conversions') {
+    return (
+      <UnitConversionsManager
+        products={products}
+        conversions={unitConversions}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {!['menu-items', 'prepared-items', 'bar-items'].includes(activeTab) && (
@@ -1261,6 +1271,12 @@ export default function Recipes() {
 
  {/* Setup Tab */}
         <TabsContent value="setup">
+          <div className="space-y-6">
+            <UnitConversionsManager
+              products={products}
+              conversions={unitConversions}
+              compact
+            />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">
               <CardHeader>
@@ -1412,6 +1428,7 @@ export default function Recipes() {
                 })}
               </CardContent>
             </Card>
+          </div>
           </div>
         </TabsContent>
       </Tabs>

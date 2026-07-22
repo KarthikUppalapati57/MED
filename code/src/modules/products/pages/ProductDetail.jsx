@@ -47,6 +47,7 @@ import {
   calculateConvertedInventoryUnit,
   parsePackageContents,
 } from '@/modules/products/utils/productUnits';
+import UnitConversionsManager from '@/modules/recipes/components/UnitConversionsManager';
 
 const DEFAULT_CATEGORIES = [
   'Bakery',
@@ -365,6 +366,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['conversion-catalog-products'] });
       queryClient.invalidateQueries({ queryKey: ['product-detail', productId] });
       queryClient.invalidateQueries({ queryKey: ['product-detail-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -624,8 +626,24 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               <CheckCircle2 className="h-4 w-4 text-primary" />
               Report price: {money(form.latest_price)} from {money(form.report_unit_source_price)} / {formatQuantity(form.report_unit_quantity)} {form.base_unit || 'unit'}
             </div>
+            <p className="text-sm text-muted-foreground">
+              Product price and cost unit live here. If recipes use a different unit (for example count vs case), add a conversion rule below.
+            </p>
           </div>
         </Section>
+
+        <UnitConversionsManager
+          compact
+          initialProductId={productId}
+          products={productId ? [{
+            id: productId,
+            name: form.name,
+            category: form.category,
+            base_unit: form.base_unit,
+            report_by_unit: form.report_by_unit,
+            latest_price: form.latest_price,
+          }] : []}
+        />
 
         <Section
           title={`You buy the following types of '${form.name || 'this product'}':`}

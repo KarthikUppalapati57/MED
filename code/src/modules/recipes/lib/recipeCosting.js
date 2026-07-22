@@ -1,12 +1,8 @@
-const UNIT_ALIASES = { ea: 'each', unit: 'each', units: 'each' };
-const normalizeUnit = (unit) => {
-  const normalized = String(unit || '').trim().toLowerCase();
-  return UNIT_ALIASES[normalized] || normalized;
-};
+import { normalizeRecipeUnit } from './recipeUnits';
 
 export function findConversionFactor({ fromUnit, toUnit, productId = null, conversions = [] }) {
-  const from = normalizeUnit(fromUnit);
-  const to = normalizeUnit(toUnit);
+  const from = normalizeRecipeUnit(fromUnit);
+  const to = normalizeRecipeUnit(toUnit);
   if (!from || !to || from === to) return 1;
 
   const candidates = conversions.filter((conversion) => {
@@ -14,14 +10,21 @@ export function findConversionFactor({ fromUnit, toUnit, productId = null, conve
     return appliesToProduct && conversion.is_active !== false;
   });
 
-  const direct = candidates.find(
-    (conversion) => normalizeUnit(conversion.from_unit) === from && normalizeUnit(conversion.to_unit) === to
+  const matchPair = (list, source, target) => list.find(
+    (conversion) => normalizeRecipeUnit(conversion.from_unit) === source
+      && normalizeRecipeUnit(conversion.to_unit) === target
   );
+
+  // Prefer product-specific rules over org-wide when both exist.
+  const productScoped = productId
+    ? candidates.filter((conversion) => conversion.product_id === productId)
+    : [];
+  const orgScoped = candidates.filter((conversion) => !conversion.product_id);
+
+  const direct = matchPair(productScoped, from, to) || matchPair(orgScoped, from, to);
   if (direct) return Number(direct.factor);
 
-  const reverse = candidates.find(
-    (conversion) => normalizeUnit(conversion.from_unit) === to && normalizeUnit(conversion.to_unit) === from
-  );
+  const reverse = matchPair(productScoped, to, from) || matchPair(orgScoped, to, from);
   if (reverse && Number(reverse.factor) !== 0) return 1 / Number(reverse.factor);
 
   return null;
@@ -84,6 +87,7 @@ export function calculateRecipeCost({
         product_name: ingredient.product_name || 'Ingredient',
         from_unit: ingredient.unit || null,
         to_unit: ingredient.cost_unit || null,
+        quantity: Number(ingredient.quantity || 0) || null,
       })),
   };
 }
