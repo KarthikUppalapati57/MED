@@ -43,6 +43,7 @@ export default function PlatformOrganizations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState(null);
+  const [selectedTenantId, setSelectedTenantId] = useState(null);
   
   const [isUpdatingBilling, setIsUpdatingBilling] = useState(false);
   const [billingForm, setBillingForm] = useState({
@@ -73,67 +74,107 @@ export default function PlatformOrganizations() {
   
   const PAGE_SIZE = 50;
   const [page, setPage] = useState(0);
-  const invalidateOrganizations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_organizations_paginated']], []), 1500);
+  const invalidateOrganizations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_organizations_all'], ['platform_tenants']], []), 1500);
   const invalidateBrands = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_brands']], []), 1500);
   const invalidateLocations = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_locations']], []), 1500);
   const invalidateUsers = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_org_users']], []), 1500);
   const invalidatePlans = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_plans']], []), 1500);
   const invalidateOnboardingReviews = useDebouncedQueryInvalidation(queryClient, React.useMemo(() => [['platform_onboarding_reviews']], []), 1500);
 
-  const { data: orgsData, isLoading: isLoadingOrgs } = useAuthQuery({
-    queryKey: ['platform_organizations_paginated', page, searchTerm],
+  const { data: orgs = [], isLoading: isLoadingOrgs } = useAuthQuery({
+    queryKey: ['platform_organizations_all'],
     queryFn: async () => {
-      let query = supabase.from('organizations')
-        .select('id, name, slug, subscription_status, plan_id, admin_email:primary_contact_email, created_at, status', { count: 'exact' });
-      
-      if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`);
-      }
-
-      const { data, error, count } = await query
-        .order('name')
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
+      const { data, error } = await supabase.from('organizations')
+        .select('id, tenant_id, name, slug, subscription_status, plan_id, stripe_customer_id, stripe_subscription_id, enabled_modules, admin_email:primary_contact_email, owner_id, created_at, status')
+        .order('name');
       if (error) throw error;
-      return { data, count };
+      return data || [];
     }
   });
 
-  const orgs = orgsData?.data || [];
-  const totalOrgs = orgsData?.count || 0;
-  const totalPages = Math.ceil(totalOrgs / PAGE_SIZE);
+  const { data: tenants = [] } = useAuthQuery({
+    queryKey: ['platform_tenants'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('tenants').select('id, name, slug, owner_id, status, created_at, metadata').order('name');
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const tenantWorkspaces = React.useMemo(() => {
+    const byTenantId = new Map();
+    tenants.forEach((tenant) => {
+      byTenantId.set(tenant.id, { ...tenant, organizations: [] });
+    });
+
+    orgs.forEach((org) => {
+      const key = org.tenant_id || `org:${org.id}`;
+      if (!byTenantId.has(key)) {
+        byTenantId.set(key, {
+          id: key,
+          name: org.name,
+          slug: org.slug,
+          owner_id: org.owner_id,
+          status: org.status,
+          created_at: org.created_at,
+          metadata: {},
+          isSyntheticTenant: true,
+          organizations: [],
+        });
+      }
+      byTenantId.get(key).organizations.push(org);
+    });
+
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    return Array.from(byTenantId.values())
+      .filter((tenant) => tenant.organizations.length > 0)
+      .filter((tenant) => {
+        if (!normalizedSearch) return true;
+        return tenant.name?.toLowerCase().includes(normalizedSearch)
+          || tenant.slug?.toLowerCase().includes(normalizedSearch)
+          || tenant.organizations.some((org) => org.name?.toLowerCase().includes(normalizedSearch) || org.slug?.toLowerCase().includes(normalizedSearch));
+      })
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [orgs, tenants, searchTerm]);
+
+  const totalPages = Math.ceil(tenantWorkspaces.length / PAGE_SIZE);
+  const paginatedTenantWorkspaces = tenantWorkspaces.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const selectedTenant = tenantWorkspaces.find((tenant) => tenant.id === selectedTenantId) || null;
+  const selectedTenantOrgs = selectedTenant?.organizations || [];
+  const selectedTenantOrgIds = selectedTenantOrgs.map((org) => org.id);
+  const selectedOrg = orgs.find(o => o.id === selectedOrgId) || selectedTenantOrgs[0] || null;
 
   const { data: orgBrands = [] } = useAuthQuery({
-    queryKey: ['platform_org_brands', selectedOrgId],
+    queryKey: ['platform_org_brands', selectedTenantId, selectedTenantOrgIds.join(',')],
     queryFn: async () => {
-      if (!selectedOrgId) return [];
-      const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at').eq('organization_id', selectedOrgId);
+      if (selectedTenantOrgIds.length === 0) return [];
+      const { data, error } = await supabase.from('brands').select('brand_id, name, organization_id, created_at').in('organization_id', selectedTenantOrgIds);
       if (error) throw error;
-      return data;
+      return data || [];
     },
-    enabled: !!selectedOrgId
+    enabled: selectedTenantOrgIds.length > 0
   });
 
   const { data: orgLocations = [] } = useAuthQuery({
-    queryKey: ['platform_org_locations', selectedOrgId],
+    queryKey: ['platform_org_locations', selectedTenantId, selectedTenantOrgIds.join(',')],
     queryFn: async () => {
-      if (!selectedOrgId) return [];
-      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at').eq('organization_id', selectedOrgId);
+      if (selectedTenantOrgIds.length === 0) return [];
+      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at').in('organization_id', selectedTenantOrgIds);
       if (error) throw error;
-      return data;
+      return data || [];
     },
-    enabled: !!selectedOrgId
+    enabled: selectedTenantOrgIds.length > 0
   });
 
   const { data: orgUsers = [] } = useAuthQuery({
-    queryKey: ['platform_org_users', selectedOrgId],
+    queryKey: ['platform_org_users', selectedTenantId, selectedTenantOrgIds.join(',')],
     queryFn: async () => {
-      if (!selectedOrgId) return [];
-      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, organization_id, brand_id, location_id, created_at, status, onboarding_status, onboarding_current_step, business_verification_status').eq('organization_id', selectedOrgId);
+      if (selectedTenantOrgIds.length === 0) return [];
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, tenant_id, organization_id, brand_id, location_id, created_at, status, onboarding_status, onboarding_current_step, business_verification_status').in('organization_id', selectedTenantOrgIds);
       if (error) throw error;
-      return data;
+      return data || [];
     },
-    enabled: !!selectedOrgId
+    enabled: selectedTenantOrgIds.length > 0
   });
 
   const { data: onboardingReviews = [], isLoading: isLoadingOnboardingReviews, error: onboardingReviewsError } = useAuthQuery({
@@ -240,6 +281,7 @@ export default function PlatformOrganizations() {
   React.useEffect(() => {
     if (searchParams.get('review') === 'business') {
       setSelectedOrgId(null);
+              setSelectedTenantId(null);
     }
   }, [searchParams]);
 
@@ -291,19 +333,20 @@ export default function PlatformOrganizations() {
       toast.success("Billing & configuration updated");
 
       // Notify Org Manager
-      const orgOwner = users.find(u => u.organization_id === selectedOrgId && u.role === 'org_manager');
+      const orgOwner = orgUsers.find(u => u.organization_id === selectedOrgId && u.role === 'org_manager');
       if (orgOwner) {
         await supabase.from('notifications').insert({
           organization_id: selectedOrgId,
           user_id: orgOwner.id,
           type: 'system',
-          title: 'Organization Plan Updated',
-          message: `Your organization's plan and modules have been updated by a Platform Administrator.`,
+          title: 'Tenant Workspace Plan Updated',
+          message: `Your tenant workspace plan and modules have been updated by a Platform Administrator.`,
           is_read: false
         });
       }
       // Invalidate this page's query
-      queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_tenants'] });
       // Invalidate Platform Users query
       queryClient.invalidateQueries({ queryKey: ['platform-orgs-lookup'] });
       // Invalidate Platform Plans query
@@ -326,7 +369,9 @@ export default function PlatformOrganizations() {
       posthog.capture('workspace_deleted');
       toast.success("Organization successfully deleted");
       setSelectedOrgId(null);
-      queryClient.invalidateQueries({ queryKey: ['platform_organizations_paginated'] });
+              setSelectedTenantId(null);
+      queryClient.invalidateQueries({ queryKey: ['platform_organizations_all'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_tenants'] });
       queryClient.invalidateQueries({ queryKey: ['platform_org_brands'] });
       queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
       queryClient.invalidateQueries({ queryKey: ['platform_org_users'] });
@@ -550,14 +595,13 @@ export default function PlatformOrganizations() {
       </Button>
     </div>
   );
-  const selectedOrg = orgs.find(o => o.id === selectedOrgId) || null;
   const isBusinessReviewMode = searchParams.get('review') === 'business';
   const businessReviewItems = onboardingReviews.filter((item) => item.hasBusinessVerification && item.verification.verification_status !== 'verified');
   const tenantReviewItems = onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
   const selectedOrgReviewItems = isBusinessReviewMode
     ? businessReviewItems
-    : selectedOrgId
-    ? onboardingReviews.filter((item) => item.verification.organization_id === selectedOrgId || item.profile?.organization_id === selectedOrgId)
+    : selectedTenantOrgIds.length > 0
+    ? onboardingReviews.filter((item) => selectedTenantOrgIds.includes(item.verification.organization_id) || selectedTenantOrgIds.includes(item.profile?.organization_id))
     : tenantReviewItems;
   const pendingTenantReviewCount = tenantReviewItems.length;
   const shouldShowTenantReviewPanel = isBusinessReviewMode || selectedOrgReviewItems.length > 0;
@@ -642,12 +686,13 @@ export default function PlatformOrganizations() {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Building2 className="w-4 h-4 text-primary" />
             </div>
-            <h2 className="font-black tracking-tight text-lg">Organizations</h2>
+            <h2 className="font-black tracking-tight text-lg">Tenants</h2>
           </div>
           <Button
             type="button"
             onClick={() => {
               setSelectedOrgId(null);
+              setSelectedTenantId(null);
               setSearchParams({ review: 'business' });
             }}
             variant={isBusinessReviewMode ? 'default' : 'outline'}
@@ -656,7 +701,7 @@ export default function PlatformOrganizations() {
               isBusinessReviewMode ? 'bg-primary text-primary-foreground' : 'border-primary/30 text-primary hover:bg-primary/10'
             )}
           >
-            <span className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Business Reviews</span>
+            <span className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /> Tenant Reviews</span>
             <Badge className={cn('border-0', isBusinessReviewMode ? 'bg-primary-foreground text-primary' : 'bg-primary text-primary-foreground')}>
               {isLoadingOnboardingReviews ? '...' : pendingTenantReviewCount}
             </Badge>
@@ -681,7 +726,7 @@ export default function PlatformOrganizations() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Search organizations..." 
+              placeholder="Search tenants or organizations..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9 text-xs bg-secondary/50 border-border focus-visible:ring-primary rounded-lg"
@@ -695,17 +740,19 @@ export default function PlatformOrganizations() {
               Array(5).fill(0).map((_, i) => (
                 <div key={i} className="h-16 bg-secondary animate-pulse rounded-lg m-2"></div>
               ))
-            ) : orgs.length === 0 ? (
-              <div className="text-center py-8 text-xs text-muted-foreground italic">No organizations found.</div>
-            ) : orgs.map(org => {
-              const isActive = org.status !== 'archived' && org.status !== 'suspended';
-              const isSelected = selectedOrgId === org.id;
+            ) : paginatedTenantWorkspaces.length === 0 ? (
+              <div className="text-center py-8 text-xs text-muted-foreground italic">No tenant workspaces found.</div>
+            ) : paginatedTenantWorkspaces.map((tenant) => {
+              const primaryOrg = tenant.organizations[0];
+              const isActive = tenant.status !== 'archived' && tenant.status !== 'suspended';
+              const isSelected = selectedTenantId === tenant.id;
 
               return (
                 <button 
-                  key={org.id}
+                  key={tenant.id}
                   onClick={() => {
-                    setSelectedOrgId(org.id);
+                    setSelectedTenantId(tenant.id);
+                    setSelectedOrgId(primaryOrg?.id || null);
                     if (searchParams.get('review')) setSearchParams({});
                   }}
                   className={cn(
@@ -723,9 +770,10 @@ export default function PlatformOrganizations() {
                     <p className={cn(
                       "text-sm font-bold truncate transition-colors",
                       isSelected ? "text-primary" : "text-foreground"
-                    )}>{org.name}</p>
+                    )}>{tenant.name}</p>
                     <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate flex items-center gap-2">
-                      <span>{org.plan_id || 'Free'}</span>
+                      <span>{tenant.organizations.length} org{tenant.organizations.length === 1 ? '' : 's'}</span>
+                      <span>{primaryOrg?.plan_id || 'starter'}</span>
                     </p>
                   </div>
                   <ChevronRight className={cn(
@@ -773,37 +821,37 @@ export default function PlatformOrganizations() {
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">{selectedOrg.name}</h1>
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">{selectedTenant?.name || selectedOrg.name}</h1>
                     <Badge variant="outline" className={cn(
                       "font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-full border",
-                      selectedOrg.status === 'archived' ? 'bg-secondary text-muted-foreground border-border' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      (selectedTenant?.status || selectedOrg.status) === 'archived' ? 'bg-secondary text-muted-foreground border-border' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     )}>
-                      {selectedOrg.status || 'Active'}
+                      {selectedTenant?.status || selectedOrg.status || 'Active'}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground font-medium mt-3">
-                    <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-muted-foreground" /> Admin: {selectedOrg.admin_email}</div>
-                    <div className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Plan ID: {selectedOrg.plan_id || 'Free'}</div>
+                    <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-muted-foreground" /> Primary admin: {selectedOrg.admin_email || 'Not assigned'}</div>
+                    <div className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Primary plan: {selectedOrg.plan_id || 'starter'}</div>
                   </div>
                 </div>
                 <div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors font-bold shadow-sm">
-                        <Trash2 className="w-4 h-4 mr-2" /> Delete Organization
+                        <Trash2 className="w-4 h-4 mr-2" /> Delete Primary Organization
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the <strong>{selectedOrg.name}</strong> organization, along with all of its brands, locations, settings, and remove user access to it.
+                          This action cannot be undone. This will permanently delete the primary organization <strong>{selectedOrg.name}</strong>, along with its brands, locations, settings, and user access. Other organizations in this tenant are not deleted by this action.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteOrganization} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                          {isDeletingOrg ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Organization"}
+                          {isDeletingOrg ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Primary Organization"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -812,14 +860,25 @@ export default function PlatformOrganizations() {
               </div>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <Card className="border-0 shadow-sm bg-card/50 backdrop-blur-sm">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0 border border-emerald-100">
+                      <Building2 className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Organizations</p>
+                      <p className="text-2xl font-black text-foreground">{selectedTenantOrgs.length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
                 <Card className="border-0 shadow-sm bg-card/50 backdrop-blur-sm">
                   <CardContent className="p-6 flex items-center gap-4">
                     <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center shrink-0 border border-violet-100">
                       <Store className="w-5 h-5 text-violet-600" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Brands</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Tenant Brands</p>
                       <p className="text-2xl font-black text-foreground">{orgBrands.length}</p>
                     </div>
                   </CardContent>
@@ -830,7 +889,7 @@ export default function PlatformOrganizations() {
                       <MapPin className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Locations</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Tenant Locations</p>
                       <p className="text-2xl font-black text-foreground">{orgLocations.length}</p>
                     </div>
                   </CardContent>
@@ -841,7 +900,7 @@ export default function PlatformOrganizations() {
                       <Users className="w-5 h-5 text-sky-600" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Users</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Tenant Users</p>
                       <p className="text-2xl font-black text-foreground">{orgUsers.length}</p>
                     </div>
                   </CardContent>
@@ -851,7 +910,7 @@ export default function PlatformOrganizations() {
               {/* Main Tabs */}
               <Tabs defaultValue="hierarchy" className="w-full">
                 <TabsList className="bg-card border shadow-sm p-1 rounded-xl h-auto mb-6">
-                  <TabsTrigger value="hierarchy" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Brand & Location Hierarchy</TabsTrigger>
+                  <TabsTrigger value="hierarchy" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Tenant Hierarchy</TabsTrigger>
                   <TabsTrigger value="directory" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">User Directory</TabsTrigger>
                   <TabsTrigger value="onboarding" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Onboarding Review</TabsTrigger>
                   <TabsTrigger value="billing" className="rounded-lg text-xs font-bold px-6 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">Billing & Plan</TabsTrigger>
@@ -861,7 +920,7 @@ export default function PlatformOrganizations() {
                 <TabsContent value="hierarchy" className="space-y-6 mt-0">
                   <div className="flex justify-end mb-2">
                     <Button onClick={() => setIsHierarchyModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm h-8 px-3 text-xs">
-                      <Plus className="w-3.5 h-3.5 mr-1.5" /> Modify Hierarchy
+                      <Plus className="w-3.5 h-3.5 mr-1.5" /> Modify Primary Org Hierarchy
                     </Button>
                   </div>
                   {orgBrands.length === 0 ? (
@@ -869,54 +928,77 @@ export default function PlatformOrganizations() {
                       <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Store className="w-8 h-8 text-muted-foreground/50" />
                       </div>
-                      <p className="font-bold text-foreground">No Brands Yet</p>
-                      <p className="text-xs text-muted-foreground mt-1">This organization hasn't created any brands or locations.</p>
+                      <p className="font-bold text-foreground">No Hierarchy Yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">This tenant workspace does not have brands or locations yet.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                      {orgBrands.map(brand => {
-                        const bLocs = orgLocations.filter(l => l.brand_id === brand.brand_id);
-                        const bUsers = orgUsers.filter(u => u.brand_id === brand.brand_id);
+                    <div className="space-y-5">
+                      {selectedTenantOrgs.map((org) => {
+                        const brandsForOrg = orgBrands.filter((brand) => brand.organization_id === org.id);
+                        const locationsForOrg = orgLocations.filter((location) => location.organization_id === org.id);
+                        const usersForOrg = orgUsers.filter((user) => user.organization_id === org.id);
                         return (
-                          <Card key={brand.brand_id} className="border-border shadow-sm overflow-hidden flex flex-col bg-card">
-                            <div className="p-5 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
+                          <Card key={org.id} className="border-border shadow-sm overflow-hidden bg-card">
+                            <div className="p-5 border-b border-border/50 bg-secondary/20 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-card shadow-sm border border-border rounded-xl flex items-center justify-center">
-                                  <Store className="w-5 h-5 text-foreground/80" />
+                                  <Building2 className="w-5 h-5 text-foreground/80" />
                                 </div>
                                 <div>
-                                  <h3 className="font-black text-foreground">{brand.name}</h3>
-                                  <p className="text-[10px] text-muted-foreground font-medium">{bLocs.length} Locations &middot; {bUsers.length} Users</p>
+                                  <h3 className="font-black text-foreground">{org.name}</h3>
+                                  <p className="text-[10px] text-muted-foreground font-medium">{brandsForOrg.length} brand(s) &middot; {locationsForOrg.length} location(s) &middot; {usersForOrg.length} user(s)</p>
                                 </div>
                               </div>
+                              <Badge variant="outline" className="w-fit text-[10px] font-bold uppercase">{org.plan_id || "starter"}</Badge>
                             </div>
-                            <div className="flex-1 p-0">
-                              {bLocs.length === 0 ? (
-                                <p className="text-xs text-center py-6 text-muted-foreground italic">No locations under this brand</p>
+                            <div className="p-5">
+                              {brandsForOrg.length === 0 ? (
+                                <p className="text-xs text-center py-6 text-muted-foreground italic">No brands under this organization</p>
                               ) : (
-                                <div className="divide-y divide-slate-100">
-                                  {bLocs.map(loc => {
-                                    const lUsers = orgUsers.filter(u => u.location_id === loc.id);
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                  {brandsForOrg.map((brand) => {
+                                    const bLocs = locationsForOrg.filter((location) => location.brand_id === brand.brand_id);
+                                    const bUsers = orgUsers.filter((user) => user.brand_id === brand.brand_id);
                                     return (
-                                      <div key={loc.id} className="p-4 px-5 flex items-center justify-between hover:bg-secondary/50 transition-colors group">
-                                        <div className="flex items-center gap-3">
-                                          <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-amber-500 transition-colors" />
-                                          <div>
-                                            <p className="text-sm font-bold text-foreground/80">{loc.name}</p>
-                                            <p className="text-[10px] text-muted-foreground">{loc.address || 'No address'}</p>
+                                      <div key={brand.brand_id} className="rounded-xl border border-border bg-secondary/20 overflow-hidden">
+                                        <div className="p-4 border-b border-border/50 flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <Store className="w-4 h-4 text-muted-foreground" />
+                                            <div>
+                                              <p className="text-sm font-black text-foreground">{brand.name}</p>
+                                              <p className="text-[10px] text-muted-foreground">{bLocs.length} location(s) &middot; {bUsers.length} user(s)</p>
+                                            </div>
                                           </div>
                                         </div>
-                                        <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">
-                                          {lUsers.length} Staff
-                                        </Badge>
+                                        {bLocs.length === 0 ? (
+                                          <p className="text-xs text-center py-5 text-muted-foreground italic">No locations under this brand</p>
+                                        ) : (
+                                          <div className="divide-y divide-border/50">
+                                            {bLocs.map((loc) => {
+                                              const lUsers = orgUsers.filter((user) => user.location_id === loc.id);
+                                              return (
+                                                <div key={loc.id} className="p-3 flex items-center justify-between hover:bg-secondary/50 transition-colors group">
+                                                  <div className="flex items-center gap-3">
+                                                    <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-amber-500 transition-colors" />
+                                                    <div>
+                                                      <p className="text-sm font-bold text-foreground/80">{loc.name}</p>
+                                                      <p className="text-[10px] text-muted-foreground">{loc.address || "No address"}</p>
+                                                    </div>
+                                                  </div>
+                                                  <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">{lUsers.length} Staff</Badge>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
                                       </div>
-                                    )
+                                    );
                                   })}
                                 </div>
                               )}
                             </div>
                           </Card>
-                        )
+                        );
                       })}
                     </div>
                   )}
@@ -1120,8 +1202,8 @@ export default function PlatformOrganizations() {
                      <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                           <div className="p-4 rounded-xl border border-border/50 bg-secondary/50 xl:col-span-2">
-                             <p className="text-sm font-bold text-foreground mb-1">Organization Modules</p>
-                             <p className="text-xs text-muted-foreground mb-6">Manage which modules are enabled for this organization.</p>
+                             <p className="text-sm font-bold text-foreground mb-1">Primary Organization Modules</p>
+                             <p className="text-xs text-muted-foreground mb-6">Manage which modules are enabled for the tenant's primary organization.</p>
                              
                              <div className="space-y-6">
                                <div>
