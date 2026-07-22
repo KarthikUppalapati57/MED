@@ -333,6 +333,10 @@ export default function Payments() {
     queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, invoiceSortBy],
     queryFn: async ({ pageParam = 0 }) => {
       const filters = {};
+      if (organization?.id) filters.organization_id = organization.id;
+      const selectedBrandId = (brand?.brand_id || brand?.id) || null;
+      if (selectedBrandId) filters.brand_id = selectedBrandId;
+      if (location?.id) filters.location_id = location.id;
       if (statusFilter !== 'all') {
         if (statusFilter === 'partial') {
            filters.payment_status = 'partial';
