@@ -821,10 +821,7 @@ export default function OnboardingPage() {
         locationAddress = normalizeAddress(businessIdentity.businessAddress);
       }
 
-      if (locationAddressSource === 'custom') {
-        const locationAddressError = addressError(locationAddress, `Row ${rowIdx + 2} location business/service address`);
-        if (locationAddressError && hasAddressValues(row, 'location_address')) throw new Error(locationAddressError);
-      } else if (!addressComplete(locationAddress)) {
+      if (locationAddressSource !== 'custom' && !addressComplete(locationAddress)) {
         locationAddressSource = 'custom';
         locationAddress = customLocationAddress;
       }
