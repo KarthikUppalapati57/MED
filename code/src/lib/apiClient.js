@@ -1090,6 +1090,38 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    adjustInventory: async ({
+      orgId,
+      locationId,
+      inventoryId,
+      newQuantity,
+      newUnit = null,
+      unitCost = null,
+      reason = 'manual_adjustment',
+      userId = null
+    }) => {
+      const { data, error } = await supabase.rpc('adjust_inventory', {
+        p_organization_id: orgId,
+        p_location_id: locationId,
+        p_inventory_id: inventoryId,
+        p_new_quantity: newQuantity,
+        p_new_unit: newUnit,
+        p_unit_cost: unitCost,
+        p_reason: reason,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
+    fulfillIntercompanyTransfer: async (orgId, transferId, userId) => {
+      const { data, error } = await supabase.rpc('fulfill_intercompany_transfer', {
+        p_organization_id: orgId,
+        p_transfer_id: transferId,
+        p_user_id: userId
+      });
+      if (error) throw error;
+      return data;
+    },
   },
   admin: {
     /** Securely update a user's role via server-side RPC (prevents privilege escalation) */

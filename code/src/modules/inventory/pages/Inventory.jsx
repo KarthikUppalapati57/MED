@@ -385,6 +385,7 @@ export default function Inventory() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [convertForm, setConvertForm] = useState({ fromUnit: '', toUnit: '', quantity: 0 });
+  const [conversionOptions, setConversionOptions] = useState([]);
   const [wastageForm, setWastageForm] = useState({ quantity: 0, unit: '', reason: 'spoiled', notes: '' });
   const [addForm, setAddForm] = useState({ product_name: '', accounting_category: '1210', current_quantity: 0, current_unit: 'ea', unit_cost: 0, par_level: 0, reorder_point: 0, location: '' });
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -958,8 +959,41 @@ export default function Inventory() {
   }, [invalidateCountSessionsRealtime, invalidateCountSheetsRealtime, invalidateInventoryRealtime, invalidateWastageRealtime, organization?.id]);
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data, syncProduct = false, sourceItem = null }) => {
-      const updatedInventory = await api.entities.Inventory.update(id, data);
+    mutationFn: async ({ id, data, syncProduct = false, sourceItem = null, logAdjustment = false, adjustmentReason = 'manual_adjustment' }) => {
+      const quantityChanged = logAdjustment && sourceItem && (
+        Number(data.current_quantity ?? sourceItem.current_quantity ?? 0) !== Number(sourceItem.current_quantity ?? 0) ||
+        String(data.current_unit ?? sourceItem.current_unit ?? '') !== String(sourceItem.current_unit ?? '') ||
+        Number(data.unit_cost ?? sourceItem.unit_cost ?? 0) !== Number(sourceItem.unit_cost ?? 0)
+      );
+
+      if (quantityChanged) {
+        await api.metrics.adjustInventory({
+          orgId: organizationId,
+          locationId: sourceItem.location_id || locationId,
+          inventoryId: id,
+          newQuantity: Number(data.current_quantity ?? sourceItem.current_quantity ?? 0),
+          newUnit: data.current_unit ?? sourceItem.current_unit ?? null,
+          unitCost: Number(data.unit_cost ?? sourceItem.unit_cost ?? 0),
+          reason: adjustmentReason,
+          userId: userProfile?.id,
+        });
+      }
+
+      const metadataPayload = quantityChanged ? Object.fromEntries(
+        Object.entries(data).filter(([key]) => ![
+          'current_quantity',
+          'current_unit',
+          'unit_cost',
+          'current_value',
+          'previous_quantity',
+          'previous_value',
+          'last_counted_date',
+        ].includes(key))
+      ) : data;
+
+      const updatedInventory = Object.keys(metadataPayload).length
+        ? await api.entities.Inventory.update(id, metadataPayload)
+        : { ...sourceItem, ...data };
 
       if (syncProduct) {
         const productRef = sourceItem?.product_id;
@@ -2191,13 +2225,35 @@ export default function Inventory() {
     }
   };
 
-  const handleConvert = (item) => {
+  const handleConvert = async (item) => {
     if (item?.is_product_backed_inventory) {
       toast.info('This product needs an inventory row before unit conversion can be saved.');
       return;
     }
     setSelectedItem(item);
     setConvertForm({ fromUnit: item.current_unit || 'ea', toUnit: '', quantity: item.current_quantity || 0 });
+    const configuredUnits = new Map();
+    const currentUnit = item.current_unit || 'ea';
+    configuredUnits.set(currentUnit, { unit: currentUnit, label: currentUnit });
+
+    const rates = item.conversion_rates && typeof item.conversion_rates === 'object' ? item.conversion_rates : {};
+    Object.keys(rates).forEach((key) => {
+      const [, toUnit] = key.split('_to_');
+      if (toUnit) configuredUnits.set(toUnit, { unit: toUnit, label: toUnit });
+    });
+
+    try {
+      const productId = item.internal_product_id || (String(item.product_id || '').match(/^[0-9a-f-]{36}$/i) ? item.product_id : null);
+      const countUnits = productId ? await api.products.listCountUnits(productId) : [];
+      countUnits.forEach((unit) => {
+        if (unit.unit) configuredUnits.set(unit.unit, { unit: unit.unit, label: unit.name || unit.unit, countUnit: unit });
+        if (unit.source_unit) configuredUnits.set(unit.source_unit, { unit: unit.source_unit, label: unit.source_unit, countUnit: unit });
+      });
+    } catch (error) {
+      toast.error(error?.message || 'Unable to load configured count units');
+    }
+
+    setConversionOptions([...configuredUnits.values()].filter(option => option.unit !== currentUnit));
     setConvertDialogOpen(true);
   };
 
@@ -2219,11 +2275,14 @@ export default function Inventory() {
   };
 
   const saveEdit = () => {
+    if (!warnIfMissing()) return;
     const value = editForm.current_quantity * editForm.unit_cost;
     updateMutation.mutate({
       id: selectedItem.id,
       sourceItem: selectedItem,
       syncProduct: true,
+      logAdjustment: true,
+      adjustmentReason: 'manual_edit',
       data: {
         ...editForm,
         current_value: value,
@@ -2252,19 +2311,46 @@ export default function Inventory() {
   };
 
   const saveConvert = () => {
-    // Local deterministic conversion rates used by this inventory adjustment form.
-    const conversionRates = {
-      'box_to_lb': 10,
-      'lb_to_ea': 16,
-      'case_to_ea': 24,
-    };
+    const fromUnit = convertForm.fromUnit;
+    const toUnit = convertForm.toUnit;
+    if (!toUnit) {
+      toast.error('Select a configured destination unit');
+      return;
+    }
 
-    const key = `${convertForm.fromUnit}_to_${convertForm.toUnit}`;
-    const rate = conversionRates[key] || 1;
+    const rates = selectedItem?.conversion_rates && typeof selectedItem.conversion_rates === 'object'
+      ? selectedItem.conversion_rates
+      : {};
+    const directRate = Number(rates[`${fromUnit}_to_${toUnit}`]);
+    const reverseRate = Number(rates[`${toUnit}_to_${fromUnit}`]);
+    let rate = Number.isFinite(directRate) && directRate > 0 ? directRate : null;
+
+    if (!rate && Number.isFinite(reverseRate) && reverseRate > 0) {
+      rate = 1 / reverseRate;
+    }
+
+    if (!rate) {
+      const option = conversionOptions.find((item) => item.unit === toUnit);
+      const countUnit = option?.countUnit;
+      if (countUnit?.unit === toUnit && countUnit?.source_unit === fromUnit) {
+        rate = Number(countUnit.source_quantity || 0) / Number(countUnit.quantity || 1);
+      } else if (countUnit?.unit === fromUnit && countUnit?.source_unit === toUnit) {
+        rate = Number(countUnit.quantity || 1) / Number(countUnit.source_quantity || 0);
+      }
+    }
+
+    if (!rate || !Number.isFinite(rate) || rate <= 0) {
+      toast.error('No verified conversion rate exists for these units');
+      return;
+    }
+
     const newQty = convertForm.quantity * rate;
 
     updateMutation.mutate({
       id: selectedItem.id,
+      sourceItem: selectedItem,
+      logAdjustment: true,
+      adjustmentReason: 'unit_conversion',
       data: {
         current_quantity: newQty,
         current_unit: convertForm.toUnit,
@@ -4327,6 +4413,19 @@ export default function Inventory() {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (!warnIfMissing()) return;
+                                    setSelectedCountSheetId(sheet.id);
+                                    setActiveSessionOpen(true);
+                                  }}
+                                >
+                                  Mobile Count
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   className="border-resend-red/40 text-resend-red hover:bg-resend-red/10 hover:text-resend-red"
                                   onClick={(event) => {
                                     event.stopPropagation();
@@ -4892,11 +4991,14 @@ export default function Inventory() {
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ea">Each (ea)</SelectItem>
-                  <SelectItem value="lb">Pound (lb)</SelectItem>
-                  <SelectItem value="oz">Ounce (oz)</SelectItem>
-                  <SelectItem value="box">Box</SelectItem>
-                  <SelectItem value="case">Case</SelectItem>
+                  {conversionOptions.map((option) => (
+                    <SelectItem key={option.unit} value={option.unit}>
+                      {option.label || option.unit}
+                    </SelectItem>
+                  ))}
+                  {conversionOptions.length === 0 && (
+                    <SelectItem value="no-configured-units" disabled>No configured units</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

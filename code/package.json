@@ -29,6 +29,7 @@
     "preview": "vite preview",
     "test:backend": "vitest run tests/backend",
     "test:frontend": "vitest run tests/frontend",
+    "test:inventory": "vitest run tests/inventory-generated",
     "test:e2e": "playwright test tests/e2e",
     "check:modules": "node scripts/module-artifact-audit.mjs",
     "check:architecture": "node scripts/architecture-release-gate.mjs",

@@ -16,16 +16,6 @@ import { format, subDays } from 'date-fns';
 import { Download } from 'lucide-react';
 import { DailyPOSSyncReview } from '@/modules/inventory/components/DailyPOSSyncReview';
 
-const trendData = [
-  { day: 'Mon', theoretical: 850, actual: 920 },
-  { day: 'Tue', theoretical: 780, actual: 810 },
-  { day: 'Wed', theoretical: 920, actual: 1050 },
-  { day: 'Thu', theoretical: 890, actual: 940 },
-  { day: 'Fri', theoretical: 1250, actual: 1420 },
-  { day: 'Sat', theoretical: 1400, actual: 1600 },
-  { day: 'Sun', theoretical: 1100, actual: 1250 },
-];
-
 export default function AvTCosting() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { organization } = useAuth();
@@ -73,15 +63,18 @@ export default function AvTCosting() {
         }
       });
       toast.success("AI Explanation generated. Check the AI Insights dashboard.");
-    } catch (e) {
+    } catch {
       toast.error("Failed to generate AI explanation");
     }
   };
 
   const calculateMetrics = (item) => {
-    const varianceQty = item.actual - item.theoretical;
-    const variancePercent = (varianceQty / item.theoretical) * 100;
-    const varianceCost = varianceQty * item.costPerUnit;
+    const theoretical = Number(item.theoretical || 0);
+    const actual = Number(item.actual || 0);
+    const costPerUnit = Number(item.costPerUnit || 0);
+    const varianceQty = actual - theoretical;
+    const variancePercent = theoretical > 0 ? (varianceQty / theoretical) * 100 : 0;
+    const varianceCost = varianceQty * costPerUnit;
     return { varianceQty, variancePercent, varianceCost };
   };
 
@@ -90,7 +83,18 @@ export default function AvTCosting() {
     .sort((a, b) => b.varianceCost - a.varianceCost)
     .slice(0, 5);
 
-  const totalVarianceCost = topBleeders.reduce((sum, item) => sum + item.varianceCost, 0);
+  const totalVarianceCost = varianceData
+    .map(item => calculateMetrics(item).varianceCost)
+    .reduce((sum, value) => sum + value, 0);
+  const totalTheoreticalCost = varianceData
+    .reduce((sum, item) => sum + (Number(item.theoretical || 0) * Number(item.costPerUnit || 0)), 0);
+  const overallVariancePercent = totalTheoreticalCost > 0 ? (totalVarianceCost / totalTheoreticalCost) * 100 : 0;
+  const criticalCount = varianceData.filter(item => item.status === 'critical').length;
+  const varianceChartData = topBleeders.map(item => ({
+    ingredient: item.ingredient,
+    theoretical: Number(item.theoretical || 0) * Number(item.costPerUnit || 0),
+    actual: Number(item.actual || 0) * Number(item.costPerUnit || 0),
+  }));
 
   const handleExportCSV = async () => {
     if (!varianceData || varianceData.length === 0) return toast.error("No data to export");
@@ -186,7 +190,7 @@ export default function AvTCosting() {
           <CardContent>
             <div className="text-4xl font-black text-rose-600">${totalVarianceCost.toFixed(2)}</div>
             <p className="text-sm font-medium text-rose-600/80 flex items-center mt-2">
-              <TrendingUp className="w-4 h-4 mr-1" /> +12.5% from last week
+              <TrendingUp className="w-4 h-4 mr-1" /> {varianceData.length} ingredient{varianceData.length === 1 ? '' : 's'} with movement data
             </p>
           </CardContent>
         </Card>
@@ -199,9 +203,9 @@ export default function AvTCosting() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Overall Variance %</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black text-slate-900">8.4%</div>
+            <div className="text-4xl font-black text-slate-900">{overallVariancePercent.toFixed(1)}%</div>
             <p className="text-sm font-medium text-emerald-600 flex items-center mt-2">
-              <TrendingDown className="w-4 h-4 mr-1" /> -1.2% from last week
+              <TrendingDown className="w-4 h-4 mr-1" /> Based on current report range
             </p>
           </CardContent>
         </Card>
@@ -214,7 +218,7 @@ export default function AvTCosting() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Critical Ingredients</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black text-amber-500">3</div>
+            <div className="text-4xl font-black text-amber-500">{criticalCount}</div>
             <p className="text-sm font-medium text-muted-foreground mt-2">
               Require immediate attention
             </p>
@@ -225,14 +229,14 @@ export default function AvTCosting() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="col-span-1 lg:col-span-2 border-border shadow-sm">
           <CardHeader>
-            <CardTitle>AvT Cost Trend</CardTitle>
-            <CardDescription>Theoretical vs Actual cost depletion over the last 7 days.</CardDescription>
+            <CardTitle>AvT Cost By Ingredient</CardTitle>
+            <CardDescription>Theoretical vs actual cost depletion from live inventory movements.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart data={varianceChartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <XAxis dataKey="ingredient" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} tickFormatter={(val) => `$${val}`} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
@@ -272,6 +276,11 @@ export default function AvTCosting() {
                   </div>
                 </div>
               ))}
+              {topBleeders.length === 0 && (
+                <div className="p-3 rounded-xl bg-card shadow-sm border text-sm text-muted-foreground">
+                  No variance rows returned for this range.
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -296,6 +305,13 @@ export default function AvTCosting() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {varianceData.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    No AvT variance data found for the selected date range.
+                  </TableCell>
+                </TableRow>
+              )}
               {varianceData.map((item) => {
                 const metrics = calculateMetrics(item);
                 return (

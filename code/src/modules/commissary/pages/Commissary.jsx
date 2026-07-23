@@ -138,16 +138,13 @@ export default function Commissary() {
 
   const fulfillOrderMutation = useMutation({
     mutationFn: async (transferId) => {
-      await api.entities.IntercompanyTransfer.update(transferId, {
-        organization_id: organization.id,
-        status: 'fulfilled',
-        fulfilled_at: new Date().toISOString(),
-        fulfilled_by: userProfile?.id
-      });
+      return api.metrics.fulfillIntercompanyTransfer(organization.id, transferId, userProfile?.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['intercompany_transfers']);
-      toast.success("Order fulfilled. GL Offset entries automatically recorded.");
+      queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', organization?.id] });
+      toast.success("Order fulfilled, inventory moved, and GL export queued.");
       setViewOrder(null);
     },
     onError: (err) => toast.error(err.message)
