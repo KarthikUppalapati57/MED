@@ -3,7 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.product_count_units (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  brand_id uuid REFERENCES public.brands(id) ON DELETE SET NULL,
+  brand_id uuid REFERENCES public.brands(brand_id) ON DELETE SET NULL,
   location_id uuid REFERENCES public.locations(id) ON DELETE SET NULL,
   product_id uuid NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   name text NOT NULL,
@@ -47,7 +47,7 @@ CREATE POLICY product_count_units_insert ON public.product_count_units
     AND EXISTS (
       SELECT 1
       FROM public.products p
-      WHERE p.id = product_id
+      WHERE p.id = product_count_units.product_id
         AND p.organization_id = product_count_units.organization_id
         AND p.deleted_at IS NULL
     )
@@ -65,7 +65,7 @@ CREATE POLICY product_count_units_update ON public.product_count_units
     AND EXISTS (
       SELECT 1
       FROM public.products p
-      WHERE p.id = product_id
+      WHERE p.id = product_count_units.product_id
         AND p.organization_id = product_count_units.organization_id
         AND p.deleted_at IS NULL
     )

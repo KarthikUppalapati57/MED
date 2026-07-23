@@ -599,7 +599,7 @@ export default function PlatformOrganizations() {
   const businessReviewItems = onboardingReviews.filter((item) => item.hasBusinessVerification && item.verification.verification_status !== 'verified');
   const tenantReviewItems = onboardingReviews.filter((item) => !item.verification.organization_id && !item.profile?.organization_id);
   const selectedOrgReviewItems = isBusinessReviewMode
-    ? businessReviewItems
+    ? tenantReviewItems
     : selectedTenantOrgIds.length > 0
     ? onboardingReviews.filter((item) => selectedTenantOrgIds.includes(item.verification.organization_id) || selectedTenantOrgIds.includes(item.profile?.organization_id))
     : tenantReviewItems;
