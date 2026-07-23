@@ -14,7 +14,7 @@ const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
 
 
 export default function Billing() {
-  const { user, organization } = useAuth();
+  const { organization } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
 
@@ -31,7 +31,7 @@ export default function Billing() {
     queryKey: ['billing-locations', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      const { data, error } = await supabase.from('locations').select('id').eq('organization_id', organization.id);
+      const { data, error } = await supabase.from('locations').select('id, plan_id, subscription_status').eq('organization_id', organization.id);
       if (error) throw error;
       return data || [];
     },
@@ -39,6 +39,15 @@ export default function Billing() {
   });
 
   const billingLocationCount = Math.max(1, locations.length || 0);
+  const locationPlanIds = React.useMemo(() => {
+    const ids = new Set((locations || []).map(location => location.plan_id).filter(Boolean));
+    return Array.from(ids);
+  }, [locations]);
+  const currentPlanLabel = locationPlanIds.length === 0
+    ? 'No assigned location plan'
+    : locationPlanIds.length === 1
+      ? `${plans.find(plan => plan.id === locationPlanIds[0])?.name || locationPlanIds[0]} plan`
+      : 'Mixed location plans';
 
   const handleCheckout = async (plan) => {
     if (!organization?.id) return toast.error("Organization context missing");
@@ -83,7 +92,7 @@ export default function Billing() {
             <Badge className="bg-resend-green text-white">Active</Badge>
           </CardTitle>
           <CardDescription className="text-indigo-700/80 dark:text-indigo-300/80">
-            You are currently on the {organization?.plan_id ? "Custom" : "Starter"} Plan for {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}.
+            You are currently on {currentPlanLabel} across {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -92,7 +101,7 @@ export default function Billing() {
         {isLoadingPlans ? (
           <div className="col-span-3 py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
         ) : plans.map(plan => {
-          const isCurrentPlan = organization?.plan_id === plan.id;
+          const isCurrentPlan = locationPlanIds.length === 1 && locationPlanIds[0] === plan.id;
 
           return (
             <Card key={plan.id} className={cn(

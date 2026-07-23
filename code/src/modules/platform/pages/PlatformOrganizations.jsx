@@ -159,7 +159,7 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_org_locations', selectedTenantId, selectedTenantOrgIds.join(',')],
     queryFn: async () => {
       if (selectedTenantOrgIds.length === 0) return [];
-      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, created_at').in('organization_id', selectedTenantOrgIds);
+      const { data, error } = await supabase.from('locations').select('id, name, brand_id, organization_id, address, plan_id, subscription_status, stripe_customer_id, stripe_subscription_id, created_at').in('organization_id', selectedTenantOrgIds);
       if (error) throw error;
       return data || [];
     },
@@ -170,9 +170,22 @@ export default function PlatformOrganizations() {
     queryKey: ['platform_org_users', selectedTenantId, selectedTenantOrgIds.join(',')],
     queryFn: async () => {
       if (selectedTenantOrgIds.length === 0) return [];
-      const { data, error } = await supabase.from('profiles').select('id, full_name, email, role, tenant_id, organization_id, brand_id, location_id, created_at, status, onboarding_status, onboarding_current_step, business_verification_status').in('organization_id', selectedTenantOrgIds);
-      if (error) throw error;
-      return data || [];
+      const profileSelect = 'id, full_name, email, role, tenant_id, organization_id, brand_id, location_id, created_at, status, onboarding_status, onboarding_current_step, business_verification_status';
+      const requests = [
+        supabase.from('profiles').select(profileSelect).in('organization_id', selectedTenantOrgIds)
+      ];
+
+      if (selectedTenantId && !String(selectedTenantId).startsWith('org:')) {
+        requests.push(supabase.from('profiles').select(profileSelect).eq('tenant_id', selectedTenantId));
+      }
+
+      const results = await Promise.all(requests);
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
+
+      const byId = new Map();
+      results.flatMap((result) => result.data || []).forEach((profile) => byId.set(profile.id, profile));
+      return Array.from(byId.values());
     },
     enabled: selectedTenantOrgIds.length > 0
   });
@@ -606,6 +619,27 @@ export default function PlatformOrganizations() {
   const pendingTenantReviewCount = tenantReviewItems.length;
   const shouldShowTenantReviewPanel = isBusinessReviewMode || selectedOrgReviewItems.length > 0;
   const topLevelUsers = orgUsers.filter(u => !u.brand_id && !u.location_id);
+  const renderHierarchyUsers = (users, emptyLabel = 'No users assigned') => {
+    if (!users.length) {
+      return <p className="text-[10px] text-muted-foreground italic">{emptyLabel}</p>;
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {users.map((user) => (
+          <div key={user.id} className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 shadow-sm">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-muted-foreground">
+              {(user.full_name || user.email || '?').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="max-w-[140px] truncate text-[11px] font-bold text-foreground">{user.full_name || user.email || 'Pending user'}</p>
+              <p className="max-w-[140px] truncate text-[9px] text-muted-foreground">{String(user.role || 'user').replace('_', ' ')}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const refreshOnboardingReview = () => {
     queryClient.invalidateQueries({ queryKey: ['platform_onboarding_reviews'] });
@@ -831,7 +865,7 @@ export default function PlatformOrganizations() {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground font-medium mt-3">
                     <div className="flex items-center gap-2"><Shield className="w-4 h-4 text-muted-foreground" /> Primary admin: {selectedOrg.admin_email || 'Not assigned'}</div>
-                    <div className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Primary plan: {selectedOrg.plan_id || 'starter'}</div>
+                    <div className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-muted-foreground" /> Billing: location-level plans</div>
                   </div>
                 </div>
                 <div>
@@ -937,6 +971,13 @@ export default function PlatformOrganizations() {
                         const brandsForOrg = orgBrands.filter((brand) => brand.organization_id === org.id);
                         const locationsForOrg = orgLocations.filter((location) => location.organization_id === org.id);
                         const usersForOrg = orgUsers.filter((user) => user.organization_id === org.id);
+                        const tenantOnlyUsers = org.id === selectedOrg?.id
+                          ? orgUsers.filter((user) => !user.organization_id && user.tenant_id === selectedTenantId)
+                          : [];
+                        const orgLevelUsers = [
+                          ...usersForOrg.filter((user) => !user.brand_id && !user.location_id),
+                          ...tenantOnlyUsers,
+                        ];
                         return (
                           <Card key={org.id} className="border-border shadow-sm overflow-hidden bg-card">
                             <div className="p-5 border-b border-border/50 bg-secondary/20 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -949,7 +990,13 @@ export default function PlatformOrganizations() {
                                   <p className="text-[10px] text-muted-foreground font-medium">{brandsForOrg.length} brand(s) &middot; {locationsForOrg.length} location(s) &middot; {usersForOrg.length} user(s)</p>
                                 </div>
                               </div>
-                              <Badge variant="outline" className="w-fit text-[10px] font-bold uppercase">{org.plan_id || "starter"}</Badge>
+                              <Badge variant="outline" className="w-fit text-[10px] font-bold uppercase">Location plans</Badge>
+                            </div>
+                            <div className="border-b border-border/50 bg-card px-5 py-3">
+                              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                <Users className="h-3.5 w-3.5" /> Organization users
+                              </div>
+                              {renderHierarchyUsers(orgLevelUsers, 'No organization-level users')}
                             </div>
                             <div className="p-5">
                               {brandsForOrg.length === 0 ? (
@@ -958,7 +1005,7 @@ export default function PlatformOrganizations() {
                                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                   {brandsForOrg.map((brand) => {
                                     const bLocs = locationsForOrg.filter((location) => location.brand_id === brand.brand_id);
-                                    const bUsers = orgUsers.filter((user) => user.brand_id === brand.brand_id);
+                                    const bUsers = orgUsers.filter((user) => user.brand_id === brand.brand_id && !user.location_id);
                                     return (
                                       <div key={brand.brand_id} className="rounded-xl border border-border bg-secondary/20 overflow-hidden">
                                         <div className="p-4 border-b border-border/50 flex items-center justify-between">
@@ -970,6 +1017,12 @@ export default function PlatformOrganizations() {
                                             </div>
                                           </div>
                                         </div>
+                                        <div className="border-b border-border/50 px-4 py-3">
+                                          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                            <Users className="h-3.5 w-3.5" /> Brand users
+                                          </div>
+                                          {renderHierarchyUsers(bUsers, 'No brand-level users')}
+                                        </div>
                                         {bLocs.length === 0 ? (
                                           <p className="text-xs text-center py-5 text-muted-foreground italic">No locations under this brand</p>
                                         ) : (
@@ -977,15 +1030,18 @@ export default function PlatformOrganizations() {
                                             {bLocs.map((loc) => {
                                               const lUsers = orgUsers.filter((user) => user.location_id === loc.id);
                                               return (
-                                                <div key={loc.id} className="p-3 flex items-center justify-between hover:bg-secondary/50 transition-colors group">
-                                                  <div className="flex items-center gap-3">
-                                                    <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-amber-500 transition-colors" />
-                                                    <div>
-                                                      <p className="text-sm font-bold text-foreground/80">{loc.name}</p>
-                                                      <p className="text-[10px] text-muted-foreground">{loc.address || "No address"}</p>
+                                                <div key={loc.id} className="p-3 hover:bg-secondary/50 transition-colors group">
+                                                  <div className="mb-3 flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                      <MapPin className="w-4 h-4 text-muted-foreground/50 group-hover:text-amber-500 transition-colors" />
+                                                      <div>
+                                                        <p className="text-sm font-bold text-foreground/80">{loc.name}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{loc.address || "No address"}</p>
+                                                      </div>
                                                     </div>
+                                                    <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">{lUsers.length} Staff</Badge>
                                                   </div>
-                                                  <Badge variant="secondary" className="bg-secondary text-muted-foreground font-bold border-none text-[10px]">{lUsers.length} Staff</Badge>
+                                                  {renderHierarchyUsers(lUsers, 'No location users')}
                                                 </div>
                                               );
                                             })}
@@ -1317,15 +1373,22 @@ export default function PlatformOrganizations() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            <div className="space-y-4">
                              <div>
-                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Subscription Plan</Label>
-                               <Select value={billingForm.plan_id} onValueChange={(val) => {
-                                 const selectedPlan = plans.find(p => p.id === val);
-                                 setBillingForm(prev => ({ 
-                                   ...prev, 
-                                   plan_id: val,
-                                   enabled_modules: selectedPlan && selectedPlan.features ? selectedPlan.features : prev.enabled_modules
-                                 }));
-                               }}>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Billable Location</Label>
+                               <Select value={billingForm.billing_location_id} onValueChange={handleBillingLocationChange}>
+                                 <SelectTrigger className="w-full bg-secondary/50 border-border">
+                                   <SelectValue placeholder="Select location scope" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="all">All locations in this organization</SelectItem>
+                                   {orgLocations.filter(location => location.organization_id === selectedOrgId).map(location => (
+                                     <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                                   ))}
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Location Subscription Plan</Label>
+                               <Select value={billingForm.plan_id} onValueChange={(val) => setBillingForm(prev => ({ ...prev, plan_id: val }))}>
                                  <SelectTrigger className="w-full bg-secondary/50 border-border">
                                    <SelectValue placeholder="Select a plan" />
                                  </SelectTrigger>
@@ -1374,7 +1437,7 @@ export default function PlatformOrganizations() {
                              </div>
                            </div>
                            <div className="md:col-span-2 pt-4 border-t border-border mt-4">
-                             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-4">Enabled Modules (Overrides Plan Default)</Label>
+                             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-4">Enabled Modules (Tenant/Organization Entitlements)</Label>
                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                {ALL_MODULE_KEYS.map(key => {
                                  const mod = MODULE_DEFINITIONS[key];

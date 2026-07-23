@@ -224,14 +224,12 @@ export function getEnabledPages(enabledModules) {
  * FAIL-CLOSED (secure-by-default):
  * - Only explicitly ungated setup pages are allowed outside module mapping
  * - Core modules are always allowed
- * - Org managers bypass subscription module restrictions
  * - Operational modules require explicit inclusion
  */
 export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);
   if (!moduleInfo) return isUngatedAuthPage(pageName);
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
-  if (["org_manager", "tenant_super_admin"].includes(userRole)) return true;
   const modulesList = enabledModules || [];
   const normalizedList = modulesList.map(m => String(m).toLowerCase());
   return normalizedList.includes(moduleInfo.key.toLowerCase());

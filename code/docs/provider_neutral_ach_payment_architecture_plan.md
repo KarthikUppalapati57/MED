@@ -57,7 +57,9 @@ flowchart TD
 
     UI --> API["Generic Payment & Banking APIs"]
 
-    API --> VAULT["Restops Bank Vault<br/>source of truth"]
+    API --> ROUTER["Bank Data Router<br/>server-side only"]
+
+    ROUTER --> VAULT["Restops Bank Vault<br/>source of truth"]
 
     VAULT --> BA["bank_accounts<br/>tenant_id<br/>organization_id<br/>brand_id<br/>location_id<br/>owner_type<br/>last4<br/>fingerprint_hash<br/>secret_id"]
 
@@ -69,10 +71,10 @@ flowchart TD
 
     API --> FEES["Fee Engine<br/>Amount + Fee = Total"]
 
-    API --> REG["Provider Registry"]
+    ROUTER --> REG["Provider Registry"]
 
-    REG --> STRIPEIN["Stripe ACH Debit<br/>money into platform"]
-    REG --> STRIPEOUT["Stripe Connect Custom<br/>vendor payouts"]
+    REG --> STRIPEIN["Stripe ACH Debit Adapter<br/>money into platform"]
+    REG --> STRIPEOUT["Stripe Connect Custom Adapter<br/>vendor payouts"]
     REG -. later .-> MOOV["Moov"]
     REG -. later .-> MT["Modern Treasury"]
     REG --> CHECKBOOK["Checkbook fallback"]
@@ -94,14 +96,16 @@ sequenceDiagram
     participant Client
     participant UI as Restops Payment Page
     participant API as create-ach-debit
+    participant Router as Bank Data Router
     participant Vault as Restops Bank Vault
     participant Stripe as Stripe ACH Direct Debit
     participant DB as Restops DB
 
     Client->>UI: Adds bank account / chooses saved bank
     UI->>API: Submit bank or selected bank_account_id
-    API->>Vault: Store/read encrypted bank details
-    API->>Stripe: Create/reuse customer + ACH payment method
+    API->>Router: Resolve provider + validate scope
+    Router->>Vault: Store/read encrypted bank details
+    Router->>Stripe: Create/reuse customer + ACH payment method
     Stripe-->>API: customer_id, payment_method_id, mandate_id
     API->>DB: Store provider references
     UI->>API: Confirm payment
@@ -139,6 +143,7 @@ sequenceDiagram
     participant Vendor
     participant UI as Vendor Onboarding Page
     participant API as vendor-banking API
+    participant Router as Bank Data Router
     participant Vault as Restops Bank Vault
     participant Stripe as Stripe Connect
     participant DB as Restops DB
@@ -146,10 +151,11 @@ sequenceDiagram
 
     Vendor->>UI: Enters bank details
     UI->>API: Submit bank details
-    API->>Vault: Store encrypted routing/account
+    API->>Router: Resolve payout provider + validate scope
+    Router->>Vault: Store encrypted routing/account
     API->>DB: Store last4, fingerprint, pending status
-    API->>Stripe: Create/reuse connected account acct_xxx
-    API->>Stripe: Attach bank as external account ba_xxx
+    Router->>Stripe: Create/reuse connected account acct_xxx
+    Router->>Stripe: Attach bank as external account ba_xxx
     Stripe-->>API: acct_xxx, ba_xxx, requirements
     API->>DB: Store provider references
     Admin->>DB: Callback verification / approval
@@ -608,3 +614,311 @@ Moov/Modern Treasury-ready provider links
 ```
 
 This keeps ACH core to the platform, lets Restops store banking details securely, supports Amount/Fee/Total debit flows, and preserves future provider switching without forcing clients or vendors to re-enter bank details.
+
+## Bank Data Routing Revision
+
+This revision answers the key operational question: if Restops stores the bank details, how are those details routed to Stripe, Moov, Modern Treasury, or another payment adapter?
+
+The answer is a server-side Bank Data Routing Layer. The frontend never chooses a provider per transaction and never receives decrypted bank details. The backend resolves the active provider from saved configuration, validates tenant/location/payment scope, decrypts the bank secret only in memory, sends it to the selected adapter only when needed, and stores only provider references after setup.
+
+```mermaid
+flowchart TD
+    UI["Restops UI"] --> API["Generic Payment API\ncollect payment / create payout / attach bank"]
+    API --> AUTH["Tenant + role + scope check\ntenant/org/brand/location/payment account"]
+    AUTH --> CFG["Resolve provider config\ncollection_provider or payout_provider"]
+    CFG --> ROUTER["Bank Data Router\nserver-side only"]
+
+    ROUTER --> META["Load bank_accounts metadata\nlast4, status, owner, secret_id"]
+    META --> CHECKS["Policy checks\nactive, verified, default, callback confirmed"]
+    CHECKS --> SECRET["Decrypt Vault secret\nrouting/account only in memory"]
+    SECRET --> NORMALIZE["Normalize provider payload\nadapter-specific shape"]
+    NORMALIZE --> ADAPTER["Selected Provider Adapter"]
+
+    ADAPTER --> STRIPE["Stripe today"]
+    ADAPTER -. future .-> MOOV["Moov later"]
+    ADAPTER -. future .-> MT["Modern Treasury later"]
+
+    ADAPTER --> LINKS["Store provider refs\nnot raw bank details"]
+    LINKS --> AUDIT["payment_provider_events\naudit log"]
+```
+
+### Routing Responsibilities
+
+```text
+1. Resolve which provider handles the action.
+2. Verify the requested bank account belongs to the correct tenant/org/brand/location/payment account scope.
+3. Verify the bank account is allowed for the action: active, verified, default if required, callback-confirmed for vendor payouts.
+4. Decrypt the bank secret only inside a trusted backend function.
+5. Pass raw routing/account details to the selected adapter only for provider setup or migration.
+6. Store returned provider references and audit events.
+```
+
+Raw bank details must not be returned to the browser, written to ordinary logs, stored in payment history rows, sent to analytics, or exposed to normal admin screens.
+
+### When Raw Bank Details Are Sent To An Adapter
+
+Raw bank details are needed only for setup/migration actions, such as:
+
+```text
+attachBankAccount
+createPaymentMethod
+createExternalAccount
+createCounterpartyAccount
+migrateBankAccountToNewProvider
+```
+
+After that, actual payments should use references:
+
+```text
+Stripe client debit: customer/payment_method/mandate refs
+Stripe vendor payout: connected account/external account refs
+Moov later: account/bank/transfer refs
+Modern Treasury later: counterparty/external account/payment order refs
+```
+
+### Internal Router-to-Adapter Payload
+
+The Bank Data Router should pass a narrow typed payload to the adapter. Adapters should not query vault tables directly.
+
+```ts
+type ProviderBankPayload = {
+  tenantId: string
+  organizationId: string
+  brandId?: string | null
+  locationId?: string | null
+  paymentAccountId?: string | null
+  bankAccountId: string
+  ownerType: 'client' | 'vendor' | 'organization' | 'location'
+  ownerId: string
+  accountHolderName: string
+  accountType: 'checking' | 'savings'
+  routingNumber: string
+  accountNumber: string
+  routingLast4: string
+  accountLast4: string
+}
+```
+
+The adapter returns provider references:
+
+```ts
+type ProviderLinkResult = {
+  providerOwnerRef: string
+  providerBankRef: string
+  providerMandateRef?: string
+  providerStatus: string
+  requirementsDue?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+}
+```
+
+Only `ProviderLinkResult` is stored in normal provider-link tables. Raw account/routing values remain in the vault.
+
+### Revised Function Boundary
+
+Add or refactor toward these generic backend functions:
+
+```text
+resolve_payment_provider_config
+prepare_bank_payload_for_provider
+attach_bank_to_active_provider
+sync_bank_provider_link
+create_provider_debit_from_bank_account
+create_provider_payout_from_bank_account
+migrate_bank_account_to_provider
+```
+
+The router is the only code path allowed to call:
+
+```text
+get_bank_account_secret_for_provider
+```
+
+### Example: Stripe Vendor Setup
+
+```text
+1. Vendor submits bank in Restops.
+2. Restops stores full bank details in Vault.
+3. Bank Data Router resolves payout_provider = stripe_connect_custom.
+4. Router decrypts bank details in memory.
+5. Router sends bank details to Stripe adapter.
+6. Stripe adapter creates/updates connected account and external bank account.
+7. Stripe returns acct_... and ba_...
+8. Restops stores acct_... and ba_... in bank_account_provider_links.
+9. Future payouts use acct_... / ba_..., not raw bank numbers.
+```
+
+### Example: Switching From Stripe To Moov Later
+
+```text
+1. Admin changes payout_provider from stripe_connect_custom to moov_ach.
+2. Migration job finds active verified bank_accounts.
+3. Router decrypts each bank secret in memory.
+4. Router sends details to Moov adapter.
+5. Moov returns new account/bank refs.
+6. Restops stores Moov refs beside the old Stripe refs.
+7. Future payouts use Moov refs.
+8. Users do not retype bank numbers, but may need to accept a new ACH authorization if required.
+```
+
+
+
+## Convenience Fee Counter Revision
+
+Add a platform-visible convenience fee counter so Restops can track how much payment-provider fee is being charged, recovered, absorbed, or deducted across client-to-platform and client-to-vendor payment flows.
+
+### Fee Counter Goals
+
+```text
+1. Show Amount + Fee + Total before every debit.
+2. Store the exact fee calculation accepted by the payer.
+3. Track total convenience fees by tenant/org/brand/location.
+4. Separate provider fees from platform markup.
+5. Show whether the fee was paid by client, vendor, or platform.
+6. Reconcile expected fees against actual Stripe/provider balance transaction fees.
+```
+
+### Payment-Level Display
+
+Every debit/payment confirmation page should show:
+
+```text
+Amount:          $120.00
+Convenience Fee:  $0.55
+Total Debit:    $120.55
+```
+
+The total debit is what comes out of the payer bank account.
+
+### Fee Counter Data Model
+
+Extend `payment_fee_events` or add a rollup source table with these fields:
+
+```text
+id
+tenant_id
+organization_id
+brand_id
+location_id
+invoice_id
+payment_id
+payer_type: client | vendor | platform
+fee_paid_by: client | vendor | platform
+provider
+provider_fee_type: ach_debit | connect_payout | bank_validation | failed_payment | dispute | other
+base_amount
+provider_fee_amount
+platform_markup_amount
+total_fee_amount
+total_debit_amount
+fee_formula
+fee_policy_id
+contract_version
+displayed_to_user_at
+accepted_by_user_at
+provider_balance_transaction_ref
+provider_reported_fee_amount
+reconciliation_status: expected | matched | mismatch | adjusted
+created_at
+```
+
+For the current default policy:
+
+```text
+fee_paid_by = client
+provider_fee_amount = Stripe calculated fee estimate
+platform_markup_amount = 0 unless configured
+total_fee_amount = provider_fee_amount + platform_markup_amount
+total_debit_amount = base_amount + total_fee_amount
+```
+
+### Fee Counter Dashboard / Query
+
+Add a dashboard counter grouped by tenant/org/brand/location/date range:
+
+```text
+Total base payments
+Total convenience fees charged
+Total provider fees estimated
+Total provider fees actually paid
+Total fees recovered from clients
+Total fees deducted from vendors
+Total fees absorbed by platform
+Net fee gain/loss
+Failed payment fees
+Dispute fees
+Bank validation fees
+```
+
+Example display:
+
+```text
+This Month
+Base payments:             $48,250.00
+Convenience fees charged:     $221.40
+Provider fees paid:           $214.10
+Fees recovered from clients:  $221.40
+Platform absorbed:              $0.00
+Net fee difference:             $7.30
+```
+
+### Fee Counter Architecture
+
+```mermaid
+flowchart TD
+    PAY["Payment Confirmation UI\nAmount + Fee + Total"] --> ACCEPT["User accepts total debit"]
+    ACCEPT --> FEE["Fee Engine\ncalculate expected fee"]
+    FEE --> EVENT["payment_fee_events\nimmutable accepted calculation"]
+    ACCEPT --> API["Create debit / payout"]
+    API --> PROVIDER["Stripe / future provider"]
+    PROVIDER --> WEBHOOK["Provider webhook / balance transaction"]
+    WEBHOOK --> ACTUAL["Actual provider fee recorded"]
+    ACTUAL --> RECON["Fee reconciliation\nexpected vs actual"]
+    EVENT --> COUNTER["Convenience Fee Counter\nrollups by tenant/org/brand/location"]
+    RECON --> COUNTER
+```
+
+### Reconciliation Rule
+
+The fee shown to the payer is an accepted business fee. The actual provider fee may differ slightly because of provider rules, failures, disputes, validation fees, or settlement timing.
+
+Track both:
+
+```text
+expected/displayed fee = what user accepted
+actual provider fee = what Stripe/provider charged Restops
+```
+
+Then compute:
+
+```text
+net_fee_difference = total_fee_amount_collected - provider_reported_fee_amount
+```
+
+### Where It Appears In The Product
+
+Add fee counters to:
+
+```text
+Payments > Setup / Provider Health
+Payments > History filters and totals
+Platform Admin > Billing / Payment Ops
+Vendor payout detail page
+Client payment receipt
+Invoice payment confirmation modal
+```
+
+### Audit Requirement
+
+For every fee collected, store proof that the payer saw and accepted it:
+
+```text
+displayed_to_user_at
+accepted_by_user_at
+accepted_by_user_id
+contract_version
+fee_formula
+base_amount
+fee_amount
+total_debit_amount
+```
