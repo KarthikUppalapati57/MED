@@ -11,18 +11,28 @@ const source = fs.readFileSync(productDetailPath, 'utf8');
 describe('product detail inventory unit workflow', () => {
   it('renders inventory units with package contents for report units', () => {
     expect(source).toContain('function buildInventoryUnitLabel(form)');
-    expect(source).toContain('function getInitialPackageReportUnit(product)');
-    expect(source).toContain("getProductUnitDefinition(reportUnit).family === 'package' ? reportUnit : 'Case'");
+    expect(source).toContain('function getInitialPackageReportUnit(product, ...packageLabels)');
+    expect(source).toContain('function inferPackageUnitFromText(...values)');
+    expect(source).toContain('function getFallbackPackageUnit()');
+    expect(source).toContain('PACKAGE_UNIT_OPTIONS[0]');
     expect(source).toContain('buildMasterUnitLabel(reportUnit, form.report_unit_quantity || 1, form.base_unit || reportUnit)');
     expect(source).toContain('buildMasterUnitLabel(packageReportUnit, sourcePackage.quantity, sourcePackage.unit)');
     expect(source).toContain('{inventoryDisplayUnit || item.current_unit || form.base_unit || \'Each\'}');
   });
 
   it('defaults add-unit counting to the package instead of the inner contents unit', () => {
-    expect(source).toContain("targetUnit: packageReportUnit || 'Case'");
+    expect(source).toContain('targetUnit: packageReportUnit || getFallbackPackageUnit()');
     expect(source).toContain("targetUnit: getProductUnitDefinition(nextForm.report_by_unit).family === 'package'");
     expect(source).not.toContain('targetUnit: current.targetUnit || parsed.unit');
     expect(source).not.toContain('targetUnit: parsed.unit,');
+    expect(source).not.toContain("|| 'Case'");
+  });
+
+  it('lets users choose the package type instead of relying on a silent case fallback', () => {
+    expect(source).toContain('<Label>Package type</Label>');
+    expect(source).toContain('setPackageReportUnit(value)');
+    expect(source).toContain('PACKAGE_UNIT_OPTIONS.map');
+    expect(source).toContain('inferPackageUnitFromText(value)');
   });
 
   it('shows package count units with their contents in the saved table and preview', () => {

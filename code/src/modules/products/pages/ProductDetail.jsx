@@ -97,6 +97,10 @@ const CATEGORY_ACCOUNTING_CODES = {
   Retail: '5300',
 };
 
+const PACKAGE_UNIT_OPTIONS = PRODUCT_UNIT_OPTIONS.filter(
+  unit => getProductUnitDefinition(unit).family === 'package'
+);
+
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
@@ -161,9 +165,29 @@ function buildInventoryUnitLabel(form) {
   return buildMasterUnitLabel(reportUnit, form.report_unit_quantity || 1, form.base_unit || reportUnit);
 }
 
-function getInitialPackageReportUnit(product) {
+function inferPackageUnitFromText(...values) {
+  const text = values.filter(Boolean).join(' ').toLowerCase();
+  if (!text) return '';
+  return PACKAGE_UNIT_OPTIONS.find(unit => {
+    const normalized = unit.toLowerCase();
+    if (new RegExp(`\\b${normalized}s?\\b`).test(text)) return true;
+    if (normalized === 'case' && /\b(cs|case)\b/.test(text)) return true;
+    if (normalized === 'box' && /\b(bx|box)\b/.test(text)) return true;
+    if (normalized === 'bag' && /\b(bg|bag)\b/.test(text)) return true;
+    if (normalized === 'pack' && /\b(pk|pack)\b/.test(text)) return true;
+    return false;
+  }) || '';
+}
+
+function getFallbackPackageUnit() {
+  return PACKAGE_UNIT_OPTIONS[0] || '';
+}
+
+function getInitialPackageReportUnit(product, ...packageLabels) {
   const reportUnit = product?.report_by_unit || '';
-  return getProductUnitDefinition(reportUnit).family === 'package' ? reportUnit : 'Case';
+  if (getProductUnitDefinition(reportUnit).family === 'package') return reportUnit;
+  return inferPackageUnitFromText(...packageLabels, product?.pack_size, product?.vendor_unit, product?.base_unit)
+    || getFallbackPackageUnit();
 }
 
 function getDefaultSourcePackage(form) {
@@ -427,8 +451,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     const sourcePackage = getDefaultSourcePackage(nextForm);
     setForm(nextForm);
     setSourcePackLabel(buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
+    const inferredPackageUnit = getInitialPackageReportUnit(product, buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
     if (getProductUnitDefinition(nextForm.report_by_unit).family === 'package') {
       setPackageReportUnit(nextForm.report_by_unit);
+    } else if (inferredPackageUnit) {
+      setPackageReportUnit(inferredPackageUnit);
     }
     setSourcePackagePrice(nextForm.report_unit_source_price || nextForm.latest_price || 0);
     setUnitDraft({
@@ -437,10 +464,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       targetQuantity: 1,
       targetUnit: getProductUnitDefinition(nextForm.report_by_unit).family === 'package'
         ? nextForm.report_by_unit
-        : packageReportUnit || 'Case',
+        : inferredPackageUnit,
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
     });
-  }, [packageReportUnit, product]);
+  }, [product]);
 
   useEffect(() => {
     setCountUnitRows((savedCountUnits || []).map(row => ({
@@ -471,6 +498,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     const packLabel = latestPack?.pack_size || latestPack?.vendor_unit;
     const parsed = parsePackageContents(packLabel);
     if (!parsed) return;
+    const inferredPackageUnit = inferPackageUnitFromText(packLabel) || packageReportUnit || getFallbackPackageUnit();
+    setPackageReportUnit(inferredPackageUnit);
     setSourcePackLabel(packLabel);
     setUnitDraft(current => ({
       ...current,
@@ -478,7 +507,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       sourceUnit: parsed.unit,
       targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
         ? current.targetUnit
-        : packageReportUnit || 'Case',
+        : inferredPackageUnit,
     }));
   }, [packageReportUnit, productLineItems]);
 
@@ -591,7 +620,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
-      targetUnit: packageReportUnit || 'Case',
+      targetUnit: packageReportUnit || getFallbackPackageUnit(),
       sourcePrice: sourcePackagePrice || form.report_unit_source_price || form.latest_price || 0,
     });
   };
@@ -941,13 +970,15 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                     const parsed = parsePackageContents(value);
                     setSourcePackLabel(value);
                     if (parsed) {
+                      const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit || getFallbackPackageUnit();
+                      setPackageReportUnit(inferredPackageUnit);
                       setUnitDraft(current => ({
                         ...current,
                         sourceQuantity: parsed.quantity,
                         sourceUnit: parsed.unit,
                         targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
                           ? current.targetUnit
-                          : packageReportUnit || 'Case',
+                          : inferredPackageUnit,
                       }));
                     }
                   }}
@@ -1014,11 +1045,13 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                             const parsed = parsePackageContents(pack);
                             setSourcePackLabel(pack);
                             if (parsed) {
+                              const inferredPackageUnit = inferPackageUnitFromText(pack) || packageReportUnit || getFallbackPackageUnit();
+                              setPackageReportUnit(inferredPackageUnit);
                               setUnitDraft(current => ({
                                  ...current,
                                  sourceQuantity: parsed.quantity,
                                  sourceUnit: parsed.unit,
-                                 targetUnit: packageReportUnit || 'Case',
+                                 targetUnit: inferredPackageUnit,
                                }));
                              }
                            }}
@@ -1219,18 +1252,40 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   const parsed = parsePackageContents(value);
                   setSourcePackLabel(value);
                   if (parsed) {
+                    const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit || getFallbackPackageUnit();
+                    setPackageReportUnit(inferredPackageUnit);
                     setUnitDraft(current => ({
                       ...current,
                       sourceQuantity: parsed.quantity,
                       sourceUnit: parsed.unit,
                       targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
                         ? current.targetUnit
-                        : packageReportUnit || 'Case',
+                        : inferredPackageUnit,
                     }));
                   }
                 }}
                 placeholder="e.g. 3 GA, 6/12 EA, Case (40 lb)"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Package type</Label>
+              <Select
+                value={packageReportUnit}
+                onValueChange={(value) => {
+                  setPackageReportUnit(value);
+                  setUnitDraft(current => ({
+                    ...current,
+                    targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
+                      ? value
+                      : current.targetUnit,
+                  }));
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PACKAGE_UNIT_OPTIONS.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Source package contains</Label>
