@@ -69,6 +69,7 @@ import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccoun
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
+import { AP_STATUS_LABELS, deriveApStatus } from '@/lib/invoiceAp';
 import { useConfirm } from '@/hooks/useConfirm';
 import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
@@ -235,6 +236,16 @@ const invoiceStatusColors = {
 const PAYMENT_ROW_HEIGHT = 72;
 const PAYMENT_TABLE_VIEWPORT_HEIGHT = 648;
 const PAYMENT_ROW_OVERSCAN = 8;
+const PAYABLE_STATUSES = new Set(['approved', 'scheduled', 'partially_paid']);
+const APPROVAL_ACTION_STATUSES = new Set(['validated', 'pending_review', 'pending_approval', 'flagged']);
+
+const isApprovedForPaymentQueue = (invoice) => (
+  PAYABLE_STATUSES.has(invoice?.status) || ['approved', 'scheduled'].includes(deriveApStatus(invoice))
+);
+
+const canApproveFromPaymentQueue = (invoice) => (
+  APPROVAL_ACTION_STATUSES.has(invoice?.status) && !isApprovedForPaymentQueue(invoice)
+);
 
 export default function Payments() {
   const navigate = useNavigate();
@@ -351,7 +362,7 @@ export default function Payments() {
       return await api.entities.Invoice.filter(filters, {
         page: pageParam,
         pageSize: 50,
-        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination',
+        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination',
         search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
         searchColumn: 'invoice_number',
         orderBy: invoiceSortBy
@@ -646,7 +657,7 @@ export default function Payments() {
   // Stats
   const { approvedUnpaid, totalDue, totalPaid, pendingPayments, overdue, overdueAmount, scheduledInvoices, scheduledAmount, partialInvoices, dueNextSevenAmount } = React.useMemo(() => {
     const openInvoices = invoices.filter(i => isPaymentQueueRouted(i) && !['paid', 'auto_pay'].includes(i.payment_status) && i.status !== 'rejected');
-    const appUnpaid = openInvoices.filter(i => ['approved', 'scheduled', 'partially_paid'].includes(i.status));
+    const appUnpaid = openInvoices.filter(isApprovedForPaymentQueue);
     const dueSum = appUnpaid.reduce((sum, i) => sum + Math.max(0, Number(i.total_amount || 0) - Number(i.paid_amount || 0)), 0);
     const paidSum = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + (p.amount || 0), 0);
     const pending = payments.filter(p => p.status === 'pending').length;
@@ -1068,12 +1079,12 @@ export default function Payments() {
                       <TableHead className="w-12">
                         <Checkbox
                           checked={
-                            filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).length > 0 &&
-                            selectedInvoiceIds.length === filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).length
+                            filteredInvoices.filter(isApprovedForPaymentQueue).length > 0 &&
+                            selectedInvoiceIds.length === filteredInvoices.filter(isApprovedForPaymentQueue).length
                           }
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedInvoiceIds(filteredInvoices.filter(i => ['approved', 'partially_paid', 'pending_review'].includes(i.status)).map(i => i.id));
+                              setSelectedInvoiceIds(filteredInvoices.filter(isApprovedForPaymentQueue).map(i => i.id));
                             } else {
                               setSelectedInvoiceIds([]);
                             }
@@ -1155,14 +1166,16 @@ export default function Payments() {
                         const isOverdue = dueDate && dueDate < new Date() && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const isDueSoon = dueDate && !isOverdue && dueDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) && !['paid', 'auto_pay'].includes(invoice.payment_status);
                         const isPayableRoute = isPaymentQueueRouted(invoice);
-                        const canPay = isPayableRoute && invoice.status === 'approved' && !['paid', 'auto_pay'].includes(invoice.payment_status);
-                        const canSchedule = isPayableRoute && ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
-                        const canRecord = isPayableRoute && ['approved', 'scheduled', 'partially_paid'].includes(invoice.status) && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const apStatus = deriveApStatus(invoice);
+                        const invoiceIsApproved = isApprovedForPaymentQueue(invoice);
+                        const canPay = isPayableRoute && invoiceIsApproved && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canSchedule = isPayableRoute && invoiceIsApproved && !['paid', 'auto_pay'].includes(invoice.payment_status);
+                        const canRecord = isPayableRoute && invoiceIsApproved && !['paid', 'auto_pay'].includes(invoice.payment_status);
 
                         return (
                           <TableRow key={invoice.id}>
                             <TableCell>
-                              {['approved', 'partially_paid', 'pending_review'].includes(invoice.status) && (
+                              {invoiceIsApproved && (
                                 <Checkbox
                                   checked={selectedInvoiceIds.includes(invoice.id)}
                                   onCheckedChange={(checked) => {
@@ -1190,8 +1203,8 @@ export default function Payments() {
                               ${invoice.total_amount?.toLocaleString()}
                             </TableCell>
                             <TableCell>
-                              <Badge className={invoiceStatusColors[invoice.status] || 'bg-secondary text-foreground'}>
-                                {invoice.status?.replace(/_/g, ' ')}
+                              <Badge className={invoiceStatusColors[apStatus] || 'bg-secondary text-foreground'}>
+                                {AP_STATUS_LABELS[apStatus] || apStatus?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -1209,7 +1222,7 @@ export default function Payments() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                {(invoice.status === 'validated' || invoice.status === 'pending_review' || invoice.status === 'flagged') && (
+                                {canApproveFromPaymentQueue(invoice) && (
                                   <>
                                     <Button
                                       size="sm"
@@ -2004,6 +2017,8 @@ export default function Payments() {
     </div>
   );
 }
+
+
 
 
 

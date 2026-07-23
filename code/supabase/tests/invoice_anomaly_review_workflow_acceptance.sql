@@ -93,6 +93,26 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'invoice_production_anomalies'
+      AND column_name = 'latest_review_decision'
+  ) THEN
+    RAISE EXCEPTION 'invoice_production_anomalies.latest_review_decision column is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'invoice_production_anomalies'
+      AND column_name = 'latest_reviewed_at'
+  ) THEN
+    RAISE EXCEPTION 'invoice_production_anomalies.latest_reviewed_at column is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
     FROM public.invoice_production_anomalies
     WHERE id = (SELECT value FROM iarw_ids WHERE key = 'invoice')
       AND anomaly_type = 'approved_status_ap_status_desync'
