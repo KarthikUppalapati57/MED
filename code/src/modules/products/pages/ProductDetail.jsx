@@ -112,6 +112,15 @@ function buildReportUnitLabel(quantity, unit) {
   return `${formatQuantity(quantity || 1)} ${trimmedUnit}`;
 }
 
+function buildCountUnitLabel({ quantity, unit, sourceQuantity, sourceUnit }) {
+  const label = buildReportUnitLabel(quantity, unit);
+  const definition = getProductUnitDefinition(unit);
+  if (definition.family !== 'package') return label;
+  const sourceAmount = Number(sourceQuantity || 0);
+  if (sourceAmount <= 0 || !sourceUnit) return label;
+  return `${label} (${formatQuantity(sourceAmount)} ${compactUnitLabel(sourceUnit)})`;
+}
+
 function compactUnitLabel(unit) {
   const normalized = String(unit || '').trim().toLowerCase();
   const labels = {
@@ -150,6 +159,11 @@ function buildMasterUnitLabel(reportUnit, quantity, contentsUnit) {
 function buildInventoryUnitLabel(form) {
   const reportUnit = form.report_by_unit || form.base_unit || 'Each';
   return buildMasterUnitLabel(reportUnit, form.report_unit_quantity || 1, form.base_unit || reportUnit);
+}
+
+function getInitialPackageReportUnit(product) {
+  const reportUnit = product?.report_by_unit || '';
+  return getProductUnitDefinition(reportUnit).family === 'package' ? reportUnit : 'Case';
 }
 
 function getDefaultSourcePackage(form) {
@@ -255,12 +269,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     sourceQuantity: 1,
     sourceUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
     targetQuantity: 1,
-    targetUnit: initialProduct?.base_unit || initialProduct?.report_by_unit || 'Each',
+    targetUnit: getInitialPackageReportUnit(initialProduct),
     sourcePrice: Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0),
   });
   const [countUnitRows, setCountUnitRows] = useState([]);
   const [sourcePackLabel, setSourcePackLabel] = useState('');
-  const [packageReportUnit, setPackageReportUnit] = useState(initialProduct?.report_by_unit || 'Case');
+  const [packageReportUnit, setPackageReportUnit] = useState(() => getInitialPackageReportUnit(initialProduct));
   const [sourcePackagePrice, setSourcePackagePrice] = useState(Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0));
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
   const backTarget = routerLocation.state?.from || `/Products/all-products${window.location.search}`;
@@ -421,10 +435,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
-      targetUnit: sourcePackage.unit,
+      targetUnit: getProductUnitDefinition(nextForm.report_by_unit).family === 'package'
+        ? nextForm.report_by_unit
+        : packageReportUnit || 'Case',
       sourcePrice: nextForm.report_unit_source_price || nextForm.latest_price || 0,
     });
-  }, [product]);
+  }, [packageReportUnit, product]);
 
   useEffect(() => {
     setCountUnitRows((savedCountUnits || []).map(row => ({
@@ -433,6 +449,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       quantity: Number(row.quantity || 1),
       unit: row.unit,
       price: Number(row.unit_price || 0),
+      sourceQuantity: Number(row.source_quantity || 1),
+      sourceUnit: row.source_unit || 'unit',
       sourceLabel: `${formatQuantity(row.source_quantity || 1)} ${row.source_unit || 'unit'}`,
       sourcePrice: Number(row.source_price || 0),
       persisted: true,
@@ -458,9 +476,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       ...current,
       sourceQuantity: parsed.quantity,
       sourceUnit: parsed.unit,
-      targetUnit: current.targetUnit || parsed.unit,
+      targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
+        ? current.targetUnit
+        : packageReportUnit || 'Case',
     }));
-  }, [productLineItems]);
+  }, [packageReportUnit, productLineItems]);
 
   const sourcePackage = useMemo(() => {
     return parsePackageContents(sourcePackLabel) || {
@@ -571,7 +591,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
-      targetUnit: sourcePackage.unit,
+      targetUnit: packageReportUnit || 'Case',
       sourcePrice: sourcePackagePrice || form.report_unit_source_price || form.latest_price || 0,
     });
   };
@@ -684,7 +704,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       toast.error(convertedUnit.reason || 'Unable to calculate this unit conversion');
       return;
     }
-    const label = buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit);
+    const label = buildCountUnitLabel({
+      quantity: unitDraft.targetQuantity,
+      unit: unitDraft.targetUnit,
+      sourceQuantity: unitDraft.sourceQuantity,
+      sourceUnit: unitDraft.sourceUnit,
+    });
     const nextRow = {
       id: `draft-unit:${Date.now()}`,
       name: label,
@@ -920,7 +945,9 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                         ...current,
                         sourceQuantity: parsed.quantity,
                         sourceUnit: parsed.unit,
-                        targetUnit: current.targetUnit || parsed.unit,
+                        targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
+                          ? current.targetUnit
+                          : packageReportUnit || 'Case',
                       }));
                     }
                   }}
@@ -988,13 +1015,13 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                             setSourcePackLabel(pack);
                             if (parsed) {
                               setUnitDraft(current => ({
-                                ...current,
-                                sourceQuantity: parsed.quantity,
-                                sourceUnit: parsed.unit,
-                                targetUnit: parsed.unit,
-                              }));
-                            }
-                          }}
+                                 ...current,
+                                 sourceQuantity: parsed.quantity,
+                                 sourceUnit: parsed.unit,
+                                 targetUnit: packageReportUnit || 'Case',
+                               }));
+                             }
+                           }}
                         >
                           Use pack
                         </Button>
@@ -1056,7 +1083,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                     {countUnitRows.map(row => (
                       <TableRow key={row.id}>
                         <TableCell>{row.name}</TableCell>
-                        <TableCell>{formatQuantity(row.quantity)} {row.unit}</TableCell>
+                        <TableCell>{buildCountUnitLabel(row)}</TableCell>
                         <TableCell className="text-right">{money(row.price)}</TableCell>
                         <TableCell>No</TableCell>
                         <TableCell className="space-x-2">
@@ -1196,7 +1223,9 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                       ...current,
                       sourceQuantity: parsed.quantity,
                       sourceUnit: parsed.unit,
-                      targetUnit: current.targetUnit || parsed.unit,
+                      targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
+                        ? current.targetUnit
+                        : packageReportUnit || 'Case',
                     }));
                   }
                 }}
@@ -1249,7 +1278,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 {convertedUnit.canConvert
-                  ? `Added count unit: ${buildReportUnitLabel(unitDraft.targetQuantity, unitDraft.targetUnit)}. Master report unit remains ${form.report_by_unit || form.base_unit || 'Each'}.`
+                  ? `Added count unit: ${buildCountUnitLabel({
+                      quantity: unitDraft.targetQuantity,
+                      unit: unitDraft.targetUnit,
+                      sourceQuantity: unitDraft.sourceQuantity,
+                      sourceUnit: unitDraft.sourceUnit,
+                    })}. Master report unit remains ${form.report_by_unit || form.base_unit || 'Each'}.`
                   : convertedUnit.reason}
               </p>
             </div>
