@@ -147,6 +147,11 @@ function buildMasterUnitLabel(reportUnit, quantity, contentsUnit) {
   return `${masterUnit} (${formatQuantity(amount)} ${compactUnitLabel(innerUnit)})`;
 }
 
+function buildInventoryUnitLabel(form) {
+  const reportUnit = form.report_by_unit || form.base_unit || 'Each';
+  return buildMasterUnitLabel(reportUnit, form.report_unit_quantity || 1, form.base_unit || reportUnit);
+}
+
 function getDefaultSourcePackage(form) {
   const quantity = Number(form.report_unit_quantity || 0);
   const sourcePrice = Number(form.report_unit_source_price || 0);
@@ -553,6 +558,23 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     targetUnit: unitDraft.targetUnit,
   }), [unitDraft.sourcePrice, unitDraft.sourceQuantity, unitDraft.sourceUnit, unitDraft.targetQuantity, unitDraft.targetUnit]);
   const convertedPrice = convertedUnit.price;
+  const inventorySyncUnit = sourcePackage.quantity > 1 && packageReportUnit
+    ? packageReportUnit
+    : form.report_by_unit || form.base_unit || 'Each';
+  const inventoryDisplayUnit = sourcePackage.quantity > 1 && packageReportUnit
+    ? buildMasterUnitLabel(packageReportUnit, sourcePackage.quantity, sourcePackage.unit)
+    : buildInventoryUnitLabel(form);
+
+  const resetUnitDraft = () => {
+    setSourcePackLabel(buildSourcePackageLabel(sourcePackage.quantity, sourcePackage.unit));
+    setUnitDraft({
+      sourceQuantity: sourcePackage.quantity,
+      sourceUnit: sourcePackage.unit,
+      targetQuantity: 1,
+      targetUnit: sourcePackage.unit,
+      sourcePrice: sourcePackagePrice || form.report_unit_source_price || form.latest_price || 0,
+    });
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -570,8 +592,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             internal_product_id: productId,
             category: form.category,
             accounting_category: form.accounting_category,
-            current_unit: form.base_unit || form.report_by_unit || 'Each',
-            report_by: form.report_by_unit || form.base_unit || 'Each',
+            current_unit: inventorySyncUnit,
+            report_by: inventorySyncUnit,
             unit_cost: form.latest_price,
             current_value: quantity * Number(form.latest_price || 0),
           });
@@ -624,8 +646,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['product-detail-inventory', product?.id, product?.product_id] });
       queryClient.invalidateQueries({ queryKey: ['count-sheet-draft-count-units'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
       toast.success('Count unit saved');
       setUnitDialogOpen(false);
     },
@@ -636,8 +661,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     mutationFn: (row) => api.products.removeCountUnit(row.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product-detail-count-units', product?.id] });
+      queryClient.invalidateQueries({ queryKey: ['product-detail-inventory', product?.id, product?.product_id] });
       queryClient.invalidateQueries({ queryKey: ['count-sheet-draft-count-units'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
       toast.success('Count unit removed');
     },
     onError: (error) => toast.error(error?.message || 'Unable to remove count unit'),
@@ -1015,7 +1043,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                     {productInventoryItems.map(item => (
                   <TableRow key={item.id}>
                     <TableCell>{item.product_name || form.name}</TableCell>
-                    <TableCell>{formatQuantity(item.current_quantity || 1)} {item.current_unit || form.base_unit || 'Each'}</TableCell>
+                    <TableCell>{formatQuantity(item.current_quantity || 1)} {inventoryDisplayUnit || item.current_unit || form.base_unit || 'Each'}</TableCell>
                     <TableCell className="text-right">{money(item.unit_cost ?? form.latest_price)}</TableCell>
                     <TableCell>{item.restricted ? 'Yes' : 'No'}</TableCell>
                     <TableCell>
@@ -1130,7 +1158,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
+      <Dialog open={unitDialogOpen} onOpenChange={(open) => {
+        setUnitDialogOpen(open);
+        resetUnitDraft();
+      }}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Add an inventory count unit</DialogTitle>
