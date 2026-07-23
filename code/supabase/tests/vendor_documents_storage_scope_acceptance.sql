@@ -95,14 +95,19 @@ BEGIN
     RAISE EXCEPTION 'org A manager bucket listing expected exactly 1 visible object, got %', v_count;
   END IF;
 
-  -- Admin-upload INSERT for org A's own vendor succeeds (path-derived scope, no vendor_documents row yet).
+  -- Admin-upload INSERT for org A's own vendor succeeds (path-derived scope, no vendor_documents
+  -- row yet -- and per the read policy above, no matching row also means not SELECT-visible yet
+  -- to org A's own manager, so verify via postgres instead of re-querying as authenticated).
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('vendor_documents', 'admin_uploads/' || v_vendor_a::text || '/1_new.pdf', v_manager_a, '{}'::jsonb);
 
+  RESET ROLE;
   SELECT count(*) INTO v_count FROM storage.objects WHERE name = 'admin_uploads/' || v_vendor_a::text || '/1_new.pdf';
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'org A manager admin-upload insert for own vendor was expected to succeed';
   END IF;
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_manager_a::text, 'role', 'authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
 
   -- Admin-upload INSERT for org B's vendor is blocked.
   BEGIN

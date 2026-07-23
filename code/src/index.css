@@ -434,3 +434,49 @@
       grid-template-columns: minmax(0, 1fr);
     }
   }
+
+  .dashboard-hero-title {
+    color: #ffffff;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.38);
+  }
+
+  .dashboard-hero-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.34);
+  }
+
+  .dashboard-hero-badge {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    font-weight: 700;
+  }
+
+  .dashboard-hero-badge-neutral {
+    background: rgba(15, 23, 42, 0.72);
+  }
+
+  .dashboard-hero-badge-live {
+    background: rgba(14, 116, 58, 0.72);
+    color: #dcfce7;
+  }
+
+  .dashboard-hero-primary-action {
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .dashboard-hero-primary-action:hover {
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
+  }
+
+  .dashboard-hero-secondary-action {
+    border-color: rgba(255, 255, 255, 0.36);
+    background: rgba(15, 23, 42, 0.42);
+    color: #ffffff;
+  }
+
+  .dashboard-hero-secondary-action:hover {
+    background: rgba(15, 23, 42, 0.62);
+    color: #ffffff;
+  }

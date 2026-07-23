@@ -1636,15 +1636,15 @@ function VisualCockpitHero({ title, subtitle, scopeLabel, canAccessPage = () => 
       <div className="dashboard-visual-hero-grid dashboard-visual-hero-grid-simple">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            {scopeLabel && <Badge className="bg-white/15 text-white hover:bg-white/20">{scopeLabel}</Badge>}
-            <Badge className="bg-resend-green/15 text-resend-green hover:bg-resend-green/20">Live operations</Badge>
+            {scopeLabel && <Badge className="dashboard-hero-badge dashboard-hero-badge-neutral">{scopeLabel}</Badge>}
+            <Badge className="dashboard-hero-badge dashboard-hero-badge-live">Live operations</Badge>
           </div>
-          <h1 className="mt-4 text-3xl font-bold tracking-tight text-white md:text-5xl">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72 md:text-base">{subtitle}</p>
+          <h1 className="dashboard-hero-title mt-4 text-3xl font-bold tracking-tight md:text-5xl">{title}</h1>
+          <p className="dashboard-hero-subtitle mt-3 max-w-2xl text-sm leading-6 md:text-base">{subtitle}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             {canAccessPage('Performance') && (
               <Link to={createPageUrl('Performance')}>
-                <Button className="gap-2 bg-white text-slate-950 hover:bg-white/90">
+                <Button className="dashboard-hero-primary-action gap-2">
                   <BarChart3 className="h-4 w-4" />
                   Performance
                 </Button>
@@ -1652,7 +1652,7 @@ function VisualCockpitHero({ title, subtitle, scopeLabel, canAccessPage = () => 
             )}
             {canAccessPage('DashboardReports') && (
               <Link to={createPageUrl('DashboardReports')}>
-                <Button variant="outline" className="gap-2 border-white/25 bg-white/10 text-white hover:bg-white/16 hover:text-white">
+                <Button variant="outline" className="dashboard-hero-secondary-action gap-2">
                   <FileText className="h-4 w-4" />
                   Reports
                 </Button>
@@ -3221,6 +3221,7 @@ export default function Dashboard() {
   }
   return <GroundStaffDashboard />;
 }
+
 
 
 
