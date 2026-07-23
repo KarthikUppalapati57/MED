@@ -822,7 +822,7 @@ export default function Invoices() {
     }
   };
 
-  const finalizeApprovedInvoiceWorkflow = async (invoice) => {
+  const syncApprovedInvoiceProducts = async (invoice) => {
     const { error: productSyncError } = await api.client.rpc('sync_invoice_products', {
       p_invoice_id: invoice.id,
       p_user_id: userProfile?.id || null,
@@ -830,6 +830,13 @@ export default function Invoices() {
     if (productSyncError) throw productSyncError;
     queryClient.invalidateQueries({ queryKey: ['products'] });
     queryClient.invalidateQueries({ queryKey: ['price_variances'] });
+  };
+
+  const finalizeApprovedInvoiceWorkflow = async (invoice, { skipProductSync = false } = {}) => {
+    if (!skipProductSync) {
+      await syncApprovedInvoiceProducts(invoice);
+    }
+
     const { ensureLedgerBill, recordPaymentLedger } = await import('@/lib/workflowService');
     const apRoutingDestination = await resolveInvoiceApRouting(invoice);
     const routingUpdate = {
@@ -986,7 +993,10 @@ export default function Invoices() {
       // If the intent is to approve, evaluate policies first
       let finalStatus = savedInvoice.status;
       let policyResult = null;
+      let productsSyncedBeforeApproval = false;
       if (finalStatus === 'pending_approval') {
+        await syncApprovedInvoiceProducts(savedInvoice);
+        productsSyncedBeforeApproval = true;
         const res = await api.client.rpc('evaluate_invoice_approval_policy', { p_invoice_id: savedInvoice.id });
         if (!res.error && res.data) {
           policyResult = res.data;
@@ -1002,7 +1012,9 @@ export default function Invoices() {
       }
 
       if (finalStatus === 'approved') {
-        const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice);
+        const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice, {
+          skipProductSync: productsSyncedBeforeApproval,
+        });
         posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
         toast.success(
           approvalResult.redirectedToPayments
@@ -1053,6 +1065,7 @@ export default function Invoices() {
       if (!(await runApprovalGate(invoiceForApproval))) return;
       const { line_items: _approvalLineItems, ...approvalInvoiceData } = invoiceForApproval;
 
+      await syncApprovedInvoiceProducts(invoiceForApproval);
       await updateMutation.mutateAsync({
         id: invoice.id, 
         data: {
@@ -1063,7 +1076,10 @@ export default function Invoices() {
           action_required_details: null,
         }
       });
-      const approvalResult = await finalizeApprovedInvoiceWorkflow({ ...invoiceForApproval, status: 'approved', ap_status: 'approved' });
+      const approvalResult = await finalizeApprovedInvoiceWorkflow(
+        { ...invoiceForApproval, status: 'approved', ap_status: 'approved' },
+        { skipProductSync: true }
+      );
       
       posthog.capture('invoice_processed', { invoiceId: invoice.id, status: 'approved' });
       toast.success(
@@ -1170,12 +1186,15 @@ export default function Invoices() {
       };
       let savedInvoice;
       if (editingInvoice.id) {
+        await syncApprovedInvoiceProducts(editingInvoice);
         savedInvoice = await updateMutation.mutateAsync({ id: editingInvoice.id, data });
       } else {
         savedInvoice = await createMutation.mutateAsync(data);
         setEditingInvoice(savedInvoice);
       }
-      const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice);
+      const approvalResult = await finalizeApprovedInvoiceWorkflow(savedInvoice, {
+        skipProductSync: !!editingInvoice.id,
+      });
       posthog.capture('invoice_processed', { invoiceId: savedInvoice.id, status: 'approved' });
       toast.success(
         approvalResult.redirectedToPayments
