@@ -6,22 +6,24 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
 const productDetailPath = path.join(root, 'src/modules/products/pages/ProductDetail.jsx');
+const inventoryPath = path.join(root, 'src/modules/inventory/pages/Inventory.jsx');
 const source = fs.readFileSync(productDetailPath, 'utf8');
+const inventorySource = fs.readFileSync(inventoryPath, 'utf8');
 
 describe('product detail inventory unit workflow', () => {
   it('renders inventory units with package contents for report units', () => {
     expect(source).toContain('function buildInventoryUnitLabel(form)');
     expect(source).toContain('function getInitialPackageReportUnit(product, ...packageLabels)');
     expect(source).toContain('function inferPackageUnitFromText(...values)');
-    expect(source).toContain('function getFallbackPackageUnit()');
-    expect(source).toContain('PACKAGE_UNIT_OPTIONS[0]');
+    expect(source).not.toContain('function getFallbackPackageUnit()');
+    expect(source).not.toContain('PACKAGE_UNIT_OPTIONS[0]');
     expect(source).toContain('buildMasterUnitLabel(reportUnit, form.report_unit_quantity || 1, form.base_unit || reportUnit)');
     expect(source).toContain('buildMasterUnitLabel(packageReportUnit, sourcePackage.quantity, sourcePackage.unit)');
     expect(source).toContain('{inventoryDisplayUnit || item.current_unit || form.base_unit || \'Each\'}');
   });
 
   it('defaults add-unit counting to the package instead of the inner contents unit', () => {
-    expect(source).toContain('targetUnit: packageReportUnit || getFallbackPackageUnit()');
+    expect(source).toContain('targetUnit: packageReportUnit,');
     expect(source).toContain("targetUnit: getProductUnitDefinition(nextForm.report_by_unit).family === 'package'");
     expect(source).not.toContain('targetUnit: current.targetUnit || parsed.unit');
     expect(source).not.toContain('targetUnit: parsed.unit,');
@@ -33,6 +35,9 @@ describe('product detail inventory unit workflow', () => {
     expect(source).toContain('setPackageReportUnit(value)');
     expect(source).toContain('PACKAGE_UNIT_OPTIONS.map');
     expect(source).toContain('inferPackageUnitFromText(value)');
+    expect(source).toContain('SelectValue placeholder="Select package type"');
+    expect(source).toContain('SelectValue placeholder="Select count unit"');
+    expect(source).toContain("toast.error('Select a count unit or package type before adding this unit')");
   });
 
   it('shows package count units with their contents in the saved table and preview', () => {
@@ -68,5 +73,12 @@ describe('product detail inventory unit workflow', () => {
     expect(source).toContain('const resetUnitDraft = () =>');
     expect(source).toContain('onOpenChange={(open) => {');
     expect(source).toContain('resetUnitDraft();');
+  });
+
+  it('shows contents-aware labels in inventory count-sheet selectors', () => {
+    expect(inventorySource).toContain('function buildCountUnitDisplayLabel(unit = {})');
+    expect(inventorySource).toContain('getProductUnitDefinition(packageUnit).family');
+    expect(inventorySource).toContain('buildCountUnitDisplayLabel(unit)');
+    expect(inventorySource).toContain('countUnitName: label');
   });
 });

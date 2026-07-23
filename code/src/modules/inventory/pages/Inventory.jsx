@@ -84,6 +84,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCOALabel } from '@/lib/accountingConfig';
+import { getProductUnitDefinition } from '@/modules/products/utils/productUnits';
 
 const LoadingDockReceiving = React.lazy(() => import('@/modules/inventory/components/LoadingDockReceiving'));
 const ActiveCountSession = React.lazy(() => import('@/modules/inventory/components/ActiveCountSession'));
@@ -92,6 +93,46 @@ const InventoryTransfers = React.lazy(() => import('@/modules/inventory/componen
 const AvTDashboard = React.lazy(() => import('@/modules/inventory/components/AvTDashboard'));
 const WASTE_CHART_COLORS = ['#ef4444', '#f97316', '#eab308', '#2563eb', '#16a34a', '#7c3aed'];
 const SUPPLY_CATEGORY_PATTERN = /(paper|packaging|container|cup|lid|straw|napkin|towel|bag|box|plate|foil|wrap|cleaning|cleaner|soap|detergent|sanitizer|bleach|sponge|scrubber|glove|apron|scraper|blade|pan|utensil|equipment|smallware|thermometer|restaurant supplies)/;
+
+function formatCountUnitQuantity(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return '0';
+  return numeric.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function compactCountUnitLabel(unit) {
+  const normalized = String(unit || '').trim().toLowerCase();
+  const labels = {
+    pound: 'lb',
+    pounds: 'lb',
+    ounce: 'oz',
+    ounces: 'oz',
+    'fluid ounce': 'fl oz',
+    'fluid ounces': 'fl oz',
+    gallon: 'gal',
+    gallons: 'gal',
+    quart: 'qt',
+    quarts: 'qt',
+    liter: 'l',
+    litre: 'l',
+    milliliter: 'ml',
+    millilitre: 'ml',
+    kilogram: 'kg',
+    gram: 'g',
+    each: 'ea',
+  };
+  return labels[normalized] || String(unit || 'unit').trim() || 'unit';
+}
+
+function buildCountUnitDisplayLabel(unit = {}) {
+  const label = unit.name || unit.unit || unit.count_unit_name || 'Count unit';
+  const packageUnit = unit.unit || unit.name || unit.count_unit_name;
+  if (getProductUnitDefinition(packageUnit).family !== 'package') return label;
+  const sourceQuantity = Number(unit.source_quantity || unit.sourceQuantity || 0);
+  const sourceUnit = unit.source_unit || unit.sourceUnit;
+  if (sourceQuantity <= 0 || !sourceUnit || /\([^)]*\)/.test(label)) return label;
+  return `${label} (${formatCountUnitQuantity(sourceQuantity)} ${compactCountUnitLabel(sourceUnit)})`;
+}
 
 function getCountSheetBucket(item) {
   if (!item) return 'Other';
@@ -1553,23 +1594,25 @@ export default function Inventory() {
 
     const savedUnits = countSheetDraftCountUnitsByProductId[item.internal_product_id] || [];
     savedUnits.forEach(unit => {
+      const label = buildCountUnitDisplayLabel(unit);
       options.push({
         value: `count-unit:${unit.id}`,
-        label: unit.name || unit.unit || 'Count unit',
+        label,
         unit: unit.unit || unit.name || 'ea',
         unitCost: Number(unit.unit_price || 0),
-        countUnitName: unit.name || unit.unit || 'Count unit',
+        countUnitName: label,
         productCountUnitId: unit.id,
       });
     });
 
     if (item.product_count_unit_id && !options.some(option => option.productCountUnitId === item.product_count_unit_id)) {
+      const label = buildCountUnitDisplayLabel(item);
       options.push({
         value: `count-unit:${item.product_count_unit_id}`,
-        label: item.count_unit_name || item.unit || 'Saved unit',
+        label,
         unit: item.unit || 'ea',
         unitCost: Number(item.unit_cost || 0),
-        countUnitName: item.count_unit_name || item.unit || 'Saved unit',
+        countUnitName: label,
         productCountUnitId: item.product_count_unit_id,
       });
     }

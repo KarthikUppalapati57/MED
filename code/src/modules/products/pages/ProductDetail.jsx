@@ -179,15 +179,10 @@ function inferPackageUnitFromText(...values) {
   }) || '';
 }
 
-function getFallbackPackageUnit() {
-  return PACKAGE_UNIT_OPTIONS[0] || '';
-}
-
 function getInitialPackageReportUnit(product, ...packageLabels) {
   const reportUnit = product?.report_by_unit || '';
   if (getProductUnitDefinition(reportUnit).family === 'package') return reportUnit;
-  return inferPackageUnitFromText(...packageLabels, product?.pack_size, product?.vendor_unit, product?.base_unit)
-    || getFallbackPackageUnit();
+  return inferPackageUnitFromText(...packageLabels, product?.pack_size, product?.vendor_unit, product?.base_unit);
 }
 
 function getDefaultSourcePackage(form) {
@@ -498,7 +493,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     const packLabel = latestPack?.pack_size || latestPack?.vendor_unit;
     const parsed = parsePackageContents(packLabel);
     if (!parsed) return;
-    const inferredPackageUnit = inferPackageUnitFromText(packLabel) || packageReportUnit || getFallbackPackageUnit();
+    const inferredPackageUnit = inferPackageUnitFromText(packLabel) || packageReportUnit;
     setPackageReportUnit(inferredPackageUnit);
     setSourcePackLabel(packLabel);
     setUnitDraft(current => ({
@@ -620,7 +615,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       sourceQuantity: sourcePackage.quantity,
       sourceUnit: sourcePackage.unit,
       targetQuantity: 1,
-      targetUnit: packageReportUnit || getFallbackPackageUnit(),
+      targetUnit: packageReportUnit,
       sourcePrice: sourcePackagePrice || form.report_unit_source_price || form.latest_price || 0,
     });
   };
@@ -729,6 +724,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   };
 
   const applyUnitDraft = () => {
+    if (!unitDraft.targetUnit) {
+      toast.error('Select a count unit or package type before adding this unit');
+      return;
+    }
     if (!convertedUnit.canConvert) {
       toast.error(convertedUnit.reason || 'Unable to calculate this unit conversion');
       return;
@@ -970,7 +969,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                     const parsed = parsePackageContents(value);
                     setSourcePackLabel(value);
                     if (parsed) {
-                      const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit || getFallbackPackageUnit();
+                      const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit;
                       setPackageReportUnit(inferredPackageUnit);
                       setUnitDraft(current => ({
                         ...current,
@@ -1045,7 +1044,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                             const parsed = parsePackageContents(pack);
                             setSourcePackLabel(pack);
                             if (parsed) {
-                              const inferredPackageUnit = inferPackageUnitFromText(pack) || packageReportUnit || getFallbackPackageUnit();
+                              const inferredPackageUnit = inferPackageUnitFromText(pack) || packageReportUnit;
                               setPackageReportUnit(inferredPackageUnit);
                               setUnitDraft(current => ({
                                  ...current,
@@ -1252,7 +1251,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   const parsed = parsePackageContents(value);
                   setSourcePackLabel(value);
                   if (parsed) {
-                    const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit || getFallbackPackageUnit();
+                    const inferredPackageUnit = inferPackageUnitFromText(value) || packageReportUnit;
                     setPackageReportUnit(inferredPackageUnit);
                     setUnitDraft(current => ({
                       ...current,
@@ -1270,18 +1269,18 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             <div className="space-y-2">
               <Label>Package type</Label>
               <Select
-                value={packageReportUnit}
+                value={packageReportUnit || undefined}
                 onValueChange={(value) => {
                   setPackageReportUnit(value);
                   setUnitDraft(current => ({
                     ...current,
-                    targetUnit: getProductUnitDefinition(current.targetUnit).family === 'package'
+                    targetUnit: !current.targetUnit || getProductUnitDefinition(current.targetUnit).family === 'package'
                       ? value
                       : current.targetUnit,
                   }));
                 }}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select package type" /></SelectTrigger>
                 <SelectContent>
                   {PACKAGE_UNIT_OPTIONS.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                 </SelectContent>
@@ -1315,8 +1314,8 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   value={unitDraft.targetQuantity}
                   onChange={(event) => setUnitDraft({ ...unitDraft, targetQuantity: Number(event.target.value || 0) })}
                 />
-                <Select value={unitDraft.targetUnit} onValueChange={(value) => setUnitDraft({ ...unitDraft, targetUnit: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={unitDraft.targetUnit || undefined} onValueChange={(value) => setUnitDraft({ ...unitDraft, targetUnit: value })}>
+                  <SelectTrigger><SelectValue placeholder="Select count unit" /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {PRODUCT_UNIT_OPTIONS.map(unit => <SelectItem key={unit} value={unit}>{unit}</SelectItem>)}
                   </SelectContent>
