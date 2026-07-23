@@ -48,7 +48,12 @@ async function invokePaymentBankAccounts(action, payload = {}) {
   return data;
 }
 
-export default function ProviderNeutralPaymentSetup() {
+export default function ProviderNeutralPaymentSetup({
+  scopeOverride = null,
+  showBankAccounts = true,
+  showProviderRouting = true,
+  feePolicyEditable = null,
+} = {}) {
   const { userProfile, organization, brand, location } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,12 +88,14 @@ export default function ProviderNeutralPaymentSetup() {
     estimate: null,
   });
 
-  const scope = useMemo(() => ({
+  const authScope = useMemo(() => ({
     tenant_id: userProfile?.tenant_id || null,
     organization_id: organization?.id || userProfile?.organization_id || null,
     brand_id: brand?.brand_id || brand?.id || userProfile?.brand_id || null,
     location_id: location?.id || userProfile?.location_id || null,
   }), [userProfile, organization, brand, location]);
+  const scope = useMemo(() => ({ ...authScope, ...(scopeOverride || {}) }), [authScope, scopeOverride]);
+  const canEditFeePolicy = feePolicyEditable ?? userProfile?.role === 'platform_admin';
 
   const load = async () => {
     setLoading(true);
@@ -160,6 +167,10 @@ export default function ProviderNeutralPaymentSetup() {
   };
 
   const saveFeePolicy = async () => {
+    if (!canEditFeePolicy) {
+      toast.error('Only platform admins can change convenience fee policy.');
+      return;
+    }
     setSaving(true);
     try {
       await invokePaymentBankAccounts('save_fee_policy', { ...scope, ...feePolicy });
@@ -258,6 +269,7 @@ export default function ProviderNeutralPaymentSetup() {
         </CardContent>
       </Card>
 
+      {showBankAccounts && (
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -345,8 +357,10 @@ export default function ProviderNeutralPaymentSetup() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {showProviderRouting && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -388,6 +402,7 @@ export default function ProviderNeutralPaymentSetup() {
             <Button onClick={saveProviderConfig} disabled={saving} className="w-full">Save Provider Routing</Button>
           </CardContent>
         </Card>
+        )}
 
         <Card className="border-0 shadow-sm">
           <CardHeader>
@@ -398,7 +413,7 @@ export default function ProviderNeutralPaymentSetup() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label>Client-to-vendor fee payer</Label>
-              <Select value={feePolicy.fee_paid_by} onValueChange={(value) => setFeePolicy((prev) => ({ ...prev, fee_paid_by: value }))}>
+              <Select value={feePolicy.fee_paid_by} disabled={!canEditFeePolicy} onValueChange={(value) => setFeePolicy((prev) => ({ ...prev, fee_paid_by: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="client">Client pays convenience fee</SelectItem>
@@ -406,8 +421,14 @@ export default function ProviderNeutralPaymentSetup() {
                 </SelectContent>
               </Select>
             </div>
-            <Input value={feePolicy.disclosure_text} onChange={(e) => setFeePolicy((prev) => ({ ...prev, disclosure_text: e.target.value }))} placeholder="Fee disclosure text" />
-            <Button onClick={saveFeePolicy} disabled={saving} className="w-full">Save Fee Policy</Button>
+            <Input value={feePolicy.disclosure_text} disabled={!canEditFeePolicy} onChange={(e) => setFeePolicy((prev) => ({ ...prev, disclosure_text: e.target.value }))} placeholder="Fee disclosure text" />
+            {canEditFeePolicy ? (
+              <Button onClick={saveFeePolicy} disabled={saving} className="w-full">Save Fee Policy</Button>
+            ) : (
+              <div className="rounded-lg border bg-secondary/40 p-3 text-xs text-muted-foreground">
+                Convenience fee policy is controlled by the platform admin. This page shows the active policy for payment transparency.
+              </div>
+            )}
 
             <div className="rounded-lg border p-3">
               <div className="grid grid-cols-3 gap-2">
@@ -445,4 +466,5 @@ export default function ProviderNeutralPaymentSetup() {
     </div>
   );
 }
+
 

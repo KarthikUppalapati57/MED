@@ -424,3 +424,13 @@
       transition: none;
     }
   }
+
+  .dashboard-visual-hero-grid-simple {
+    max-width: 980px;
+  }
+
+  @media (min-width: 1024px) {
+    .dashboard-visual-hero-grid-simple {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }

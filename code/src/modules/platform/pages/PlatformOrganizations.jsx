@@ -24,6 +24,7 @@ import posthog from '@/lib/posthog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { sendBusinessVerificationDecisionEmail } from '@/lib/emailService';
+import ProviderNeutralPaymentSetup from '@/modules/payments/components/ProviderNeutralPaymentSetup';
 
 function verificationStatusTone(status) {
   if (status === 'verified') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -1437,6 +1438,19 @@ export default function PlatformOrganizations() {
                              </div>
                            </div>
                            <div className="md:col-span-2 pt-4 border-t border-border mt-4">
+                             <ProviderNeutralPaymentSetup
+                               scopeOverride={{
+                                 tenant_id: selectedTenantId || selectedOrg?.tenant_id || null,
+                                 organization_id: selectedOrgId,
+                                 brand_id: null,
+                                 location_id: null,
+                               }}
+                               showBankAccounts={false}
+                               showProviderRouting={false}
+                               feePolicyEditable={true}
+                             />
+                           </div>
+                           <div className="md:col-span-2 pt-4 border-t border-border mt-4">
                              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-4">Enabled Modules (Tenant/Organization Entitlements)</Label>
                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                {ALL_MODULE_KEYS.map(key => {
@@ -1837,6 +1851,7 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
+
 
 
 

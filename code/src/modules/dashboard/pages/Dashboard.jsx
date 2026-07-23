@@ -1630,15 +1630,10 @@ function DataHealthBanner({ score = 80, sources = [], canAccessPage = () => true
 }
 
 
-function VisualCockpitHero({ title, subtitle, scopeLabel, metrics, dataHealthScore, canAccessPage = () => true }) {
-  const primarySales = metrics.monthSales || metrics.weekSales || metrics.today || 0;
-  const salesTrend = Number(metrics.weekVsLastWeek || 0);
-  const primeTarget = DEFAULT_DASHBOARD_RULES.primeCostPercent;
-  const healthStyle = { background: `conic-gradient(hsl(var(--primary)) ${Math.max(0, Math.min(100, dataHealthScore)) * 3.6}deg, hsl(var(--muted)) 0deg)` };
-
+function VisualCockpitHero({ title, subtitle, scopeLabel, canAccessPage = () => true }) {
   return (
     <section className="dashboard-visual-hero route-fade-in" string="progress">
-      <div className="dashboard-visual-hero-grid">
+      <div className="dashboard-visual-hero-grid dashboard-visual-hero-grid-simple">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {scopeLabel && <Badge className="bg-white/15 text-white hover:bg-white/20">{scopeLabel}</Badge>}
@@ -1665,31 +1660,10 @@ function VisualCockpitHero({ title, subtitle, scopeLabel, metrics, dataHealthSco
             )}
           </div>
         </div>
-        <div className="dashboard-metric-orbit" aria-label="Dashboard summary">
-          <div className="dashboard-metric-ring" style={healthStyle}>
-            <div>
-              <span>{dataHealthScore}%</span>
-              <small>Data health</small>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="dashboard-hero-stat">
-              <span>Sales</span>
-              <strong>{currency(primarySales)}</strong>
-              <small>{percent(salesTrend)} W/W</small>
-            </div>
-            <div className="dashboard-hero-stat">
-              <span>Prime Cost</span>
-              <strong>{plainPercent(metrics.primeCostPercent)}</strong>
-              <small>Target {plainPercent(primeTarget)}</small>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
 }
-
 function VisualSignalGrid({ metrics, rules = DEFAULT_DASHBOARD_RULES, canAccessPage = () => true }) {
   const signals = [
     {
@@ -3026,8 +3000,6 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
         title={title}
         subtitle={subtitle}
         scopeLabel={scopeLabel}
-        metrics={metrics}
-        dataHealthScore={dataHealthScore}
         canAccessPage={canAccessPage}
       />
       <VisualSignalGrid metrics={metrics} rules={dashboardRules.rules} canAccessPage={canAccessPage} />
@@ -3249,6 +3221,7 @@ export default function Dashboard() {
   }
   return <GroundStaffDashboard />;
 }
+
 
 
 
