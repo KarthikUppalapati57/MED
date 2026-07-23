@@ -12,7 +12,7 @@ function ChartFallback() {
   );
 }
 
-export function SalesForecastWidget({ salesData }) {
+export function SalesForecastWidget({ salesData, isLoading = false }) {
   // Moving-average forecast generation based on historical sales variance
   const { forecastData, weekProjection, monthProjection, volatility, confidence } = useMemo(() => {
     if (!salesData || salesData.length === 0) {
@@ -92,6 +92,14 @@ export function SalesForecastWidget({ salesData }) {
     };
 
   }, [salesData]);
+
+  if (isLoading) {
+    return (
+      <div className="h-full min-h-[240px] w-full flex items-center justify-center text-sm text-muted-foreground">
+        Loading sales data...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

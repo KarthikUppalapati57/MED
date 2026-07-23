@@ -1,10 +1,14 @@
 import { notConfiguredAdapter } from './notConfigured.ts'
+import { stripeAchDebitAdapter } from './stripeAchDebit.ts'
+import { stripeConnectCustomPayoutAdapter } from './stripeConnectCustom.ts'
 import type { PaymentProviderAdapter, ProviderUse } from './types.ts'
 
 const ADAPTERS: Record<string, PaymentProviderAdapter> = {
   'not_configured:collection': notConfiguredAdapter('collection'),
   'not_configured:payout': notConfiguredAdapter('payout'),
   'not_configured:check': notConfiguredAdapter('check'),
+  'stripe_ach_debit:collection': stripeAchDebitAdapter,
+  'stripe_connect_custom:payout': stripeConnectCustomPayoutAdapter,
 }
 
 export function getPaymentProviderAdapter(provider: string | null | undefined, providerUse: ProviderUse) {
@@ -19,3 +23,4 @@ export function getPaymentProviderAdapter(provider: string | null | undefined, p
 export function installedPaymentProviderAdapters() {
   return Object.keys(ADAPTERS).sort()
 }
+

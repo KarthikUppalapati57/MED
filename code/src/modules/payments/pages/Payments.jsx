@@ -66,10 +66,11 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayModal';
 import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
+import ProviderNeutralPaymentSetup from '@/modules/payments/components/ProviderNeutralPaymentSetup';
 import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
-import { AP_STATUS_LABELS, deriveApStatus } from '@/lib/invoiceAp';
+import { AP_STATUS_LABELS, deriveApStatus, isInvoicePaymentReady } from '@/lib/invoiceAp';
 import { useConfirm } from '@/hooks/useConfirm';
 import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
@@ -236,12 +237,9 @@ const invoiceStatusColors = {
 const PAYMENT_ROW_HEIGHT = 72;
 const PAYMENT_TABLE_VIEWPORT_HEIGHT = 648;
 const PAYMENT_ROW_OVERSCAN = 8;
-const PAYABLE_STATUSES = new Set(['approved', 'scheduled', 'partially_paid']);
 const APPROVAL_ACTION_STATUSES = new Set(['validated', 'pending_review', 'pending_approval', 'flagged']);
 
-const isApprovedForPaymentQueue = (invoice) => (
-  PAYABLE_STATUSES.has(invoice?.status) || ['approved', 'scheduled'].includes(deriveApStatus(invoice))
-);
+const isApprovedForPaymentQueue = isInvoicePaymentReady;
 
 const canApproveFromPaymentQueue = (invoice) => (
   APPROVAL_ACTION_STATUSES.has(invoice?.status) && !isApprovedForPaymentQueue(invoice)
@@ -1625,6 +1623,10 @@ export default function Payments() {
             )}
 
             <div className="lg:col-span-2">
+              <ProviderNeutralPaymentSetup />
+            </div>
+
+            <div className="lg:col-span-2">
               <PaymentAccountsSettings />
             </div>
 
@@ -2017,6 +2019,7 @@ export default function Payments() {
     </div>
   );
 }
+
 
 
 

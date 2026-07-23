@@ -38,6 +38,23 @@ export function deriveApStatus(invoice) {
   return invoice?.ap_status || 'processing';
 }
 
+export function isInvoicePaymentReady(invoice) {
+  const status = invoice?.status || '';
+  const apStatus = invoice?.ap_status || deriveApStatus(invoice);
+  const paymentStatus = invoice?.payment_status || 'unpaid';
+  const paidAmount = Number(invoice?.paid_amount || 0);
+  const totalAmount = Number(invoice?.total_amount || 0);
+
+  return status !== 'rejected'
+    && apStatus !== 'rejected'
+    && !['paid', 'auto_pay'].includes(paymentStatus)
+    && paidAmount < totalAmount
+    && (
+      ['approved', 'scheduled', 'partially_paid'].includes(status)
+      || ['approved', 'scheduled'].includes(apStatus)
+      || paymentStatus === 'partial'
+    );
+}
 export function deriveActionReason(invoice) {
   if (deriveApStatus(invoice) !== 'action_required') return null;
   if (invoice?.action_required_reason) return invoice.action_required_reason;

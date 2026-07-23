@@ -18,6 +18,12 @@ export const MODULE_DEFINITIONS = {
     minRole: "ground_staff",
     icon: "LayoutDashboard",
   },
+  dashboard_reports: {
+    label: "Dashboard Reports",
+    pages: ["DashboardReports"],
+    minRole: "location_manager",
+    icon: "FileBarChart",
+  },
   performance: {
     label: "Performance",
     pages: ["Performance"],

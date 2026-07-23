@@ -1,15 +1,17 @@
 ﻿import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PieChart, PieChartIcon, BarChart3, LineChart, FileText, Download, Play, Save } from "lucide-react";
+import { PieChartIcon, BarChart3, FileText, Download, Play, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { exportToCSV } from '@/lib/exportUtils';
+import { format } from 'date-fns';
 
 const METRICS = [
   { id: 'sales_revenue', label: 'Sales Revenue', category: 'Financials' },
@@ -55,14 +57,14 @@ export default function CustomReports() {
     );
   };
 
-  const handleRunReport = async () => {
-    if (selectedMetrics.length === 0) return toast.error("Please select at least one metric.");
+  const handleRunReport = async (metrics = selectedMetrics, dimension = selectedDimension) => {
+    if (metrics.length === 0) return toast.error("Please select at least one metric.");
 
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.rpc('run_custom_report', {
-        p_metrics: selectedMetrics,
-        p_dimension: selectedDimension,
+        p_metrics: metrics,
+        p_dimension: dimension,
       });
 
       if (error) throw error;
@@ -74,6 +76,29 @@ export default function CustomReports() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleLoadReport = (report) => {
+    const metrics = report.query_config?.metrics || [];
+    const dimension = report.query_config?.dimension || 'date';
+    setReportName(report.name);
+    setSelectedMetrics(metrics);
+    setSelectedDimension(dimension);
+    setReportData(null);
+    handleRunReport(metrics, dimension);
+  };
+
+  const handleExportReport = () => {
+    if (!reportData || reportData.length === 0) return toast.error("No data to export");
+    const dimensionLabel = DIMENSIONS.find(d => d.id === selectedDimension)?.label || selectedDimension;
+    const exportRows = reportData.map((row) => {
+      const flat = { [dimensionLabel]: row.dimension };
+      selectedMetrics.forEach((mId) => {
+        flat[METRICS.find(m => m.id === mId)?.label || mId] = row[mId];
+      });
+      return flat;
+    });
+    exportToCSV(exportRows, `${reportName || 'custom-report'}-${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
   const handleSaveReport = async () => {
@@ -162,7 +187,11 @@ export default function CustomReports() {
             <CardContent>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {savedReports.map(report => (
-                  <div key={report.id} className="flex items-center gap-2 text-sm p-2 hover:bg-secondary rounded-lg cursor-pointer">
+                  <div
+                    key={report.id}
+                    onClick={() => handleLoadReport(report)}
+                    className="flex items-center gap-2 text-sm p-2 hover:bg-secondary rounded-lg cursor-pointer"
+                  >
                     <FileText className="w-4 h-4 text-muted-foreground" />
                     <span className="truncate">{report.name}</span>
                   </div>
@@ -188,10 +217,10 @@ export default function CustomReports() {
                 <Button variant="outline" size="sm" onClick={handleSaveReport}>
                   <Save className="w-4 h-4 mr-2" /> Save
                 </Button>
-                <Button variant="outline" size="sm" disabled={!reportData}>
+                <Button variant="outline" size="sm" disabled={!reportData || reportData.length === 0} onClick={handleExportReport}>
                   <Download className="w-4 h-4 mr-2" /> Export
                 </Button>
-                <Button size="sm" onClick={handleRunReport} disabled={isGenerating} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button size="sm" onClick={() => handleRunReport()} disabled={isGenerating} className="bg-blue-600 hover:bg-blue-700 text-white">
                   {isGenerating ? <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
                   Run Query
                 </Button>

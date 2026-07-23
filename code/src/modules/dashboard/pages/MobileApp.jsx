@@ -1,34 +1,91 @@
-﻿import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
+import { createPageUrl } from '@/utils';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { toast } from 'sonner';
-import { 
-  Camera, 
-  CheckCircle2, 
-  ListTodo, 
-  ClipboardList, 
-  Home, 
-  UploadCloud, 
-  Search,
-  ChevronRight
+import {
+  Camera,
+  CheckCircle2,
+  ListTodo,
+  ClipboardList,
+  Home,
+  UploadCloud,
+  ChevronRight,
+  PackageSearch,
 } from 'lucide-react';
 
 export default function MobileApp() {
-  const { organization } = useAuth();
+  const { organization, brand, location, userProfile } = useAuth();
+  const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+
+  const activeBrandId = brand?.brand_id || brand?.id || location?.brand_id || userProfile?.brand_id || null;
+  const activeLocationId = location?.id || userProfile?.location_id || null;
 
   const { data: inventoryItems = [] } = useAuthQuery({
-    queryKey: ['mobile-count-inventory', organization?.id],
-    queryFn: () => api.entities.Inventory.list(),
+    queryKey: ['mobile-count-inventory', organization?.id, activeLocationId],
+    queryFn: () => api.entities.Inventory.list(null, {
+      limit: 10,
+      select: 'id, organization_id, brand_id, location_id, product_name, name, current_quantity, current_unit, unit',
+    }),
     enabled: !!organization?.id,
   });
 
-  // Home View
+  const { data: pendingInvoices = [] } = useAuthQuery({
+    queryKey: ['mobile-approvals', organization?.id, activeLocationId],
+    queryFn: async () => {
+      const data = await api.entities.Invoice.list('-created_at', {
+        limit: 20,
+        select: 'id, organization_id, brand_id, location_id, invoice_number, vendor_name, total_amount, status, invoice_date, created_at',
+      });
+      return data.filter(inv => inv.status === 'pending_review' || inv.status === 'needs_review');
+    },
+    enabled: !!organization?.id,
+  });
+
+  const openPage = (pageName) => navigate(createPageUrl(pageName));
+
+  const handleCreateInvoiceDraft = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!organization?.id) {
+      toast.error('Organization context is required before creating an invoice draft.');
+      return;
+    }
+
+    setIsCreatingInvoice(true);
+    try {
+      await api.entities.Invoice.create({
+        organization_id: organization.id,
+        brand_id: activeBrandId,
+        location_id: activeLocationId,
+        vendor_name: file.name.replace(/\.[^.]+$/, '') || 'Mobile invoice draft',
+        invoice_number: `MOBILE-${Date.now()}`,
+        invoice_date: new Date().toISOString().slice(0, 10),
+        total_amount: 0,
+        status: 'pending_review',
+        payment_status: 'unpaid',
+        source: 'mobile_app',
+        line_items: [],
+        validation_notes: `Created from mobile capture file: ${file.name}`,
+      });
+      toast.success('Invoice draft created. Complete extraction and review in Invoices.');
+      openPage('Invoices');
+    } catch (error) {
+      toast.error(error.message || 'Failed to create invoice draft.');
+    } finally {
+      setIsCreatingInvoice(false);
+    }
+  };
+
   const renderHome = () => (
     <div className="space-y-6">
       <div className="bg-brand text-primary-foreground p-6 rounded-b-3xl shadow-md -mx-4 -mt-4 mb-4">
@@ -42,7 +99,7 @@ export default function MobileApp() {
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
               <Camera className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-sm">Snap Invoice</span>
+            <span className="font-semibold text-sm">Invoice Draft</span>
           </CardContent>
         </Card>
         
@@ -61,24 +118,25 @@ export default function MobileApp() {
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
               <ClipboardList className="w-6 h-6" />
             </div>
-            <span className="font-semibold text-sm">Stock Count</span>
+            <span className="font-semibold text-sm">Inventory</span>
           </CardContent>
         </Card>
       </div>
 
       <div>
-        <h3 className="font-bold mb-3">Recent Activity</h3>
+        <h3 className="font-bold mb-3">Recent Approval Work</h3>
         <div className="space-y-3">
           {pendingInvoices.slice(0, 2).map((invoice) => (
-            <div key={invoice.id} className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100">
+            <button key={invoice.id} type="button" onClick={() => openPage('Invoices')} className="w-full flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-left">
               <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
-              <div>
-                <p className="text-sm font-semibold">{invoice.vendor_name || 'Invoice'}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{invoice.vendor_name || 'Invoice'}</p>
                 <p className="text-xs text-muted-foreground">Needs approval</p>
               </div>
-            </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
           ))}
           {pendingInvoices.length === 0 && (
             <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-sm text-muted-foreground">
@@ -90,37 +148,24 @@ export default function MobileApp() {
     </div>
   );
 
-  // Snap Invoice View
   const renderSnap = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold">Snap Invoice</h2>
+        <h2 className="text-xl font-bold">Invoice Draft</h2>
       </div>
       
-      <div className="flex-1 bg-slate-900 rounded-2xl flex items-center justify-center relative overflow-hidden mb-6">
-        <div className="absolute inset-4 border-2 border-white/30 border-dashed rounded-xl"></div>
-        <Camera className="w-16 h-16 text-white/50" />
-        <p className="absolute bottom-8 text-white/70 text-sm font-medium">Align edges within frame</p>
+      <div className="flex-1 bg-slate-900 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden mb-6 p-6 text-center">
+        <div className="absolute inset-4 border-2 border-white/30 border-dashed rounded-xl" />
+        <Camera className="w-16 h-16 text-white/50 relative" />
+        <p className="relative mt-4 text-white/80 text-sm font-medium">Choose a receipt or invoice image to create a real review draft.</p>
       </div>
 
-      <Button size="lg" className="w-full rounded-full h-14 bg-brand text-lg" onClick={() => {
-        toast.success('Invoice uploaded for OCR extraction!');
-        setActiveTab('home');
-      }}>
-        <UploadCloud className="w-5 h-5 mr-2" /> Upload to RestOps
+      <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleCreateInvoiceDraft} />
+      <Button size="lg" className="w-full rounded-full h-14 bg-brand text-lg" disabled={isCreatingInvoice} onClick={() => fileInputRef.current?.click()}>
+        <UploadCloud className="w-5 h-5 mr-2" /> {isCreatingInvoice ? 'Creating Draft' : 'Create Invoice Draft'}
       </Button>
     </div>
   );
-
-  // Approve View
-  const { data: pendingInvoices = [] } = useAuthQuery({
-    queryKey: ['mobile-approvals', organization?.id],
-    queryFn: async () => {
-      const data = await api.entities.Invoice.list();
-      return data.filter(inv => inv.status === 'pending_review' || inv.status === 'needs_review');
-    },
-    enabled: !!organization?.id,
-  });
 
   const renderApprove = () => (
     <div className="flex flex-col h-full">
@@ -138,14 +183,14 @@ export default function MobileApp() {
         ) : (
           pendingInvoices.map((inv) => (
             <Card key={inv.id} className="border-0 shadow-sm">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-bold">{inv.vendor_name || 'Vendor'}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{inv.invoice_number} â€¢ {new Date(inv.invoice_date).toLocaleDateString()}</p>
-                  <p className="text-lg font-bold text-brand mt-1">${Number(inv.total_amount).toFixed(2)}</p>
+              <CardContent className="p-4 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold truncate">{inv.vendor_name || 'Vendor'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{inv.invoice_number || 'Draft'} - {inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'No date'}</p>
+                  <p className="text-lg font-bold text-brand mt-1">${Number(inv.total_amount || 0).toFixed(2)}</p>
                 </div>
-                <Button size="icon" variant="ghost" className="rounded-full bg-slate-50 text-brand">
-                  <ChevronRight className="w-5 h-5" />
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => openPage('Invoices')}>
+                  Review
                 </Button>
               </CardContent>
             </Card>
@@ -155,54 +200,43 @@ export default function MobileApp() {
     </div>
   );
 
-  // Count View
   const renderCount = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Active Count</h2>
-        <Badge className="bg-brand text-white">Walk-in Cooler</Badge>
-      </div>
-
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Search item to count..." className="pl-9 h-12 rounded-xl bg-white border-0 shadow-sm" />
+        <h2 className="text-xl font-bold">Inventory Work</h2>
+        <Badge className="bg-brand text-white">{location?.name || 'Active scope'}</Badge>
       </div>
 
       <div className="space-y-3 overflow-y-auto pb-20">
         {inventoryItems.slice(0, 10).map((item) => (
           <Card key={item.id} className="border-0 shadow-sm overflow-hidden">
-            <div className="flex">
-              <div className="flex-1 p-4">
-                <p className="font-bold">{item.product_name || item.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Expected: {Number(item.current_quantity || 0).toLocaleString()} {item.current_unit || item.unit || 'units'}</p>
+            <CardContent className="p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-bold truncate">{item.product_name || item.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">On hand: {Number(item.current_quantity || 0).toLocaleString()} {item.current_unit || item.unit || 'units'}</p>
               </div>
-              <div className="w-24 bg-brand/5 border-l border-brand/10 p-3 flex flex-col justify-center">
-                <Input 
-                  type="number" 
-                  placeholder="0.0" 
-                  className="h-10 text-center font-bold text-lg border-brand/20 focus-visible:ring-brand bg-white"
-                />
-              </div>
-            </div>
+              <PackageSearch className="w-5 h-5 text-muted-foreground" />
+            </CardContent>
           </Card>
         ))}
         {inventoryItems.length === 0 && (
           <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 text-sm text-muted-foreground">No countable inventory items found.</CardContent>
+            <CardContent className="p-4 text-sm text-muted-foreground">No inventory items found for this scope.</CardContent>
           </Card>
         )}
+        <Button className="w-full rounded-full h-12" onClick={() => openPage('Inventory')}>
+          Open Inventory Workflow
+        </Button>
       </div>
     </div>
   );
 
   return (
     <div className="max-w-md mx-auto h-[800px] border-[8px] border-slate-900 rounded-[3rem] overflow-hidden relative shadow-2xl bg-slate-50 flex flex-col">
-      {/* Mobile Status Bar Mock */}
       <div className="h-7 w-full bg-brand flex justify-center items-center shrink-0">
         <div className="w-32 h-5 bg-slate-900 rounded-b-2xl absolute top-0"></div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 hide-scrollbar">
         {activeTab === 'home' && renderHome()}
         {activeTab === 'snap' && renderSnap()}
@@ -210,34 +244,23 @@ export default function MobileApp() {
         {activeTab === 'count' && renderCount()}
       </div>
 
-      {/* Bottom Nav */}
       <div className="h-20 bg-white border-t flex justify-around items-center px-6 pb-2 shrink-0">
-        <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-brand font-bold' : 'text-muted-foreground'}`}
-        >
+        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-brand font-bold' : 'text-muted-foreground'}`}>
           <Home className="w-6 h-6" />
           <span className="text-[10px]">Home</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('approve')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'approve' ? 'text-brand font-bold' : 'text-muted-foreground'}`}
-        >
+        <button onClick={() => setActiveTab('approve')} className={`flex flex-col items-center gap-1 ${activeTab === 'approve' ? 'text-brand font-bold' : 'text-muted-foreground'}`}>
           <div className="relative">
             <ListTodo className="w-6 h-6" />
             <span className="absolute -top-1 -right-1 bg-resend-red text-white text-[8px] min-w-3.5 h-3.5 px-0.5 flex items-center justify-center rounded-full">{pendingInvoices.length}</span>
           </div>
           <span className="text-[10px]">Approve</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('count')}
-          className={`flex flex-col items-center gap-1 ${activeTab === 'count' ? 'text-brand font-bold' : 'text-muted-foreground'}`}
-        >
+        <button onClick={() => setActiveTab('count')} className={`flex flex-col items-center gap-1 ${activeTab === 'count' ? 'text-brand font-bold' : 'text-muted-foreground'}`}>
           <ClipboardList className="w-6 h-6" />
-          <span className="text-[10px]">Count</span>
+          <span className="text-[10px]">Inventory</span>
         </button>
       </div>
     </div>
   );
 }
-

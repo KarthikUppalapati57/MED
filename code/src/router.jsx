@@ -6,6 +6,7 @@ export const Layout = React.lazy(() => import('./Layout.jsx'));
 // Lazy load all pages
 const AutoOrdering = React.lazy(() => import('./modules/orders/pages/AutoOrdering'));
 const Dashboard = React.lazy(() => import('./modules/dashboard/pages/Dashboard'));
+const DashboardReports = React.lazy(() => import('./modules/dashboard/pages/DashboardReports'));
 const Inventory = React.lazy(() => import('./modules/inventory/pages/Inventory'));
 const Invoices = React.lazy(() => import('./modules/invoices/pages/Invoices'));
 const Payments = React.lazy(() => import('./modules/payments/pages/Payments'));
@@ -63,6 +64,7 @@ export const mainPage = "Dashboard";
 export const legacyRoutes = {
     "AutoOrdering": AutoOrdering,
     "Dashboard": Dashboard,
+    "DashboardReports": DashboardReports,
     "Inventory": Inventory,
     "Invoices": Invoices,
     "OnboardingPage": OnboardingPage,
@@ -114,6 +116,7 @@ export const legacyRoutes = {
 };
 export const canonicalRoutes = [
     { path: "dashboard", pageName: "Dashboard", Page: Dashboard },
+    { path: "dashboard-reports/:view?", pageName: "DashboardReports", Page: DashboardReports },
     { path: "performance/:view?", pageName: "Performance", Page: Performance },
     { path: "inbox", pageName: "Notifications", Page: Notifications },
     { path: "invoices/:view?", pageName: "Invoices", Page: Invoices },
@@ -161,3 +164,7 @@ export const setupRoutes = {
     OnboardingPage,
     CompleteOnboarding,
 };
+
+
+
+

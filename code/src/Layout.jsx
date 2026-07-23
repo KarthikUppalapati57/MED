@@ -39,7 +39,8 @@ import {
   BookOpen,
   RefreshCcw,
   Calculator,
-  Wine
+  Wine,
+  FileBarChart
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ import { useOfflineSync } from '@/hooks/useOfflineSync';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
+  { name: 'Dashboard Reports', href: 'DashboardReports', icon: FileBarChart, minRole: 'location_manager' },
   { name: 'Executive BI', href: 'ExecutiveBI', icon: Activity, minRole: 'org_manager' },
   { name: 'Mobile App', href: 'MobileApp', icon: Smartphone, minRole: 'ground_staff' },
   { name: 'Performance', href: 'Performance', icon: Activity, minRole: 'manager' },
@@ -719,3 +721,4 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 }
+

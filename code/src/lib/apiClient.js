@@ -1,4 +1,4 @@
-﻿import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 
 function normalizeOtpEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -24,8 +24,10 @@ const TABLE_SCOPE_COLUMNS = {
   closed_periods: ['organization_id'],
   count_sessions: ['organization_id'],
   count_sheets: ['organization_id', 'location_id'],
+  customers: ['organization_id'],
   employees: ['organization_id', 'location_id'],
   employee_shifts: ['organization_id', 'location_id'],
+  loyalty_memberships: ['organization_id'],
   gl_mappings: ['organization_id'],
   integrations: ['organization_id'],
   api_keys: ['organization_id'],
@@ -365,6 +367,8 @@ export const api = {
     WebhookEventQueue: createEntityClient('webhook_events_queue'),
     SmartPrepPlan: createEntityClient('smart_prep_plans'),
     MvDailySalesSummary: createEntityClient('mv_daily_sales_summary'),
+    Customer: createEntityClient('customers'),
+    LoyaltyMembership: createEntityClient('loyalty_memberships'),
 
   },
   financial: {
@@ -672,6 +676,34 @@ export const api = {
         p_payload: payload,
       });
       if (error) throw error;
+
+      try {
+        const purpose = payload.metadata?.purpose || 'vendor_funding';
+        await supabase.functions.invoke('payment-bank-accounts', {
+          body: {
+            action: 'create_bank_account',
+            payload: {
+              organization_id: data?.bank_account?.organization_id || payload.organization_id || null,
+              brand_id: data?.bank_account?.brand_id || payload.brand_id || null,
+              location_id: data?.bank_account?.location_id || payload.location_id || null,
+              purpose,
+              owner_type: 'organization',
+              owner_id: data?.bank_account?.organization_id || payload.organization_id || null,
+              nickname: payload.nickname,
+              bank_name: payload.bank_name,
+              account_holder_name: payload.account_holder_name,
+              account_type: payload.account_type,
+              routing_number: payload.routing_number,
+              account_number: payload.account_number,
+              default_for_owner: payload.is_default !== false,
+              source: 'complete_onboarding',
+            },
+          },
+        });
+      } catch (vaultError) {
+        console.warn('Provider-neutral bank vault mirror failed:', vaultError);
+      }
+
       return data;
     },
     setDefaultBankAccount: async (bankAccountId) => {
@@ -1734,3 +1766,4 @@ export const api = {
     }
   }
 };
+

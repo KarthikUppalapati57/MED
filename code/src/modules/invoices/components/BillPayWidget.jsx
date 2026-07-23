@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
+import { isInvoicePaymentReady } from '@/lib/invoiceAp';
 import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 // Labels only -- process-payout dispatches to the right rail off this same string, see
@@ -157,12 +158,12 @@ export function BillPayWidget({ invoice }) {
 
   if (!invoice) return null;
 
-  // Only show this widget if the invoice is approved, scheduled, partially paid, or paid
-  if (!['approved', 'scheduled', 'partially_paid', 'paid'].includes(invoice.status)) {
+  const isPaid = ['paid', 'auto_pay'].includes(invoice.payment_status) || invoice.status === 'paid';
+  const paymentReady = isInvoicePaymentReady(invoice);
+
+  if (!paymentReady && !isPaid) {
     return null;
   }
-
-  const isPaid = ['paid', 'auto_pay'].includes(invoice.payment_status) || invoice.status === 'paid';
   if (!isPaid && !isPaymentQueueRouted(invoice)) {
     return (
       <Card className="border-border shadow-sm bg-muted/30">
@@ -191,13 +192,13 @@ export function BillPayWidget({ invoice }) {
             Bill Pay & Payments
           </CardTitle>
           <div className="flex gap-2">
-            {!isFullyPaid && invoice.status === 'approved' && (
+            {!isFullyPaid && paymentReady && (
               <Button size="sm" variant="outline" onClick={() => setIsScheduling(true)}>
                 <CalendarIcon className="w-4 h-4 mr-2" />
                 Schedule
               </Button>
             )}
-            {!isFullyPaid && ['approved', 'scheduled'].includes(invoice.status) &&
+            {!isFullyPaid && paymentReady &&
              ['location_manager', 'branch_manager', 'org_manager', 'tenant_super_admin', 'platform_admin'].includes(profile?.role) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

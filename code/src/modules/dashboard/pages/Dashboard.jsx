@@ -39,7 +39,6 @@ import { toast } from 'sonner';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
 import { notifyManagers } from '@/lib/notificationService';
@@ -55,10 +54,6 @@ import BudgetProgressWidget from '@/modules/dashboard/components/BudgetProgressW
 
 const SpendPieChart = React.lazy(() => import('@/modules/dashboard/components/DashboardCharts').then((module) => ({ default: module.SpendPieChart })));
 const BenchmarkBarChart = React.lazy(() => import('@/modules/dashboard/components/DashboardCharts').then((module) => ({ default: module.BenchmarkBarChart })));
-const ExecutiveReportPanel = React.lazy(() => import('@/modules/dashboard/components/DashboardReportPanels').then((module) => ({ default: module.ExecutiveReportPanel })));
-const ScheduledReportsPanel = React.lazy(() => import('@/modules/dashboard/components/DashboardReportPanels').then((module) => ({ default: module.ScheduledReportsPanel })));
-const DashboardReportHistoryPanel = React.lazy(() => import('@/modules/dashboard/components/DashboardReportPanels').then((module) => ({ default: module.DashboardReportHistoryPanel })));
-const DashboardProductionReadinessPanel = React.lazy(() => import('@/modules/dashboard/components/DashboardReportPanels').then((module) => ({ default: module.DashboardProductionReadinessPanel })));
 
 const COLORS = ['#0d9488', '#0891b2', '#6366f1', '#f59e0b', '#ef4444', '#84cc16'];
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1112,6 +1107,29 @@ function useDashboardData(scope) {
     return scoped;
   }, [(brand?.brand_id || brand?.id), context, location?.id, scope]);
 
+  const listScopedRows = React.useCallback(async (table, { orderBy, select = '*', limit = 250, gte = {}, lte = {} } = {}) => {
+    let query = supabase
+      .from(table)
+      .select(select)
+      .eq('organization_id', organization.id);
+
+    Object.entries(gte).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.gte(key, value);
+    });
+    Object.entries(lte).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) query = query.lte(key, value);
+    });
+    if (orderBy) {
+      const ascending = !orderBy.startsWith('-');
+      query = query.order(ascending ? orderBy : orderBy.slice(1), { ascending });
+    }
+    if (limit) query = query.limit(limit);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }, [organization?.id]);
+
   const { data: dashboardSummary = null, isError: dashboardSummaryFailed } = useAuthQuery({
     queryKey: ['dashboard-summary', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope, periodStart, periodEnd],
     queryFn: async () => {
@@ -1128,6 +1146,7 @@ function useDashboardData(scope) {
     },
     enabled: dashboardSummaryEnabled,
     retry: false,
+    throwOnError: false,
     staleTime: 60 * 1000,
   });
 
@@ -1135,9 +1154,10 @@ function useDashboardData(scope) {
 
   const { data: invoices = [] } = useAuthQuery({
     queryKey: ['dashboard-invoices', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.Invoice.list('-created_at', {
+    queryFn: () => listScopedRows('invoices', {
+      orderBy: '-created_at',
       limit: 50,
-      select: 'id, organization_id, brand_id, location_id, total_amount, status, payment_status, due_date, invoice_date, created_at',
+      select: 'id, organization_id, brand_id, location_id, total_amount, status, payment_status, due_date, invoice_date, created_at, line_items',
     }),
     select: selectByScope,
     enabled: rawFallbackEnabled,
@@ -1145,7 +1165,8 @@ function useDashboardData(scope) {
 
   const { data: payments = [] } = useAuthQuery({
     queryKey: ['dashboard-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.Payment.list('-created_at', {
+    queryFn: () => listScopedRows('payments', {
+      orderBy: '-created_at',
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, amount, status, payment_date, created_at',
     }),
@@ -1155,9 +1176,9 @@ function useDashboardData(scope) {
 
   const { data: inventory = [] } = useAuthQuery({
     queryKey: ['dashboard-inventory', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.Inventory.list(null, {
+    queryFn: () => listScopedRows('inventory', {
       limit: 50,
-      select: 'id, organization_id, brand_id, location_id, current_quantity, current_value, unit_cost, product_name',
+      select: 'id, organization_id, brand_id, location_id, current_quantity, current_value, unit_cost, product_name, reorder_point',
     }),
     select: selectByScope,
     enabled: rawFallbackEnabled,
@@ -1165,7 +1186,7 @@ function useDashboardData(scope) {
 
   const { data: products = [] } = useAuthQuery({
     queryKey: ['dashboard-products', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.Product.list(null, {
+    queryFn: () => listScopedRows('products', {
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, is_inventoried',
     }),
@@ -1175,7 +1196,8 @@ function useDashboardData(scope) {
 
   const { data: salesData = [] } = useAuthQuery({
     queryKey: ['dashboard-sales', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.PosSalesData.list('-date', {
+    queryFn: () => listScopedRows('pos_sales_data', {
+      orderBy: '-date',
       limit: 50,
       select: 'id, organization_id, location_id, date, revenue',
     }),
@@ -1185,7 +1207,8 @@ function useDashboardData(scope) {
 
   const { data: shifts = [] } = useAuthQuery({
     queryKey: ['dashboard-shifts', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.EmployeeShift.list('-shift_start', {
+    queryFn: () => listScopedRows('employee_shifts', {
+      orderBy: '-shift_start',
       limit: 50,
       select: 'id, organization_id, location_id, shift_start, status, labor_cost',
     }),
@@ -1195,7 +1218,8 @@ function useDashboardData(scope) {
 
   const { data: orders = [] } = useAuthQuery({
     queryKey: ['dashboard-orders', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.AutoOrder.list('-created_at', {
+    queryFn: () => listScopedRows('auto_orders', {
+      orderBy: '-created_at',
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, status, created_at',
     }),
@@ -1205,7 +1229,8 @@ function useDashboardData(scope) {
 
   const { data: wastageLogs = [] } = useAuthQuery({
     queryKey: ['dashboard-wastage', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope],
-    queryFn: () => api.entities.WastageLog.list('-created_at', {
+    queryFn: () => listScopedRows('wastage_logs', {
+      orderBy: '-created_at',
       limit: 50,
       select: 'id, organization_id, brand_id, location_id, value, created_at',
     }),
@@ -1215,7 +1240,10 @@ function useDashboardData(scope) {
 
   const { data: budgetTargets = [] } = useAuthQuery({
     queryKey: ['dashboard-budget-targets', organization?.id, (brand?.brand_id || brand?.id), location?.id, scope, periodStart, periodEnd],
-    queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
+    queryFn: () => listScopedRows('budget_targets', {
+      select: 'id, organization_id, brand_id, location_id, category, target_amount, period_start, period_end',
+      limit: 100,
+    }),
     select: React.useCallback((data) => selectByScope(data).filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [periodEnd, periodStart, selectByScope]),
     enabled: rawFallbackEnabled,
   });
@@ -1601,6 +1629,156 @@ function DataHealthBanner({ score = 80, sources = [], canAccessPage = () => true
   );
 }
 
+
+function VisualCockpitHero({ title, subtitle, scopeLabel, metrics, dataHealthScore, canAccessPage = () => true }) {
+  const primarySales = metrics.monthSales || metrics.weekSales || metrics.today || 0;
+  const salesTrend = Number(metrics.weekVsLastWeek || 0);
+  const primeTarget = DEFAULT_DASHBOARD_RULES.primeCostPercent;
+  const healthStyle = { background: `conic-gradient(hsl(var(--primary)) ${Math.max(0, Math.min(100, dataHealthScore)) * 3.6}deg, hsl(var(--muted)) 0deg)` };
+
+  return (
+    <section className="dashboard-visual-hero route-fade-in" string="progress">
+      <div className="dashboard-visual-hero-grid">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {scopeLabel && <Badge className="bg-white/15 text-white hover:bg-white/20">{scopeLabel}</Badge>}
+            <Badge className="bg-resend-green/15 text-resend-green hover:bg-resend-green/20">Live operations</Badge>
+          </div>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-white md:text-5xl">{title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/72 md:text-base">{subtitle}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            {canAccessPage('Performance') && (
+              <Link to={createPageUrl('Performance')}>
+                <Button className="gap-2 bg-white text-slate-950 hover:bg-white/90">
+                  <BarChart3 className="h-4 w-4" />
+                  Performance
+                </Button>
+              </Link>
+            )}
+            {canAccessPage('DashboardReports') && (
+              <Link to={createPageUrl('DashboardReports')}>
+                <Button variant="outline" className="gap-2 border-white/25 bg-white/10 text-white hover:bg-white/16 hover:text-white">
+                  <FileText className="h-4 w-4" />
+                  Reports
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+        <div className="dashboard-metric-orbit" aria-label="Dashboard summary">
+          <div className="dashboard-metric-ring" style={healthStyle}>
+            <div>
+              <span>{dataHealthScore}%</span>
+              <small>Data health</small>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="dashboard-hero-stat">
+              <span>Sales</span>
+              <strong>{currency(primarySales)}</strong>
+              <small>{percent(salesTrend)} W/W</small>
+            </div>
+            <div className="dashboard-hero-stat">
+              <span>Prime Cost</span>
+              <strong>{plainPercent(metrics.primeCostPercent)}</strong>
+              <small>Target {plainPercent(primeTarget)}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VisualSignalGrid({ metrics, rules = DEFAULT_DASHBOARD_RULES, canAccessPage = () => true }) {
+  const signals = [
+    {
+      label: 'Revenue Pulse',
+      value: currency(metrics.weekSales),
+      helper: `${percent(metrics.weekVsLastWeek)} from last week`,
+      icon: TrendingUp,
+      href: 'Performance',
+      tone: 'green',
+      progress: Math.min(100, Math.abs(Number(metrics.weekVsLastWeek || 0)) + 45),
+    },
+    {
+      label: 'Cost Control',
+      value: plainPercent(metrics.primeCostPercent),
+      helper: `Prime target ${plainPercent(rules.primeCostPercent)}`,
+      icon: Target,
+      href: 'Performance',
+      tone: metrics.primeCostPercent > rules.primeCostPercent ? 'red' : 'blue',
+      progress: Math.min(100, Number(metrics.primeCostPercent || 0)),
+    },
+    {
+      label: 'AP Pressure',
+      value: currency(metrics.unpaid),
+      helper: `${metrics.pendingInvoices.length} pending invoices`,
+      icon: CreditCard,
+      href: 'Payments',
+      tone: metrics.unpaid > 0 ? 'yellow' : 'green',
+      progress: Math.min(100, metrics.pendingInvoices.length * 18),
+    },
+    {
+      label: 'Inventory Risk',
+      value: metrics.lowStock.length,
+      helper: `${currency(metrics.wastageCost)} waste logged`,
+      icon: Warehouse,
+      href: 'Inventory',
+      tone: metrics.lowStock.length ? 'orange' : 'green',
+      progress: Math.min(100, metrics.lowStock.length * 12),
+    },
+  ].filter((signal) => !signal.href || canAccessPage(pageKeyFromHref(signal.href)));
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {signals.map((signal) => (
+        <Link key={signal.label} to={createPageUrl(signal.href)} className={cn('dashboard-signal-tile hover-lift', `dashboard-signal-${signal.tone}`)} string="progress">
+          <div className="flex items-start justify-between gap-3">
+            <div className="dashboard-signal-icon"><signal.icon className="h-5 w-5" /></div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{signal.label}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{signal.value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{signal.helper}</p>
+          <Progress value={signal.progress} className="mt-4 h-1.5" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function VisualActionRail({ actions = [], canAccessPage = () => true }) {
+  const visible = actions
+    .filter((item) => !item.href || canAccessPage(pageKeyFromHref(item.href)))
+    .slice(0, 3);
+
+  return (
+    <SectionCard title="Priority Actions" description="The dashboard now shows the shortest useful action list. Full schedules, rules, and report history live in Dashboard Reports.">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {(visible.length ? visible : [{ title: 'No urgent dashboard alerts', body: 'Core workflows look clear from the data currently available.', tone: 'green' }]).map((item, index) => {
+          const body = (
+            <div className="dashboard-visual-card h-full" string="progress">
+              <div className="flex items-center justify-between gap-3">
+                <Badge className={cn({
+                  'bg-resend-red/10 text-resend-red': item.tone === 'red',
+                  'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
+                  'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
+                  'bg-resend-blue/10 text-resend-blue': item.tone === 'blue',
+                  'bg-resend-green/10 text-resend-green': item.tone === 'green',
+                })}>#{index + 1}</Badge>
+                {item.href && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+              </div>
+              <p className="mt-4 text-sm font-semibold text-foreground">{item.title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.body}</p>
+            </div>
+          );
+          return item.href ? <Link key={item.title} to={createPageUrl(item.href)}>{body}</Link> : <div key={item.title}>{body}</div>;
+        })}
+      </div>
+    </SectionCard>
+  );
+}
 function KpiStrip({ metrics, platformStats, mode = 'operator', scope = 'org', canAccessPage = () => true, rules = DEFAULT_DASHBOARD_RULES }) {
   if (mode === 'platform') {
     return (
@@ -2833,157 +3011,37 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const data = useDashboardData(scope);
   const dashboardRules = useDashboardRules({ brand, location, organization, scope, userProfile });
-  const reportPreferences = useDashboardReportPreferences({ brand, location, organization, scope, userProfile });
-  const reportDeliveries = useDashboardReportDeliveries({ brand, location, organization, scope });
   const metrics = useDashboardMetrics(data, dashboardRules.rules);
   const canAccessPage = React.useMemo(
     () => createCanAccessPage({ organization, userProfile, hasMinRole, isPlatformAdmin }),
     [hasMinRole, isPlatformAdmin, organization, userProfile]
   );
-  const canManageSettings = React.useMemo(
-    () => canManageDashboardOperations({ scope, userProfile, isPlatformAdmin }),
-    [isPlatformAdmin, scope, userProfile]
-  );
   const dataHealthScore = getDataHealthScore(metrics, data, canAccessPage);
   const dataCoverageSources = getDataCoverageSources(metrics, data, canAccessPage);
   const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage, dashboardRules.rules), [canAccessPage, dashboardRules.rules, metrics, scope]);
-  const dashboardPersistence = useDashboardPersistence({
-    actions: roleActions,
-    brand,
-    dataHealthScore,
-    location,
-    metrics,
-    organization,
-    scope,
-    userProfile,
-  });
-  const escalations = React.useMemo(() => buildEscalations({
-    actions: roleActions,
-    metrics,
-    reviews: dashboardPersistence.reviews,
-    rules: dashboardRules.rules,
-    statusMap: dashboardPersistence.statusMap,
-  }), [dashboardPersistence.reviews, dashboardPersistence.statusMap, dashboardRules.rules, metrics, roleActions]);
 
   return (
-    <div className="space-y-6">
-      <DashboardHeader title={title} subtitle={subtitle} scopeLabel={scopeLabel} />
+    <div className="dashboard-visual-page space-y-6" string="progress">
+      <VisualCockpitHero
+        title={title}
+        subtitle={subtitle}
+        scopeLabel={scopeLabel}
+        metrics={metrics}
+        dataHealthScore={dataHealthScore}
+        canAccessPage={canAccessPage}
+      />
+      <VisualSignalGrid metrics={metrics} rules={dashboardRules.rules} canAccessPage={canAccessPage} />
       <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
-      <KpiStrip metrics={metrics} scope={scope} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
-      <DecisionBriefPanel metrics={metrics} scope={scope} rules={dashboardRules.rules} />
-      <ForecastIntelligencePanel metrics={metrics} rules={dashboardRules.rules} canAccessPage={canAccessPage} />
-      <React.Suspense fallback={<DashboardPanelFallback />}>
-        <ExecutiveReportPanel
-          actions={roleActions}
-          brand={brand}
-          dataHealthScore={dataHealthScore}
-          escalations={escalations}
-          location={location}
-          metrics={metrics}
-          organization={organization}
-          rules={dashboardRules.rules}
-          scope={scope}
-          statusMap={dashboardPersistence.statusMap}
-          userProfile={userProfile}
-        />
-        <ScheduledReportsPanel
-          actions={roleActions}
-          brand={brand}
-          canManage={canManageSettings}
-          dataHealthScore={dataHealthScore}
-          escalations={escalations}
-          location={location}
-          metrics={metrics}
-          onSavePreferences={reportPreferences.savePreferences}
-          organization={organization}
-          preferences={reportPreferences.preferences}
-          rules={dashboardRules.rules}
-          scope={scope}
-          statusMap={dashboardPersistence.statusMap}
-          userProfile={userProfile}
-        />
-        <DashboardReportHistoryPanel
-          brand={brand}
-          canManage={canManageSettings}
-          deliveries={reportDeliveries.deliveries}
-          isLoading={reportDeliveries.isLoading}
-          location={location}
-          onRefresh={reportDeliveries.refreshDeliveries}
-          organization={organization}
-          preferences={reportPreferences.preferences}
-          scope={scope}
-          userProfile={userProfile}
-        />
-      </React.Suspense>
-      <CollaborationStatusPanel syncState={dashboardPersistence.syncState} />
-      <React.Suspense fallback={<DashboardPanelFallback />}>
-        <DashboardProductionReadinessPanel
-          canManageSettings={canManageSettings}
-          dataCoverageSources={dataCoverageSources}
-          dataHealthScore={dataHealthScore}
-          metrics={metrics}
-          reportDeliveries={reportDeliveries.deliveries}
-          reportPreferences={reportPreferences.preferences}
-          rules={dashboardRules.rules}
-          syncState={dashboardPersistence.syncState}
-        />
-      </React.Suspense>
-      <DashboardRulesPanel canManage={canManageSettings} rules={dashboardRules.rules} onSaveRules={dashboardRules.saveRules} />
-      <RoleActionPlanPanel
-        actions={roleActions}
-        metrics={metrics}
-        scope={scope}
-        canAccessPage={canAccessPage}
-        statusMap={dashboardPersistence.statusMap}
-        setStatusMap={dashboardPersistence.setStatusMap}
-        onActionStatusChange={dashboardPersistence.persistActionStatus}
-        onResetActions={dashboardPersistence.resetActions}
-      />
-      <EscalationPanel escalations={escalations} organization={organization} brand={brand} location={location} scope={scope} userProfile={userProfile} />
-      <HandoffBriefPanel
-        actions={roleActions}
-        metrics={metrics}
-        scope={scope}
-        statusMap={dashboardPersistence.statusMap}
-        dataHealthScore={dataHealthScore}
-        canAccessPage={canAccessPage}
-        note={dashboardPersistence.note}
-        setNote={dashboardPersistence.setNote}
-        onHandoffExport={dashboardPersistence.auditHandoffExport}
-        syncState={dashboardPersistence.syncState}
-      />
-      <ManagerReviewLogPanel
-        actions={roleActions}
-        metrics={metrics}
-        scope={scope}
-        statusMap={dashboardPersistence.statusMap}
-        dataHealthScore={dataHealthScore}
-        canAccessPage={canAccessPage}
-        reviews={dashboardPersistence.reviews}
-        onSaveReview={dashboardPersistence.saveReview}
-        onClearReviews={dashboardPersistence.clearReviews}
-        syncState={dashboardPersistence.syncState}
-      />
-      <OperatingSnapshot metrics={metrics} scope={scope} rules={dashboardRules.rules} />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-1">
-          <NeedsAttentionPanel items={metrics.recommendations} canAccessPage={canAccessPage} />
-        </div>
-        <div className="xl:col-span-2">
-          <SalesPerformanceTable metrics={metrics} />
-        </div>
-      </div>
+      <VisualActionRail actions={roleActions} canAccessPage={canAccessPage} />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <BudgetProgressWidget metrics={metrics} />
+        <BudgetProgressWidget metrics={metrics} scope={scope} location={location} />
         <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
       </div>
-      <BenchmarkPanel metrics={metrics} title={scope === 'location' ? 'Location Benchmarking' : scope === 'brand' ? 'Brand Benchmarking' : 'Organization Benchmarking'} />
       <SpendAndWorkflowGrid metrics={metrics} data={data} canAccessPage={canAccessPage} />
       <DataCoveragePanel metrics={metrics} data={data} canAccessPage={canAccessPage} />
     </div>
   );
 }
-
 function GroundStaffDashboard() {
   const { organization, location, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
@@ -3191,3 +3249,10 @@ export default function Dashboard() {
   }
   return <GroundStaffDashboard />;
 }
+
+
+
+
+
+
+

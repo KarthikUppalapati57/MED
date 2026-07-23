@@ -59,6 +59,23 @@ const LANDING_PLANS = [
     features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
   },
 ];
+const REVEAL_STEPS = [
+  {
+    label: 'Capture',
+    title: 'Every invoice, count, and vendor signal lands in one operating stream.',
+    metric: '01',
+  },
+  {
+    label: 'Verify',
+    title: 'Rules, approvals, and audit context surface before spend drifts.',
+    metric: '02',
+  },
+  {
+    label: 'Act',
+    title: 'Teams move from variance to purchase order, payment, or recipe update without rework.',
+    metric: '03',
+  },
+];
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -241,6 +258,55 @@ export default function LandingPage() {
             <StatItem value="0.8ms" label="Latency Delta" />
             <StatItem value="150+" label="Global Nodes" />
             <StatItem value="24/7" label="Uptime Metric" />
+          </div>
+        </div>
+      </section>
+      {/* Reveal-on-scroll narrative */}
+      <section className="relative z-10 overflow-hidden border-b border-black/5 dark:border-white/10 bg-[#FAF8F4]/90 dark:bg-background/80 py-28 md:py-36">
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
+          <div className="grid gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <motion.div
+              initial={{ opacity: 0, y: 36 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.45 }}
+              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:sticky lg:top-28"
+            >
+              <div className="mb-8 inline-flex items-center gap-3 border border-black/10 bg-white/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[3px] text-[#b83316] dark:border-white/10 dark:bg-white/5">
+                <Database className="h-3.5 w-3.5" />
+                Scroll Reveal
+              </div>
+              <h2 className="max-w-3xl text-4xl font-bold leading-[0.98] tracking-tighter text-black dark:text-white md:text-6xl">
+                Operations become visible as the work moves.
+              </h2>
+              <p className="mt-8 max-w-xl text-lg font-medium leading-relaxed text-black/70 dark:text-white/85 technical-tracking">
+                RestOps turns the daily flow of restaurant work into a sequenced control plane, revealing risk, approvals, and next actions exactly when teams need them.
+              </p>
+            </motion.div>
+
+            <div className="space-y-6">
+              {REVEAL_STEPS.map((step, index) => (
+                <motion.article
+                  key={step.label}
+                  initial={{ opacity: 0, y: 46, filter: 'blur(10px)' }}
+                  whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  viewport={{ once: true, amount: 0.55 }}
+                  transition={{ duration: 0.8, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
+                  className="group border border-black/10 bg-[#F2EEE8]/75 p-8 transition-all duration-500 hover:border-[#b83316]/35 hover:bg-white/70 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] md:p-10"
+                >
+                  <div className="mb-14 flex items-center justify-between gap-6">
+                    <span className="text-[11px] font-bold uppercase tracking-[4px] text-black/60 dark:text-white/75">
+                      {step.label}
+                    </span>
+                    <span className="font-mono text-sm text-[#b83316]">{step.metric}</span>
+                  </div>
+                  <h3 className="max-w-2xl text-2xl font-bold leading-tight tracking-tighter text-black dark:text-white md:text-4xl">
+                    {step.title}
+                  </h3>
+                  <div className="mt-10 h-[2px] w-12 bg-[#b83316] transition-all duration-500 group-hover:w-28" />
+                </motion.article>
+              ))}
+            </div>
           </div>
         </div>
       </section>

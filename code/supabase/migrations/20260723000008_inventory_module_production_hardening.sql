@@ -4,6 +4,8 @@ BEGIN;
 -- This migration is intentionally additive/repairing: it preserves existing
 -- tables and replaces vulnerable RPC bodies with caller-scoped versions.
 
+ALTER TABLE public.receivings ADD COLUMN IF NOT EXISTS location_id uuid;
+
 ALTER TABLE public.receiving_items
   ADD COLUMN IF NOT EXISTS unit text,
   ADD COLUMN IF NOT EXISTS unit_cost numeric,

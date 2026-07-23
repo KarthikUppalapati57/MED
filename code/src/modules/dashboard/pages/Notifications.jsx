@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Check, Trash2, ShieldAlert, Sparkles, AlertCircle, Info, Clock, CheckCircle2, Mail, Smartphone, MonitorCheck, SlidersHorizontal } from "lucide-react";
+import { Bell, Check, Trash2, ShieldAlert, Sparkles, AlertCircle, Info, Clock, CheckCircle2, MonitorCheck, SlidersHorizontal } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -33,8 +33,6 @@ const MODULE_LABEL_OVERRIDES = {
 
 const DELIVERY_CHANNELS = [
   { key: 'in_app_enabled', label: 'App', icon: MonitorCheck },
-  { key: 'email_enabled', label: 'Email', icon: Mail },
-  { key: 'phone_enabled', label: 'Phone', icon: Smartphone },
 ];
 
 const isMissingPreferenceTable = (error) => {
@@ -394,7 +392,7 @@ export default function Notifications() {
         <div className="flex flex-col gap-2 border-b border-border/50 p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Notification Settings</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Delivery channels by accessible module.</p>
+            <p className="mt-1 text-sm text-muted-foreground">In-app delivery and priority filtering by accessible module.</p>
           </div>
           {preferencesError && !isMissingPreferenceTable(preferencesError) && (
             <Badge variant="destructive">Settings unavailable</Badge>
@@ -506,3 +504,4 @@ export default function Notifications() {
     </div>
   );
 }
+

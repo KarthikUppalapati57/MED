@@ -44,19 +44,7 @@ function TabFallback() {
   );
 }
 
-const money = (value) => `$${Number(value || 0).toLocaleString(undefined, {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 0,
-})}`;
-
 const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
-
-const sameDate = (value, target) => {
-  if (!value || !target) return false;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return false;
-  return parsed.toISOString().slice(0, 10) === target;
-};
 
 export default function Performance() {
   const navigate = useNavigate();
@@ -76,10 +64,6 @@ export default function Performance() {
 
   const filterCb = React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]);
   const needsSalesData = ['overview', 'pnl', 'sales_report', 'sales_forecast', 'variance'].includes(activeTab);
-  const needsInvoices = ['overview', 'pnl'].includes(activeTab);
-  const needsShifts = ['overview', 'pnl'].includes(activeTab);
-  const needsAllocations = ['overview', 'pnl'].includes(activeTab);
-  const needsLineItems = ['overview', 'movers'].includes(activeTab);
   const needsBudgetTargets = ['overview', 'pnl', 'budget'].includes(activeTab);
 
   const results = useAuthQueries({
@@ -95,6 +79,12 @@ export default function Performance() {
         select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
           .filter((target) => target.period_start === periodStart && target.period_end === periodEnd), [organization, brand, location, periodStart, periodEnd]),
         enabled: !!organization?.id && needsBudgetTargets,
+      },
+      {
+        queryKey: ['pos_sales_data', organization?.id],
+        queryFn: () => api.entities.PosSalesData.list(),
+        select: filterCb,
+        enabled: !!organization?.id && needsSalesData,
       }
     ]
   });
@@ -107,6 +97,7 @@ export default function Performance() {
   };
 
   const budgetTargets = results[1].data || [];
+  const salesData = results[2].data || [];
 
   const budgetByCategory = useMemo(() => {
     const map = {};
@@ -131,6 +122,10 @@ export default function Performance() {
 
   // --- PRICE MOVERS ---
   const moversData = metricsData.movers_data || [];
+
+  // --- LABOR VARIANCE (actual vs target, positive = over target) ---
+  const laborTarget = Number(budgetByCategory.Labor?.target_amount || totalSales * 0.28);
+  const laborVariance = totalLaborCost - laborTarget;
 
   // --- P&L DATA ---
   const getTarget = (category, fallback) => Number(budgetByCategory[category]?.target_amount || fallback || 0);
@@ -488,7 +483,7 @@ export default function Performance() {
           <TabsContent value="sales_report" className="space-y-6 m-0">
             {activeTab === 'sales_report' && (
               <React.Suspense fallback={<TabFallback />}>
-                <SalesReportWidget salesData={salesData} />
+                <SalesReportWidget salesData={salesData} isLoading={results[2].isLoading} />
               </React.Suspense>
             )}
           </TabsContent>
@@ -496,7 +491,7 @@ export default function Performance() {
           <TabsContent value="sales_forecast" className="space-y-6 m-0">
             {activeTab === 'sales_forecast' && (
               <React.Suspense fallback={<TabFallback />}>
-                <SalesForecastWidget salesData={salesData} />
+                <SalesForecastWidget salesData={salesData} isLoading={results[2].isLoading} />
               </React.Suspense>
             )}
           </TabsContent>
@@ -526,7 +521,12 @@ export default function Performance() {
           <TabsContent value="variance" className="space-y-6 m-0">
             {activeTab === 'variance' && (
               <React.Suspense fallback={<TabFallback />}>
-                <ExplainableVarianceWidget varianceTotal={totalSales - budget} />
+                <ExplainableVarianceWidget
+                  varianceTotal={totalSales - budget}
+                  laborVariance={laborVariance}
+                  periodStart={periodStart}
+                  periodEnd={periodEnd}
+                />
               </React.Suspense>
             )}
           </TabsContent>

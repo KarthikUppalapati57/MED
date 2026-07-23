@@ -12,11 +12,13 @@ const payout = read('code/supabase/functions/process-payout/index.ts');
 const onboarding = read('code/supabase/functions/vendor-onboarding/index.ts');
 const webhook = read('code/supabase/functions/payout-webhook/index.ts');
 const fundingSource = read('code/supabase/functions/create-dwolla-funding-source/index.ts');
+const dwollaPayoutAdapter = read('code/supabase/functions/_shared/payoutProviders/dwolla.ts');
 
 for (const [name, source] of [
   ['process-payout', payout],
   ['vendor-onboarding', onboarding],
   ['payout-webhook', webhook],
+  ['_shared/payoutProviders/dwolla', dwollaPayoutAdapter],
 ]) {
   assert(!source.includes('dwolla_customer_url'), `${name} still references vendors.dwolla_customer_url`);
   assert(!source.includes('dwolla_onboarding_status'), `${name} still references vendors.dwolla_onboarding_status`);
@@ -29,18 +31,24 @@ assert(!fundingSource.includes('dwolla_onboarding_status'), 'create-dwolla-fundi
 assert(!fundingSource.includes('vendor.dwolla_customer_url'), 'create-dwolla-funding-source vendor branch still reads vendors.dwolla_customer_url');
 assert(!fundingSource.includes("'vendors').update({ dwolla_customer_url"), 'create-dwolla-funding-source vendor branch still writes vendors.dwolla_customer_url');
 
-assert(payout.includes("rpc('get_vendor_provider_link'"), 'process-payout must resolve Dwolla vendor link through get_vendor_provider_link');
-assert(payout.includes("p_provider: 'dwolla'"), 'process-payout must request the Dwolla provider link');
-assert(payout.includes('!dwollaLink?.provider_customer_ref'), 'process-payout must fail closed when destination provider ref is missing');
-assert(payout.indexOf('!dwollaLink?.provider_customer_ref') < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must guard destination before release_invoice_funds mutates state');
-assert(payout.includes("destination: { href: dwollaLink.provider_customer_ref }"), 'process-payout destination must come from provider_customer_ref');
-assert(payout.includes('source: { href: paymentAccount.dwolla_funding_source_url }'), 'process-payout source funding ref must remain on payment_accounts');
-assert(!/destination:\s*\{\s*href:\s*(invoice\.payment_account|paymentAccount)\.dwolla_funding_source_url/.test(payout), 'process-payout must not use the source ref as the destination');
+// process-payout/index.ts is a thin dispatcher (see its own top-of-file comment) -- the
+// Dwolla-specific preflight/destination-resolution logic lives in the adapter it calls into.
+assert(payout.includes('provider.preflight(ctx)'), 'process-payout must run the provider adapter preflight before mutating payment state');
+assert(payout.indexOf('provider.preflight(ctx)') < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must guard the payout before release_invoice_funds mutates state');
 
-assert(onboarding.includes("from('vendor_payment_provider_links')"), 'vendor-onboarding must write provider-link status');
-assert(onboarding.includes("provider_status: 'document_required'"), 'vendor-onboarding must set document_required on provider-link');
-assert(onboarding.includes("provider: 'dwolla'"), 'vendor-onboarding must target the Dwolla provider link');
-assert(!onboarding.includes('organization_id:') && !onboarding.includes('brand_id:') && !onboarding.includes('location_id:'), 'vendor-onboarding insert must not client-supply derived scope columns');
+assert(dwollaPayoutAdapter.includes("rpc('get_vendor_provider_link'"), 'dwolla payout adapter must resolve the vendor link through get_vendor_provider_link');
+assert(dwollaPayoutAdapter.includes("p_provider: 'dwolla'"), 'dwolla payout adapter must request the Dwolla provider link');
+assert(dwollaPayoutAdapter.includes('!dwollaLink?.provider_funding_ref'), 'dwolla payout adapter must fail closed when the vendor funding source is missing');
+// Dwolla's transfers API requires both _links.source and _links.destination to be funding-source
+// refs, not customer refs -- provider_customer_ref alone cannot receive a transfer.
+assert(dwollaPayoutAdapter.includes('destinationUrl: dwollaLink.provider_funding_ref'), 'dwolla payout adapter destination must come from provider_funding_ref, not provider_customer_ref');
+assert(dwollaPayoutAdapter.includes('sourceUrl: paymentAccount.dwolla_funding_source_url'), 'dwolla payout adapter source funding ref must remain on payment_accounts');
+assert(!/destinationUrl:\s*paymentAccount\.dwolla_funding_source_url/.test(dwollaPayoutAdapter), 'dwolla payout adapter must not use the source ref as the destination');
+
+assert(onboarding.includes('from("vendor_payment_provider_links")'), 'vendor-onboarding must write provider-link status');
+assert(onboarding.includes("provider_status: \"unverified\""), 'vendor-onboarding must set unverified on provider-link creation (matches create-dwolla-funding-source and the VO-ST-012 state model)');
+assert(onboarding.includes("provider: \"dwolla\""), 'vendor-onboarding must target the Dwolla provider link');
+assert(!onboarding.includes('organization_id:') && !onboarding.includes('brand_id:') && !onboarding.includes('location_id:'), 'vendor-onboarding insert must not client-supply derived scope columns (set_vendor_sensitive_scope trigger owns them)');
 
 assert(webhook.includes("from('vendor_payment_provider_links')"), 'payout-webhook must update provider-links');
 assert(webhook.includes("eq('provider_customer_ref', resourceUrl)"), 'payout-webhook must match by provider_customer_ref');
@@ -50,5 +58,6 @@ assert(!webhook.includes("eq('is_active'"), 'payout-webhook must not filter by i
 assert(fundingSource.includes("rpc('get_vendor_provider_link'"), 'create-dwolla-funding-source must resolve the existing vendor customer ref through get_vendor_provider_link');
 assert(fundingSource.includes("p_provider: 'dwolla'"), 'create-dwolla-funding-source must request the Dwolla provider link');
 assert(fundingSource.includes("from('vendor_payment_provider_links')"), 'create-dwolla-funding-source must write the vendor result to provider-links');
+assert(!fundingSource.includes('organization_id: vendor.organization_id'), 'create-dwolla-funding-source vendor upsert must not client-supply derived scope columns (set_vendor_sensitive_scope trigger owns them)');
 
 console.log('V1c-b edge rewire static assertions passed');

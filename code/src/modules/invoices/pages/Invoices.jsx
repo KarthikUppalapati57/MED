@@ -1063,15 +1063,14 @@ export default function Invoices() {
         throw new Error('This invoice has no saved line items. Open it, add/review line items, then approve it.');
       }
       if (!(await runApprovalGate(invoiceForApproval))) return;
-      const { line_items: _approvalLineItems, ...approvalInvoiceData } = invoiceForApproval;
-
       await syncApprovedInvoiceProducts(invoiceForApproval);
       await updateMutation.mutateAsync({
-        id: invoice.id, 
+        id: invoice.id,
         data: {
-          ...approvalInvoiceData,
           status: 'approved',
           ap_status: 'approved',
+          approved_by: userProfile?.id || null,
+          approved_date: new Date().toISOString(),
           action_required_reason: null,
           action_required_details: null,
         }
@@ -1176,11 +1175,11 @@ export default function Invoices() {
         throw new Error('Run Validate before approving this invoice.');
       }
       if (!(await runApprovalGate(editingInvoice))) return;
-      const { line_items: _editorApprovalLineItems, ...editorApprovalInvoiceData } = editingInvoice;
       const data = {
-        ...editorApprovalInvoiceData,
         status: 'approved',
         ap_status: 'approved',
+        approved_by: userProfile?.id || null,
+        approved_date: new Date().toISOString(),
         action_required_reason: null,
         action_required_details: null,
       };

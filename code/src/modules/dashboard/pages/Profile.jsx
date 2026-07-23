@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { AUDIT_MODULES, logAudit } from '@/lib/audit';
+import { notifyManagers } from '@/lib/notificationService';
 import { toast } from 'sonner';
 import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -39,6 +41,8 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
 
   // Sync profile details when loaded
   useEffect(() => {
@@ -131,34 +135,106 @@ export default function Profile() {
     }
   };
 
-  const handleDataExport = () => {
-    // Generate a simple CSV for data export (simulating a full export)
-    const headers = ["ID", "Email", "Full Name", "Phone", "Role", "Organization ID"];
-    const row = [
-      user?.id,
-      user?.email,
-      userProfile?.full_name,
-      userProfile?.phone,
-      role,
-      organization?.id
-    ];
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + headers.join(",") + "\n"
-      + row.map(e => `"${e || ''}"`).join(",");
-      
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `restops_data_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    toast.success("Data export initiated successfully.");
+  const handleDataExport = async () => {
+    if (!user?.id) return;
+    setIsExportingData(true);
+    try {
+      const [notificationsResult, auditResult] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('id,title,message,type,is_read,created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(500),
+        organization?.id
+          ? supabase
+              .from('audit_logs')
+              .select('id,action,module,table_name,record_id,created_at')
+              .eq('organization_id', organization.id)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(500)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (notificationsResult.error) throw notificationsResult.error;
+      if (auditResult.error) console.warn('Audit events omitted from data export:', auditResult.error.message);
+
+      const exportPayload = {
+        exported_at: new Date().toISOString(),
+        user: {
+          id: user.id,
+          email: user.email,
+          full_name: userProfile?.full_name || null,
+          phone: userProfile?.phone || null,
+          role,
+          organization_id: organization?.id || null,
+        },
+        organization: organization ? { id: organization.id, name: organization.name } : null,
+        notifications: notificationsResult.data || [],
+        audit_events: auditResult.error ? [] : (auditResult.data || []),
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `restops_data_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      await logAudit({
+        action: 'profile_data_export_downloaded',
+        entityId: user.id,
+        entityType: 'profile_privacy_request',
+        module: AUDIT_MODULES.USERS,
+        orgId: organization?.id,
+        userId: user.id,
+        details: { notification_count: exportPayload.notifications.length, audit_event_count: exportPayload.audit_events.length },
+      });
+      toast.success('Data export downloaded.');
+    } catch (err) {
+      console.error('Error exporting profile data:', err);
+      toast.error(err.message || 'Failed to export data.');
+    } finally {
+      setIsExportingData(false);
+    }
   };
 
-  const handleAccountDeletion = () => {
-    // In a real app, this would trigger an email or set a deletion flag
-    toast.success("Account deletion request submitted to Platform Admins. You will be contacted shortly to confirm.");
+  const handleAccountDeletion = async () => {
+    if (!user?.id) return;
+    setIsRequestingDeletion(true);
+    try {
+      await logAudit({
+        action: 'account_deletion_requested',
+        entityId: user.id,
+        entityType: 'profile_privacy_request',
+        module: AUDIT_MODULES.USERS,
+        orgId: organization?.id,
+        userId: user.id,
+        details: { email: user.email, role },
+      });
+
+      if (organization?.id) {
+        await notifyManagers({
+          organization_id: organization.id,
+          title: 'Account deletion requested',
+          message: `${userProfile?.full_name || user.email || 'A user'} requested account deletion from their profile privacy controls.`,
+          type: 'system',
+          metadata: { source: 'profile_privacy', requested_user_id: user.id },
+          exclude_user_id: user.id,
+        });
+      }
+
+      toast.success('Account deletion request recorded and sent to managers.');
+    } catch (err) {
+      console.error('Error requesting account deletion:', err);
+      toast.error(err.message || 'Failed to submit deletion request.');
+    } finally {
+      setIsRequestingDeletion(false);
+    }
   };
 
   return (
@@ -409,19 +485,21 @@ export default function Profile() {
               <div className="space-y-4">
                 <Button 
                   onClick={handleDataExport}
+                  disabled={isExportingData}
                   variant="outline" 
                   className="w-full justify-start text-sm border-border/60 hover:bg-secondary/60"
                 >
                   <Download className="w-4 h-4 mr-2 text-foreground" />
-                  Export My Data (CSV)
+                  {isExportingData ? 'Exporting Data...' : 'Export My Data (JSON)'}
                 </Button>
                 <Button 
                   onClick={handleAccountDeletion}
+                  disabled={isRequestingDeletion}
                   variant="outline" 
                   className="w-full justify-start text-sm border-resend-red/20 text-resend-red hover:bg-resend-red/10"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Request Account Deletion
+                  {isRequestingDeletion ? 'Submitting Request...' : 'Request Account Deletion'}
                 </Button>
               </div>
             </CardContent>
@@ -431,4 +509,7 @@ export default function Profile() {
     </div>
   );
 }
+
+
+
 

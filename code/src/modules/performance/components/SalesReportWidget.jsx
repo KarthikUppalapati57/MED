@@ -14,9 +14,9 @@ function ChartFallback() {
   );
 }
 
-export function SalesReportWidget({ salesData }) {
+export function SalesReportWidget({ salesData, isLoading = false }) {
   const now = new Date();
-  
+
   // Metrics: WTD, PTD, YTD
   const metrics = useMemo(() => {
     const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday start
@@ -130,6 +130,14 @@ export function SalesReportWidget({ salesData }) {
         amount
       }));
   }, [salesData]);
+
+  if (isLoading) {
+    return (
+      <div className="h-full min-h-[240px] w-full flex items-center justify-center text-sm text-muted-foreground">
+        Loading sales data...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

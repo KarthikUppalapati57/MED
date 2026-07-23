@@ -13,6 +13,7 @@ const __Layout = React.lazy(() => import('./Layout.jsx'));
 // Dynamically import pages using React.lazy for code-splitting
 const AutoOrdering = React.lazy(() => import('./modules/orders/pages/AutoOrdering'));
 const Dashboard = React.lazy(() => import('./modules/dashboard/pages/Dashboard'));
+const DashboardReports = React.lazy(() => import('./modules/dashboard/pages/DashboardReports'));
 const Inventory = React.lazy(() => import('./modules/inventory/pages/Inventory'));
 const Invoices = React.lazy(() => import('./modules/invoices/pages/Invoices'));
 const Payments = React.lazy(() => import('./modules/payments/pages/Payments'));
@@ -65,6 +66,7 @@ const OrderOnline = React.lazy(() => import('./modules/recipes/pages/OrderOnline
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
     "Dashboard": Dashboard,
+    "DashboardReports": DashboardReports,
     "Inventory": Inventory,
     "Invoices": Invoices,
     "OnboardingPage": OnboardingPage,
@@ -123,3 +125,7 @@ export const pagesConfig = {
     Pages: PAGES,
     Layout: __Layout,
 };
+
+
+
+

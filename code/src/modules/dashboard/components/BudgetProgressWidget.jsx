@@ -1,7 +1,7 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { BarChart3 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,10 @@ function currency(value) {
 function percent(value) {
   if (!Number.isFinite(Number(value))) return '0%';
   return `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(1)}%`;
+}
+
+function normalizeCategory(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
 function SectionCard({ title, description, children }) {
@@ -39,16 +43,25 @@ function EmptyState({ icon: Icon, title, description }) {
   );
 }
 
-export default function BudgetProgressWidget({ metrics }) {
+export default function BudgetProgressWidget({ metrics, scope = 'org', location = null }) {
   const { organization } = useAuth();
+  const activeLocationId = location?.id || null;
   
-  const { data: budgets = [] } = useQuery({
-    queryKey: ['dashboard-budgets', organization?.id],
+  const { data: budgets = [] } = useAuthQuery({
+    queryKey: ['dashboard-budgets', organization?.id, scope, activeLocationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('budgets')
-        .select('*')
-        .eq('organization_id', organization?.id);
+        .select('id, organization_id, location_id, gl_category, budget_limit')
+        .eq('organization_id', organization.id);
+
+      if (scope === 'location' && activeLocationId) {
+        query = query.or(`location_id.eq.${activeLocationId},location_id.is.null`);
+      } else {
+        query = query.is('location_id', null);
+      }
+
+      const { data, error } = await query;
       if (error) {
         console.warn('Budgets table might not exist yet', error);
         return [];
@@ -56,15 +69,22 @@ export default function BudgetProgressWidget({ metrics }) {
       return data || [];
     },
     enabled: !!organization?.id,
+    throwOnError: false,
   });
 
-  // Re-map the metrics.budgetPacing using the actual hard budgets from the database
+  const exactLocationBudgets = budgets.filter((budget) => budget.location_id && budget.location_id === activeLocationId);
+  const sharedBudgets = budgets.filter((budget) => !budget.location_id);
+  const scopedBudgets = exactLocationBudgets.length ? [...exactLocationBudgets, ...sharedBudgets] : sharedBudgets;
+
   const enhancedPacing = metrics.budgetPacing.map(item => {
-    const dbBudget = budgets.find(b => b.gl_category.toLowerCase() === item.category.toLowerCase() || 
-                                      (item.category.toLowerCase().includes('cogs') && b.gl_category.toLowerCase() === 'food') ||
-                                      (item.category.toLowerCase().includes('labor') && b.gl_category.toLowerCase() === 'labor'));
+    const itemCategory = normalizeCategory(item.category);
+    const dbBudget = scopedBudgets.find((budget) => {
+      const budgetCategory = normalizeCategory(budget.gl_category);
+      return budgetCategory === itemCategory
+        || (itemCategory.includes('cogs') && budgetCategory === 'food')
+        || (itemCategory.includes('labor') && budgetCategory === 'labor');
+    });
     
-    // Use database target if available, otherwise fallback to the derived target
     const target = dbBudget?.budget_limit ? Number(dbBudget.budget_limit) : item.target;
     const actual = item.actual;
     const pacing = target > 0 ? (actual - target) / target * 100 : 0;
@@ -114,3 +134,5 @@ export default function BudgetProgressWidget({ metrics }) {
     </SectionCard>
   );
 }
+
+
