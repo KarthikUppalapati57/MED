@@ -27,6 +27,14 @@ const NOTIFICATION_MODULES = [
   { key: 'system', label: 'System', types: ['system', 'alert', 'warning', 'error', 'AI_alert'] },
 ];
 
+export function resolveNotificationModuleKey(notif) {
+  const metadataModuleKey = notif?.metadata?.module_key;
+  if (metadataModuleKey && NOTIFICATION_MODULES.some((module) => module.key === metadataModuleKey)) {
+    return metadataModuleKey;
+  }
+  return NOTIFICATION_MODULES.find((module) => module.types.includes(notif?.type))?.key || 'system';
+}
+
 const MODULE_LABEL_OVERRIDES = {
   dashboard: 'Dashboard & System',
 };
@@ -246,11 +254,9 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  const moduleOf = (notif) => NOTIFICATION_MODULES.find(m => m.types.includes(notif.type))?.key || 'system';
-
   const notificationsByModule = React.useMemo(() => {
     const map = new Map(NOTIFICATION_MODULES.map(m => [m.key, []]));
-    notifications.forEach(n => map.get(moduleOf(n)).push(n));
+    notifications.forEach(n => map.get(resolveNotificationModuleKey(n)).push(n));
     return map;
   }, [notifications]);
 

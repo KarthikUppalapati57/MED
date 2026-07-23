@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import crypto from "node:crypto";
-import { ensureDwollaCustomerAndFundingSource } from "../_shared/dwolla.ts";
 import { sendTransactionalEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
@@ -263,17 +262,25 @@ serve(async (req) => {
         return jsonResponse({ error: "Missing token, tax_id, or W9 document" }, 400);
       }
 
+      // Atomically claim the token before doing any work: a plain SELECT-then-update lets two
+      // concurrent submits both pass the pending-check and both insert documents/tax rows before
+      // either marks it used (unlike submit_vendor_banking_via_link, which locks the row). This
+      // UPDATE...WHERE status='pending' can only ever match once across concurrent callers, so
+      // only one request proceeds past this point -- any later failure requires a re-issued link,
+      // same as an already-used token today.
       const { data: link, error: linkError } = await supabase
         .from("vendor_link_tokens")
-        .select("id, vendor_id, organization_id, brand_id, location_id, status, expires_at")
+        .update({ status: "submitted", submitted_at: new Date().toISOString() })
         .eq("token", token)
         .eq("link_type", "tax")
         .eq("status", "pending")
         .is("deleted_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .select("id, vendor_id, organization_id, brand_id, location_id")
         .maybeSingle();
 
       if (linkError) throw linkError;
-      if (!link || new Date(link.expires_at) < new Date()) {
+      if (!link) {
         return jsonResponse({ error: "Invalid or expired token" }, 400);
       }
 
@@ -317,12 +324,6 @@ serve(async (req) => {
       });
       if (secretError) throw secretError;
 
-      const { error: linkUpdateError } = await supabase
-        .from("vendor_link_tokens")
-        .update({ status: "submitted", submitted_at: new Date().toISOString() })
-        .eq("id", link.id);
-      if (linkUpdateError) throw linkUpdateError;
-
       const { error: vendorError } = await supabase
         .from("vendors")
         .update({ onboarding_status: "tax_submitted" })
@@ -353,54 +354,58 @@ serve(async (req) => {
       });
       if (error) throw error;
 
-      // Best-effort real Dwolla funding-source creation right after vaulting the vendor's
-      // bank details, so ACH readiness is automatic. Non-fatal: a Dwolla hiccup must never
-      // block the banking submission itself, which already succeeded above.
+      // Also store the vendor receiving account in the provider-neutral bank vault.
+      // This keeps Restops as the source of truth even when the active ACH provider changes.
       try {
         const { data: vendor } = await supabase
           .from("vendors")
-          .select("id, organization_id, name, contact_name, email")
+          .select("id, organization_id, brand_id, location_id, name, contact_name")
           .eq("id", data.vendor_id)
           .maybeSingle();
 
-        const { data: banking } = await supabase.rpc("get_vendor_banking_for_audit", {
-          p_banking_row_id: data.banking_row_id,
-        });
+        if (vendor) {
+          const accountNumber = String(bank_details.accountNumber).replace(/\D/g, "");
+          const routingNumber = String(bank_details.routingNumber).replace(/\D/g, "");
+          const fingerprintHash = crypto
+            .createHash("sha256")
+            .update(`${routingNumber}:${accountNumber}`)
+            .digest("hex");
 
-        if (vendor && banking?.account && banking?.routing) {
-          const { data: existingLinks } = await supabase.rpc("get_vendor_provider_link", {
-            p_vendor_id: vendor.id,
-            p_provider: "dwolla",
+          const { data: bankAccount, error: bankAccountError } = await supabase
+            .from("bank_accounts")
+            .insert({
+              organization_id: vendor.organization_id,
+              brand_id: vendor.brand_id ?? null,
+              location_id: vendor.location_id ?? null,
+              owner_type: "vendor",
+              owner_id: vendor.id,
+              purpose: "vendor_receiving",
+              nickname: `${vendor.name || "Vendor"} receiving account`,
+              account_holder_name: vendor.contact_name || vendor.name,
+              bank_name: bank_details.bankName || null,
+              account_type: bank_details.accountType || "checking",
+              routing_last4: routingNumber.slice(-4),
+              account_last4: accountNumber.slice(-4),
+              fingerprint_hash: fingerprintHash,
+              default_for_owner: true,
+              verification_status: "pending",
+              metadata: { source: "vendor_magic_link", legacy_vendor_banking_row_id: data.banking_row_id },
+            })
+            .select("id")
+            .single();
+
+          if (bankAccountError) throw bankAccountError;
+
+          const { error: secretError } = await supabase.rpc("store_bank_account_secret", {
+            p_bank_account_id: bankAccount.id,
+            p_account_number: accountNumber,
+            p_routing_number: routingNumber,
+            p_fingerprint_hash: fingerprintHash,
           });
-          const existingCustomerUrl = existingLinks?.[0]?.provider_customer_ref;
-
-          const holderName = vendor.contact_name || vendor.name;
-          const [firstName, ...lastNameParts] = holderName.split(/\s+/);
-
-          const { customerUrl, fundingSourceUrl } = await ensureDwollaCustomerAndFundingSource({
-            existingCustomerUrl,
-            firstName: firstName || "Vendor",
-            lastName: lastNameParts.join(" ") || vendor.name,
-            email: vendor.email,
-            businessName: vendor.name,
-            routingNumber: banking.routing,
-            accountNumber: banking.account,
-            bankAccountType: "checking",
-            fundingSourceName: vendor.name,
-          });
-
-          await supabase.from("vendor_payment_provider_links").upsert({
-            vendor_id: vendor.id,
-            organization_id: vendor.organization_id,
-            provider: "dwolla",
-            provider_customer_ref: customerUrl,
-            provider_funding_ref: fundingSourceUrl,
-            provider_status: "unverified",
-            is_active: true,
-          }, { onConflict: "vendor_id,provider" });
+          if (secretError) throw secretError;
         }
-      } catch (dwollaError) {
-        console.error("Non-fatal: Dwolla funding source creation failed during bank-info submit:", dwollaError);
+      } catch (vaultError) {
+        console.error("Non-fatal: provider-neutral vendor bank vault write failed:", vaultError);
       }
 
       return jsonResponse({ success: true, ...data });
@@ -412,3 +417,4 @@ serve(async (req) => {
     return jsonResponse({ error: error.message }, 500);
   }
 });
+

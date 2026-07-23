@@ -150,7 +150,6 @@ serve(async (req) => {
 
       await serviceSupabase.from('vendor_payment_provider_links').upsert({
         vendor_id,
-        organization_id: vendor.organization_id,
         provider: 'dwolla',
         provider_customer_ref: customerUrl,
         provider_funding_ref: fundingSourceUrl,

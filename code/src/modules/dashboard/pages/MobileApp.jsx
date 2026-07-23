@@ -33,7 +33,7 @@ export default function MobileApp() {
     queryKey: ['mobile-count-inventory', organization?.id, activeLocationId],
     queryFn: () => api.entities.Inventory.list(null, {
       limit: 10,
-      select: 'id, organization_id, brand_id, location_id, product_name, name, current_quantity, current_unit, unit',
+      select: 'id, organization_id, brand_id, location_id, product_name, current_quantity, current_unit',
     }),
     enabled: !!organization?.id,
   });
@@ -212,8 +212,8 @@ export default function MobileApp() {
           <Card key={item.id} className="border-0 shadow-sm overflow-hidden">
             <CardContent className="p-4 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-bold truncate">{item.product_name || item.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">On hand: {Number(item.current_quantity || 0).toLocaleString()} {item.current_unit || item.unit || 'units'}</p>
+                <p className="font-bold truncate">{item.product_name || 'Inventory item'}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">On hand: {Number(item.current_quantity || 0).toLocaleString()} {item.current_unit || 'units'}</p>
               </div>
               <PackageSearch className="w-5 h-5 text-muted-foreground" />
             </CardContent>

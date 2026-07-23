@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
@@ -31,6 +31,45 @@ function shouldSendPreference(preference: Record<string, unknown>, reportType: R
   return day === 1;
 }
 
+function shouldSendCustomReport(report: Record<string, unknown>, dateKey: string, force: boolean) {
+  if (force) return Boolean(report.schedule_cron);
+  const cron = String(report.schedule_cron || '');
+  if (!cron) return false;
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  const day = date.getUTCDay();
+  const dayOfMonth = date.getUTCDate();
+  if (cron === '0 6 * * *') return true;
+  if (cron === '0 6 * * 1') return day === 1;
+  if (cron === '0 6 1 * *') return dayOfMonth === 1;
+  return false;
+}
+
+function customReportBounds(config: Record<string, unknown>, dateKey: string) {
+  const savedStart = config?.start_date ? new Date(`${config.start_date}T00:00:00.000Z`) : null;
+  const savedEnd = config?.end_date ? new Date(`${config.end_date}T00:00:00.000Z`) : null;
+  const end = new Date(`${dateKey}T00:00:00.000Z`);
+  const days = savedStart && savedEnd
+    ? Math.max(0, Math.round((savedEnd.getTime() - savedStart.getTime()) / 86400000))
+    : 30;
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - days);
+  return { start: toDateKey(start), end: toDateKey(end) };
+}
+
+function buildCustomReportText({ report, rows, start, end }: {
+  report: Record<string, unknown>;
+  rows: Array<Record<string, unknown>>;
+  start: string;
+  end: string;
+}) {
+  const modules = new Set(rows.map((row) => row.module).filter(Boolean));
+  return [
+    `Custom report ready: ${report.name || 'Untitled Report'}`,
+    `Period: ${start} to ${end}`,
+    `Rows: ${rows.length}`,
+    `Modules: ${modules.size ? Array.from(modules).join(', ') : 'No matching rows'}`,
+  ].join('\n');
+}
 function buildReportText({ preference, reportType, summary, dateKey }: {
   preference: Record<string, unknown>;
   reportType: ReportType;
@@ -159,6 +198,11 @@ serve(async (req) => {
       .neq('status', 'inactive');
     if (profileError) throw profileError;
 
+    const { data: customReports, error: customReportsError } = await supabase
+      .from('custom_reports')
+      .select('id, organization_id, name, query_config, schedule_cron, created_by')
+      .not('schedule_cron', 'is', null);
+    if (customReportsError) throw customReportsError;
     const results = [];
 
     for (const preference of preferences || []) {
@@ -246,6 +290,76 @@ serve(async (req) => {
       }
     }
 
+
+    for (const report of customReports || []) {
+      if (!shouldSendCustomReport(report, dateKey, force)) {
+        results.push({ custom_report_id: report.id, status: 'skipped_custom_report_schedule' });
+        continue;
+      }
+
+      const config = report.query_config || {};
+      const { start: customStart, end: customEnd } = customReportBounds(config, dateKey);
+      const metrics = Array.isArray(config.metrics) ? config.metrics : [];
+      const modules = Array.isArray(config.modules) ? config.modules : [];
+      const dimension = config.dimension || 'date';
+
+      try {
+        if (!metrics.length || !modules.length) {
+          results.push({ custom_report_id: report.id, status: 'skipped_custom_report_incomplete_config' });
+          continue;
+        }
+
+        const { data: rows, error: reportError } = await supabase.rpc('run_custom_report', {
+          p_dimension: dimension,
+          p_end_date: customEnd,
+          p_metrics: metrics,
+          p_modules: modules,
+          p_organization_id: report.organization_id,
+          p_start_date: customStart,
+        });
+        if (reportError) throw reportError;
+
+        const recipients = (profiles || []).filter((profile) => {
+          if (profile.organization_id !== report.organization_id) return false;
+          if (report.created_by && profile.id === report.created_by) return true;
+          return ['org_manager', 'tenant_super_admin'].includes(String(profile.role));
+        });
+
+        if (!recipients.length) {
+          results.push({ custom_report_id: report.id, status: 'skipped_custom_report_no_recipients' });
+          continue;
+        }
+
+        const reportText = buildCustomReportText({ report, rows: Array.isArray(rows) ? rows : [], start: customStart, end: customEnd });
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert(recipients.map((recipient) => ({
+            is_read: false,
+            message: reportText.slice(0, 950),
+            organization_id: report.organization_id,
+            reference_id: report.id,
+            title: 'Scheduled custom report ready',
+            type: 'system',
+            user_id: recipient.id,
+          })));
+        if (notificationError) throw notificationError;
+
+        const { error: auditError } = await supabase.rpc('log_audit_event', { p_entry: {
+          action: 'custom_report_scheduler_sent',
+          details: { reportName: report.name, rowCount: Array.isArray(rows) ? rows.length : 0, recipients: recipients.length },
+          entity_id: report.id,
+          entity_type: 'custom_report',
+          module: 'custom_reports',
+          organization_id: report.organization_id,
+          table_name: 'custom_reports',
+        }});
+        if (auditError) console.warn('Custom report audit insert failed:', auditError.message);
+
+        results.push({ custom_report_id: report.id, notified: recipients.length, rows: Array.isArray(rows) ? rows.length : 0, status: 'custom_report_sent' });
+      } catch (error) {
+        results.push({ custom_report_id: report.id, error: error.message || String(error), status: 'custom_report_failed' });
+      }
+    }
     return new Response(JSON.stringify({ success: true, date: dateKey, results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -257,3 +371,5 @@ serve(async (req) => {
     });
   }
 });
+
+
