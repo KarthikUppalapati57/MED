@@ -1390,131 +1390,107 @@ export default function Invoices() {
   }, [invoices]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground mt-1">Upload, code, and approve vendor invoices</p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Button variant="outline" className="flex-1 sm:flex-none" onClick={handleExportCsv}>
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button variant="outline" className="hidden sm:flex" onClick={() => setEmailConfigOpen(true)}>
-            <Mail className="h-4 w-4 mr-2 text-brand" />
-            Email Settings
-          </Button>
-          <Button onClick={handleOpenMobileCapture} className={cn("bg-primary hover:bg-primary sm:hidden", !hasLocation && "opacity-50 cursor-not-allowed")}>
-            <Camera className="h-4 w-4 mr-2" />
-            Scan Receipt
-          </Button>
-          <Button variant="outline" onClick={handleCreateManualInvoice} className={cn("flex-1 sm:flex-none", !hasLocation && "opacity-50 cursor-not-allowed")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Invoice
-          </Button>
-          <Button onClick={handleOpenUpload} className={cn("bg-primary hover:bg-primary hidden sm:flex", !hasLocation && "opacity-50 cursor-not-allowed")}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Invoice
-          </Button>
-        </div>
-      </div>
-
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-[1.1fr_2fr]">
+    <div className="invoice-visual-page space-y-5">
+      <section className="invoice-command-hero" string="progress">
+        <div className="invoice-command-grid">
+          <div className="min-w-0 space-y-4">
+            <Badge className="invoice-hero-badge">Invoice Control</Badge>
             <div>
-              <p className="text-sm font-semibold text-foreground">Invoice Coding & Approval</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Capture, review, and approve every vendor bill before payment execution.
+              <h1 className="text-3xl font-bold text-white sm:text-4xl">Invoices</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/78 sm:text-base">
+                Capture vendor bills, review exceptions, approve payables, and keep AP moving from one clean workspace.
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-              {intakeMethods.map(({ label, detail, icon: Icon }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => handleIntakeClick(label)}
-                  className={cn("text-left rounded-md border border-border bg-background px-3 py-2 hover:bg-secondary transition-colors", label !== 'Email' && !hasLocation && "opacity-50 cursor-not-allowed")}
-                >
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Icon className="h-4 w-4 text-primary" />
-                    {label}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">{detail}</p>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <Button onClick={handleOpenUpload} className={cn("invoice-hero-primary", !hasLocation && "opacity-50 cursor-not-allowed")}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+              <Button variant="outline" onClick={handleCreateManualInvoice} className={cn("invoice-hero-secondary", !hasLocation && "opacity-50 cursor-not-allowed")}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create
+              </Button>
+              <Button variant="outline" onClick={handleOpenMobileCapture} className={cn("invoice-hero-secondary sm:hidden", !hasLocation && "opacity-50 cursor-not-allowed")}>
+                <Camera className="h-4 w-4 mr-2" />
+                Scan
+              </Button>
+              <Button variant="outline" className="invoice-hero-secondary hidden sm:inline-flex" onClick={() => setEmailConfigOpen(true)}>
+                <Mail className="h-4 w-4 mr-2" />
+                Email
+              </Button>
+              <Button variant="outline" className="invoice-hero-secondary" onClick={handleExportCsv}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Needs Action</p>
-            <p className="text-2xl font-bold text-resend-orange">{stats.actionRequiredCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending Approval</p>
-            <p className="text-2xl font-bold text-resend-yellow">{stats.pendingApprovalCount}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Scheduled</p>
-            <p className="text-2xl font-bold text-purple-700">{formatMoney(stats.scheduledAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Open AP</p>
-            <p className="text-2xl font-bold text-foreground">{formatMoney(stats.unpaidAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Overdue</p>
-            <p className="text-2xl font-bold text-resend-red">{stats.overdueCount}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            {workflowStages.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setApStatusFilter(apStatusFilter === key ? 'all' : key)}
-                className={cn(
-                  "rounded-md border px-3 py-3 text-left transition-colors",
-                  apStatusFilter === key ? "border-primary bg-primary/5" : "border-border bg-background hover:bg-secondary"
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <Icon className="h-4 w-4 text-primary" />
-                  <span className="text-xl font-bold">{stats.stageCounts[key] || 0}</span>
-                </div>
-                <p className="text-sm font-medium mt-2">{label}</p>
-                <p className="text-xs text-muted-foreground">
-                  {AP_STATUS_LABELS[key] || label}
-                </p>
-              </button>
-            ))}
+          <div className="invoice-hero-panel" aria-label="Invoice summary">
+            <div>
+              <span className="text-xs font-medium text-white/62">Open AP</span>
+              <strong>{formatMoney(stats.unpaidAmount)}</strong>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="invoice-hero-mini invoice-signal-orange">
+                <span>{stats.actionRequiredCount}</span>
+                <small>Need action</small>
+              </div>
+              <div className="invoice-hero-mini invoice-signal-red">
+                <span>{stats.overdueCount}</span>
+                <small>Overdue</small>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="grid gap-4 xl:grid-cols-[minmax(240px,1fr)_repeat(4,180px)_120px]">
+        <div className="invoice-intake-rail">
+          {intakeMethods.map(({ label, detail, icon: Icon }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => handleIntakeClick(label)}
+              className={cn("invoice-intake-chip", label !== 'Email' && !hasLocation && "opacity-50 cursor-not-allowed")}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+              <small>{detail}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="invoice-signal-grid" string="progress" aria-label="Invoice status summary">
+        {[
+          ['Needs Action', stats.actionRequiredCount, 'invoice-signal-orange'],
+          ['Pending Approval', stats.pendingApprovalCount, 'invoice-signal-yellow'],
+          ['Scheduled', formatMoney(stats.scheduledAmount), 'invoice-signal-blue'],
+          ['Open AP', formatMoney(stats.unpaidAmount), 'invoice-signal-green'],
+          ['Overdue', stats.overdueCount, 'invoice-signal-red'],
+        ].map(([label, value, tone]) => (
+          <div key={label} className={cn('invoice-stat-tile', tone)}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </section>
+
+      <section className="invoice-stage-strip" string="progress" aria-label="Invoice workflow filters">
+        {workflowStages.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setApStatusFilter(apStatusFilter === key ? 'all' : key)}
+            className={cn('invoice-stage-chip', apStatusFilter === key && 'is-active')}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+            <strong>{stats.stageCounts[key] || 0}</strong>
+          </button>
+        ))}
+      </section>
+
+      <section className="invoice-filter-bar" string="progress">
+        <div className="grid gap-4 xl:grid-cols-[minmax(240px,1fr)_repeat(4,180px)_120px]">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1671,19 +1647,18 @@ export default function Invoices() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </section>
 
       {/* Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className="invoice-table-shell" string="progress">
         <CardContent className="p-0">
           <div
             ref={invoiceTableRef}
-            className="max-h-[684px] overflow-auto"
+            className="invoice-table-viewport"
             onScroll={(event) => setInvoiceTableScrollTop(event.currentTarget.scrollTop)}
           >
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
+              <TableHeader className="invoice-table-header sticky top-0 z-10">
                 <TableRow>
                   <TableHead className="w-[50px]">
                     <Checkbox 
@@ -1746,7 +1721,7 @@ export default function Invoices() {
                     const actionReason = deriveActionReason(invoice);
                     const aging = getInvoiceAging(invoice);
                     return (
-                      <TableRow key={invoice.id} className="cursor-pointer hover:bg-secondary">
+                      <TableRow key={invoice.id} className="invoice-row cursor-pointer">
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox 
                             checked={selectedInvoiceIds.includes(invoice.id)}
@@ -1871,7 +1846,7 @@ export default function Invoices() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-center px-4 py-4 border-t text-sm text-muted-foreground sm:justify-between">
+          <div className="invoice-table-footer">
             <span>
               Showing rows {filteredInvoices.length === 0 ? 0 : invoiceWindow.startIndex + 1}
               -{invoiceWindow.endIndex} of {filteredInvoices.length} invoices
