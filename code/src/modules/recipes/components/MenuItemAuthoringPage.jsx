@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import MissingConversionActions from '@/modules/recipes/components/MissingConversionActions';
 import { toast } from 'sonner';
 
 const UNITS = ['serving', 'each', 'count', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'cup', 'tbsp', 'tsp'];
@@ -37,7 +38,7 @@ function Section({ title, description, children }) {
   return <Card><CardHeader><CardTitle className="text-lg">{title}</CardTitle>{description && <CardDescription>{description}</CardDescription>}</CardHeader><CardContent className="space-y-4">{children}</CardContent></Card>;
 }
 
-export default function MenuItemAuthoringPage({ products = [], preparedItems = [], locations = [], conversions = [] }) {
+export default function MenuItemAuthoringPage({ products = [], preparedItems = [], locations = [], conversions = [], recipe = null }) {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const queryClient = useQueryClient();
@@ -78,6 +79,68 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
   });
 
   const dirty = JSON.stringify(form) !== baselineRef.current;
+
+  useEffect(() => {
+    if (!recipe?.id) return;
+    let active = true;
+    (async () => {
+      try {
+        const [yields, visibility, steps, assignments, equipment, ingredients, prices] = await Promise.all([
+          api.entities.RecipeYield.filter({ recipe_id: recipe.id }, { orderBy: '-is_primary', limit: 100 }),
+          api.entities.RecipeLocationVisibility.filter({ recipe_id: recipe.id }, { limit: 1000 }),
+          api.entities.RecipePreparationStep.filter({ recipe_id: recipe.id }, { orderBy: 'step_number', limit: 100 }),
+          api.entities.RecipeEquipmentAssignment.filter({ recipe_id: recipe.id }, { limit: 100 }),
+          api.entities.RecipeEquipmentCatalog.list('name', { limit: 1000 }),
+          api.entities.RecipeIngredient.filter({ recipe_id: recipe.id }, { orderBy: 'sort_order', limit: 1000 }),
+          api.entities.RecipeLocationPrice.filter({ recipe_id: recipe.id }, { limit: 1000 }),
+        ]);
+        if (!active) return;
+        const equipmentMap = new Map(equipment.map((row) => [row.id, row.name]));
+        const catalogRows = [
+          ...products.map((row) => ({ ...row, kind: 'product', unit_cost: Number(row.latest_price || 0), cost_unit: row.base_unit || row.report_by_unit || 'each' })),
+          ...preparedItems.map((row) => ({ ...row, kind: 'prepared', unit_cost: Number(row.cost_per_serving || 0), cost_unit: row.yield_unit || 'serving' })),
+        ];
+        const selectedIds = visibility.filter((row) => row.location_id && row.is_visible).map((row) => row.location_id);
+        const next = {
+          ...initialForm(),
+          name: recipe.name || '',
+          description: recipe.description || '',
+          recipeTypeId: recipe.recipe_type_id || '',
+          category: recipe.category || 'main_course',
+          status: recipe.status || 'active',
+          shelfLifeQuantity: recipe.shelf_life_quantity || '',
+          shelfLifeUnit: recipe.shelf_life_unit || 'days',
+          yields: (yields.length ? yields : [{ quantity: recipe.yield_quantity || 1, unit: recipe.yield_unit || 'serving', is_primary: true }])
+            .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+            .map((row) => ({ ...row, id: row.id || crypto.randomUUID() })),
+          visibilityMode: selectedIds.length ? 'selected' : 'all',
+          visibleLocationIds: selectedIds,
+          equipmentNames: assignments.map((row) => equipmentMap.get(row.equipment_id)).filter(Boolean),
+          steps: steps.length ? steps.map((row) => ({ ...row, id: row.id || crypto.randomUUID(), notes: row.notes || '' })) : [{ id: crypto.randomUUID(), instruction: '', notes: '' }],
+          ingredients: ingredients.map((row) => {
+            const selected = catalogRows.find((item) => item.id === (row.product_id || row.sub_recipe_id));
+            return recalculateAuthoringIngredient({
+              ...row,
+              product_name: selected?.name || row.product_name || 'Ingredient',
+              unit_cost: Number(row.unit_cost_snapshot || selected?.unit_cost || 0),
+              cost_unit: row.cost_unit || selected?.cost_unit || row.unit,
+            }, conversions);
+          }),
+          globalPrice: recipe.selling_price ?? '',
+          useLocationPrices: prices.length > 0,
+          locationPrices: locations.map((entry) => ({ location_id: entry.id, name: entry.name, price: prices.find((row) => row.location_id === entry.id)?.price ?? '' })),
+          targetMarginPercent: recipe.target_margin_percent ?? 70,
+          marginAlertEnabled: recipe.margin_alert_enabled ?? true,
+        };
+        setForm(next);
+        baselineRef.current = JSON.stringify(next);
+      } catch (error) {
+        toast.error(error?.message || 'Unable to load Menu Item');
+      }
+    })();
+    return () => { active = false; };
+  }, [recipe?.id, products, preparedItems, locations, conversions]);
+
   useEffect(() => {
     const beforeUnload = (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -168,7 +231,14 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
     if (!canManageRecipes) errors.unshift('Your role cannot manage recipes.');
     if (!authoringSchema.supported) errors.unshift('Apply the local Menu Item authoring migration before saving.');
     if (errors.length) { toast.error(errors[0]); return; }
-    const approved = await confirm(getConfirmationMessage('createRecipe', form.name.trim()));
+      const approved = await confirm(recipe?.id ? {
+        title: `Save Menu Item changes?`,
+        description: 'This will update the menu item, yields, ingredients, visibility, preparation, equipment, and location prices.',
+        confirmText: 'Save Changes',
+        cancelText: 'Cancel',
+        variant: 'info',
+        severity: 'medium',
+      } : getConfirmationMessage('createRecipe', form.name.trim()));
     if (!approved) return;
     setSaving(true);
     try {
@@ -176,6 +246,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
       const steps = form.steps.filter((step) => step.instruction.trim()).map((step, index) => ({ step_number: index + 1, instruction: step.instruction.trim(), notes: step.notes.trim() }));
       const saved = await api.recipes.saveMenuItemPhase1({
         recipe: {
+          id: recipe?.id || null,
           organization_id: organization.id,
           brand_id: (brand?.brand_id || brand?.id) || null,
           location_id: location?.id || null,
@@ -196,7 +267,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       queryClient.invalidateQueries({ queryKey: ['recipe-location-visibility'] });
       queryClient.invalidateQueries({ queryKey: ['menu-item-authoring-schema'] });
-      toast.success('Menu Item created');
+      toast.success(recipe?.id ? 'Menu Item saved' : 'Menu Item created');
       navigate(`/Recipes/menu-items/${saved.id}${routerLocation.search}`);
     } catch (error) {
       const migrationMissing = error?.code === 'PGRST202' || String(error?.message || '').includes('save_menu_item_phase1');
@@ -205,7 +276,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
   };
 
   return <div className="mx-auto max-w-7xl space-y-6 pb-12">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><Button variant="ghost" className="mb-2 px-0" onClick={cancel}><ArrowLeft className="mr-2 h-4 w-4" /> Menu Items</Button><h1 className="text-3xl font-semibold">Create a Menu Item</h1><p className="text-muted-foreground">Build a tenant-scoped sellable recipe using MED-fresh costing and operating controls.</p></div><div className="flex gap-2"><Button variant="outline" onClick={cancel} disabled={saving}>Cancel</Button><Button onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Menu Item'}</Button></div></div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><Button variant="ghost" className="mb-2 px-0" onClick={cancel}><ArrowLeft className="mr-2 h-4 w-4" /> Menu Items</Button><h1 className="text-3xl font-semibold">{recipe?.id ? 'Edit' : 'Create'} a Menu Item</h1><p className="text-muted-foreground">Build a tenant-scoped sellable recipe using MED-fresh costing and operating controls.</p></div><div className="flex gap-2"><Button variant="outline" onClick={cancel} disabled={saving}>Cancel</Button><Button onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Menu Item'}</Button></div></div>
     {!authoringSchema.supported && <Alert><AlertTitle>Local Recipe migration required</AlertTitle><AlertDescription>The authoring page remains available for review, but saving is disabled in Supabase environments without `20260715000004_menu_item_authoring_phase1.sql`.</AlertDescription></Alert>}
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -245,7 +316,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
         <Section title="Location pricing" description="Use the global price everywhere or set explicit overrides for individual locations."><div className="flex items-center gap-2"><Checkbox checked={form.useLocationPrices} onCheckedChange={(checked) => setForm({ ...form, useLocationPrices: Boolean(checked), locationPrices: checked ? locations.map((entry) => ({ location_id: entry.id, name: entry.name, price: '' })) : [] })} /><Label>Set location-specific prices</Label></div>{form.useLocationPrices && <div className="space-y-2">{form.locationPrices.map((row, index) => { const effectivePrice = row.price === '' ? Number(form.globalPrice || 0) : Number(row.price); const locationProfit = effectivePrice - costs.costPerYieldUnit; const locationPlateCost = effectivePrice > 0 ? costs.costPerYieldUnit / effectivePrice * 100 : null; return <div className="grid items-center gap-3 rounded-md border p-3 sm:grid-cols-[1fr_150px_120px_120px]" key={row.location_id}><span className="text-sm font-medium">{row.name}</span><Input type="number" min="0" step="0.01" placeholder="Use global" value={row.price} onChange={(e) => setForm((current) => ({ ...current, locationPrices: current.locationPrices.map((item, i) => i === index ? { ...item, price: e.target.value } : item) }))} /><span className="text-sm text-muted-foreground">Profit {money.format(locationProfit)}</span><span className="text-sm text-muted-foreground">Plate {locationPlateCost == null ? '—' : `${locationPlateCost.toFixed(1)}%`}</span></div>; })}</div>}</Section>
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ChefHat className="h-5 w-5" /> Live economics</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="global-price">Global menu price</Label><Input id="global-price" type="number" min="0" step="0.01" value={form.globalPrice} onChange={(e) => setForm({ ...form, globalPrice: e.target.value })} /></div><div className="grid grid-cols-2 gap-3">{[['Ingredient total', money.format(costs.ingredientCost)], ['Cost per serving', money.format(costs.costPerYieldUnit)], ['Net profit', money.format(costs.netProfit)], ['Plate cost', costs.plateCostPercent == null ? 'Set price' : `${costs.plateCostPercent.toFixed(1)}%`]].map(([label, value]) => <div key={label} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold">{value}</p></div>)}</div>{costs.missingConversions.length > 0 && <p className="text-xs text-destructive">Resolve {costs.missingConversions.length} missing unit conversion{costs.missingConversions.length === 1 ? '' : 's'} before relying on total cost.</p>}<div className="flex items-center gap-2"><Checkbox checked={form.marginAlertEnabled} onCheckedChange={(checked) => setForm({ ...form, marginAlertEnabled: Boolean(checked) })} /><Label>Enable cost monitoring</Label></div><Button className="w-full" onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? 'Saving...' : 'Save Menu Item'}</Button></CardContent></Card></aside>
+      <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ChefHat className="h-5 w-5" /> Live economics</CardTitle></CardHeader><CardContent className="space-y-4"><div><Label htmlFor="global-price">Global menu price</Label><Input id="global-price" type="number" min="0" step="0.01" value={form.globalPrice} onChange={(e) => setForm({ ...form, globalPrice: e.target.value })} /></div><div className="grid grid-cols-2 gap-3">{[['Ingredient total', money.format(costs.ingredientCost)], ['Cost per serving', money.format(costs.costPerYieldUnit)], ['Net profit', money.format(costs.netProfit)], ['Plate cost', costs.plateCostPercent == null ? 'Set price' : `${costs.plateCostPercent.toFixed(1)}%`]].map(([label, value]) => <div key={label} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold">{value}</p></div>)}</div><MissingConversionActions missingConversions={costs.missingConversions} /><div className="flex items-center gap-2"><Checkbox checked={form.marginAlertEnabled} onCheckedChange={(checked) => setForm({ ...form, marginAlertEnabled: Boolean(checked) })} /><Label>Enable cost monitoring</Label></div><Button className="w-full" onClick={save} disabled={saving || !canManageRecipes || !authoringSchema.supported}>{saving ? 'Saving...' : 'Save Menu Item'}</Button></CardContent></Card></aside>
     </div>
 
     <Dialog open={Boolean(importPreview)} onOpenChange={(open) => !open && setImportPreview(null)}>

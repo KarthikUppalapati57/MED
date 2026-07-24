@@ -3,7 +3,10 @@ import { calculateRecipeCost } from './recipeCosting';
 export const BEVERAGE_TYPE_NAMES = ['Cocktail', 'Beer', 'Wine', 'Spirit Pour', 'Non-Alcoholic Beverage', 'Other'];
 
 export function isBarItem(recipe, beverageTypeIds = []) {
-  return !recipe?.is_batch && (beverageTypeIds.includes(recipe?.recipe_type_id) || recipe?.category === 'beverage');
+  return Boolean(recipe)
+    && !recipe.deleted_at
+    && !recipe.is_batch
+    && (beverageTypeIds.includes(recipe.recipe_type_id) || recipe.category === 'beverage');
 }
 
 export function calculateBarItemCosts({ ingredients = [], primaryYield, sellingPrice, conversions = [] }) {

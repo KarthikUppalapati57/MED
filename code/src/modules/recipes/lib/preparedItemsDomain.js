@@ -1,6 +1,6 @@
 import { calculateRecipeCost } from './recipeCosting';
 
-export const isPreparedItem = (recipe) => Boolean(recipe?.is_batch || recipe?.category === 'prepared_item');
+export const isPreparedItem = (recipe) => Boolean(recipe && !recipe.deleted_at && (recipe.is_batch || recipe.category === 'prepared_item'));
 
 export function filterPreparedItems(items, { search = '', type = 'all', status = 'all' } = {}) {
   const needle = search.trim().toLowerCase();

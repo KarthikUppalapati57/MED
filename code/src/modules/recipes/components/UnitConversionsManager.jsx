@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ArrowRightLeft, Loader2, Pencil, Plus, Search, ToggleLeft, Trash2 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -28,6 +29,8 @@ export default function UnitConversionsManager({
   products: productsProp,
   conversions: conversionsProp,
   initialProductId = null,
+  initialDialogDefaults = null,
+  returnTo = '',
   compact = false,
 }) {
   const { organization, brand, location } = useAuth();
@@ -116,6 +119,14 @@ export default function UnitConversionsManager({
     setDialogDefaults(defaults || (initialProductId ? { productId: initialProductId, scope: 'product' } : { scope: 'product' }));
     setDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (!initialDialogDefaults) return;
+    setScopeFilter(initialDialogDefaults.scope || 'product');
+    if (initialDialogDefaults.productId) setProductFilter(initialDialogDefaults.productId);
+    setDialogDefaults(initialDialogDefaults);
+    setDialogOpen(true);
+  }, [initialDialogDefaults]);
 
   const openEdit = (row) => {
     setDialogDefaults({
@@ -210,6 +221,20 @@ export default function UnitConversionsManager({
             <Alert variant="destructive">
               <AlertTitle>Unable to load conversion rules</AlertTitle>
               <AlertDescription>{error?.message || 'Try again after the recipe unit conversions migration is applied.'}</AlertDescription>
+            </Alert>
+          )}
+
+          {initialDialogDefaults && (
+            <Alert>
+              <AlertTitle>Conversion rule started from a recipe</AlertTitle>
+              <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span>Enter the factor, save the rule, then return to the recipe to recalculate costs.</span>
+                {returnTo ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link to={returnTo}>Return to recipe</Link>
+                  </Button>
+                ) : null}
+              </AlertDescription>
             </Alert>
           )}
 

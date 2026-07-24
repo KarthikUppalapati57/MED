@@ -22,6 +22,9 @@ import BarItemsOperations from '@/modules/recipes/components/BarItemsOperations'
 import BarItemAuthoringPage from '@/modules/recipes/components/BarItemAuthoringPage';
 import BarItemDetailPage from '@/modules/recipes/components/BarItemDetailPage';
 import UnitConversionsManager from '@/modules/recipes/components/UnitConversionsManager';
+import { classifyRecipe, filterActiveRecipes, getBeverageTypeIds } from '@/modules/recipes/lib/recipeClassification';
+import { readMissingConversionSetupParams } from '@/modules/recipes/lib/missingConversionRoute';
+import { resolveRecipeEditRoute } from '@/modules/recipes/lib/recipeRouteGuards';
 import {
   Plus,
   Search,
@@ -86,6 +89,20 @@ import { toast } from "sonner";
 
 const FALLBACK_RECIPE_CATEGORY_OPTIONS = ['appetizer', 'main_course', 'dessert', 'beverage', 'side', 'sauce'];
 
+function RecipeRouteStatus({ title, description, loading = false }) {
+  return (
+    <div className="mx-auto flex min-h-96 max-w-3xl items-center justify-center">
+      <Card className="w-full border shadow-sm">
+        <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+          {loading && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+          <h1 className="text-xl font-semibold">{title}</h1>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Recipes() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
@@ -149,6 +166,12 @@ export default function Recipes() {
   const formBaselineRef = useRef(null);
   const needsProducts = ['recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer', 'unit-conversions', 'setup'].includes(activeTab) || dialogOpen;
 
+  useEffect(() => {
+    if (activeTab === 'unit-conversions') {
+      navigate(`/Recipes/setup${routerLocation.search}`, { replace: true });
+    }
+  }, [activeTab, navigate, routerLocation.search]);
+
   const [sortRecipes, setSortRecipes] = useState('-created_at');
   const debouncedSearch = useDebounce(search, 500);
 
@@ -167,7 +190,7 @@ export default function Recipes() {
         search: debouncedSearch,
         searchColumn: 'name',
       };
-      const legacySelect = 'id, organization_id, brand_id, location_id, name, description, category, status, yield_quantity, yield_unit, yield_percentage, cost_per_serving, selling_price, target_margin_percent, margin_alert_enabled, ingredients, packaging_items, instructions, prep_time_minutes, cook_time_minutes, labor_rate_per_hour, labor_time_minutes, total_ingredient_cost, total_packaging_cost, labor_cost, created_at, total_cost, is_batch';
+      const legacySelect = 'id, organization_id, brand_id, location_id, name, description, category, status, yield_quantity, yield_unit, yield_percentage, cost_per_serving, selling_price, target_margin_percent, margin_alert_enabled, ingredients, packaging_items, instructions, prep_time_minutes, cook_time_minutes, labor_rate_per_hour, labor_time_minutes, total_ingredient_cost, total_packaging_cost, labor_cost, created_at, deleted_at, total_cost, is_batch';
       const baseSelect = `${legacySelect}, recipe_type_id, shelf_life_quantity, shelf_life_unit, costing_version, last_costed_at`;
       try {
         return await api.entities.Recipe.list(sortRecipes, { ...options, select: `${baseSelect}, margin_alert_status` });
@@ -197,7 +220,7 @@ export default function Recipes() {
   });
 
   const recipes = React.useMemo(() => {
-    return recipesData?.pages.flat() || [];
+    return filterActiveRecipes(recipesData?.pages.flat() || []);
   }, [recipesData]);
 
   const { data: products = [] } = useAuthQuery({
@@ -300,6 +323,8 @@ export default function Recipes() {
     enabled: !!organization?.id && ['menu-items', 'prepared-items', 'bar-items'].includes(activeTab),
   });
 
+  const beverageTypeIds = React.useMemo(() => getBeverageTypeIds(recipeTypes), [recipeTypes]);
+
   const productsMap = React.useMemo(() => {
     const map = new Map();
     for (let i = 0; i < products.length; i++) {
@@ -360,6 +385,64 @@ export default function Recipes() {
     conversions: unitConversions,
     recipeTypes,
   }), [recipes, products, unitConversions, recipeTypes]);
+
+  const setupChecklist = React.useMemo(() => {
+    const productsWithPrice = products.filter((product) => Number(product.latest_price || 0) > 0);
+    const productsWithUnit = products.filter((product) => product.base_unit || product.report_by_unit);
+    const recipeCategoriesReady = !recipeCategoriesLoadFailed && recipeCategories.length > 0;
+    return [
+      {
+        label: 'Products loaded',
+        description: 'Ingredient catalog is available to Recipes.',
+        complete: products.length > 0,
+        count: products.length,
+      },
+      {
+        label: 'Product prices available',
+        description: 'Products with latest prices can produce ingredient costs.',
+        complete: products.length > 0 && productsWithPrice.length === products.length,
+        count: productsWithPrice.length,
+        total: products.length,
+      },
+      {
+        label: 'Product cost units available',
+        description: 'Base or reporting units let conversions connect cleanly.',
+        complete: products.length > 0 && productsWithUnit.length === products.length,
+        count: productsWithUnit.length,
+        total: products.length,
+      },
+      {
+        label: 'Conversion rules added',
+        description: 'Rules convert purchased units into recipe units.',
+        complete: unitConversions.length > 0,
+        count: unitConversions.length,
+      },
+      {
+        label: 'Prepared / batch items started',
+        description: 'Reusable prep items make menu costing easier to maintain.',
+        complete: moduleReadiness.preparedItems.length > 0,
+        count: moduleReadiness.preparedItems.length,
+      },
+      {
+        label: 'Menu prices entered',
+        description: 'Prices unlock plate cost, gross profit, and margin alerts.',
+        complete: moduleReadiness.menuItems.length > 0 && moduleReadiness.pricedMenuItems.length === moduleReadiness.menuItems.length,
+        count: moduleReadiness.pricedMenuItems.length,
+        total: moduleReadiness.menuItems.length,
+      },
+      {
+        label: 'Recipe categories ready',
+        description: 'Categories keep the recipe library organized.',
+        complete: recipeCategoriesReady,
+        count: recipeCategories.length,
+      },
+    ];
+  }, [products, unitConversions, moduleReadiness, recipeCategories, recipeCategoriesLoadFailed]);
+
+  const setupConversionPrefill = React.useMemo(
+    () => readMissingConversionSetupParams(routerLocation.search),
+    [routerLocation.search],
+  );
 
   const getReadinessAction = React.useCallback((step) => {
     switch (step.key) {
@@ -517,6 +600,23 @@ export default function Recipes() {
     });
     setEditingRecipe(null);
   };
+
+  const handleCreateRecipeType = React.useCallback((type) => {
+    switch (type) {
+      case 'menu-item':
+        navigate(`/Recipes/menu-items/new${routerLocation.search}`);
+        break;
+      case 'prepared-item':
+        navigate(`/Recipes/prepared-items/new${routerLocation.search}`);
+        break;
+      case 'bar-item':
+        navigate(`/Recipes/bar-items/new${routerLocation.search}`);
+        break;
+      default:
+        resetForm();
+        setDialogOpen(true);
+    }
+  }, [navigate, routerLocation.search]);
 
   useEffect(() => {
     if (dialogOpen && formBaselineRef.current === null) {
@@ -780,8 +880,19 @@ export default function Recipes() {
   }, [recipes, search, categoryFilter]);
 
   const menuItemRouteValue = currentSubPath === 'menu-items' ? pathParts[2] : null;
-  if (menuItemRouteValue === 'new') {
+  const menuItemEdit = currentSubPath === 'menu-items' && pathParts[3] === 'edit';
+  const menuRecipes = recipes.filter((recipe) => classifyRecipe(recipe, { beverageTypeIds }).key === 'menu-item');
+  const menuEditRoute = resolveRecipeEditRoute({
+    routeValue: menuItemRouteValue,
+    isEdit: menuItemEdit,
+    recipes: menuRecipes,
+    isLoading,
+  });
+  if (menuEditRoute.state === 'loading') return <RecipeRouteStatus loading title="Loading Menu Item" description="Opening the item for editing." />;
+  if (menuEditRoute.state === 'not-found') return <RecipeRouteStatus title="Menu Item not found" description="This item may have been deleted, moved, or is outside the current organization context." />;
+  if (menuItemRouteValue === 'new' || menuEditRoute.state === 'edit') {
     return <MenuItemAuthoringPage
+      recipe={menuEditRoute.recipe}
       products={products}
       preparedItems={recipes.filter((recipe) => recipe.is_batch || recipe.category === 'prepared_item')}
       locations={recipeLocations}
@@ -789,15 +900,22 @@ export default function Recipes() {
     />;
   }
   if (menuItemRouteValue) {
-    return <MenuItemDetailPage recipeId={menuItemRouteValue} locations={recipeLocations} />;
+    return <MenuItemDetailPage recipeId={menuItemRouteValue} locations={recipeLocations} onEdit={(item) => navigate(`/Recipes/menu-items/${item.id}/edit${routerLocation.search}`)} />;
   }
 
   const preparedItemRouteValue = currentSubPath === 'prepared-items' ? pathParts[2] : null;
   const preparedItemEdit = currentSubPath === 'prepared-items' && pathParts[3] === 'edit';
-  const preparedRecipes = recipes.filter((recipe) => recipe.is_batch || recipe.category === 'prepared_item');
-  if (preparedItemRouteValue === 'new' || preparedItemEdit) {
-    const editingPreparedItem = preparedItemEdit ? preparedRecipes.find((recipe) => recipe.id === preparedItemRouteValue) : null;
-    return <PreparedItemAuthoringPage recipe={editingPreparedItem} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
+  const preparedRecipes = recipes.filter((recipe) => classifyRecipe(recipe, { beverageTypeIds }).key === 'prepared-item');
+  const preparedEditRoute = resolveRecipeEditRoute({
+    routeValue: preparedItemRouteValue,
+    isEdit: preparedItemEdit,
+    recipes: preparedRecipes,
+    isLoading,
+  });
+  if (preparedEditRoute.state === 'loading') return <RecipeRouteStatus loading title="Loading Prepared Item" description="Opening the item for editing." />;
+  if (preparedEditRoute.state === 'not-found') return <RecipeRouteStatus title="Prepared Item not found" description="This item may have been deleted, moved, or is outside the current organization context." />;
+  if (preparedItemRouteValue === 'new' || preparedEditRoute.state === 'edit') {
+    return <PreparedItemAuthoringPage recipe={preparedEditRoute.recipe} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
   }
   if (preparedItemRouteValue) {
     return <PreparedItemDetailPage recipeId={preparedItemRouteValue} onEdit={(item) => navigate(`/Recipes/prepared-items/${item.id}/edit${routerLocation.search}`)} />;
@@ -805,24 +923,23 @@ export default function Recipes() {
 
   const barItemRouteValue = currentSubPath === 'bar-items' ? pathParts[2] : null;
   const barItemEdit = currentSubPath === 'bar-items' && pathParts[3] === 'edit';
-  const beverageTypeIds = recipeTypes.filter((row) => row.kind === 'beverage').map((row) => row.id);
-  const barRecipes = recipes.filter((row) => !row.is_batch && (row.category === 'beverage' || beverageTypeIds.includes(row.recipe_type_id)));
-  if (barItemRouteValue === 'new' || barItemEdit) {
-    const editingBarItem = barItemEdit ? barRecipes.find((row) => row.id === barItemRouteValue) : null;
-    return <BarItemAuthoringPage recipe={editingBarItem} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
+  const barRecipes = recipes.filter((row) => classifyRecipe(row, { beverageTypeIds }).key === 'bar-item');
+  const barEditRoute = resolveRecipeEditRoute({
+    routeValue: barItemRouteValue,
+    isEdit: barItemEdit,
+    recipes: barRecipes,
+    isLoading,
+  });
+  if (barEditRoute.state === 'loading') return <RecipeRouteStatus loading title="Loading Bar Item" description="Opening the item for editing." />;
+  if (barEditRoute.state === 'not-found') return <RecipeRouteStatus title="Bar Item not found" description="This item may have been deleted, moved, or is outside the current organization context." />;
+  if (barItemRouteValue === 'new' || barEditRoute.state === 'edit') {
+    return <BarItemAuthoringPage recipe={barEditRoute.recipe} products={products} preparedItems={preparedRecipes} recipeTypes={recipeTypes} locations={recipeLocations} conversions={unitConversions} />;
   }
   if (barItemRouteValue) {
     return <BarItemDetailPage recipeId={barItemRouteValue} locations={recipeLocations} onEdit={(item) => navigate(`/Recipes/bar-items/${item.id}/edit${routerLocation.search}`)} />;
   }
 
-  if (activeTab === 'unit-conversions') {
-    return (
-      <UnitConversionsManager
-        products={products}
-        conversions={unitConversions}
-      />
-    );
-  }
+  if (activeTab === 'unit-conversions') return null;
 
   return (
     <div className="recipe-visual-page space-y-6" string="progress">
@@ -834,12 +951,12 @@ export default function Recipes() {
           {activeTab === 'setup' ? (
             <>
               <h1 className="text-2xl font-bold text-foreground">Recipe Setup</h1>
-              <p className="text-muted-foreground mt-1">Configure organization-wide recipe settings and categories</p>
+              <p className="text-muted-foreground mt-1">Manage unit conversion rules and recipe categories in one place</p>
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-foreground">Recipes</h1>
-              <p className="text-muted-foreground mt-1">Manage recipes and calculate costs</p>
+              <h1 className="text-2xl font-bold text-foreground">Recipe Library</h1>
+              <p className="text-muted-foreground mt-1">Create, organize, and review recipe costing records</p>
             </>
           )}
         </div>
@@ -859,14 +976,32 @@ export default function Recipes() {
             Add Category
           </Button>
         ) : (
-          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Recipe
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="bg-primary hover:bg-primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Create
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuItem onClick={() => handleCreateRecipeType('menu-item')}>
+                Create Menu Item
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreateRecipeType('prepared-item')}>
+                Create Prepared Item
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreateRecipeType('bar-item')}>
+                Create Bar Item
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCreateRecipeType('general-recipe')}>
+                Create General Recipe
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
-      {/* Stats — Recipes List and related views only */}
+      {/* Stats — Recipe Library and related views only */}
       {activeTab !== 'setup' && (
       <div className="recipe-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
         <Card className="recipe-stat-card border-0 shadow-sm">
@@ -911,7 +1046,7 @@ export default function Recipes() {
               <div>
                 <CardTitle className="text-lg">Recipe costing readiness</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Build the costing engine first: products, conversions, prepared items, menu items, and prices.
+                  Build the costing engine first: products, Setup conversion rules, prepared items, menu items, and prices.
                 </p>
               </div>
               <Badge variant={moduleReadiness.percent >= 80 ? 'default' : 'secondary'} className="w-fit">
@@ -960,7 +1095,7 @@ export default function Recipes() {
             locationId={location?.id || null}
             onAdd={() => navigate(`/Recipes/menu-items/new${routerLocation.search}`)}
             onView={(item) => navigate(`/Recipes/menu-items/${item.id}${routerLocation.search}`)}
-            onEdit={handleEdit}
+            onEdit={(item) => navigate(`/Recipes/menu-items/${item.id}/edit${routerLocation.search}`)}
           />
         </TabsContent>
 
@@ -974,7 +1109,7 @@ export default function Recipes() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search recipes..."
+                placeholder="Search recipe library..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -1018,7 +1153,9 @@ export default function Recipes() {
         ) : filteredRecipes.length === 0 ? (
           <div className="col-span-full text-center py-8 text-muted-foreground">No recipes found</div>
         ) : (
-          filteredRecipes.map((recipe) => (
+          filteredRecipes.map((recipe) => {
+            const classification = classifyRecipe(recipe, { beverageTypeIds });
+            return (
             <Card key={recipe.id} className="recipe-grid-card border-0 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -1028,9 +1165,12 @@ export default function Recipes() {
                     </div>
                     <div>
                       <CardTitle className="text-base">{recipe.name}</CardTitle>
-                      <Badge variant="secondary" className="mt-1">
-                        {recipe.category?.replace('_', ' ')}
-                      </Badge>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <Badge variant="default">{classification.label}</Badge>
+                        <Badge variant="secondary">
+                          {recipe.category?.replace('_', ' ') || 'uncategorized'}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -1077,7 +1217,8 @@ export default function Recipes() {
                 </div>
               </CardContent>
             </Card>
-          ))
+          );
+          })
         )}
       </div>
       {hasNextRecipesPage && (
@@ -1325,37 +1466,69 @@ export default function Recipes() {
  {/* Setup Tab */}
         <TabsContent value="setup">
           <div className="space-y-6">
+            <Card className="border shadow-sm">
+              <CardHeader>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Costing Setup Checklist</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Confirm the recipe-costing foundation before building menu, batch, and beverage recipes.
+                    </p>
+                  </div>
+                  <Badge variant={setupChecklist.every((item) => item.complete) ? 'default' : 'secondary'} className="w-fit">
+                    {setupChecklist.filter((item) => item.complete).length}/{setupChecklist.length} ready
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {setupChecklist.map((item) => (
+                  <div key={item.label} className="rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{item.label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                      </div>
+                      <Badge variant={item.complete ? 'default' : 'secondary'}>
+                        {item.total != null ? `${item.count}/${item.total}` : item.count}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
             <UnitConversionsManager
               products={products}
               conversions={unitConversions}
+              initialDialogDefaults={setupConversionPrefill.defaults}
+              returnTo={setupConversionPrefill.returnTo}
               compact
             />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Settings className="h-4 w-4" /> Recipe Configuration
+                  <Settings className="h-4 w-4" /> Costing Behavior
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Default Labor Rate</p>
-                    <p className="text-sm text-muted-foreground">Applied to all new recipes</p>
+                    <p className="font-medium">Labor Rate</p>
+                    <p className="text-sm text-muted-foreground">Entered on each recipe until organization defaults are persisted.</p>
                   </div>
-                  <Input className="w-28" type="number" step="0.01" defaultValue="15.00" />
+                  <Badge variant="secondary">Per recipe</Badge>
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Target Food Cost %</p>
-                    <p className="text-sm text-muted-foreground">Goal for plate cost as % of selling price</p>
+                    <p className="font-medium">Plate-Cost Targets</p>
+                    <p className="text-sm text-muted-foreground">Set per menu item or bar item for cost monitoring.</p>
                   </div>
-                  <Input className="w-28" type="number" step="1" defaultValue="30" />
+                  <Badge variant="secondary">Per item</Badge>
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Auto-Calculate on Save</p>
-                    <p className="text-sm text-muted-foreground">Automatically calculate costs when recipes are saved</p>
+                    <p className="font-medium">Cost Calculation</p>
+                    <p className="text-sm text-muted-foreground">Recipes recalculate from ingredients, yields, and conversion rules when saved.</p>
                   </div>
                   <Badge className="bg-resend-green/10 text-resend-green">Enabled</Badge>
                 </div>

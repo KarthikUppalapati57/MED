@@ -282,8 +282,8 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Menu Items</h2>
-          <p className="text-sm text-muted-foreground">Cost finished dishes from Products and Prepared Items, then watch price, profit, and plate-cost risk.</p>
+          <h2 className="text-xl font-semibold">Sellable Menu Items</h2>
+          <p className="text-sm text-muted-foreground">Finished dishes with price, profit, and plate-cost tracking.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importRows} />
