@@ -323,8 +323,8 @@ export default function PhaseOneOverview({
         ? [{
             tone: 'risk',
             title: `${summary.categoriesOverBudget} categories over budget`,
-            body: 'Open Category Report to inspect invoice allocations and vendors.',
-            tab: 'category',
+            body: 'Open Spend & Products to inspect invoice allocations, vendors, and product movement.',
+            tab: 'spend_products',
           }]
         : []),
       ...(invoiceUnpaid > 0
@@ -339,8 +339,8 @@ export default function PhaseOneOverview({
         ? [{
             tone: 'warn',
             title: `${lowStock} inventory items near reorder`,
-            body: 'Open Usage Report to compare stock and movement pressure.',
-            tab: 'usage_report',
+            body: 'Open Inventory & Recipes to compare stock, usage, and recipe margin pressure.',
+            tab: 'inventory_recipes',
           }]
         : []),
       ...(recipeMarginRisks.length > 0
@@ -355,8 +355,8 @@ export default function PhaseOneOverview({
         ? [{
             tone: 'warn',
             title: `${priceMovers.length} product price movers`,
-            body: 'Open Price Movers to identify vendor item increases.',
-            tab: 'movers',
+            body: 'Open Spend & Products to identify vendor item increases.',
+            tab: 'spend_products',
           }]
         : []),
     ].slice(0, 5);
@@ -512,8 +512,8 @@ export default function PhaseOneOverview({
                 <CardTitle className="text-base">Budget vs actual category spend</CardTitle>
                 <CardDescription>Actuals are invoice allocation spend. Budgets are saved product/invoice category targets.</CardDescription>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => onOpenTab?.('category')}>
-                Open Category Report
+              <Button type="button" variant="outline" size="sm" onClick={() => onOpenTab?.('spend_products')}>
+                Open Spend & Products
               </Button>
             </div>
           </CardHeader>

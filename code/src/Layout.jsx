@@ -441,7 +441,9 @@ export default function Layout({ children, currentPageName }) {
           <Link to="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity">
             <RestopsLogo className="h-16 w-40" />
           </Link>
-          <button 
+          <button
+            type="button"
+            aria-label="Close navigation menu"
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -470,6 +472,9 @@ export default function Layout({ children, currentPageName }) {
                   className="space-y-0.5"
                 >
                   <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.name} navigation group`}
                     onClick={() => toggleMenu(item.name)}
                     className={cn(
                       "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
@@ -571,6 +576,8 @@ export default function Layout({ children, currentPageName }) {
  {/* Top header glass effect */}
         <header className="sticky top-0 z-30 h-16 glass-header border-b border-border flex items-center justify-between px-4 lg:px-6">
           <button
+            type="button"
+            aria-label="Open navigation menu"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -588,7 +595,7 @@ export default function Layout({ children, currentPageName }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="sm" aria-label="Toggle language" onClick={() => {
               const newLang = i18n.language === 'en' ? 'es' : 'en';
               i18n.changeLanguage(newLang);
             }}>
@@ -598,7 +605,7 @@ export default function Layout({ children, currentPageName }) {
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" aria-label="Open notifications" className="relative text-muted-foreground hover:text-foreground">
                   <Bell className="h-5 w-5" />
                   {notifications.length > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-resend-red text-white text-xs border-0 animate-pulse">
@@ -655,7 +662,7 @@ export default function Layout({ children, currentPageName }) {
             {/* User menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 hover:bg-secondary/70">
+                <Button variant="ghost" aria-label="Open user menu" className="flex items-center gap-2 hover:bg-secondary/70">
                   <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center border border-border">
                     <User className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -713,4 +720,6 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 }
+
+
 

@@ -430,8 +430,9 @@ function SignupPage() {
               </div>
             )}
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Full Name</label>
+              <label htmlFor="signup-full-name" className="block text-sm font-medium text-foreground">Full Name</label>
               <input
+                id="signup-full-name"
                 type="text"
                 value={form.full_name}
                 onChange={(e) => setForm((current) => ({ ...current, full_name: e.target.value }))}
@@ -441,8 +442,9 @@ function SignupPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Email</label>
+              <label htmlFor="signup-email" className="block text-sm font-medium text-foreground">Email</label>
               <input
+                id="signup-email"
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))}
@@ -455,8 +457,9 @@ function SignupPage() {
               {!!inviteInfo?.email && <p className="text-xs text-muted-foreground">This invite is assigned to {inviteInfo.email}.</p>}
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Username</label>
+              <label htmlFor="signup-username" className="block text-sm font-medium text-foreground">Username</label>
               <input
+                id="signup-username"
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm((current) => ({ ...current, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24) }))}
@@ -475,8 +478,9 @@ function SignupPage() {
               </p>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Password</label>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-foreground">Password</label>
               <input
+                id="signup-password"
                 type="password"
                 autoComplete="new-password"
                 value={form.password}
@@ -488,8 +492,9 @@ function SignupPage() {
               <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Confirm Password</label>
+              <label htmlFor="signup-confirm-password" className="block text-sm font-medium text-foreground">Confirm Password</label>
               <input
+                id="signup-confirm-password"
                 type="password"
                 autoComplete="new-password"
                 value={form.confirm}
@@ -767,8 +772,9 @@ function LoginPage() {
 
         <form className="space-y-4" onSubmit={handleLogin}>
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-foreground">Email or Username</label>
+            <label htmlFor="login-identifier" className="block text-sm font-medium text-foreground">Email or Username</label>
             <input
+              id="login-identifier"
               type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -780,7 +786,7 @@ function LoginPage() {
           </div>
           <div className="space-y-1">
             <div className="flex justify-between items-center">
-              <label className="block text-sm font-medium text-foreground">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-foreground">Password</label>
               <button 
                 type="button" 
                 onClick={() => setIsResetMode(true)}
@@ -790,6 +796,7 @@ function LoginPage() {
               </button>
             </div>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -1024,9 +1031,10 @@ function UpdatePasswordPage() {
         <form className="space-y-4" onSubmit={handleUpdate}>
           {!isRecovery && (
             <div className="space-y-1.5 mb-4 border-b border-border/40 pb-4">
-              <label className="block text-sm font-semibold text-foreground">Current Password</label>
+              <label htmlFor="current-password" className="block text-sm font-semibold text-foreground">Current Password</label>
               <div className="relative">
                 <input
+                  id="current-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={currentPassword}
@@ -1039,9 +1047,10 @@ function UpdatePasswordPage() {
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-foreground">New Password</label>
+            <label htmlFor="new-password" className="block text-sm font-semibold text-foreground">New Password</label>
             <div className="relative">
               <input
+                id="new-password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 value={password}
@@ -1065,8 +1074,9 @@ function UpdatePasswordPage() {
             <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_DESCRIPTION}</p>
           </div>
           <div className="space-y-1.5">
-            <label className="block text-sm font-semibold text-foreground">Confirm Password</label>
+            <label htmlFor="confirm-new-password" className="block text-sm font-semibold text-foreground">Confirm Password</label>
             <input
+              id="confirm-new-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               value={confirm}
@@ -1078,8 +1088,9 @@ function UpdatePasswordPage() {
           </div>
           {needsRecoveryMfa && (
             <div className="space-y-1.5 rounded-lg border border-border/60 bg-secondary/20 p-3">
-              <label className="block text-sm font-semibold text-foreground">MFA Code</label>
+              <label htmlFor="password-reset-mfa-code" className="block text-sm font-semibold text-foreground">MFA Code</label>
               <input
+                id="password-reset-mfa-code"
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -1421,3 +1432,7 @@ function App() {
 }
 
 export default App
+
+
+
+

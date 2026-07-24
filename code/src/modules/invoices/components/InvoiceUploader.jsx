@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { hashFile } from '@/lib/fileHash';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const MAX_INVOICE_FILE_BYTES = 50 * 1024 * 1024;
 const ACCEPTED_INVOICE_MIME_TYPES = new Set([
@@ -57,6 +58,7 @@ export default function InvoiceUploader({
   onUploadDraftFailed,
   organizationId
 }) {
+  const { confirm } = useConfirmation();
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState('');
@@ -578,4 +580,5 @@ export default function InvoiceUploader({
     </Dialog>
   );
 }
+
 

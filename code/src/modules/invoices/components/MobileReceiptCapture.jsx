@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, UploadCloud, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -7,10 +7,12 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { hashFile } from '@/lib/fileHash';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 // extractInvoiceData import removed
 
 export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtracted }) {
   const { organization } = useAuth();
+  const { confirm } = useConfirmation();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -90,11 +92,14 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
         const duplicates = await api.financial.findDuplicateInvoiceDocuments({ organizationId: organization.id, fileHash }).catch(() => []);
         if (duplicates.length > 0) {
           const match = duplicates[0];
-          const proceed = window.confirm(
-            `This photo looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}` +
-            `${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}).\n\n` +
-            `Upload it again anyway?`
-          );
+          const proceed = await confirm({
+            title: 'Duplicate receipt detected',
+            description: `This photo looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}). Upload it again anyway?`,
+            confirmText: 'Upload Anyway',
+            cancelText: 'Retake or Cancel',
+            variant: 'warning',
+            severity: 'high',
+          });
           if (!proceed) {
             setIsUploading(false);
             setProgressMsg('');
@@ -246,4 +251,5 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
     </Dialog>
   );
 }
+
 

@@ -78,7 +78,7 @@ export const ConfirmationDialog = ({
       }
     }}>
       <AlertDialogContent
-        ariaLabel={ariaLabel}
+        aria-label={ariaLabel || title}
         className="max-w-md"
       >
         <AlertDialogHeader>
@@ -135,3 +135,4 @@ export const ConfirmationDialog = ({
     </AlertDialog>
   );
 };
+
