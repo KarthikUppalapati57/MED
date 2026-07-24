@@ -146,7 +146,6 @@ export default function UnitConversionDialog({
     const next = emptyDraft(initialValues || {}, products);
     setDraft(next);
     baselineRef.current = next;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid reset when catalog finishes loading
   }, [open, initialValues]);
 
   useEffect(() => {

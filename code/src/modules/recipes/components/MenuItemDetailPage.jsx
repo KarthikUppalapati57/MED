@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ChefHat, MapPin } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -14,6 +14,7 @@ const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD
 
 export default function MenuItemDetailPage({ recipeId, locations = [] }) {
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const { organization } = useAuth();
   const { data, isLoading, error } = useAuthQuery({
     queryKey: ['menu-item-detail', organization?.id, recipeId],
@@ -50,7 +51,7 @@ export default function MenuItemDetailPage({ recipeId, locations = [] }) {
   const selectedLocations = visibility.filter((row) => row.location_id && row.is_visible).map((row) => locations.find((entry) => entry.id === row.location_id)?.name).filter(Boolean);
 
   return <div className="mx-auto max-w-6xl space-y-6 pb-12">
-    <div><Button variant="ghost" className="mb-2 px-0" onClick={() => navigate('/Recipes/menu-items')}><ArrowLeft className="mr-2 h-4 w-4" /> Menu Items</Button><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-2"><h1 className="text-3xl font-semibold">{recipe.name}</h1><Badge variant={recipe.status === 'active' ? 'default' : 'secondary'} className="capitalize">{recipe.status}</Badge></div><p className="mt-1 text-muted-foreground">{recipe.description || 'No description provided.'}</p></div><Badge variant="outline" className="capitalize">{String(recipe.category || 'other').replaceAll('_', ' ')}</Badge></div></div>
+    <div><Button variant="ghost" className="mb-2 px-0" onClick={() => navigate(`/Recipes/menu-items${routerLocation.search}`)}><ArrowLeft className="mr-2 h-4 w-4" /> Menu Items</Button><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex items-center gap-2"><h1 className="text-3xl font-semibold">{recipe.name}</h1><Badge variant={recipe.status === 'active' ? 'default' : 'secondary'} className="capitalize">{recipe.status}</Badge></div><p className="mt-1 text-muted-foreground">{recipe.description || 'No description provided.'}</p></div><Badge variant="outline" className="capitalize">{String(recipe.category || 'other').replaceAll('_', ' ')}</Badge></div></div>
 
     <div className="grid gap-3 sm:grid-cols-4">{[
       ['Unit cost', money.format(Number(recipe.cost_per_serving || 0))],

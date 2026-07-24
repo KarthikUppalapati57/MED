@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Edit2, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 const money=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
 export default function PreparedItemDetailPage({recipeId,onEdit}) {
-  const navigate=useNavigate(); const {organization}=useAuth();
+  const navigate=useNavigate(); const routerLocation=useLocation(); const {organization}=useAuth();
   const {data,isLoading,error}=useAuthQuery({queryKey:['prepared-item-detail',organization?.id,recipeId],enabled:Boolean(organization?.id&&recipeId),queryFn:async()=>{
     const recipe=await api.entities.Recipe.get(recipeId);
     const [yields,ingredients,steps,dependencies,snapshots]=await Promise.all([
@@ -23,7 +23,7 @@ export default function PreparedItemDetailPage({recipeId,onEdit}) {
   if(isLoading)return <div className="flex min-h-96 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin"/></div>;
   if(error)return <Alert variant="destructive"><AlertTitle>Unable to load Prepared Item</AlertTitle><AlertDescription>{error.message}</AlertDescription></Alert>;
   const {recipe,yields,ingredients,steps,dependencies,snapshots}=data;
-  return <div className="mx-auto max-w-6xl space-y-6 pb-12"><div className="flex items-center justify-between"><div><Button variant="ghost" className="px-0" onClick={()=>navigate('/Recipes/prepared-items')}><ArrowLeft className="mr-2 h-4 w-4"/>Prepared Items</Button><h1 className="text-3xl font-semibold">{recipe.name}</h1><div className="mt-2 flex gap-2"><Badge className="capitalize">{recipe.status}</Badge><Badge variant="outline">Prepared Item</Badge></div></div><Button onClick={()=>onEdit(recipe)}><Edit2 className="mr-2 h-4 w-4"/>Edit</Button></div>
+  return <div className="mx-auto max-w-6xl space-y-6 pb-12"><div className="flex items-center justify-between"><div><Button variant="ghost" className="px-0" onClick={()=>navigate(`/Recipes/prepared-items${routerLocation.search}`)}><ArrowLeft className="mr-2 h-4 w-4"/>Prepared Items</Button><h1 className="text-3xl font-semibold">{recipe.name}</h1><div className="mt-2 flex gap-2"><Badge className="capitalize">{recipe.status}</Badge><Badge variant="outline">Prepared Item</Badge></div></div><Button onClick={()=>onEdit(recipe)}><Edit2 className="mr-2 h-4 w-4"/>Edit</Button></div>
   <div className="grid gap-4 md:grid-cols-4">{[['Batch cost',money.format(Number(recipe.total_cost||0))],['Cost / primary yield',money.format(Number(recipe.cost_per_serving||0))],['Primary yield',`${recipe.yield_quantity||0} ${recipe.yield_unit||''}`],['Shelf life',recipe.shelf_life_quantity?`${recipe.shelf_life_quantity} ${recipe.shelf_life_unit}`:'Not set']].map(([label,value])=><Card key={label}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></CardContent></Card>)}</div>
   {recipe.description&&<Card><CardHeader><CardTitle>Description</CardTitle></CardHeader><CardContent>{recipe.description}</CardContent></Card>}
   <Card><CardHeader><CardTitle>Yields</CardTitle></CardHeader><CardContent><div className="flex flex-wrap gap-2">{yields.map((row)=><Badge variant={row.is_primary?'default':'outline'} key={row.id}>{row.quantity} {row.unit}{row.is_primary?' · Primary':''} · {money.format(Number(row.cost_per_unit||0))}</Badge>)}</div></CardContent></Card>
