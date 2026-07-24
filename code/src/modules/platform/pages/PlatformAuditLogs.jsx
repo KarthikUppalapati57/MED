@@ -22,6 +22,28 @@ const PLATFORM_AUDIT_ROW_HEIGHT = 72;
 const PLATFORM_AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
 const PLATFORM_AUDIT_ROW_OVERSCAN = 8;
 
+async function attachAuditLogProfiles(logs) {
+  const rows = logs || [];
+  const userIds = [...new Set(rows.map((log) => log.user_id).filter(Boolean))];
+
+  if (userIds.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .in('id', userIds);
+
+  if (error) {
+    console.warn('Unable to hydrate audit log profiles:', error);
+    return rows;
+  }
+
+  const profilesById = new Map((data || []).map((profile) => [profile.id, profile]));
+  return rows.map((log) => ({
+    ...log,
+    profiles: profilesById.get(log.user_id) || null,
+  }));
+}
 // Every table actually wired to write into audit_logs (traced live: process_audit_log() and
 // process_onboarding_audit_log() trigger bindings) -- 'organizations'/'plans'/'webhook_events'/
 // 'brands'/'locations' were listed here before but no trigger ever populates audit_logs for
@@ -78,7 +100,7 @@ export default function PlatformAuditLogs() {
     queryFn: async () => {
       let q = supabase
         .from('audit_logs')
-        .select('*, profiles:user_id(email, full_name)', { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       if (logModuleFilter !== 'All') {
         q = q.eq('table_name', logModuleFilter.toLowerCase());
@@ -96,7 +118,7 @@ export default function PlatformAuditLogs() {
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
         
       if (error) throw error;
-      return { data, count };
+      return { data: await attachAuditLogProfiles(data), count };
     },
     enabled: authChecked && userRole === 'platform_admin',
   });

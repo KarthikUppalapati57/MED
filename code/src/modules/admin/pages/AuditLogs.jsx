@@ -26,6 +26,29 @@ const AUDIT_ROW_HEIGHT = 72;
 const AUDIT_TABLE_VIEWPORT_HEIGHT = 648;
 const AUDIT_ROW_OVERSCAN = 8;
 
+async function attachAuditLogProfiles(logs) {
+  const rows = logs || [];
+  const userIds = [...new Set(rows.map((log) => log.user_id).filter(Boolean))];
+
+  if (userIds.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .in('id', userIds);
+
+  if (error) {
+    console.warn('Unable to hydrate audit log profiles:', error);
+    return rows;
+  }
+
+  const profilesById = new Map((data || []).map((profile) => [profile.id, profile]));
+  return rows.map((log) => ({
+    ...log,
+    profiles: profilesById.get(log.user_id) || null,
+  }));
+}
+
 export default function AuditLogs() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
@@ -110,14 +133,14 @@ export default function AuditLogs() {
         if (filterOrgId !== 'all') conditions.organization_id = filterOrgId;
         if (filterBrandId !== 'all') conditions.brand_id = filterBrandId;
         if (filterLocationId !== 'all') conditions.location_id = filterLocationId;
-        return await api.entities.AuditLog.filter(conditions, {
-          select: '*, profiles:user_id(email, full_name)',
+        const logs = await api.entities.AuditLog.filter(conditions, {
           orderBy: sortBy,
           page: pageParam,
           pageSize: 50,
           search: debouncedSearch || undefined,
           searchColumn: 'action',
         });
+        return attachAuditLogProfiles(logs);
       } catch (err) {
         console.error('Error fetching audit logs:', err);
         throw err;

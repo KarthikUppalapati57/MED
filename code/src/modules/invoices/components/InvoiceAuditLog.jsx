@@ -4,6 +4,28 @@ import { format } from 'date-fns';
 import { History, Activity, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
+async function attachInvoiceAuditProfiles(events) {
+  const rows = events || [];
+  const userIds = [...new Set(rows.map((event) => event.user_id).filter(Boolean))];
+
+  if (userIds.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .in('id', userIds);
+
+  if (error) {
+    console.warn('Unable to hydrate invoice audit profiles:', error);
+    return rows;
+  }
+
+  const profilesById = new Map((data || []).map((profile) => [profile.id, profile]));
+  return rows.map((event) => ({
+    ...event,
+    user: profilesById.get(event.user_id) || null,
+  }));
+}
 export function InvoiceAuditLog({ invoiceId }) {
   const { data: events = [], isLoading, isError, error } = useQuery({
     queryKey: ['invoice-audit-events', invoiceId],
@@ -11,17 +33,11 @@ export function InvoiceAuditLog({ invoiceId }) {
       if (!invoiceId) return [];
       const { data, error } = await supabase
         .from('invoice_audit_events')
-        .select(`
-          *,
-          user:user_id (
-            email,
-            raw_user_meta_data
-          )
-        `)
+        .select('*')
         .eq('invoice_id', invoiceId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return attachInvoiceAuditProfiles(data || []);
     },
     enabled: !!invoiceId
   });
@@ -60,7 +76,7 @@ export function InvoiceAuditLog({ invoiceId }) {
       </div>
 
       <div className="relative border-l border-slate-200 ml-3 space-y-8 pb-4">
-        {events.map((event, idx) => (
+        {events.map((event) => (
           <div key={event.id} className="relative pl-6">
             <div className="absolute -left-1.5 top-1 w-3 h-3 bg-white border-2 border-slate-300 rounded-full" />
             
@@ -79,7 +95,7 @@ export function InvoiceAuditLog({ invoiceId }) {
 
             {event.user && (
               <p className="text-xs text-slate-500 mt-1">
-                By: {event.user.raw_user_meta_data?.full_name || event.user.email}
+                By: {event.user.full_name || event.user.email}
               </p>
             )}
 

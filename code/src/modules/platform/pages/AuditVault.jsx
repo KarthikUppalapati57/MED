@@ -32,10 +32,10 @@ export default function AuditVault() {
       const headers = ['ID', 'Timestamp', 'User_ID', 'Action', 'Entity_Type', 'Entity_ID', 'Details'];
       const csvRows = logs.map(log => [
         log.id,
-        new Date(log.created_at).toISOString(),
+        log.created_at ? new Date(log.created_at).toISOString() : '',
         log.user_id || 'SYSTEM',
         log.action,
-        log.entity_type,
+        log.entity_type || log.table_name || '',
         log.entity_id,
         JSON.stringify(log.details || {}).replace(/"/g, '""')
       ]);
@@ -63,8 +63,8 @@ export default function AuditVault() {
   };
 
   const filteredLogs = logs?.filter(log => 
-    log.action.toLowerCase().includes(search.toLowerCase()) || 
-    log.entity_type.toLowerCase().includes(search.toLowerCase())
+    String(log.action || '').toLowerCase().includes(search.toLowerCase()) || 
+    String(log.entity_type || log.table_name || '').toLowerCase().includes(search.toLowerCase())
   ) || [];
 
   return (
@@ -124,7 +124,7 @@ export default function AuditVault() {
                     <div>
                       <Badge variant="outline" className="font-mono">{log.action}</Badge>
                     </div>
-                    <div className="capitalize">{log.entity_type}</div>
+                    <div className="capitalize">{log.entity_type || log.table_name || 'system'}</div>
                     <div className="text-xs truncate text-muted-foreground font-mono" title={log.user_id}>
                       {log.user_id || 'SYSTEM'}
                     </div>
