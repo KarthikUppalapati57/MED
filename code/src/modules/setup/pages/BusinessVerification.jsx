@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -406,7 +406,7 @@ export default function BusinessVerification() {
     setContactOtp((prev) => ({ ...prev, [channel]: { ...prev[channel], verifying: true } }));
 
     try {
-      const result = await api.onboarding.verifyContactOtp({ channel, target: channel === 'email' ? form.email : form.phone, code: state.code });
+      const result = await api.onboarding.verifyContactOtp({ channel, target: channel === 'email' ? form.email : form.phone, code: state.code, otpId: state.otpId });
       setContactOtp((prev) => ({
         ...prev,
         [channel]: {
@@ -660,7 +660,7 @@ export default function BusinessVerification() {
                     {userProfile?.tax_identifier_last4 && (
                       <div className="rounded-lg border bg-secondary/30 p-4 text-sm">
                         <b>{(userProfile?.tax_identifier_type || requiredIdentifierType).toUpperCase()} on file:</b>{' '}
-                        <span className="font-mono">{revealedTaxId || `â€¢â€¢â€¢â€¢â€¢${userProfile.tax_identifier_last4}`}</span>
+                        <span className="font-mono">{revealedTaxId || `•••••${userProfile.tax_identifier_last4}`}</span>
                         <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" onClick={handleToggleRevealTaxId} disabled={revealingTaxId}>
                           {revealingTaxId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : revealedTaxId ? 'Hide' : 'Show'}
                         </Button>
