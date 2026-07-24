@@ -140,8 +140,8 @@ export default function InvoiceEditor({ invoice, onChange }) {
     handleFieldChange(field, formattedValue);
   };
 
-  const RequiredLabel = ({ children }) => (
-    <Label>
+  const RequiredLabel = ({ children, htmlFor }) => (
+    <Label htmlFor={htmlFor}>
       {children}
       {isManualEntry && <span className="ml-1 text-red-600" aria-label="required">*</span>}
     </Label>
@@ -241,58 +241,64 @@ export default function InvoiceEditor({ invoice, onChange }) {
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <RequiredLabel>Vendor Name</RequiredLabel>
+              <RequiredLabel htmlFor="invoice-vendor-name">Vendor Name</RequiredLabel>
               <Input
+                id="invoice-vendor-name"
                 value={invoice.vendor_name || ''}
                 onChange={(e) => handleFieldChange('vendor_name', e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <RequiredLabel>Invoice Number</RequiredLabel>
+              <RequiredLabel htmlFor="invoice-number">Invoice Number</RequiredLabel>
               <Input
+                id="invoice-number"
                 value={invoice.invoice_number || ''}
                 onChange={(e) => handleFieldChange('invoice_number', e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Account Number</Label>
+              <Label htmlFor="invoice-account-number">Account Number</Label>
               <Input
+                id="invoice-account-number"
                 value={invoice.account_number || ''}
                 onChange={(e) => handleFieldChange('account_number', e.target.value)}
                 placeholder="Vendor account #"
               />
             </div>
             <div className="space-y-2">
-              <Label>Invoice Date</Label>
+              <Label htmlFor="invoice-date">Invoice Date</Label>
               <Input
+                id="invoice-date"
                 type="date"
                 value={(invoice.invoice_date || '').split('T')[0]}
                 onChange={(e) => handleFieldChange('invoice_date', e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Due Date</Label>
+              <Label htmlFor="invoice-due-date">Due Date</Label>
               <Input
+                id="invoice-due-date"
                 type="date"
                 value={(invoice.due_date || '').split('T')[0]}
                 onChange={(e) => handleFieldChange('due_date', e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Payment Terms</Label>
+              <Label htmlFor="invoice-payment-terms">Payment Terms</Label>
               <Input
+                id="invoice-payment-terms"
                 value={invoice.payment_terms || ''}
                 onChange={(e) => handleFieldChange('payment_terms', e.target.value)}
                 placeholder="e.g. Net 30"
               />
             </div>
             <div className="space-y-2">
-              <Label>Payment Status</Label>
+              <Label htmlFor="invoice-payment-status">Payment Status</Label>
               <Select
                 value={invoice.payment_status || 'unpaid'}
                 onValueChange={(val) => handleFieldChange('payment_status', val)}
               >
-                <SelectTrigger className="w-full bg-white border-slate-200">
+                <SelectTrigger id="invoice-payment-status" className="w-full bg-white border-slate-200">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -303,10 +309,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Subtotal</Label>
+              <Label htmlFor="invoice-subtotal">Subtotal</Label>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-subtotal"
                 value={displayNumberInput(invoice.subtotal)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('subtotal', e.target.value)}
@@ -314,10 +321,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Tax Amount</Label>
+              <Label htmlFor="invoice-tax-amount">Tax Amount</Label>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-tax-amount"
                 value={displayNumberInput(invoice.tax_amount)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('tax_amount', e.target.value)}
@@ -325,10 +333,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Fuel Surcharge</Label>
+              <Label htmlFor="invoice-fuel-surcharge">Fuel Surcharge</Label>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-fuel-surcharge"
                 value={displayNumberInput(invoice.fuel_surcharge)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('fuel_surcharge', e.target.value)}
@@ -336,10 +345,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Delivery Fee</Label>
+              <Label htmlFor="invoice-delivery-fee">Delivery Fee</Label>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-delivery-fee"
                 value={displayNumberInput(invoice.delivery_fee)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('delivery_fee', e.target.value)}
@@ -347,10 +357,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Other Charges</Label>
+              <Label htmlFor="invoice-other-charges">Other Charges</Label>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-other-charges"
                 value={displayNumberInput(invoice.other_charges)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('other_charges', e.target.value)}
@@ -358,10 +369,11 @@ export default function InvoiceEditor({ invoice, onChange }) {
               />
             </div>
             <div className="space-y-2">
-              <RequiredLabel>Total Amount</RequiredLabel>
+              <RequiredLabel htmlFor="invoice-total-amount">Total Amount</RequiredLabel>
               <Input
                 type="number"
                 step="0.01"
+                id="invoice-total-amount"
                 value={displayNumberInput(invoice.total_amount)}
                 placeholder="0.00"
                 onChange={(e) => handleFieldChange('total_amount', e.target.value)}
@@ -492,6 +504,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-600"
+                        aria-label={`Remove line item ${index + 1}: ${item.description || item.vendor_item_code || 'unnamed item'}`}
                         onClick={() => removeLineItem(index)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -607,5 +620,10 @@ export default function InvoiceEditor({ invoice, onChange }) {
     </div>
   );
 }
+
+
+
+
+
 
 

@@ -209,11 +209,14 @@ export default function InvoiceUploader({
         const duplicates = await api.financial.findDuplicateInvoiceDocuments({ organizationId, fileHash }).catch(() => []);
         if (duplicates.length > 0) {
           const match = duplicates[0];
-          const proceed = window.confirm(
-            `This file looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}` +
-            `${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}).\n\n` +
-            `Upload it again anyway?`
-          );
+          const proceed = await confirm({
+            title: 'Duplicate invoice detected',
+            description: `This file looks identical to an invoice already uploaded (${match.vendor_name || 'Unknown Vendor'}${match.invoice_number ? ` #${match.invoice_number}` : ''}, ${match.status || 'pending_review'}). Upload it again anyway?`,
+            confirmText: 'Upload Anyway',
+            cancelText: 'Cancel Upload',
+            variant: 'warning',
+            severity: 'high',
+          });
           if (!proceed) {
             setUploading(false);
             return;
@@ -580,5 +583,6 @@ export default function InvoiceUploader({
     </Dialog>
   );
 }
+
 
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -85,6 +85,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCOALabel } from '@/lib/accountingConfig';
 import { getProductUnitDefinition } from '@/modules/products/utils/productUnits';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const LoadingDockReceiving = React.lazy(() => import('@/modules/inventory/components/LoadingDockReceiving'));
 const ActiveCountSession = React.lazy(() => import('@/modules/inventory/components/ActiveCountSession'));
@@ -373,6 +374,7 @@ function useDebouncedQueryInvalidation(queryClient, queryKeys, delay = 1000) {
 }
 
 export default function Inventory() {
+  const { confirm } = useConfirmation();
   const { isGroundStaff } = usePermissions();
   const { hasLocation, warnIfMissing } = useRequireLocation();
   const navigate = useNavigate();
@@ -2258,14 +2260,20 @@ export default function Inventory() {
     setEditDialogOpen(true);
   };
 
-  const handleDelete = (item) => {
+  const handleDelete = async (item) => {
     if (item?.is_product_backed_inventory) {
       toast.info('This product is marked inventoried in Products. Turn off inventory tracking from the product if it should not appear here.');
       return;
     }
-    if (confirm(`Remove "${item.product_name}" from inventory? This cannot be undone.`)) {
-      deleteMutation.mutate(item.id);
-    }
+    const proceed = await confirm({
+      title: `Remove ${item.product_name} from inventory?`,
+      description: 'This inventory item will be deleted. This action cannot be undone.',
+      confirmText: 'Remove Item',
+      cancelText: 'Keep Item',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (proceed) deleteMutation.mutate(item.id);
   };
 
   const handleConvert = async (item) => {
@@ -2555,7 +2563,15 @@ export default function Inventory() {
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Delete ${selectedIds.size} selected item(s)? This cannot be undone.`)) {
+    const proceed = await confirm({
+      title: `Delete ${selectedIds.size} selected item(s)?`,
+      description: 'Selected inventory items will be deleted. This action cannot be undone.',
+      confirmText: 'Delete Items',
+      cancelText: 'Keep Items',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (proceed) {
       try {
         await api.entities.Inventory.deleteMany([...selectedIds]);
         queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -2872,8 +2888,16 @@ export default function Inventory() {
                 <Button size="sm" variant="outline" onClick={handleExport}>
                   <Download className="h-4 w-4 mr-1" /> Export
                 </Button>
-                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600" onClick={() => {
-                  if (confirm('Apply AI suggested Par Levels to selected items based on recent sales trends?')) {
+                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600" onClick={async () => {
+                  const proceed = await confirm({
+                    title: 'Apply AI suggested par levels?',
+                    description: 'Selected items will receive updated par levels based on recent sales trends.',
+                    confirmText: 'Apply Suggestions',
+                    cancelText: 'Review Again',
+                    variant: 'warning',
+                    severity: 'medium',
+                  });
+                  if (proceed) {
                     const selected = inventory.filter(i => selectedIds.has(i.id));
                     selected.forEach(item => {
                       const smartPar = Math.ceil((item.par_level || 10) * 1.3);
@@ -3105,7 +3129,7 @@ export default function Inventory() {
                           ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {items} item{items === 1 ? '' : 's'} Â· {percent === null ? '0.0' : percent.toFixed(1)}% of inventory
+                          {items} item{items === 1 ? '' : 's'} · {percent === null ? '0.0' : percent.toFixed(1)}% of inventory
                         </p>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-secondary">
@@ -5296,7 +5320,7 @@ export default function Inventory() {
                 {selectedStockCountLabel}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {format(new Date(`${stockCountDate}T00:00:00`), 'MMM d, yyyy')} Â· {currentStockCountItems.filter(item => item.count > 0).length} counted item{currentStockCountItems.filter(item => item.count > 0).length === 1 ? '' : 's'} Â· ${currentStockCountTotal.toFixed(2)}
+                {format(new Date(`${stockCountDate}T00:00:00`), 'MMM d, yyyy')} · {currentStockCountItems.filter(item => item.count > 0).length} counted item{currentStockCountItems.filter(item => item.count > 0).length === 1 ? '' : 's'} · ${currentStockCountTotal.toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5323,7 +5347,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-yellow/40 bg-resend-yellow/10 p-4">
               <p className="font-semibold text-foreground">{stockCountCloseTarget?.type || stockCountCloseTarget?.scope || 'Inventory Count'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {stockCountCloseTarget?.date ? format(new Date(`${stockCountCloseTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} Â· ${Number(stockCountCloseTarget?.total || 0).toFixed(2)}
+                {stockCountCloseTarget?.date ? format(new Date(`${stockCountCloseTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} · ${Number(stockCountCloseTarget?.total || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5353,7 +5377,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-red/25 bg-resend-red/10 p-4">
               <p className="font-semibold text-foreground">{stockCountDeleteTarget?.type || stockCountDeleteTarget?.scope || 'Inventory Count'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {stockCountDeleteTarget?.date ? format(new Date(`${stockCountDeleteTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} Â· ${Number(stockCountDeleteTarget?.total || 0).toFixed(2)}
+                {stockCountDeleteTarget?.date ? format(new Date(`${stockCountDeleteTarget.date}T00:00:00`), 'MMM d, yyyy') : 'Saved count'} · ${Number(stockCountDeleteTarget?.total || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5404,7 +5428,7 @@ export default function Inventory() {
             <div className="rounded-md border border-resend-red/20 bg-resend-red/10 p-4">
               <p className="font-semibold text-foreground">{wastageDeleteTarget?.product_name || 'Waste item'}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {Number(wastageDeleteTarget?.quantity || 0)} {wastageDeleteTarget?.unit || ''} Â· ${Number(wastageDeleteTarget?.value || 0).toFixed(2)}
+                {Number(wastageDeleteTarget?.quantity || 0)} {wastageDeleteTarget?.unit || ''} · ${Number(wastageDeleteTarget?.value || 0).toFixed(2)}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -5468,6 +5492,12 @@ export default function Inventory() {
     </div>
   );
 }
+
+
+
+
+
+
 
 
 

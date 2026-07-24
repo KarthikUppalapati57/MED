@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Shield, Users, Search, Loader2, X, Copy, Mail, UserPlus, UserCheck, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const createSecureToken = (length = 48) => {
   if (!window.crypto?.getRandomValues) {
@@ -32,6 +33,7 @@ const createSecureToken = (length = 48) => {
 };
 
 export default function PlatformUserManagement() {
+  const { confirm } = useConfirmation();
   const { user, role: userRole } = useAuth();
   const queryClient = useQueryClient();
   const authChecked = !!user;
@@ -80,8 +82,8 @@ export default function PlatformUserManagement() {
         return (data || []).map(p => ({
           membership_id: p.id,
           user_id: p.id,
-          email: p.email || "â€”",
-          full_name: p.full_name || "â€”",
+          email: p.email || "—",
+          full_name: p.full_name || "—",
           role: p.role,
           created_at: p.created_at,
           last_sign_in_at: p.updated_at,
@@ -322,7 +324,7 @@ export default function PlatformUserManagement() {
                     <Badge className="bg-purple-500/50/10 text-purple-400 hover:bg-purple-500/50/10 border-none text-[10px]">Platform Admin</Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                    {admin.created_at ? new Date(admin.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                   </TableCell>
                   <TableCell>
                     <Button 
@@ -372,10 +374,10 @@ export default function PlatformUserManagement() {
                     <TableRow key={invite.id}>
                       <TableCell className="text-sm font-medium">{invite.email}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                        {invite.created_at ? new Date(invite.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'â€”'}
+                        {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </TableCell>
                       <TableCell>
                         <Badge className={isExpired ? 'bg-resend-red/10 text-resend-red text-[10px]' : 'bg-resend-yellow/10 text-resend-yellow text-[10px]'}>
@@ -388,7 +390,15 @@ export default function PlatformUserManagement() {
                           variant="ghost"
                           className="text-xs h-7 px-2 text-resend-red hover:text-resend-red hover:bg-resend-red/5"
                           onClick={async () => {
-                            if (!window.confirm(`Delete invitation for ${invite.email}?`)) return;
+                            const proceed = await confirm({
+                              title: `Delete invitation for ${invite.email}?`,
+                              description: 'This invitation link will stop working immediately.',
+                              confirmText: 'Delete Invitation',
+                              cancelText: 'Keep Invitation',
+                              variant: 'destructive',
+                              severity: 'high',
+                            });
+                            if (!proceed) return;
                             
                             await queryClient.cancelQueries({ queryKey: ['platform-admin-invites'] });
                             const prev = queryClient.getQueryData(['platform-admin-invites']);
@@ -498,5 +508,7 @@ export default function PlatformUserManagement() {
     </div>
   );
 }
+
+
 
 

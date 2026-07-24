@@ -13,9 +13,11 @@ import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
 import { Users, Search, Loader2, ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function PlatformUsers() {
   const navigate = useNavigate();
+  const { confirm } = useConfirmation();
   const { user, role: userRole } = useAuth();
   const authChecked = !!user;
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,7 +38,15 @@ export default function PlatformUsers() {
   }, [authChecked, invalidateUsers, userRole]);
 
   const handleDelete = async (userId) => {
-    if (!window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) return;
+    const proceed = await confirm({
+      title: 'Permanently delete user?',
+      description: 'This removes the user account and cannot be undone.',
+      confirmText: 'Delete User',
+      cancelText: 'Keep User',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (!proceed) return;
     
     setDeletingId(userId);
     try {
@@ -301,3 +311,4 @@ export default function PlatformUsers() {
     </div>
   );
 }
+

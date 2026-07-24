@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MFAEnrollment } from '@/components/auth/MFAEnrollment';
 import ApprovalPolicySettings from '@/modules/invoices/components/ApprovalPolicySettings';
 import CustomRolesTab from '@/modules/admin/components/CustomRolesTab';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 function formatBytes(bytes) {
   const n = Number(bytes) || 0;
@@ -31,6 +32,7 @@ function formatBytes(bytes) {
 
 export default function OrgManagement() {
   const { user, userProfile, mfaLevel, mfaFactors, unenrollMFA } = useAuth();
+  const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -241,7 +243,15 @@ export default function OrgManagement() {
   };
 
   const handleDeleteBrand = async (brand) => {
-    if (!window.confirm(`Delete brand "${brand.name}" and all its locations? This cannot be undone.`)) return;
+    const proceed = await confirm({
+      title: `Delete brand ${brand.name}?`,
+      description: 'All locations under this brand will also be deleted. This action cannot be undone.',
+      confirmText: 'Delete Brand',
+      cancelText: 'Keep Brand',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (!proceed) return;
     
     await queryClient.cancelQueries({ queryKey: ['my-brands'] });
     await queryClient.cancelQueries({ queryKey: ['my-locations'] });
@@ -270,7 +280,15 @@ export default function OrgManagement() {
   };
 
   const handleDeleteLocation = async (location) => {
-    if (!window.confirm(`Delete location "${location.name}"? This cannot be undone.`)) return;
+    const proceed = await confirm({
+      title: `Delete location ${location.name}?`,
+      description: 'This location will be deleted. This action cannot be undone.',
+      confirmText: 'Delete Location',
+      cancelText: 'Keep Location',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (!proceed) return;
     
     await queryClient.cancelQueries({ queryKey: ['my-locations'] });
     const prevLocations = queryClient.getQueryData(['my-locations']);
@@ -735,10 +753,16 @@ export default function OrgManagement() {
                             variant="ghost" 
                             size="sm" 
                             className="text-resend-red hover:text-resend-red hover:bg-resend-red/5 text-xs"
-                            onClick={() => {
-                              if (window.confirm('Are you sure you want to disable MFA? This will make your account less secure.')) {
-                                unenrollMFA(factor.id);
-                              }
+                            onClick={async () => {
+                              const proceed = await confirm({
+                                title: 'Disable MFA?',
+                                description: 'This will make your account less secure. You can enroll a new factor later from security settings.',
+                                confirmText: 'Disable MFA',
+                                cancelText: 'Keep MFA Enabled',
+                                variant: 'warning',
+                                severity: 'high',
+                              });
+                              if (proceed) unenrollMFA(factor.id);
                             }}
                           >
                             <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
@@ -942,3 +966,4 @@ export default function OrgManagement() {
     </div>
   );
 }
+

@@ -24,6 +24,7 @@ import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
   UserCheck, UserX, PlusCircle, Clock, Upload, AlertCircle, Key, Store, MapPin
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 // Restops Roles 
 const Restops_ROLES = {
@@ -173,7 +174,15 @@ function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
               )}
               <DropdownMenuItem className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-red hover:bg-resend-red/5"
                 onClick={async () => {
-                  if (!window.confirm(`Delete ${member.profiles?.email || member.email}? This cannot be undone.`)) return;
+                  const proceed = await confirm({
+                    title: `Delete ${member.profiles?.email || member.email}?`,
+                    description: 'This team member will lose access. This action cannot be undone.',
+                    confirmText: 'Delete Member',
+                    cancelText: 'Keep Member',
+                    variant: 'destructive',
+                    severity: 'critical',
+                  });
+                  if (!proceed) return;
                   const userId = member.user_id || member.id;
 
                   // Optimistic update
@@ -820,6 +829,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
 
 // Main UserManagement Component 
 export default function UserManagement() {
+  const { confirm } = useConfirmation();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [showInvite, setShowInvite] = useState(false);
@@ -1305,3 +1315,4 @@ export default function UserManagement() {
     </div>
   );
 }
+

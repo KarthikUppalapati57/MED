@@ -110,8 +110,7 @@ BEGIN
   RETURNING * INTO v_request;
 
   UPDATE public.vendors
-     SET onboarding_status = 'banking_submitted',
-         updated_at = now()
+     SET onboarding_status = 'banking_submitted'
    WHERE id = p_vendor_id
      AND COALESCE(onboarding_status, 'invited') NOT IN ('active', 'completed', 'rejected');
 

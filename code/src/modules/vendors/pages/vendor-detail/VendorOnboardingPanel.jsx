@@ -55,6 +55,8 @@ export default function VendorOnboardingPanel({ vendorId }) {
   const [overrideReasons, setOverrideReasons] = React.useState({});
   const [preferenceDraft, setPreferenceDraft] = React.useState(null);
   const [bankIntent, setBankIntent] = React.useState('add');
+  const [taxEntryDraft, setTaxEntryDraft] = React.useState({ tax_id: '', legal_name: '', tax_classification: '' });
+  const [bankEntryDraft, setBankEntryDraft] = React.useState({ account: '', routing: '' });
 
   const invalidate = React.useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['vendor_onboarding_panel', vendorId] });
@@ -185,6 +187,40 @@ export default function VendorOnboardingPanel({ vendorId }) {
     onError: (err) => toast.error(err.message || 'Unable to issue magic link'),
   });
 
+  // Manual counterparts to the magic-link flows above -- for vendors who read tax/banking
+  // details over the phone or by email instead of using the self-service portal.
+  const adminTaxEntryMutation = useMutation({
+    mutationFn: () => supabase.rpc('admin_submit_vendor_tax_info', {
+      p_vendor_id: vendorId,
+      p_tax_id: taxEntryDraft.tax_id,
+      p_legal_name: taxEntryDraft.legal_name || null,
+      p_tax_classification: taxEntryDraft.tax_classification || null,
+    }),
+    onSuccess: ({ error }) => {
+      if (error) throw error;
+      toast.success('Tax info saved');
+      setTaxEntryDraft({ tax_id: '', legal_name: '', tax_classification: '' });
+      invalidate();
+    },
+    onError: (err) => toast.error(err.message || 'Unable to save tax info'),
+  });
+
+  const adminBankEntryMutation = useMutation({
+    mutationFn: () => supabase.rpc('admin_submit_vendor_banking_info', {
+      p_vendor_id: vendorId,
+      p_account: bankEntryDraft.account,
+      p_routing: bankEntryDraft.routing,
+      p_intent: bankIntent,
+    }),
+    onSuccess: ({ error }) => {
+      if (error) throw error;
+      toast.success('Banking info saved -- still requires callback verification below');
+      setBankEntryDraft({ account: '', routing: '' });
+      invalidate();
+    },
+    onError: (err) => toast.error(err.message || 'Unable to save banking info'),
+  });
+
   const confirmCallbackMutation = useMutation({
     mutationFn: (requestId) => supabase.rpc('confirm_vendor_banking_callback', {
       p_request_id: requestId,
@@ -261,13 +297,27 @@ export default function VendorOnboardingPanel({ vendorId }) {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <StepCard icon={Mail} title="OTP and Vendor Links" description="Issue secure vendor-facing links after email OTP verification." status={data.vendor.onboarding_status}>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => issueLinkMutation.mutate({ type: 'tax' })} disabled={issueLinkMutation.isPending}>
-              Send Tax/W-9 Link
-            </Button>
-            <Button variant="outline" onClick={() => issueLinkMutation.mutate({ type: 'documents' })} disabled={issueLinkMutation.isPending}>
-              Send Document Link
-            </Button>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => issueLinkMutation.mutate({ type: 'tax' })} disabled={issueLinkMutation.isPending}>
+                Send Tax/W-9 Link
+              </Button>
+              <Button variant="outline" onClick={() => issueLinkMutation.mutate({ type: 'documents' })} disabled={issueLinkMutation.isPending}>
+                Send Document Link
+              </Button>
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-sm text-muted-foreground">Or enter tax info manually (vendor provided it by phone/email)</Label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <Input placeholder="Tax ID (EIN/SSN)" value={taxEntryDraft.tax_id} onChange={(e) => setTaxEntryDraft({ ...taxEntryDraft, tax_id: e.target.value })} />
+                <Input placeholder="Legal name" value={taxEntryDraft.legal_name} onChange={(e) => setTaxEntryDraft({ ...taxEntryDraft, legal_name: e.target.value })} />
+                <Input placeholder="Classification (llc, sole_prop...)" value={taxEntryDraft.tax_classification} onChange={(e) => setTaxEntryDraft({ ...taxEntryDraft, tax_classification: e.target.value })} />
+              </div>
+              <Button size="sm" onClick={() => adminTaxEntryMutation.mutate()} disabled={adminTaxEntryMutation.isPending || !taxEntryDraft.tax_id.trim()}>
+                Save Tax Info
+              </Button>
+            </div>
           </div>
         </StepCard>
 
@@ -337,6 +387,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
               </Button>
             </div>
             {!canIssueBanking && <p className="text-sm text-muted-foreground">Banking unlocks after tax verification and W-9 on file.</p>}
+
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-sm text-muted-foreground">Or enter account details manually (still requires callback verification below)</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Account number" value={bankEntryDraft.account} onChange={(e) => setBankEntryDraft({ ...bankEntryDraft, account: e.target.value })} />
+                <Input placeholder="Routing number" value={bankEntryDraft.routing} onChange={(e) => setBankEntryDraft({ ...bankEntryDraft, routing: e.target.value })} />
+              </div>
+              <Button size="sm" onClick={() => adminBankEntryMutation.mutate()} disabled={!canIssueBanking || adminBankEntryMutation.isPending || !bankEntryDraft.account.trim() || !bankEntryDraft.routing.trim()}>
+                Save Banking Info
+              </Button>
+            </div>
             {data.bankingRows.map((row) => (
               <div key={row.id} className="rounded-md border p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">

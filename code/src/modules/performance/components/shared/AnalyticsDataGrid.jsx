@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,6 +20,7 @@ export function AnalyticsDataGrid({
   emptyMessage = 'No rows to display.',
   className,
 }) {
+  const searchInputId = useId();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('desc');
@@ -54,6 +55,12 @@ export function AnalyticsDataGrid({
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice(page * pageSize, page * pageSize + pageSize);
 
+  const getSortState = (col) => {
+    const key = col.sortAccessor || col.accessor;
+    if (col.sortable === false || sortKey !== key) return 'none';
+    return sortDir === 'asc' ? 'ascending' : 'descending';
+  };
+
   const toggleSort = (key) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -67,7 +74,10 @@ export function AnalyticsDataGrid({
   return (
     <div className={cn('space-y-3', className)}>
       <div className="flex items-center justify-between gap-3">
+        <label className="sr-only" htmlFor={searchInputId}>{searchPlaceholder}</label>
         <Input
+          id={searchInputId}
+          type="search"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -90,6 +100,7 @@ export function AnalyticsDataGrid({
                   key={col.id || col.accessor}
                   className={cn('whitespace-nowrap', col.className)}
                   style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                  aria-sort={getSortState(col)}
                 >
                   {col.sortable === false ? (
                     col.header
@@ -98,6 +109,7 @@ export function AnalyticsDataGrid({
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleSort(col.sortAccessor || col.accessor)}
+                      aria-label={`Sort by ${col.header}, currently ${getSortState(col)}`}
                     >
                       {col.header}
                       {sortKey === (col.sortAccessor || col.accessor) ? (
@@ -159,3 +171,8 @@ export function AnalyticsDataGrid({
 }
 
 export default AnalyticsDataGrid;
+
+
+
+
+

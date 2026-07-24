@@ -11,10 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from 'sonner';
 import { Shield, Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 
 export default function CustomRolesTab() {
   const { organization, role: authRole } = useAuth();
+  const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -139,10 +141,16 @@ export default function CustomRolesTab() {
                         <Edit className="h-4 w-4 mr-2" /> Edit
                       </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" 
-                        onClick={() => {
-                          if (window.confirm(`Delete the "${role.name}" role? Users assigned to this role will lose their access.`)) {
-                            deleteRoleMutation.mutate(role.id);
-                          }
+                        onClick={async () => {
+                          const proceed = await confirm({
+                            title: `Delete ${role.name}?`,
+                            description: 'Users assigned to this role will lose their access. This action cannot be undone.',
+                            confirmText: 'Delete Role',
+                            cancelText: 'Keep Role',
+                            variant: 'destructive',
+                            severity: 'critical',
+                          });
+                          if (proceed) deleteRoleMutation.mutate(role.id);
                         }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -199,3 +207,5 @@ export default function CustomRolesTab() {
     </div>
   );
 }
+
+

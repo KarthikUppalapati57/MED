@@ -72,8 +72,7 @@ BEGIN
   v_store_result := public.store_vendor_tax_secret(v_tax.id, p_tax_id);
 
   UPDATE public.vendors
-     SET onboarding_status = 'tax_submitted',
-         updated_at = now()
+     SET onboarding_status = 'tax_submitted'
    WHERE id = p_vendor_id
      AND COALESCE(onboarding_status, 'invited') NOT IN ('active', 'completed', 'rejected');
 
