@@ -426,8 +426,8 @@ export const api = {
       if (error) throw error;
       return data;
     },
-    softDeleteInvoice: async (invoiceId) => {
-      const { data, error } = await supabase.rpc('soft_delete_invoice_workflow', {
+    hardDeleteInvoice: async (invoiceId) => {
+      const { data, error } = await supabase.rpc('hard_delete_invoice_workflow', {
         p_invoice_id: invoiceId,
       });
       if (error) throw error;

@@ -759,7 +759,7 @@ export default function Invoices() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => api.financial.softDeleteInvoice(id),
+    mutationFn: (id) => api.financial.hardDeleteInvoice(id),
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ['invoices-dashboard'] });
       const qk = ['invoices-dashboard', organization?.id];
@@ -786,7 +786,7 @@ export default function Invoices() {
   const handleDelete = async (invoice) => {
     if (await confirm({
       title: 'Delete invoice?',
-      description: `Delete invoice ${invoice.invoice_number}? This cannot be undone.`,
+      description: `Permanently delete invoice ${invoice.invoice_number}? This cannot be undone.`,
     })) {
       deleteMutation.mutate(invoice.id);
     }
@@ -795,10 +795,10 @@ export default function Invoices() {
   const handleBulkDelete = async () => {
     if (!(await confirm({
       title: 'Delete selected invoices?',
-      description: `This will delete ${selectedInvoiceIds.length} invoice(s). This cannot be undone.`,
+      description: `This will permanently delete ${selectedInvoiceIds.length} invoice(s). This cannot be undone.`,
     }))) return;
     try {
-      await Promise.all(selectedInvoiceIds.map(id => api.financial.softDeleteInvoice(id)));
+      await Promise.all(selectedInvoiceIds.map(id => api.financial.hardDeleteInvoice(id)));
       queryClient.invalidateQueries({ queryKey: ['invoices-dashboard'] });
       toast.success(`${selectedInvoiceIds.length} invoice(s) deleted`);
       setSelectedInvoiceIds([]);
