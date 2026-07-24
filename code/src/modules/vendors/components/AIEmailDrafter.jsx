@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Bot, Send, X, Loader2 } from 'lucide-react';
-import { generateVendorCreditRequestEmail } from '@/lib/geminiService';
+import { generateVendorCreditRequestEmail } from '@/lib/aiService';
 import { toast } from 'sonner';
 
 export default function AIEmailDrafter({ open, onOpenChange, invoice, po, varianceDetails, onSend }) {

@@ -3,7 +3,7 @@ import { format, addDays, startOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Bot, Loader2 } from 'lucide-react';
-import { generateLaborSchedule } from '@/lib/geminiService';
+import { generateLaborSchedule } from '@/lib/aiService';
 import { api } from '@/lib/apiClient';
 import { toast } from 'sonner';
 export default function LaborScheduler({ employees, shifts, forecastData, onCreateShift, onEditShift }) {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
-import { generateVendorInsights, chatAboutVendor } from '@/lib/geminiService';
+import { generateVendorInsights, chatAboutVendor } from '@/lib/aiService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,7 @@ export default function AIVendorAnalyst({ vendorId }) {
         }
       })
       .catch((err) => {
-        setMessages([{ role: 'assistant', content: err.message === 'Gemini API key is not configured.' ? err.message : `I couldn't analyze this vendor: ${err.message}` }]);
+        setMessages([{ role: 'assistant', content: `I couldn't analyze this vendor: ${err.message}` }]);
       })
       .finally(() => setIsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +99,7 @@ export default function AIVendorAnalyst({ vendorId }) {
           </div>
           AI Vendor Analyst
         </CardTitle>
-        <CardDescription>Powered by Gemini</CardDescription>
+        <CardDescription>Azure-ready vendor analysis</CardDescription>
       </CardHeader>
 
       <CardContent className="flex-1 p-0 overflow-hidden flex flex-col">

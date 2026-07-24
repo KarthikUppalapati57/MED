@@ -131,6 +131,7 @@ async function upsertUser({ email, fullName, role }, context) {
     demo_account: true,
     demo_scope: 'performance-professional-demo',
     full_name: fullName,
+    tenant_id: context.tenantId || null,
     organization_id: context.organizationId || null,
     brand_id: context.brandId || null,
     location_id: context.locationId || null,
@@ -171,6 +172,7 @@ async function seedProfile(account, user, context) {
       id: user.id,
       location_id: context.locationId || null,
       organization_id: context.organizationId || null,
+      tenant_id: context.tenantId || null,
       role: account.role,
       status: 'active',
     }, { onConflict: 'id' })
@@ -201,9 +203,21 @@ async function seedProfile(account, user, context) {
 }
 
 async function seedHierarchy(tenant) {
-  const org = await must(`organization ${tenant.slug}`, supabase
+  const tenantRow = await must(`tenant ${tenant.name}`, supabase
+    .from('tenants')
+    .upsert({
+      name: tenant.name,
+      slug: tenant.slug,
+      status: 'active',
+      metadata: demoMeta(tenant.slug, 'tenant'),
+    }, { onConflict: 'slug' })
+    .select('id, name, slug')
+    .single());
+
+  const org = await must(`organization ${tenant.name}`, supabase
     .from('organizations')
     .upsert({
+      tenant_id: tenantRow.id,
       name: tenant.name,
       slug: tenant.slug,
       status: 'active',
@@ -212,12 +226,11 @@ async function seedHierarchy(tenant) {
       enabled_modules: MODULES,
       primary_contact_email: `${EMAIL_NAMESPACE}.${tenant.emailPrefix}.tenant@restops.test`,
     }, { onConflict: 'slug' })
-    .select('id, name, slug')
+    .select('id, name, slug, tenant_id')
     .single());
 
   const brands = [];
   const locationsByBrand = [];
-
   for (const brandDef of tenant.brands) {
     const existingBrand = await must(`find brand ${brandDef.name}`, supabase
       .from('brands')
@@ -255,7 +268,7 @@ async function seedHierarchy(tenant) {
     locationsByBrand.push(locations);
   }
 
-  return { org, brands, locationsByBrand };
+  return { org, tenant: tenantRow, brands, locationsByBrand };
 }
 
 function accountsForTenant(tenant, context) {
@@ -361,7 +374,7 @@ async function seedVendors(context) {
             default_expense_category: vendor.category,
             default_payment_method: vendorIndex % 2 === 0 ? 'stripe' : 'check',
             email: `ap+${vendor.name.toLowerCase().replace(/[^a-z0-9]+/g, '.')}@demo-vendor.test`,
-            file_routing_preference: 'invoices',
+            file_routing_preference: 'storage',
             health_score: vendor.health - locationIndex,
             location_id: location.id,
             name: vendor.name,
@@ -464,7 +477,7 @@ async function seedBudgets(context) {
         const target = Math.round(baseBudgets[category] * (0.82 + brandIndex * 0.08 + locationIndex * 0.04 + categoryIndex * 0.015));
         await must(`budget ${location.name} ${category}`, supabase
           .from('budget_targets')
-          .upsert({
+          .insert({
             brand_id: brand.brand_id,
             category,
             location_id: location.id,
@@ -473,7 +486,7 @@ async function seedBudgets(context) {
             period_end: endOfMonth(),
             target_amount: target,
             target_percent: null,
-          }, { onConflict: 'organization_id,location_id,category,period_start,period_end' })
+          })
           .select('id')
           .single());
       }
@@ -509,8 +522,6 @@ async function seedInvoicesPayments(context, tenant, productsByBrand) {
         const tax = Number((subtotal * 0.0625).toFixed(2));
         const total = Number((subtotal + tax + 18).toFixed(2));
         const paymentStatus = invoiceIndex % 4 === 0 ? 'paid' : invoiceIndex % 4 === 1 ? 'partial' : 'unpaid';
-        const status = paymentStatus === 'paid' ? 'paid' : 'approved';
-
         const invoice = await must(`invoice ${location.name} ${invoiceIndex}`, supabase
           .from('invoices')
           .insert({
@@ -525,11 +536,13 @@ async function seedInvoicesPayments(context, tenant, productsByBrand) {
             location: location.name,
             location_id: location.id,
             organization_id: context.org.id,
-            paid_amount: paymentStatus === 'paid' ? total : paymentStatus === 'partial' ? Number((total * 0.45).toFixed(2)) : 0,
-            payment_status: paymentStatus,
+            tenant_id: context.org.tenant_id || context.tenant?.id || null,
+            paid_amount: 0,
+            payment_status: 'unpaid',
             raw_text: 'Performance professional demo invoice. Generated seed data.',
             source: 'performance_demo_seed',
-            status,
+            status: 'pending_review',
+            ap_status: 'processing',
             subtotal,
             tax_amount: tax,
             total_amount: total,
@@ -580,6 +593,18 @@ async function seedInvoicesPayments(context, tenant, productsByBrand) {
             .single());
         }
 
+        await must(`finalize invoice ${invoice.invoice_number}`, supabase
+          .from('invoices')
+          .update({
+            ap_status: 'scheduled',
+            paid_amount: 0,
+            payment_status: 'unpaid',
+            status: 'scheduled',
+          })
+          .eq('id', invoice.id)
+          .select('id')
+          .single());
+
         if (!isPrevious) {
           await must(`payment ${invoice.invoice_number}`, supabase
             .from('payments')
@@ -591,9 +616,10 @@ async function seedInvoicesPayments(context, tenant, productsByBrand) {
               location_id: location.id,
               notes: 'Performance demo payment exposure seed.',
               organization_id: context.org.id,
+              tenant_id: context.org.tenant_id || context.tenant?.id || null,
               payment_date: isoDate(-1 - invoiceIndex),
               payment_method: invoiceIndex % 3 === 0 ? 'ach' : 'card',
-              status: paymentStatus === 'paid' ? 'completed' : invoiceIndex % 3 === 0 ? 'scheduled' : 'pending',
+              status: paymentStatus === 'paid' || paymentStatus === 'partial' ? 'completed' : 'pending',
               transaction_id: `DEMO-PAY-${invoice.invoice_number}`,
               vendor_name: vendorName,
             })
@@ -672,7 +698,7 @@ async function seedInventoryActivity(context, inventoryRows, ownerUserId) {
         product_id: row.product.id,
         product_name: row.product.name,
         quantity: 2,
-        reason: 'Demo spoilage',
+        reason: 'spoiled',
         unit: row.item.unit,
         value: Number((2 * row.item.latestCost).toFixed(2)),
       }));
@@ -751,12 +777,14 @@ for (const tenant of demoTenants) {
   for (const account of accounts) {
     const user = await upsertUser(account, {
       organizationId: account.organizationId,
+      tenantId: context.tenant?.id || context.org.tenant_id || null,
       brandId: account.brandId,
       locationId: account.locationId,
     });
     if (!firstAdminUser && account.role === 'tenant_super_admin') firstAdminUser = user;
     await seedProfile(account, user, {
       organizationId: account.organizationId,
+      tenantId: context.tenant?.id || context.org.tenant_id || null,
       brandId: account.brandId,
       locationId: account.locationId,
     });

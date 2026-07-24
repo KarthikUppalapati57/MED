@@ -11,20 +11,12 @@ function normalizeOtpPhone(value) {
   return String(value || '').trim();
 }
 
-function getOnboardingOtpRedirectUrl() {
-  if (typeof window === 'undefined') return undefined;
-  return `${window.location.origin}/business-verification`;
-}
 
 const ONBOARDING_CONTACT_DEV_OTPS = {
   email: '724913',
   phone: '381602',
 };
 
-function isLocalBrowserOrigin() {
-  if (typeof window === 'undefined') return false;
-  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
-}
 
 function isOnboardingContactDevOtpEnabled() {
   const flag = String(import.meta.env.VITE_ONBOARDING_CONTACT_DEV_OTP_ENABLED || '').toLowerCase();
@@ -53,6 +45,10 @@ function buildLocalDevOtpResponse({ channel, target }) {
 
 function isLocalDevOtpId(otpId) {
   return String(otpId || '').startsWith('local_dev_contact_') || String(otpId || '').startsWith('dev_contact_');
+}
+
+function isResendContactOtpId(otpId) {
+  return Boolean(otpId) && !String(otpId).startsWith('supabase_auth_') && !isLocalDevOtpId(otpId);
 }
 
 const TABLE_SCOPE_COLUMNS = {
@@ -597,28 +593,27 @@ export const api = {
       const normalizedChannel = String(channel || '').toLowerCase();
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
 
-      if (isOnboardingContactDevOtpEnabled()) {
-        return buildLocalDevOtpResponse({
-          channel: normalizedChannel,
-          target: normalizedTarget,
-        });
-      }
-
       try {
         if (normalizedChannel === 'email') {
-          const { error } = await supabase.auth.signInWithOtp({
-            email: normalizedTarget,
-            options: {
-              shouldCreateUser: false,
-              emailRedirectTo: getOnboardingOtpRedirectUrl(),
-              data: {
-                otp_context: 'onboarding_contact_verification',
-                otp_channel: 'email',
-              },
+          const { data, error } = await supabase.functions.invoke('onboarding-contact-otp', {
+            body: {
+              action: 'send-email-otp',
+              payload: { target: normalizedTarget },
             },
           });
           if (error) throw error;
-        } else if (normalizedChannel === 'phone') {
+          if (data?.error) throw new Error(data.error);
+          return data;
+        }
+
+        if (isOnboardingContactDevOtpEnabled()) {
+          return buildLocalDevOtpResponse({
+            channel: normalizedChannel,
+            target: normalizedTarget,
+          });
+        }
+
+        if (normalizedChannel === 'phone') {
           const { error } = await supabase.auth.updateUser({ phone: normalizedTarget });
           if (error) throw error;
         } else {
@@ -633,7 +628,7 @@ export const api = {
         };
       } catch (authError) {
         const message = authError?.message || '';
-        if (/sms provider|email provider|provider is not configured|not configured/i.test(message)) {
+        if (normalizedChannel !== 'email' && /sms provider|provider is not configured|not configured/i.test(message)) {
           return buildLocalDevOtpResponse({
             channel: normalizedChannel,
             target: normalizedTarget,
@@ -641,7 +636,7 @@ export const api = {
         }
         throw new Error(
           message ||
-          'Secure contact verification delivery is not configured. Configure Supabase Auth email/SMS OTP before onboarding can continue.'
+          'Secure contact verification delivery is not configured. Configure Resend email OTP/SMS OTP before onboarding can continue.'
         );
       }
     },
@@ -655,6 +650,18 @@ export const api = {
           channel: normalizedChannel,
           target: normalizedTarget,
         });
+      }
+
+      if (normalizedChannel === 'email' && isResendContactOtpId(otpId)) {
+        const { data, error } = await supabase.functions.invoke('onboarding-contact-otp', {
+          body: {
+            action: 'verify-email-otp',
+            payload: { otp_id: otpId, code: token },
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        return data;
       }
 
       try {
@@ -1919,4 +1926,3 @@ export const api = {
     }
   }
 };
-

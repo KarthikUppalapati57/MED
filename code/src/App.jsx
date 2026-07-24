@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query'
+﻿import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
@@ -47,12 +47,17 @@ const MFASetupPage = React.lazy(() => import('./modules/setup/pages/MFASetupPage
 const TermsOfService = React.lazy(() => import('./modules/public/pages/TermsOfService'));
 const PrivacyPolicy = React.lazy(() => import('./modules/public/pages/PrivacyPolicy'));
 const CookiePolicy = React.lazy(() => import('./modules/public/pages/CookiePolicy'));
+const AcceptableUsePolicy = React.lazy(() => import('./modules/public/pages/AcceptableUsePolicy'));
+const SecurityPolicy = React.lazy(() => import('./modules/public/pages/SecurityPolicy'));
+const DataProcessingAddendum = React.lazy(() => import('./modules/public/pages/DataProcessingAddendum'));
+const ServiceLevelAgreement = React.lazy(() => import('./modules/public/pages/ServiceLevelAgreement'));
 const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
 const VendorOnboardingTax = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingTax'));
 const VendorOnboardingBank = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingBank'));
 const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'));
 
 const INVITE_VALIDATION_TIMEOUT_MS = 15000;
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 const PENDING_INVITE_TOKEN_KEY = 'restops_pending_invite_token';
 const PASSWORD_RECOVERY_ACTIVE_KEY = 'restops_password_recovery_active';
 const MFA_SETUP_SKIP_KEY_PREFIX = 'restops_mfa_setup_skipped';
@@ -1168,10 +1173,11 @@ const AuthenticatedApp = () => {
   // MFA Interceptor
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
   const isEnrolled = verifiedFactors.length > 0;
+  const isDemoAccount = Boolean(user?.app_metadata?.demo_account || user?.user_metadata?.demo_account);
   
   const highPrivilegeRoles = ['platform_admin', 'tenant_super_admin', 'org_manager', 'branch_manager'];
   // High-privilege users are prompted for MFA, but may choose to set it up later.
-  const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled;
+  const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled && !isDemoAccount;
   
   // Challenge if they are enrolled (regardless of role) but haven't verified this session
   const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1' && isEnrolled;
@@ -1301,6 +1307,10 @@ const AuthenticatedApp = () => {
         <Route path="/terms" element={lazyElement(<TermsOfService />, 'Loading terms...')} />
       <Route path="/privacy" element={lazyElement(<PrivacyPolicy />, 'Loading privacy policy...')} />
       <Route path="/cookies" element={lazyElement(<CookiePolicy />, 'Loading cookie policy...')} />
+      <Route path="/acceptable-use" element={lazyElement(<AcceptableUsePolicy />, 'Loading acceptable use policy...')} />
+      <Route path="/security" element={lazyElement(<SecurityPolicy />, 'Loading security policy...')} />
+      <Route path="/dpa" element={lazyElement(<DataProcessingAddendum />, 'Loading data processing addendum...')} />
+      <Route path="/sla" element={lazyElement(<ServiceLevelAgreement />, 'Loading service level agreement...')} />
       <Route path="/docs" element={lazyElement(<Documentation />, 'Loading documentation...')} />
       <Route path="/vendor-onboarding/tax/:token" element={lazyElement(<VendorOnboardingTax />, 'Loading secure portal...')} />
       <Route path="/vendor-onboarding/bank/:token" element={lazyElement(<VendorOnboardingBank />, 'Loading secure portal...')} />
@@ -1420,6 +1430,35 @@ function ConfirmationDialogRenderer() {
   return <ConfirmationDialog isOpen={isOpen} config={config} />;
 }
 
+function InactivityLogout() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const timeoutRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!user) return undefined;
+
+    const resetTimer = () => {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = window.setTimeout(async () => {
+        await logout();
+        navigate('/login?reason=inactive', { replace: true });
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const events = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart', 'visibilitychange'];
+    events.forEach((eventName) => window.addEventListener(eventName, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      window.clearTimeout(timeoutRef.current);
+      events.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
+    };
+  }, [user, logout, navigate]);
+
+  return null;
+}
+
 function App() {
   if (!hasSupabaseEnv) {
     return (
@@ -1449,6 +1488,7 @@ function App() {
         <QueryClientProvider client={queryClientInstance}>
           <ConfirmationProvider>
             <Router>
+              <InactivityLogout />
               <AuthenticatedApp />
             </Router>
             <ConfirmationDialogRenderer />

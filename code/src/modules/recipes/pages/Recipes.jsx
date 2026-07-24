@@ -9,7 +9,7 @@ import { getConfirmationMessage } from '@/lib/confirmationMessages';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
-import { generateRecipeInsights } from '@/lib/geminiService';
+import { generateRecipeInsights } from '@/lib/aiService';
 import { calculateIngredientCost, calculateRecipeCost } from '@/modules/recipes/lib/recipeCosting';
 import { buildRecipeModuleReadiness } from '@/modules/recipes/lib/recipeModuleReadiness';
 import MenuItemsOperations from '@/modules/recipes/components/MenuItemsOperations';
@@ -1280,7 +1280,7 @@ export default function Recipes() {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <p className="text-sm text-muted-foreground mb-4">Click "Generate AI Insights" to have Gemini analyze your recipe margins and performance.</p>
+                    <p className="text-sm text-muted-foreground mb-4">Click "Generate AI Insights" to analyze recipe margins and performance with approved production-safe logic.</p>
                   </div>
                 )}
               </CardContent>

@@ -17,6 +17,7 @@ DECLARE
   v_owner uuid := gen_random_uuid();
   v_branch uuid := gen_random_uuid();
   v_location_manager uuid := gen_random_uuid();
+  v_creator uuid := gen_random_uuid();
   v_owner_vendor uuid;
   v_branch_vendor uuid;
   v_location_vendor uuid;
@@ -32,7 +33,8 @@ BEGIN
     ('location2', v_location2),
     ('owner', v_owner),
     ('branch', v_branch),
-    ('location_manager', v_location_manager);
+    ('location_manager', v_location_manager),
+    ('creator', v_creator);
 
   INSERT INTO auth.users (
     id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -40,7 +42,8 @@ BEGIN
   ) VALUES
     (v_owner, 'authenticated', 'authenticated', 'vendor-transition-owner@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_branch, 'authenticated', 'authenticated', 'vendor-transition-branch@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-    (v_location_manager, 'authenticated', 'authenticated', 'vendor-transition-location@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
+    (v_location_manager, 'authenticated', 'authenticated', 'vendor-transition-location@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    (v_creator, 'authenticated', 'authenticated', 'vendor-transition-creator@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
   INSERT INTO public.organizations (id, name, slug, owner_id)
   VALUES (v_org, 'Vendor Approval Transition Org', 'vendor-approval-transition-' || replace(v_org::text, '-', ''), v_owner);
@@ -60,7 +63,8 @@ BEGIN
   ) VALUES
     (v_owner, 'vendor-transition-owner@example.test', 'Vendor Transition Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'vendor-transition-branch@example.test', 'Vendor Transition Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
-    (v_location_manager, 'vendor-transition-location@example.test', 'Vendor Transition Location', 'location_manager', v_org, v_brand1, v_location1, 'location')
+    (v_location_manager, 'vendor-transition-location@example.test', 'Vendor Transition Location', 'location_manager', v_org, v_brand1, v_location1, 'location'),
+    (v_creator, 'vendor-transition-creator@example.test', 'Vendor Transition Creator', 'branch_manager', v_org, v_brand1, NULL, 'brand')
   ON CONFLICT (id) DO UPDATE
      SET email = EXCLUDED.email,
          full_name = EXCLUDED.full_name,
@@ -76,22 +80,23 @@ BEGIN
   VALUES
     (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
-    (v_org, v_location_manager, 'location_manager');
+    (v_org, v_location_manager, 'location_manager'),
+    (v_org, v_creator, 'branch_manager');
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, approval_status, created_by)
-  VALUES (v_org, v_brand1, NULL, 'Vendor Transition Owner Vendor', 'active', 'draft', v_owner)
+  VALUES (v_org, v_brand1, NULL, 'Vendor Transition Owner Vendor', 'active', 'draft', v_creator)
   RETURNING id INTO v_owner_vendor;
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, approval_status, created_by)
-  VALUES (v_org, v_brand1, NULL, 'Vendor Transition Branch Vendor', 'active', 'draft', v_owner)
+  VALUES (v_org, v_brand1, NULL, 'Vendor Transition Branch Vendor', 'active', 'draft', v_creator)
   RETURNING id INTO v_branch_vendor;
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, approval_status, created_by)
-  VALUES (v_org, v_brand1, v_location1, 'Vendor Transition Location Vendor', 'active', 'draft', v_owner)
+  VALUES (v_org, v_brand1, v_location1, 'Vendor Transition Location Vendor', 'active', 'draft', v_creator)
   RETURNING id INTO v_location_vendor;
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, approval_status, created_by)
-  VALUES (v_org, v_brand2, NULL, 'Vendor Transition Out Of Brand Vendor', 'active', 'draft', v_owner)
+  VALUES (v_org, v_brand2, NULL, 'Vendor Transition Out Of Brand Vendor', 'active', 'draft', v_creator)
   RETURNING id INTO v_out_of_brand_vendor;
 
   INSERT INTO vendor_approval_transition_ids(key, value) VALUES
@@ -144,6 +149,14 @@ BEGIN
     RAISE EXCEPTION 'owner RPC did not return approved: %', v_result;
   END IF;
 
+  -- transition_vendor_approval is SECURITY DEFINER (owned by postgres, a superuser), so its own
+  -- internal UPDATE bypasses RLS regardless of the caller's active location -- the RETURNING
+  -- clause above already proves the write happened. But a plain SELECT run as org_manager here
+  -- (with no active location) still goes through operational_vendors_select's
+  -- reference_scope_visible(), which requires one with no exceptions -- verify as postgres so
+  -- this doesn't re-litigate read visibility, which isn't what this test is about.
+  RESET ROLE;
+
   IF NOT EXISTS (
     SELECT 1 FROM public.vendors
     WHERE id = (SELECT value FROM vendor_approval_transition_ids WHERE key = 'owner_vendor')
@@ -151,6 +164,16 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'owner RPC draft->approved did not persist';
   END IF;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config(
+    'request.jwt.claims',
+    jsonb_build_object(
+      'sub', (SELECT value::text FROM vendor_approval_transition_ids WHERE key = 'owner'),
+      'role', 'authenticated'
+    )::text,
+    true
+  );
 
   BEGIN
     PERFORM public.transition_vendor_approval(
@@ -189,6 +212,10 @@ BEGIN
     RAISE EXCEPTION 'in-brand branch RPC did not return approved: %', v_result;
   END IF;
 
+  -- Same reasoning as the owner block: verify the SECURITY DEFINER RPC's write as postgres, not
+  -- through the same location-less branch_manager whose own read-visibility is a separate concern.
+  RESET ROLE;
+
   IF NOT EXISTS (
     SELECT 1 FROM public.vendors
     WHERE id = (SELECT value FROM vendor_approval_transition_ids WHERE key = 'branch_vendor')
@@ -196,6 +223,16 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'in-brand branch RPC draft->approved did not persist';
   END IF;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config(
+    'request.jwt.claims',
+    jsonb_build_object(
+      'sub', (SELECT value::text FROM vendor_approval_transition_ids WHERE key = 'branch'),
+      'role', 'authenticated'
+    )::text,
+    true
+  );
 
   BEGIN
     PERFORM public.transition_vendor_approval(

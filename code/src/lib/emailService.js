@@ -1,19 +1,11 @@
 /**
- * EmailJS Service Reusable email utility for the Restops platform.
+ * Production-safe email facade.
  *
- * Sends transactional emails via EmailJS (client-side, no backend needed).
- * Used for: invitations, invoice notifications, approval alerts, and requests.
- *
- * Env vars required (already configured in .env):
- *   VITE_EMAILJS_SERVICE_ID
- *   VITE_EMAILJS_TEMPLATE_ID
- *   VITE_EMAILJS_PUBLIC_KEY
+ * Client-side EmailJS is not an approved production technology. Transactional
+ * mail should go through Supabase Edge Functions backed by Resend. Existing
+ * callers keep using this facade, but it no-ops instead of exposing email data
+ * to an unapproved browser-side processor.
  */
-import emailjs from 'emailjs-com';
-
-const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
 /**
  * Sends an email via EmailJS.
@@ -26,30 +18,14 @@ const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function sendEmail({ to_email, to_name, subject, message, from_name = 'Restops Platform' }) {
-  if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
-    console.warn('[EmailService] EmailJS is not configured. Skipping email.');
-    return { success: false, error: 'EmailJS not configured' };
-  }
-
-  try {
-    const result = await emailjs.send(
-      SERVICE_ID,
-      TEMPLATE_ID,
-      {
-        to_email,
-        to_name: to_name || to_email,
-        from_name,
-        subject,
-        message,
-      },
-      PUBLIC_KEY
-    );
-    console.log('[EmailService] Email sent:', result.status, result.text);
-    return { success: true };
-  } catch (err) {
-    console.error('[EmailService] Failed to send email:', err);
-    return { success: false, error: err?.text || err?.message || 'Unknown error' };
-  }
+  console.info('[EmailService] Browser email disabled; route transactional mail through Resend Edge Functions.', {
+    to_email,
+    to_name,
+    subject,
+    from_name,
+    message_length: String(message || '').length,
+  });
+  return { success: false, error: 'Browser email disabled; use Resend Edge Functions.' };
 }
 
 // Pre-built email templates 

@@ -66,7 +66,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
-import { generateVendorSuggestions } from '@/lib/geminiService';
+import { generateVendorSuggestions } from '@/lib/aiService';
 import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import VendorOnboardingWizard from '../../components/VendorOnboardingWizard';
 
@@ -974,7 +974,7 @@ export default function VendorList() {
               <Sparkles className="h-5 w-5 text-primary" />
               Vendor Suggestions
             </DialogTitle>
-            <p className="text-xs text-muted-foreground">Analysis of your existing vendor list, powered by Gemini.</p>
+            <p className="text-xs text-muted-foreground">Analysis of your existing vendor list using approved production-safe logic.</p>
           </DialogHeader>
 
           {loadingSuggestions ? (

@@ -9,11 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { Banknote, CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, PhoneCall, ShieldCheck, XCircle } from 'lucide-react';
 
 const statusText = (value) => (value ? value.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()) : 'Not Started');
+
+const VENDOR_MANUAL_AUTH_CONFIRMATION = 'I confirm that the vendor has authorized me to enter this information into the platform.';
 
 const statusVariant = (value) => {
   if (['verified', 'on_file', 'confirmed', 'approved', 'active', 'connected'].includes(value)) return 'default';
@@ -57,6 +60,8 @@ export default function VendorOnboardingPanel({ vendorId }) {
   const [bankIntent, setBankIntent] = React.useState('add');
   const [taxEntryDraft, setTaxEntryDraft] = React.useState({ tax_id: '', legal_name: '', tax_classification: '' });
   const [bankEntryDraft, setBankEntryDraft] = React.useState({ account: '', routing: '' });
+  const [taxManualAuthorized, setTaxManualAuthorized] = React.useState(false);
+  const [bankManualAuthorized, setBankManualAuthorized] = React.useState(false);
 
   const invalidate = React.useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['vendor_onboarding_panel', vendorId] });
@@ -190,32 +195,40 @@ export default function VendorOnboardingPanel({ vendorId }) {
   // Manual counterparts to the magic-link flows above -- for vendors who read tax/banking
   // details over the phone or by email instead of using the self-service portal.
   const adminTaxEntryMutation = useMutation({
-    mutationFn: () => supabase.rpc('admin_submit_vendor_tax_info', {
-      p_vendor_id: vendorId,
-      p_tax_id: taxEntryDraft.tax_id,
-      p_legal_name: taxEntryDraft.legal_name || null,
-      p_tax_classification: taxEntryDraft.tax_classification || null,
-    }),
+    mutationFn: () => {
+      if (!taxManualAuthorized) throw new Error(VENDOR_MANUAL_AUTH_CONFIRMATION);
+      return supabase.rpc('admin_submit_vendor_tax_info', {
+        p_vendor_id: vendorId,
+        p_tax_id: taxEntryDraft.tax_id,
+        p_legal_name: taxEntryDraft.legal_name || null,
+        p_tax_classification: taxEntryDraft.tax_classification || null,
+      });
+    },
     onSuccess: ({ error }) => {
       if (error) throw error;
       toast.success('Tax info saved');
       setTaxEntryDraft({ tax_id: '', legal_name: '', tax_classification: '' });
+      setTaxManualAuthorized(false);
       invalidate();
     },
     onError: (err) => toast.error(err.message || 'Unable to save tax info'),
   });
 
   const adminBankEntryMutation = useMutation({
-    mutationFn: () => supabase.rpc('admin_submit_vendor_banking_info', {
-      p_vendor_id: vendorId,
-      p_account: bankEntryDraft.account,
-      p_routing: bankEntryDraft.routing,
-      p_intent: bankIntent,
-    }),
+    mutationFn: () => {
+      if (!bankManualAuthorized) throw new Error(VENDOR_MANUAL_AUTH_CONFIRMATION);
+      return supabase.rpc('admin_submit_vendor_banking_info', {
+        p_vendor_id: vendorId,
+        p_account: bankEntryDraft.account,
+        p_routing: bankEntryDraft.routing,
+        p_intent: bankIntent,
+      });
+    },
     onSuccess: ({ error }) => {
       if (error) throw error;
       toast.success('Banking info saved -- still requires callback verification below');
       setBankEntryDraft({ account: '', routing: '' });
+      setBankManualAuthorized(false);
       invalidate();
     },
     onError: (err) => toast.error(err.message || 'Unable to save banking info'),
@@ -314,7 +327,11 @@ export default function VendorOnboardingPanel({ vendorId }) {
                 <Input placeholder="Legal name" value={taxEntryDraft.legal_name} onChange={(e) => setTaxEntryDraft({ ...taxEntryDraft, legal_name: e.target.value })} />
                 <Input placeholder="Classification (llc, sole_prop...)" value={taxEntryDraft.tax_classification} onChange={(e) => setTaxEntryDraft({ ...taxEntryDraft, tax_classification: e.target.value })} />
               </div>
-              <Button size="sm" onClick={() => adminTaxEntryMutation.mutate()} disabled={adminTaxEntryMutation.isPending || !taxEntryDraft.tax_id.trim()}>
+              <label className="flex items-start gap-2 rounded-md border p-3 text-xs leading-relaxed text-muted-foreground">
+                <Checkbox checked={taxManualAuthorized} onCheckedChange={(checked) => setTaxManualAuthorized(checked === true)} />
+                <span>{VENDOR_MANUAL_AUTH_CONFIRMATION}</span>
+              </label>
+              <Button size="sm" onClick={() => adminTaxEntryMutation.mutate()} disabled={adminTaxEntryMutation.isPending || !taxEntryDraft.tax_id.trim() || !taxManualAuthorized}>
                 Save Tax Info
               </Button>
             </div>
@@ -394,7 +411,11 @@ export default function VendorOnboardingPanel({ vendorId }) {
                 <Input placeholder="Account number" value={bankEntryDraft.account} onChange={(e) => setBankEntryDraft({ ...bankEntryDraft, account: e.target.value })} />
                 <Input placeholder="Routing number" value={bankEntryDraft.routing} onChange={(e) => setBankEntryDraft({ ...bankEntryDraft, routing: e.target.value })} />
               </div>
-              <Button size="sm" onClick={() => adminBankEntryMutation.mutate()} disabled={!canIssueBanking || adminBankEntryMutation.isPending || !bankEntryDraft.account.trim() || !bankEntryDraft.routing.trim()}>
+              <label className="flex items-start gap-2 rounded-md border p-3 text-xs leading-relaxed text-muted-foreground">
+                <Checkbox checked={bankManualAuthorized} onCheckedChange={(checked) => setBankManualAuthorized(checked === true)} />
+                <span>{VENDOR_MANUAL_AUTH_CONFIRMATION}</span>
+              </label>
+              <Button size="sm" onClick={() => adminBankEntryMutation.mutate()} disabled={!canIssueBanking || adminBankEntryMutation.isPending || !bankEntryDraft.account.trim() || !bankEntryDraft.routing.trim() || !bankManualAuthorized}>
                 Save Banking Info
               </Button>
             </div>

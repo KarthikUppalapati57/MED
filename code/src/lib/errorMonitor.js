@@ -1,12 +1,9 @@
 import { supabase } from '@/lib/supabaseClient';
-import * as Sentry from "@sentry/react";
 
 /**
  * Lightweight error monitoring service.
  * Logs errors to Supabase `error_logs` table for visibility.
  * Falls back to console.error if Supabase is unavailable.
- * 
- * To upgrade to Sentry later, replace `captureError` internals.
  */
 
 const ERROR_LOG_TABLE = 'error_logs';
@@ -52,16 +49,6 @@ export async function captureError(error, context = {}) {
     context,
   });
 
-  // Send to Sentry
-  if (import.meta.env.VITE_SENTRY_DSN) {
-    Sentry.captureException(error, {
-      contexts: {
-        app_context: context
-      },
-      user: context.userId ? { id: context.userId } : undefined,
-      level: context.severity || 'error',
-    });
-  }
 
   // Attempt to persist to Supabase
   try {

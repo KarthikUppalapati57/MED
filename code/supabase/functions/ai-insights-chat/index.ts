@@ -3,8 +3,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseServiceRoleClient } from '../_shared/supabase.ts';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
 const ROLE_RANK = {
   ground_staff: 0,
   location_manager: 1,
@@ -167,7 +165,13 @@ async function getScopedContext(supabase: unknown, scope: Record<string, unknown
   };
 }
 
-async function callGemini({ apiKey, message, history, context, scopeLabel }: Record<string, unknown>) {
+async function callAzureOpenAI({ message, history, context, scopeLabel }: Record<string, unknown>) {
+  const endpoint = Deno.env.get('AZURE_OPENAI_ENDPOINT')?.trim()?.replace(/\/+$/, '');
+  const key = Deno.env.get('AZURE_OPENAI_API_KEY')?.trim();
+  const deployment = Deno.env.get('AZURE_OPENAI_DEPLOYMENT')?.trim();
+  const apiVersion = Deno.env.get('AZURE_OPENAI_API_VERSION')?.trim() || 'v1';
+  if (!endpoint || !key || !deployment) throw new Error('Azure OpenAI is not configured in Supabase secrets.');
+
   const systemInstruction = `You are Restops AI Insights Copilot, a restaurant operations copilot.
 You must answer only with the scoped restaurant data provided in CONTEXT.
 Never claim access to data outside the current scope.
@@ -175,55 +179,48 @@ If the answer cannot be supported by the context, say what data is missing and s
 Keep answers concise, concrete, and action-oriented. Use bullets when helpful.
 Current scope: ${scopeLabel}.`;
 
-  const contents = [
+  const messages = [
+    { role: 'system', content: systemInstruction },
     ...((Array.isArray(history) ? history : []).slice(-8).map((msg) => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: String(msg.content || '').slice(0, 1200) }],
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: String(msg.content || '').slice(0, 1200),
     }))),
     {
       role: 'user',
-      parts: [{
-        text: [
-          `Question: ${String(message).slice(0, 1500)}`,
-          '',
-          'CONTEXT:',
-          JSON.stringify(context, null, 2).slice(0, 18000),
-        ].join('\n'),
-      }],
+      content: [
+        `Question: ${String(message).slice(0, 1500)}`,
+        '',
+        'CONTEXT:',
+        JSON.stringify(context, null, 2).slice(0, 18000),
+      ].join('\n'),
     },
   ];
 
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(`${endpoint}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemInstruction }] },
-      contents,
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 900,
-      },
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': key,
+    },
+    body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 900 }),
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    console.error('Gemini API error:', error);
-    throw new Error(error?.error?.message || 'AI engine request failed');
+    const errorText = await response.text();
+    console.error('Azure OpenAI API error:', errorText);
+    throw new Error(`AI engine request failed: ${response.status}`);
   }
 
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'I could not generate an answer from the available context.';
+  return data.choices?.[0]?.message?.content || 'I could not generate an answer from the available context.';
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405);
 
   try {
-    const apiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('VITE_GEMINI_API_KEY');
-    if (!apiKey) return jsonResponse({ error: 'Gemini API key is not configured in Supabase secrets.' }, 500);
-
     const authHeader = req.headers.get('Authorization');
     const userClient = getSupabaseClient(authHeader);
     const admin = getSupabaseServiceRoleClient();
@@ -316,8 +313,7 @@ serve(async (req) => {
         ? `Brand: ${brand.name}`
         : `Organization: ${organization?.name || orgId}`;
 
-    const reply = await callGemini({
-      apiKey,
+    const reply = await callAzureOpenAI({
       message,
       history: body.history,
       context: {

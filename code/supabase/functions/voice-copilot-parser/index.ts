@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GEMINI_MODEL = Deno.env.get('VOICE_COPILOT_GEMINI_MODEL') || 'gemini-2.5-flash';
-
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -17,15 +15,6 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
 
 function normalizeTranscript(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ').trim();
-}
-
-function extractJsonObject(text: string) {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const candidate = fenced || text;
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) throw new Error('AI parser did not return JSON');
-  return JSON.parse(candidate.slice(start, end + 1));
 }
 
 function parseWithRules(transcript: string) {
@@ -64,41 +53,6 @@ function parseWithRules(transcript: string) {
   };
 }
 
-async function parseWithGemini(transcript: string) {
-  const apiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_GEMINI_API_KEY');
-  if (!apiKey) return null;
-
-  const prompt = `You parse restaurant operations voice commands for Restops. Return only compact JSON with keys: intent, confidence, item_name, quantity, unit, reason, action, parameters. Allowed intents: LOG_WASTE, UPDATE_COUNT, LOG_PREP, CREATE_ORDER_NOTE, UNKNOWN. Transcript: ${JSON.stringify(transcript)}`;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Gemini voice parser failed: ${body || response.statusText}`);
-  }
-
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((part: Record<string, string>) => part.text || '').join('') || '';
-  const parsed = extractJsonObject(text);
-  return {
-    intent: parsed.intent || 'UNKNOWN',
-    confidence: Number(parsed.confidence || 0),
-    item_name: parsed.item_name || parsed.parameters?.item_name || null,
-    quantity: parsed.quantity == null ? parsed.parameters?.quantity ?? null : Number(parsed.quantity),
-    unit: parsed.unit || parsed.parameters?.unit || null,
-    reason: parsed.reason || null,
-    action: parsed.action || parsed.intent || 'UNKNOWN',
-    parameters: parsed.parameters || {},
-    source: 'gemini',
-  };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -118,7 +72,7 @@ serve(async (req) => {
       throw new Error('Missing required field: transcript');
     }
 
-    const parsed = await parseWithGemini(transcript) || parseWithRules(transcript);
+    const parsed = parseWithRules(transcript);
     const understood = parsed.intent !== 'UNKNOWN';
 
     return jsonResponse({

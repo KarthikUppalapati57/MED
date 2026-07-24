@@ -485,7 +485,7 @@ export default function InvoiceUploader({
                   <div className="flex items-center justify-center gap-2 mt-2">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500" />
                     <span className="text-xs text-amber-600 font-medium">
-                      Gemini AI-Powered Extraction
+                      Azure AI-Powered Extraction
                     </span>
                   </div>
                   <Input

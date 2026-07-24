@@ -17,6 +17,7 @@ DECLARE
   v_owner uuid := gen_random_uuid();
   v_branch uuid := gen_random_uuid();
   v_location_manager uuid := gen_random_uuid();
+  v_creator uuid := gen_random_uuid();
   v_vendor_brand1 uuid;
   v_vendor_brand2 uuid;
   v_vendor_location1 uuid;
@@ -29,7 +30,8 @@ BEGIN
     ('location2', v_location2),
     ('owner', v_owner),
     ('branch', v_branch),
-    ('location_manager', v_location_manager);
+    ('location_manager', v_location_manager),
+    ('creator', v_creator);
 
   INSERT INTO auth.users (
     id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -37,7 +39,8 @@ BEGIN
   ) VALUES
     (v_owner, 'authenticated', 'authenticated', 'vendor-approval-owner@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_branch, 'authenticated', 'authenticated', 'vendor-approval-branch@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
-    (v_location_manager, 'authenticated', 'authenticated', 'vendor-approval-location@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
+    (v_location_manager, 'authenticated', 'authenticated', 'vendor-approval-location@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()),
+    (v_creator, 'authenticated', 'authenticated', 'vendor-approval-creator@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now());
 
   INSERT INTO public.organizations (id, name, slug, owner_id)
   VALUES (v_org, 'Vendor Approval Containment Org', 'vendor-approval-containment-' || replace(v_org::text, '-', ''), v_owner);
@@ -57,7 +60,8 @@ BEGIN
   ) VALUES
     (v_owner, 'vendor-approval-owner@example.test', 'Vendor Approval Owner', 'org_manager', v_org, NULL, NULL, 'organization'),
     (v_branch, 'vendor-approval-branch@example.test', 'Vendor Approval Branch', 'branch_manager', v_org, v_brand1, NULL, 'brand'),
-    (v_location_manager, 'vendor-approval-location@example.test', 'Vendor Approval Location', 'location_manager', v_org, v_brand1, v_location1, 'location')
+    (v_location_manager, 'vendor-approval-location@example.test', 'Vendor Approval Location', 'location_manager', v_org, v_brand1, v_location1, 'location'),
+    (v_creator, 'vendor-approval-creator@example.test', 'Vendor Approval Creator', 'branch_manager', v_org, v_brand1, NULL, 'brand')
   ON CONFLICT (id) DO UPDATE
      SET email = EXCLUDED.email,
          full_name = EXCLUDED.full_name,
@@ -73,18 +77,19 @@ BEGIN
   VALUES
     (v_org, v_owner, 'org_manager'),
     (v_org, v_branch, 'branch_manager'),
-    (v_org, v_location_manager, 'location_manager');
+    (v_org, v_location_manager, 'location_manager'),
+    (v_org, v_creator, 'branch_manager');
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, created_by)
-  VALUES (v_org, v_brand1, NULL, 'Vendor Approval Brand 1 Vendor', 'active', v_owner)
+  VALUES (v_org, v_brand1, NULL, 'Vendor Approval Brand 1 Vendor', 'active', v_creator)
   RETURNING id INTO v_vendor_brand1;
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, created_by)
-  VALUES (v_org, v_brand1, v_location1, 'Vendor Approval Location 1 Vendor', 'active', v_owner)
+  VALUES (v_org, v_brand1, v_location1, 'Vendor Approval Location 1 Vendor', 'active', v_creator)
   RETURNING id INTO v_vendor_location1;
 
   INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, created_by)
-  VALUES (v_org, v_brand2, NULL, 'Vendor Approval Brand 2 Vendor', 'active', v_owner)
+  VALUES (v_org, v_brand2, NULL, 'Vendor Approval Brand 2 Vendor', 'active', v_creator)
   RETURNING id INTO v_vendor_brand2;
 
   INSERT INTO vendor_approval_containment_ids(key, value) VALUES
@@ -188,6 +193,16 @@ END $$;
 
 DO $$
 BEGIN
+  -- Postgres requires SELECT-policy visibility to even locate a row for an UPDATE's WHERE
+  -- clause, IN ADDITION to the UPDATE policy's own USING clause -- so even though
+  -- reference_scope_writable() lets org_manager write any brand-shared vendor in their org with
+  -- no active location, reference_scope_visible()'s "no exceptions, active location required"
+  -- rule means the UPDATE can't find the row at all without one. This isn't a test artifact:
+  -- it's true in the real app too -- you can't approve a vendor you can't first see/select in
+  -- the UI. Simulate having switched into brand2's location before approving its vendor.
+  UPDATE public.profiles SET location_id = (SELECT value FROM vendor_approval_containment_ids WHERE key = 'location2'), updated_at = now()
+  WHERE id = (SELECT value FROM vendor_approval_containment_ids WHERE key = 'owner');
+
   SET LOCAL ROLE authenticated;
   PERFORM set_config(
     'request.jwt.claims',
@@ -222,6 +237,11 @@ DO $$
 DECLARE
   v_rows integer;
 BEGIN
+  -- Same reasoning as the org_manager block above: switch branch_manager into brand1's location
+  -- before approving a brand1 vendor, or the UPDATE can't locate the row to write to at all.
+  UPDATE public.profiles SET location_id = (SELECT value FROM vendor_approval_containment_ids WHERE key = 'location1'), updated_at = now()
+  WHERE id = (SELECT value FROM vendor_approval_containment_ids WHERE key = 'branch');
+
   SET LOCAL ROLE authenticated;
   PERFORM set_config(
     'request.jwt.claims',
@@ -244,6 +264,18 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'in-brand branch_manager direct vendor approval did not persist';
   END IF;
+
+  -- Still only switched into brand1 -- vendor_brand2 must be rejected regardless, both because
+  -- reference_scope_writable() denies branch_manager write access outside their own brand AND
+  -- because it isn't visible from here either.
+  PERFORM set_config(
+    'request.jwt.claims',
+    jsonb_build_object(
+      'sub', (SELECT value::text FROM vendor_approval_containment_ids WHERE key = 'branch'),
+      'role', 'authenticated'
+    )::text,
+    true
+  );
 
   BEGIN
     UPDATE public.vendors
