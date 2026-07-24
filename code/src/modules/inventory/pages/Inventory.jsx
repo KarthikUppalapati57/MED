@@ -2678,7 +2678,7 @@ export default function Inventory() {
   }, [filteredInventory, inventoryTableScrollTop]);
 
   return (
-    <div className="space-y-6">
+    <div className="inventory-visual-page space-y-6" string="progress">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -2744,8 +2744,8 @@ export default function Inventory() {
       })()}
 
       {activeTab === 'inventory' && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card className="border-0 shadow-sm">
+        <div className="inventory-stat-grid grid grid-cols-2 gap-4 lg:grid-cols-4" string="progress">
+          <Card className="inventory-stat-card border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2756,7 +2756,7 @@ export default function Inventory() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="inventory-stat-card border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2767,7 +2767,7 @@ export default function Inventory() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="inventory-stat-card border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2778,7 +2778,7 @@ export default function Inventory() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="inventory-stat-card border-0 shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -2792,7 +2792,7 @@ export default function Inventory() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="inventory-tab-shell space-y-6" string="progress">
         <TabsList className="flex h-auto w-full flex-wrap items-center gap-1 rounded-lg bg-muted/60 p-1">
           <TabsTrigger value="inventory" className="min-w-32 flex-1 whitespace-nowrap px-3 py-2">Inventory List</TabsTrigger>
           <TabsTrigger value="receiving" className="min-w-28 flex-1 whitespace-nowrap px-3 py-2 text-primary font-bold">Receiving</TabsTrigger>
@@ -2833,7 +2833,7 @@ export default function Inventory() {
 
         <TabsContent value="inventory" className="space-y-4">
           {/* Filters */}
-          <Card className="border-0 shadow-sm">
+          <Card className="inventory-filter-bar border-0 shadow-sm" string="progress">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
@@ -2896,7 +2896,7 @@ export default function Inventory() {
           )}
 
           {/* Inventory Table */}
-          <Card className="border-0 shadow-sm">
+          <Card className="inventory-table-shell border-0 shadow-sm" string="progress">
             <CardContent className="p-0">
               <div
                 ref={inventoryTableRef}

@@ -1310,7 +1310,7 @@ export default function Products() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="product-visual-page space-y-6" string="progress">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -1346,33 +1346,33 @@ export default function Products() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+      <div className="product-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
+        <Card className="product-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Products</p>
             <p className="text-2xl font-bold text-foreground">{loadingSummary ? '...' : totalProducts}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="product-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Inventoried</p>
             <p className="text-2xl font-bold text-foreground">{loadingSummary ? '...' : inventoriedCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="product-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Tax Exempt</p>
             <p className="text-2xl font-bold text-foreground">{loadingSummary ? '...' : taxExemptCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="product-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Categories</p>
             <p className="text-2xl font-bold text-foreground">{loadingSummary ? '...' : categoriesCount}</p>
           </CardContent>
         </Card>
       </div>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="product-tab-shell space-y-6" string="progress">
         <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none p-0 h-auto">
           <TabsTrigger value="all-products" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
             Master Catalog
@@ -1394,7 +1394,7 @@ export default function Products() {
 
         <TabsContent value="all-products" className="space-y-4">
       {/* Filters */}
-      <Card className="border-0 shadow-sm">
+      <Card className="product-filter-bar border-0 shadow-sm" string="progress">
         <CardContent className="space-y-3 border bg-muted/40 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <Select value={productCategoryTypeFilter} onValueChange={setProductCategoryTypeFilter}>
@@ -1455,7 +1455,7 @@ export default function Products() {
       )}
 
       {/* Table */}
-      <Card className="border-0 shadow-sm">
+      <Card className="product-table-shell border-0 shadow-sm" string="progress">
         <CardContent className="p-0">
           <ProductsScrollableTable className="min-w-[1660px]">
             <TableHeader>
@@ -1761,7 +1761,7 @@ export default function Products() {
 
  {/* AI Verification Queue Tab */}
         <TabsContent value="ai-verification">
-          <Card className="border-0 shadow-sm border-t-4 border-t-primary">
+          <Card className="product-panel-card border-0 shadow-sm border-t-4 border-t-primary" string="progress">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -1999,7 +1999,7 @@ export default function Products() {
 
         {/* Price Action Center Tab */}
         <TabsContent value="price-variances">
-          <Card className="border-0 shadow-sm border-t-4 border-t-resend-red">
+          <Card className="product-panel-card border-0 shadow-sm border-t-4 border-t-resend-red" string="progress">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -2103,7 +2103,7 @@ export default function Products() {
 
         {/* Purchase Report Tab */}
         <TabsContent value="purchase-report">
-          <Card className="border-0 shadow-sm">
+          <Card className="product-panel-card border-0 shadow-sm" string="progress">
             <CardHeader className="flex flex-col gap-3 border-b bg-background px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle className="text-xl font-semibold tracking-normal">Purchase Report</CardTitle>

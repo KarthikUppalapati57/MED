@@ -890,9 +890,9 @@ export default function Payments() {
   }, [filteredPayments, paymentHistoryTableScrollTop]);
 
   return (
-    <div className="space-y-6">
+    <div className="payment-visual-page space-y-6" string="progress">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="payment-page-header flex items-center justify-between" string="progress">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Payments</h1>
           <p className="text-muted-foreground mt-1">Execute, schedule, and record vendor payments</p>
@@ -910,7 +910,7 @@ export default function Payments() {
         location={location}
       />
 
-      <Card className="border-0 shadow-sm">
+      <Card className="payment-command-panel border-0 shadow-sm" string="progress">
         <CardContent className="p-4">
           <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
             <div>
@@ -920,22 +920,22 @@ export default function Payments() {
               </p>
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              <button type="button" onClick={() => setActiveTab('invoices')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+              <button type="button" onClick={() => setActiveTab('invoices')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
                 <p className="text-xs text-muted-foreground">Approved Unpaid</p>
                 <p className="text-xl font-bold">{approvedUnpaid.length}</p>
                 <p className="text-xs text-muted-foreground">{`$${totalDue.toLocaleString()}`}</p>
               </button>
-              <button type="button" onClick={() => setActiveTab('schedule')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+              <button type="button" onClick={() => setActiveTab('schedule')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
                 <p className="text-xs text-muted-foreground">Scheduled</p>
                 <p className="text-xl font-bold">{scheduledInvoices.length}</p>
                 <p className="text-xs text-muted-foreground">{`$${scheduledAmount.toLocaleString()}`}</p>
               </button>
-              <button type="button" onClick={() => setStatusFilter('partial')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+              <button type="button" onClick={() => setStatusFilter('partial')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
                 <p className="text-xs text-muted-foreground">Partial</p>
                 <p className="text-xl font-bold">{partialInvoices.length}</p>
                 <p className="text-xs text-muted-foreground">Remaining balance</p>
               </button>
-              <button type="button" onClick={() => setStatusFilter('approved')} className="rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
+              <button type="button" onClick={() => setStatusFilter('approved')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
                 <p className="text-xs text-muted-foreground">Due 7 Days</p>
                 <p className="text-xl font-bold">{`$${dueNextSevenAmount.toLocaleString()}`}</p>
                 <p className="text-xs text-muted-foreground">Cash needed</p>
@@ -946,8 +946,8 @@ export default function Payments() {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+      <div className="payment-stat-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
+        <Card className="payment-stat-card border-0 shadow-sm">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -963,7 +963,7 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="payment-stat-card border-0 shadow-sm">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -979,7 +979,7 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="payment-stat-card border-0 shadow-sm">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -993,7 +993,7 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="payment-stat-card border-0 shadow-sm">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -1009,7 +1009,7 @@ export default function Payments() {
       </div>
 
       {/* Search & Filter */}
-      <Card className="border-0 shadow-sm">
+      <Card className="payment-filter-bar border-0 shadow-sm" string="progress">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -1041,7 +1041,7 @@ export default function Payments() {
       </Card>
 
       {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="payment-tab-shell" string="progress">
         <div className="border-b border-border">
           <TabsList className="h-auto p-0 bg-transparent gap-6 justify-start w-full overflow-x-auto">
             <TabsTrigger value="invoices" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 py-3">Payable Queue</TabsTrigger>
@@ -1056,7 +1056,7 @@ export default function Payments() {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="mt-4">
-          <Card className="border-0 shadow-sm">
+          <Card className="payment-table-shell border-0 shadow-sm" string="progress">
             <CardHeader className="flex flex-row items-center justify-between py-4">
               <CardTitle>All Invoices</CardTitle>
               {selectedInvoiceIds.length > 0 && (
@@ -1300,7 +1300,7 @@ export default function Payments() {
 
         {/* Scheduled Payments Tab */}
         <TabsContent value="schedule" className="mt-4">
-          <Card className="border-0 shadow-sm">
+          <Card className="payment-table-shell border-0 shadow-sm" string="progress">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
@@ -1381,7 +1381,7 @@ export default function Payments() {
 
         {/* Payment History Tab */}
         <TabsContent value="history" className="mt-4">
-          <Card className="border-0 shadow-sm">
+          <Card className="payment-table-shell border-0 shadow-sm" string="progress">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-primary" />
@@ -1515,7 +1515,7 @@ export default function Payments() {
         <TabsContent value="reconciliation" className="mt-4">
           <div className="space-y-6">
             {/* Open Invoices for Reconciliation */}
-            <Card className="border-0 shadow-sm">
+            <Card className="payment-table-shell border-0 shadow-sm" string="progress">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
@@ -1585,7 +1585,7 @@ export default function Payments() {
             </Card>
 
             {/* Email Tracked Invoices */}
-            <Card className="border-0 shadow-sm">
+            <Card className="payment-table-shell border-0 shadow-sm" string="progress">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5 text-resend-blue" />
@@ -1606,7 +1606,7 @@ export default function Payments() {
 
         {/* Setup Tab */}
         <TabsContent value="setup" className="mt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="payment-setup-grid grid grid-cols-1 lg:grid-cols-2 gap-6" string="progress">
             {queryParams.get('banking') === 'skipped' && (
               <Card className="border-amber-500/40 bg-amber-500/10 shadow-sm lg:col-span-2">
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1630,7 +1630,7 @@ export default function Payments() {
               <PaymentAccountsSettings />
             </div>
 
-            <Card className="border-0 shadow-sm">
+            <Card className="payment-setup-card border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Settings className="h-4 w-4" /> Payment Defaults
@@ -1706,7 +1706,7 @@ export default function Payments() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm">
+            <Card className="payment-setup-card border-0 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Mail className="h-4 w-4" /> Notifications
@@ -1746,7 +1746,7 @@ export default function Payments() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm lg:col-span-2">
+            <Card className="payment-setup-card border-0 shadow-sm lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Bell className="h-4 w-4" /> Due-Date Reminders
@@ -1802,7 +1802,7 @@ export default function Payments() {
 
         {/* Subscription Tab */}
         <TabsContent value="subscription" className="mt-4">
-          <Card className="border-0 shadow-sm max-w-2xl mx-auto overflow-hidden">
+          <Card className="payment-subscription-card border-0 shadow-sm max-w-2xl mx-auto overflow-hidden" string="progress">
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-8 text-white relative">
               <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
               <div className="relative z-10 flex items-center gap-4">

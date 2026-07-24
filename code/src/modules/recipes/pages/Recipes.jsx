@@ -825,7 +825,7 @@ export default function Recipes() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="recipe-visual-page space-y-6" string="progress">
       {!['menu-items', 'prepared-items', 'bar-items'].includes(activeTab) && (
         <>
       {/* Header */}
@@ -868,14 +868,14 @@ export default function Recipes() {
 
       {/* Stats — Recipes List and related views only */}
       {activeTab !== 'setup' && (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
+      <div className="recipe-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
+        <Card className="recipe-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Recipes</p>
             <p className="text-2xl font-bold text-foreground">{stats.totalRecipes}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="recipe-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Avg Cost/Serving</p>
             <p className="text-2xl font-bold text-foreground">
@@ -883,7 +883,7 @@ export default function Recipes() {
             </p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="recipe-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Active</p>
             <p className="text-2xl font-bold text-foreground">
@@ -891,7 +891,7 @@ export default function Recipes() {
             </p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="recipe-stat-card border-0 shadow-sm">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Categories</p>
             <p className="text-2xl font-bold text-foreground">
@@ -905,7 +905,7 @@ export default function Recipes() {
       )}
 
       {['menu-items', 'recipes', 'prepared-items', 'bar-items', 'setup'].includes(activeTab) && (
-        <Card className="border shadow-sm">
+        <Card className="recipe-workflow-card border shadow-sm" string="progress">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -945,7 +945,7 @@ export default function Recipes() {
         </Card>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="recipe-tab-shell space-y-6" string="progress">
 
         <TabsContent value="menu-items" className="mt-0">
           <MenuItemsOperations
@@ -968,7 +968,7 @@ export default function Recipes() {
         <TabsContent value="recipes" className="space-y-4">
 
       {/* Filters */}
-      <Card className="border-0 shadow-sm">
+      <Card className="recipe-filter-bar border-0 shadow-sm" string="progress">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -1012,14 +1012,14 @@ export default function Recipes() {
       </Card>
 
       {/* Recipes Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="recipe-card-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" string="progress">
         {isLoading ? (
           <div className="col-span-full text-center py-8 text-muted-foreground">Loading...</div>
         ) : filteredRecipes.length === 0 ? (
           <div className="col-span-full text-center py-8 text-muted-foreground">No recipes found</div>
         ) : (
           filteredRecipes.map((recipe) => (
-            <Card key={recipe.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <Card key={recipe.id} className="recipe-grid-card border-0 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -1103,7 +1103,7 @@ export default function Recipes() {
         <TabsContent value="menu-analysis">
           <div className="space-y-6">
             {/* AI Insights Card */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-indigo-50">
+            <Card className="recipe-panel-card border-0 shadow-sm bg-gradient-to-br from-purple-50 to-indigo-50" string="progress">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -1148,7 +1148,7 @@ export default function Recipes() {
             {/* Analytics Dashboard */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Cost Distribution */}
-              <Card className="border-0 shadow-sm">
+              <Card className="recipe-panel-card border-0 shadow-sm" string="progress">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" /> Cost Distribution by Category
@@ -1180,7 +1180,7 @@ export default function Recipes() {
               </Card>
 
               {/* Most/Least Expensive */}
-              <Card className="border-0 shadow-sm">
+              <Card className="recipe-panel-card border-0 shadow-sm" string="progress">
                 <CardHeader>
                   <CardTitle className="text-base">Plate Cost Ranking</CardTitle>
                 </CardHeader>
@@ -1265,7 +1265,7 @@ export default function Recipes() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-sm">
+                <Card className="recipe-panel-card border-0 shadow-sm" string="progress">
                   <CardHeader><CardTitle className="text-base">Cost Breakdown</CardTitle></CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -1296,7 +1296,7 @@ export default function Recipes() {
               </div>
 
               {viewingRecipe.instructions && (
-                <Card className="border-0 shadow-sm">
+                <Card className="recipe-panel-card border-0 shadow-sm" string="progress">
                   <CardHeader><CardTitle className="text-base">Instructions</CardTitle></CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground whitespace-pre-wrap">{viewingRecipe.instructions}</p>

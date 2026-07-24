@@ -795,6 +795,207 @@
   }
 }
 
+/* Payments page: StringTune-style progressive enhancement hooks */
+.payment-visual-page [string="progress"] {
+  --progress: 1;
+  animation: payment-reveal 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.payment-command-panel,
+.payment-stat-card,
+.payment-filter-bar,
+.payment-table-shell,
+.payment-setup-card,
+.payment-subscription-card {
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 8px;
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--secondary) / 0.28) 100%);
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.5);
+}
+
+.payment-command-panel {
+  overflow: hidden;
+}
+
+.payment-command-tile {
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.payment-command-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, hsl(var(--primary) / 0.12), transparent 46%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.payment-command-tile:hover,
+.payment-command-tile:focus-visible {
+  border-color: hsl(var(--primary) / 0.58);
+  box-shadow: 0 14px 26px -24px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
+}
+
+.payment-command-tile:hover::after,
+.payment-command-tile:focus-visible::after {
+  opacity: 1;
+}
+
+.payment-stat-card {
+  border-top: 3px solid hsl(var(--primary) / 0.7);
+}
+
+.payment-stat-card:nth-child(2) {
+  border-top-color: hsl(var(--resend-green) / 0.72);
+}
+
+.payment-stat-card:nth-child(3) {
+  border-top-color: hsl(var(--resend-red) / 0.72);
+}
+
+.payment-stat-card:nth-child(4) {
+  border-top-color: hsl(var(--resend-yellow) / 0.78);
+}
+
+.payment-filter-bar,
+.payment-table-shell {
+  overflow: hidden;
+}
+
+.payment-tab-shell > [string="progress"] {
+  --progress: 1;
+}
+
+@keyframes payment-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-visual-page [string="progress"],
+  .payment-command-tile {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}
+/* Products, inventory, and recipes: StringTune-style progressive enhancement hooks */
+.product-visual-page [string="progress"],
+.inventory-visual-page [string="progress"],
+.recipe-visual-page [string="progress"] {
+  --progress: 1;
+  animation: ops-module-reveal 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.product-stat-card,
+.product-filter-bar,
+.product-table-shell,
+.inventory-stat-card,
+.inventory-filter-bar,
+.inventory-table-shell,
+.recipe-stat-card,
+.recipe-filter-bar,
+.recipe-workflow-card,
+.recipe-grid-card {
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 8px;
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--secondary) / 0.24) 100%);
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.5);
+}
+
+.product-panel-card,
+.recipe-panel-card {
+  border-radius: 8px;
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.5);
+}
+
+.product-filter-bar,
+.product-table-shell,
+.inventory-filter-bar,
+.inventory-table-shell,
+.recipe-filter-bar,
+.recipe-workflow-card,
+.product-panel-card,
+.recipe-panel-card {
+  overflow: hidden;
+}
+
+.product-stat-card,
+.inventory-stat-card,
+.recipe-stat-card {
+  border-top: 3px solid hsl(var(--primary) / 0.7);
+}
+
+.product-stat-card:nth-child(2),
+.inventory-stat-card:nth-child(2),
+.recipe-stat-card:nth-child(2) {
+  border-top-color: hsl(var(--resend-green) / 0.72);
+}
+
+.product-stat-card:nth-child(3),
+.inventory-stat-card:nth-child(3),
+.recipe-stat-card:nth-child(3) {
+  border-top-color: hsl(var(--resend-red) / 0.68);
+}
+
+.product-stat-card:nth-child(4),
+.inventory-stat-card:nth-child(4),
+.recipe-stat-card:nth-child(4) {
+  border-top-color: hsl(var(--resend-yellow) / 0.78);
+}
+
+.product-table-shell,
+.inventory-table-shell {
+  isolation: isolate;
+}
+
+.recipe-grid-card {
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.recipe-grid-card:hover,
+.recipe-grid-card:focus-within {
+  border-color: hsl(var(--primary) / 0.52);
+  box-shadow: 0 20px 36px -30px rgba(0, 0, 0, 0.55);
+  transform: translateY(-1px);
+}
+
+@keyframes ops-module-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-visual-page [string="progress"],
+  .inventory-visual-page [string="progress"],
+  .recipe-visual-page [string="progress"],
+  .recipe-grid-card {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}
 .invoice-command-hero-compact .invoice-command-grid-balanced {
   gap: 20px;
 }
