@@ -910,41 +910,6 @@ export default function Payments() {
         location={location}
       />
 
-      <Card className="payment-command-panel border-0 shadow-sm" string="progress">
-        <CardContent className="p-4">
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_2fr]">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Bill Pay Execution</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Execute payments, schedule transfers, and monitor cash timing from one AP queue.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              <button type="button" onClick={() => setActiveTab('invoices')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
-                <p className="text-xs text-muted-foreground">Approved Unpaid</p>
-                <p className="text-xl font-bold">{approvedUnpaid.length}</p>
-                <p className="text-xs text-muted-foreground">{`$${totalDue.toLocaleString()}`}</p>
-              </button>
-              <button type="button" onClick={() => setActiveTab('schedule')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
-                <p className="text-xs text-muted-foreground">Scheduled</p>
-                <p className="text-xl font-bold">{scheduledInvoices.length}</p>
-                <p className="text-xs text-muted-foreground">{`$${scheduledAmount.toLocaleString()}`}</p>
-              </button>
-              <button type="button" onClick={() => setStatusFilter('partial')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
-                <p className="text-xs text-muted-foreground">Partial</p>
-                <p className="text-xl font-bold">{partialInvoices.length}</p>
-                <p className="text-xs text-muted-foreground">Remaining balance</p>
-              </button>
-              <button type="button" onClick={() => setStatusFilter('approved')} className="payment-command-tile rounded-md border border-border bg-background px-3 py-3 text-left hover:bg-secondary transition-colors">
-                <p className="text-xs text-muted-foreground">Due 7 Days</p>
-                <p className="text-xl font-bold">{`$${dueNextSevenAmount.toLocaleString()}`}</p>
-                <p className="text-xs text-muted-foreground">Cash needed</p>
-              </button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Stats */}
       <div className="payment-stat-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
         <Card className="payment-stat-card border-0 shadow-sm">
