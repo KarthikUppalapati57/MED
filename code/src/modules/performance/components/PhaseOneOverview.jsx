@@ -121,27 +121,6 @@ function EmptyState({ children }) {
   );
 }
 
-function ComingSoonStrip() {
-  const items = [
-    'Sales report',
-    'Sales forecast',
-    'Labor analytics',
-    'POS analytics',
-    'Prime cost',
-    'Benchmarking',
-    'Advanced Executive BI',
-  ];
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((item) => (
-        <Badge key={item} variant="secondary" className="text-xs">
-          {item}: Coming soon
-        </Badge>
-      ))}
-    </div>
-  );
-}
-
 export default function PhaseOneOverview({
   periodStart,
   periodEnd,
@@ -430,12 +409,11 @@ export default function PhaseOneOverview({
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Phase 1 Performance Command Center</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Performance Command Center</h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-            One visual view for Invoices, Payments, Products, Inventory, and Recipes. Sales, labor, POS, forecasting, and advanced BI remain out of Phase 1.
+            One visual view for Invoices, Payments, Products, Inventory, and Recipes.
           </p>
         </div>
-        <ComingSoonStrip />
       </div>
 
       {queryErrors.length > 0 ? (
