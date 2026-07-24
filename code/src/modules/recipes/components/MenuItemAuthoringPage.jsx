@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUp, ChefHat, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -39,6 +39,7 @@ function Section({ title, description, children }) {
 
 export default function MenuItemAuthoringPage({ products = [], preparedItems = [], locations = [], conversions = [] }) {
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const queryClient = useQueryClient();
   const { organization, brand, location } = useAuth();
   const { canManageRecipes } = usePermissions();
@@ -158,7 +159,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
   const cancel = async () => {
     if (dirty && !(await confirm(getConfirmationMessage('discardRecipeChanges')))) return;
     baselineRef.current = JSON.stringify(form);
-    navigate('/Recipes/menu-items');
+    navigate(`/Recipes/menu-items${routerLocation.search}`);
   };
 
   const save = async () => {
@@ -196,7 +197,7 @@ export default function MenuItemAuthoringPage({ products = [], preparedItems = [
       queryClient.invalidateQueries({ queryKey: ['recipe-location-visibility'] });
       queryClient.invalidateQueries({ queryKey: ['menu-item-authoring-schema'] });
       toast.success('Menu Item created');
-      navigate(`/Recipes/menu-items/${saved.id}`);
+      navigate(`/Recipes/menu-items/${saved.id}${routerLocation.search}`);
     } catch (error) {
       const migrationMissing = error?.code === 'PGRST202' || String(error?.message || '').includes('save_menu_item_phase1');
       toast.error(migrationMissing ? 'This Supabase environment does not have the Menu Item authoring migration.' : error?.message || 'Unable to save Menu Item');

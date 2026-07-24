@@ -62,7 +62,6 @@ export function sortMenuItems(items, key = 'name', direction = 'asc') {
   const multiplier = direction === 'desc' ? -1 : 1;
   const valueFor = (item) => {
     if (key === 'inventoryTracking') return item.inventoryTracking ? 1 : 0;
-    if (key === 'posMapping') return item.mappedPosItem?.item_name || item.mappingStatus || '';
     if (key === 'monitoring') return item.alertStatus || '';
     if (key === 'plateCostPercent') return item.plateCostPercent;
     return item[key];

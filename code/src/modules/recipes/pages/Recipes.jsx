@@ -11,6 +11,7 @@ import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/geminiService';
 import { calculateIngredientCost, calculateRecipeCost } from '@/modules/recipes/lib/recipeCosting';
+import { buildRecipeModuleReadiness } from '@/modules/recipes/lib/recipeModuleReadiness';
 import MenuItemsOperations from '@/modules/recipes/components/MenuItemsOperations';
 import MenuItemAuthoringPage from '@/modules/recipes/components/MenuItemAuthoringPage';
 import MenuItemDetailPage from '@/modules/recipes/components/MenuItemDetailPage';
@@ -299,19 +300,6 @@ export default function Recipes() {
     enabled: !!organization?.id && ['menu-items', 'prepared-items', 'bar-items'].includes(activeTab),
   });
 
-  const { data: menuPosItems = [] } = useAuthQuery({
-    queryKey: ['menu-items-pos-items', organization?.id],
-    queryFn: () => api.entities.PosItem.list('item_name', { limit: 5000, select: 'id, organization_id, location_id, pos_item_id, item_name, pos_provider, price' }),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
-    enabled: !!organization?.id && activeTab === 'menu-items',
-  });
-
-  const { data: menuPosMappings = [] } = useAuthQuery({
-    queryKey: ['pos_menu_mapping', organization?.id],
-    queryFn: () => api.entities.PosMenuMapping.list(null, { limit: 5000, select: 'id, organization_id, pos_item_id, recipe_id' }),
-    enabled: !!organization?.id && activeTab === 'menu-items',
-  });
-
   const productsMap = React.useMemo(() => {
     const map = new Map();
     for (let i = 0; i < products.length; i++) {
@@ -365,6 +353,32 @@ export default function Recipes() {
       categoriesCount
     };
   }, [recipes]);
+
+  const moduleReadiness = React.useMemo(() => buildRecipeModuleReadiness({
+    recipes,
+    products,
+    conversions: unitConversions,
+    recipeTypes,
+  }), [recipes, products, unitConversions, recipeTypes]);
+
+  const getReadinessAction = React.useCallback((step) => {
+    switch (step.key) {
+      case 'products':
+        return { label: 'Source', run: () => toast.info('Products are owned by the Products module and are already available to recipe costing.') };
+      case 'conversions':
+        return { label: step.complete ? 'Review' : 'Configure', run: () => setActiveTab('setup') };
+      case 'prepared-items':
+        return { label: step.complete ? 'Open' : 'Create', run: () => step.complete ? setActiveTab('prepared-items') : navigate(`/Recipes/prepared-items/new${routerLocation.search}`) };
+      case 'menu-items':
+        return { label: step.complete ? 'Open' : 'Create', run: () => step.complete ? setActiveTab('menu-items') : navigate(`/Recipes/menu-items/new${routerLocation.search}`) };
+      case 'prices':
+        return { label: 'Review', run: () => setActiveTab('menu-items') };
+      case 'bar-items':
+        return { label: step.complete ? 'Open' : 'Create', run: () => step.complete ? setActiveTab('bar-items') : navigate(`/Recipes/bar-items/new${routerLocation.search}`) };
+      default:
+        return { label: 'Open', run: () => {} };
+    }
+  }, [navigate, routerLocation.search, setActiveTab]);
 
   const menuAnalysis = React.useMemo(() => {
     const byCategory = recipes.reduce((acc, r) => {
@@ -672,7 +686,7 @@ export default function Recipes() {
           cost_per_serving: result.costPerYieldUnit,
         },
       });
-    } catch (error) {
+    } catch {
       toast.error('Failed to calculate cost');
     } finally {
       setCalculatingCost(false);
@@ -890,6 +904,47 @@ export default function Recipes() {
         </>
       )}
 
+      {['menu-items', 'recipes', 'prepared-items', 'bar-items', 'setup'].includes(activeTab) && (
+        <Card className="border shadow-sm">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-lg">Recipe costing readiness</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Build the costing engine first: products, conversions, prepared items, menu items, and prices.
+                </p>
+              </div>
+              <Badge variant={moduleReadiness.percent >= 80 ? 'default' : 'secondary'} className="w-fit">
+                {moduleReadiness.completedRequired}/{moduleReadiness.requiredTotal} required complete
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {moduleReadiness.steps.map((step) => {
+              const action = getReadinessAction(step);
+              const ActionIcon = step.complete ? Eye : ['products', 'conversions', 'prices'].includes(step.key) ? Settings : Plus;
+              return (
+                <div key={step.key} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{step.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{step.description}</p>
+                    </div>
+                    <Badge variant={step.complete ? 'default' : step.optional ? 'outline' : 'secondary'}>
+                      {step.total > 0 ? `${step.count}/${step.total}` : step.count}
+                    </Badge>
+                  </div>
+                  <Button type="button" variant={step.complete ? 'outline' : 'secondary'} size="sm" className="mt-3" onClick={action.run}>
+                    <ActionIcon className="mr-2 h-3.5 w-3.5" />
+                    {action.label}
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
 
         <TabsContent value="menu-items" className="mt-0">
@@ -898,8 +953,6 @@ export default function Recipes() {
             visibilityRows={recipeVisibility.rows}
             visibilitySupported={recipeVisibility.supported}
             locations={recipeLocations}
-            posItems={menuPosItems}
-            posMappings={menuPosMappings}
             alertHistoryRows={recipeAlertHistory.rows}
             alertHistorySupported={recipeAlertHistory.supported}
             organizationId={organization?.id}

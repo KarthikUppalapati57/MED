@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Bell, BellOff, Download, Edit2, Eye, FileDown, Link2, Loader2, MapPin, Plus, Search, Unlink, Upload, UtensilsCrossed } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Bell, BellOff, Download, Edit2, Eye, FileDown, Loader2, MapPin, Plus, Search, Upload, UtensilsCrossed } from 'lucide-react';
 import Papa from 'papaparse';
 import { api } from '@/lib/apiClient';
 import { exportToCSV } from '@/lib/exportUtils';
 import { useConfirmation } from '@/hooks/useConfirmation';
 import { buildMenuItems, filterMenuItems, sortMenuItems } from '@/modules/recipes/lib/menuItemsDomain';
 import { analyzeMenuItemImportRows } from '@/modules/recipes/lib/menuItemsImport';
-import { enrichMenuItemWithPos } from '@/modules/recipes/lib/menuItemPosMapping';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +41,7 @@ function SortableHead({ label, sortKey, sort, onSort, className = '' }) {
   return <TableHead className={className}><button type="button" className="inline-flex items-center gap-1 whitespace-nowrap font-medium hover:text-foreground" onClick={() => onSort(sortKey)}>{label}<Icon className={`h-3.5 w-3.5 ${active ? 'text-primary' : 'text-muted-foreground'}`} /></button></TableHead>;
 }
 
-export default function MenuItemsOperations({ recipes, visibilityRows = [], visibilitySupported = false, locations = [], posItems = [], posMappings = [], alertHistoryRows = [], alertHistorySupported = false, organizationId, brandId, locationId, onAdd, onEdit, onView }) {
+export default function MenuItemsOperations({ recipes, visibilityRows = [], visibilitySupported = false, locations = [], alertHistoryRows = [], alertHistorySupported = false, organizationId, brandId, locationId, onAdd, onEdit, onView }) {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmation();
   const [search, setSearch] = useState('');
@@ -63,8 +62,6 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
   const [visibilityItem, setVisibilityItem] = useState(null);
   const [visibilityMode, setVisibilityMode] = useState('all');
   const [selectedLocationIds, setSelectedLocationIds] = useState([]);
-  const [mappingItem, setMappingItem] = useState(null);
-  const [posSearch, setPosSearch] = useState('');
   const importInputRef = useRef(null);
 
   const menuItems = useMemo(() => {
@@ -76,12 +73,15 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
       const rows = rowsByRecipe.get(item.id) || [];
       const hidden = rows.some((row) => row.location_id === null && row.is_visible === false);
       const selectedIds = rows.filter((row) => row.location_id && row.is_visible).map((row) => row.location_id);
-      return enrichMenuItemWithPos({ ...item, visibilityMode: hidden ? 'hidden' : selectedIds.length ? 'selected' : 'all', visibleLocationIds: selectedIds }, posItems, posMappings);
+      return { ...item, visibilityMode: hidden ? 'hidden' : selectedIds.length ? 'selected' : 'all', visibleLocationIds: selectedIds };
     });
-  }, [recipes, visibilityRows, posItems, posMappings]);
+  }, [recipes, visibilityRows]);
   const supportsAlertLifecycle = useMemo(() => recipes.length > 0 && recipes.every((recipe) => Object.prototype.hasOwnProperty.call(recipe, 'margin_alert_status')), [recipes]);
   const categories = useMemo(() => [...new Set(menuItems.map((item) => item.category).filter(Boolean))].sort(), [menuItems]);
-  const filteredItems = useMemo(() => sortMenuItems(filterMenuItems(menuItems, { search, categories: selectedCategories, alertStatuses: selectedAlertStatuses, visibility: visibilityFilter, activeOnly }).filter((item) => mappingFilter === 'any' || (mappingFilter === 'missing-price' ? item.priceSource === 'missing' : item.mappingStatus === mappingFilter)), sort.key, sort.direction), [menuItems, search, selectedCategories, selectedAlertStatuses, visibilityFilter, mappingFilter, activeOnly, sort]);
+  const filteredItems = useMemo(() => sortMenuItems(filterMenuItems(menuItems, { search, categories: selectedCategories, alertStatuses: selectedAlertStatuses, visibility: visibilityFilter, activeOnly }).filter((item) => {
+    if (mappingFilter === 'missing-price') return item.priceSource === 'missing';
+    return true;
+  }), sort.key, sort.direction), [menuItems, search, selectedCategories, selectedAlertStatuses, visibilityFilter, mappingFilter, activeOnly, sort]);
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paginatedItems = useMemo(() => filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredItems, currentPage, pageSize]);
@@ -132,34 +132,6 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['recipe-location-visibility'] }); setVisibilityItem(null); toast.success('Menu-item visibility updated'); },
     onError: (error) => toast.error(error?.message || 'Unable to update visibility'),
   });
-
-  const mappingMutation = useMutation({
-    mutationFn: async ({ recipeId, posItemId }) => {
-      const existingForRecipe = posMappings.filter((entry) => entry.recipe_id === recipeId);
-      const existingForPos = posMappings.find((entry) => entry.pos_item_id === posItemId);
-      const deleteIds = [...new Set([...existingForRecipe.map((entry) => entry.id), existingForPos?.id].filter(Boolean))];
-      await api.entities.PosMenuMapping.deleteMany(deleteIds);
-      return api.entities.PosMenuMapping.create({ organization_id: organizationId, recipe_id: recipeId, pos_item_id: posItemId });
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping'] }); setMappingItem(null); setPosSearch(''); toast.success('POS mapping saved'); },
-    onError: (error) => toast.error(error?.message || 'Unable to save POS mapping'),
-  });
-
-  const removeMapping = async () => {
-    if (!mappingItem?.mapping) return;
-    const confirmed = await confirm({ title: 'Remove POS mapping?', description: `${mappingItem.name} will no longer receive POS price or sales data from ${mappingItem.mappedPosItem?.item_name || 'this POS item'}.`, confirmText: 'Remove mapping', variant: 'destructive', severity: 'high' });
-    if (!confirmed) return;
-    try { await api.entities.PosMenuMapping.delete(mappingItem.mapping.id); queryClient.invalidateQueries({ queryKey: ['pos_menu_mapping'] }); setMappingItem(null); toast.success('POS mapping removed'); } catch (error) { toast.error(error?.message || 'Unable to remove mapping'); }
-  };
-
-  const choosePosMapping = async (posItem) => {
-    const occupied = posMappings.find((entry) => entry.pos_item_id === posItem.id && entry.recipe_id !== mappingItem.id);
-    if (occupied || mappingItem.mapping) {
-      const confirmed = await confirm({ title: 'Replace POS mapping?', description: `${posItem.item_name} will be linked to ${mappingItem.name}. Existing conflicting mappings will be removed.`, confirmText: 'Replace mapping', severity: 'medium' });
-      if (!confirmed) return;
-    }
-    mappingMutation.mutate({ recipeId: mappingItem.id, posItemId: posItem.id });
-  };
 
   const openVisibility = (item) => {
     if (!visibilitySupported) { toast.info('Location visibility requires the recipe_location_visibility database migration.'); return; }
@@ -218,9 +190,8 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
       'Unit Profit': item.netProfit.toFixed(2),
       'Plate Cost %': item.plateCostPercent === null ? '' : item.plateCostPercent.toFixed(1),
       'Plate Cost Target %': item.targetPlateCostPercent.toFixed(1),
-      'Inventory Tracking': item.inventoryTracking ? 'Mapped' : 'Not mapped',
+      'Ingredient Source': item.inventoryTracking ? 'Products linked' : 'No ingredients',
       Visibility: item.visibilityMode === 'all' ? 'All Locations' : item.visibilityMode === 'hidden' ? 'Hidden' : `Selected: ${item.visibleLocationIds.map((id) => locations.find((entry) => entry.id === id)?.name).filter(Boolean).join('; ')}`,
-      'POS Mapping': item.mappedPosItem?.item_name || '',
       'Price Source': item.priceSource,
       'Cost Monitoring': item.alertStatus === 'active' ? 'Active' : item.alertStatus === 'paused' ? 'Paused' : 'No Alerts',
     })), `menu-items-${new Date().toISOString().slice(0, 10)}`);
@@ -312,7 +283,7 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Menu Items</h2>
-          <p className="text-sm text-muted-foreground">Monitor the selling economics of finished dishes without changing the recipe library.</p>
+          <p className="text-sm text-muted-foreground">Cost finished dishes from Products and Prepared Items, then watch price, profit, and plate-cost risk.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importRows} />
@@ -331,12 +302,12 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
 
       <Card>
         <CardContent className="p-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_150px_150px_160px_auto]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_150px_150px_150px_auto]">
             <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" placeholder="Find a menu item" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="justify-between font-normal">Type <span className="font-semibold">{selectedCategories.length ? `${selectedCategories.length} selected` : 'All'}</span></Button></DropdownMenuTrigger><DropdownMenuContent className="w-64" align="start"><DropdownMenuCheckboxItem checked={!selectedCategories.length} onCheckedChange={() => setSelectedCategories([])}>All types</DropdownMenuCheckboxItem><DropdownMenuSeparator />{categories.map((value) => <DropdownMenuCheckboxItem key={value} checked={selectedCategories.includes(value)} onCheckedChange={(checked) => setSelectedCategories((current) => toggleValue(current, value, checked))} className="capitalize">{value.replaceAll('_', ' ')}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="justify-between font-normal">Alerts <span className="font-semibold">{selectedAlertStatuses.length ? `${selectedAlertStatuses.length} selected` : 'All'}</span></Button></DropdownMenuTrigger><DropdownMenuContent className="w-56" align="start"><DropdownMenuCheckboxItem checked={!selectedAlertStatuses.length} onCheckedChange={() => setSelectedAlertStatuses([])}>All</DropdownMenuCheckboxItem><DropdownMenuSeparator /><DropdownMenuLabel>Alert types</DropdownMenuLabel><DropdownMenuCheckboxItem checked={selectedAlertStatuses.includes('active')} onCheckedChange={(checked) => setSelectedAlertStatuses((current) => toggleValue(current, 'active', checked))}>Active</DropdownMenuCheckboxItem><DropdownMenuCheckboxItem checked={selectedAlertStatuses.includes('paused')} onCheckedChange={(checked) => setSelectedAlertStatuses((current) => toggleValue(current, 'paused', checked))}>Paused</DropdownMenuCheckboxItem><DropdownMenuCheckboxItem checked={selectedAlertStatuses.includes('none')} onCheckedChange={(checked) => setSelectedAlertStatuses((current) => toggleValue(current, 'none', checked))}>No Alerts</DropdownMenuCheckboxItem></DropdownMenuContent></DropdownMenu>
             <Select value={visibilityFilter} onValueChange={setVisibilityFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="any">All visibility</SelectItem><SelectItem value="all">All locations</SelectItem><SelectItem value="selected">Selected locations</SelectItem><SelectItem value="hidden">Hidden</SelectItem></SelectContent></Select>
-            <Select value={mappingFilter} onValueChange={setMappingFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="any">All POS mapping</SelectItem><SelectItem value="mapped">Mapped</SelectItem><SelectItem value="suggested">Suggested</SelectItem><SelectItem value="unmapped">Unmapped</SelectItem><SelectItem value="missing-price">Missing price</SelectItem></SelectContent></Select>
+            <Select value={mappingFilter === 'missing-price' ? 'missing-price' : 'any'} onValueChange={setMappingFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="any">All prices</SelectItem><SelectItem value="missing-price">Missing price</SelectItem></SelectContent></Select>
             <label className="flex items-center gap-2 rounded-md border px-3 text-sm"><Checkbox checked={activeOnly} onCheckedChange={(checked) => setActiveOnly(Boolean(checked))} /> Active only</label>
           </div>
         </CardContent>
@@ -351,16 +322,15 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select visible menu items" /></TableHead><SortableHead label="Name" sortKey="name" sort={sort} onSort={changeSort} /><SortableHead label="Classification" sortKey="category" sort={sort} onSort={changeSort} /><SortableHead label="Inventory tracking" sortKey="inventoryTracking" sort={sort} onSort={changeSort} /><SortableHead label="Visibility" sortKey="visibilityMode" sort={sort} onSort={changeSort} /><SortableHead label="POS mapping" sortKey="posMapping" sort={sort} onSort={changeSort} /><SortableHead label="Unit cost" sortKey="cost" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Menu price" sortKey="menuPrice" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Unit profit" sortKey="netProfit" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Plate cost" sortKey="plateCostPercent" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Monitoring" sortKey="monitoring" sort={sort} onSort={changeSort} /><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-10"><Checkbox checked={allVisibleSelected} onCheckedChange={toggleAll} aria-label="Select visible menu items" /></TableHead><SortableHead label="Name" sortKey="name" sort={sort} onSort={changeSort} /><SortableHead label="Classification" sortKey="category" sort={sort} onSort={changeSort} /><SortableHead label="Ingredient source" sortKey="inventoryTracking" sort={sort} onSort={changeSort} /><SortableHead label="Visibility" sortKey="visibilityMode" sort={sort} onSort={changeSort} /><SortableHead label="Unit cost" sortKey="cost" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Menu price" sortKey="menuPrice" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Unit profit" sortKey="netProfit" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Plate cost" sortKey="plateCostPercent" sort={sort} onSort={changeSort} className="text-right" /><SortableHead label="Monitoring" sortKey="monitoring" sort={sort} onSort={changeSort} /><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
               <TableBody>
-                {!filteredItems.length ? <TableRow><TableCell colSpan={12} className="h-32 text-center text-muted-foreground">No menu items match these controls.</TableCell></TableRow> : paginatedItems.map((item) => (
+                {!filteredItems.length ? <TableRow><TableCell colSpan={11} className="h-32 text-center"><div className="flex flex-col items-center gap-2 text-muted-foreground"><p>No menu items match these controls.</p><Button type="button" size="sm" onClick={onAdd}><Plus className="mr-2 h-4 w-4" /> Add sellable item</Button></div></TableCell></TableRow> : paginatedItems.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell><Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={(checked) => setSelectedIds(checked ? [...selectedIds, item.id] : selectedIds.filter((id) => id !== item.id))} aria-label={`Select ${item.name}`} /></TableCell>
                     <TableCell><button type="button" className="font-medium hover:text-primary hover:underline" onClick={() => onView ? onView(item) : setViewingItem(item)}>{item.name}</button><p className="text-xs text-muted-foreground">{item.status || 'active'}</p></TableCell>
                     <TableCell><Badge variant="secondary" className="capitalize">{(item.category || 'unclassified').replaceAll('_', ' ')}</Badge></TableCell>
-                    <TableCell>{item.inventoryTracking ? <Badge variant="outline">Mapped · {item.mappedIngredientCount}</Badge> : <span className="text-sm text-muted-foreground">Not mapped</span>}</TableCell>
+                    <TableCell>{item.inventoryTracking ? <Badge variant="outline">Products linked · {item.mappedIngredientCount}</Badge> : <span className="text-sm text-muted-foreground">No ingredients</span>}</TableCell>
                     <TableCell><Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openVisibility(item)}><MapPin className="mr-1 h-3.5 w-3.5" />{item.visibilityMode === 'all' ? 'All Locations' : item.visibilityMode === 'hidden' ? 'Hidden' : `${item.visibleLocationIds.length} Locations`}</Button></TableCell>
-                    <TableCell><Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => { setMappingItem(item); setPosSearch(''); }}><Link2 className="mr-1 h-3.5 w-3.5" />{item.mappingStatus === 'mapped' ? item.mappedPosItem?.item_name : item.mappingStatus === 'suggested' ? 'Suggested match' : 'Unmapped'}</Button></TableCell>
                     <TableCell className="text-right tabular-nums">{money.format(item.cost)}</TableCell>
                     <TableCell className="text-right tabular-nums">{money.format(item.menuPrice)}<p className="text-xs capitalize text-muted-foreground">{item.priceSource}</p></TableCell>
                     <TableCell className={`text-right tabular-nums ${item.netProfit < 0 ? 'text-destructive' : ''}`}>{money.format(item.netProfit)}</TableCell>
@@ -414,7 +384,6 @@ export default function MenuItemsOperations({ recipes, visibilityRows = [], visi
 
       <Dialog open={Boolean(visibilityItem)} onOpenChange={(open) => !open && !visibilityMutation.isPending && setVisibilityItem(null)}><DialogContent><DialogHeader><DialogTitle>Location visibility</DialogTitle><DialogDescription>Choose where {visibilityItem?.name} is available.</DialogDescription></DialogHeader><div className="space-y-3"><Select value={visibilityMode} onValueChange={setVisibilityMode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All locations</SelectItem><SelectItem value="selected">Selected locations</SelectItem><SelectItem value="hidden">Hidden everywhere</SelectItem></SelectContent></Select>{visibilityMode === 'selected' && <div className="max-h-64 space-y-2 overflow-auto rounded-md border p-3">{locations.map((entry) => <label key={entry.id} className="flex items-center gap-2 text-sm"><Checkbox checked={selectedLocationIds.includes(entry.id)} onCheckedChange={(checked) => setSelectedLocationIds((current) => checked ? [...new Set([...current, entry.id])] : current.filter((id) => id !== entry.id))} />{entry.name}</label>)}</div>}</div><DialogFooter><Button variant="outline" onClick={() => setVisibilityItem(null)} disabled={visibilityMutation.isPending}>Cancel</Button><Button onClick={saveVisibility} disabled={visibilityMutation.isPending}>{visibilityMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save visibility'}</Button></DialogFooter></DialogContent></Dialog>
 
-      <Dialog open={Boolean(mappingItem)} onOpenChange={(open) => !open && !mappingMutation.isPending && setMappingItem(null)}><DialogContent><DialogHeader><DialogTitle>POS mapping</DialogTitle><DialogDescription>Link {mappingItem?.name} to one POS item. Manual recipe price remains preferred; POS price is used only as a fallback.</DialogDescription></DialogHeader><div className="space-y-3">{mappingItem?.suggestedPosItem && !mappingItem.mapping && <Button variant="outline" className="w-full justify-start" onClick={() => choosePosMapping(mappingItem.suggestedPosItem)}><Link2 className="mr-2 h-4 w-4" /> Suggested: {mappingItem.suggestedPosItem.item_name} ({Math.round(mappingItem.suggestionScore * 100)}%)</Button>}<div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" placeholder="Search POS items" value={posSearch} onChange={(event) => setPosSearch(event.target.value)} /></div><div className="max-h-72 space-y-2 overflow-auto rounded-md border p-2">{posItems.filter((entry) => !posSearch.trim() || entry.item_name.toLowerCase().includes(posSearch.trim().toLowerCase())).slice(0, 100).map((entry) => <Button key={entry.id} variant={mappingItem?.mappedPosItem?.id === entry.id ? 'secondary' : 'ghost'} className="h-auto w-full justify-between py-2" onClick={() => choosePosMapping(entry)} disabled={mappingMutation.isPending}><span className="text-left"><span className="block">{entry.item_name}</span><span className="text-xs text-muted-foreground">{entry.pos_provider} · {entry.pos_item_id}</span></span><span>{entry.price == null ? 'No price' : money.format(Number(entry.price))}</span></Button>)}</div></div><DialogFooter>{mappingItem?.mapping && <Button variant="destructive" onClick={removeMapping} disabled={mappingMutation.isPending}><Unlink className="mr-2 h-4 w-4" /> Remove mapping</Button>}<Button variant="outline" onClick={() => setMappingItem(null)} disabled={mappingMutation.isPending}>Close</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }
