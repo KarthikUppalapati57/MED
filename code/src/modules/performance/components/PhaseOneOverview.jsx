@@ -17,11 +17,11 @@ import {
 import {
   AlertTriangle,
   Boxes,
+  CalendarDays,
   ChefHat,
   CreditCard,
   FileText,
   Package,
-  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -55,6 +55,13 @@ function pctOf(part, total) {
   return (Number(part || 0) / t) * 100;
 }
 
+function formatPeriodDate(value) {
+  if (!value) return 'Not set';
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function compactMoney(value) {
   const n = Number(value) || 0;
   return new Intl.NumberFormat(undefined, {
@@ -74,7 +81,7 @@ function StatCard({ icon: Icon, label, value, detail, tone = 'default' }) {
   }[tone] || 'bg-muted/40 text-foreground';
 
   return (
-    <Card className="border-border/50">
+    <Card className="glass-card border-border/50 shadow-sm hover-lift">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -99,7 +106,7 @@ function MiniModule({ icon: Icon, label, value, detail, progress, tone = 'defaul
       : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card p-3 min-w-0">
+    <div className="glass-card hover-lift rounded-lg border border-border/50 p-3 min-w-0">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -407,12 +414,17 @@ export default function PhaseOneOverview({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Performance Command Center</h2>
+          <p className="text-xs font-medium uppercase text-muted-foreground">Performance analytics</p>
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mt-1">Performance Command Center</h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
             One visual view for Invoices, Payments, Products, Inventory, and Recipes.
           </p>
+        </div>
+        <div className="glass-card border border-border/50 rounded-lg px-3 py-2 text-sm text-muted-foreground flex items-center gap-2 w-fit">
+          <CalendarDays className="h-4 w-4" />
+          <span>{formatPeriodDate(periodStart)} - {formatPeriodDate(periodEnd)}</span>
         </div>
       </div>
 
@@ -421,7 +433,7 @@ export default function PhaseOneOverview({
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-amber-900">Some Phase 1 analytics did not load</p>
+                <p className="text-sm font-medium text-amber-900">Some analytics did not load</p>
                 <p className="text-xs text-amber-800 mt-1">
                   The dashboard is showing all available data and keeping failed sources isolated.
                 </p>
@@ -476,7 +488,7 @@ export default function PhaseOneOverview({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-2 border-border/50">
+        <Card className="xl:col-span-2 glass-card border-border/50 shadow-sm hover-lift">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div>
@@ -511,15 +523,15 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="glass-card border-border/50 shadow-sm hover-lift">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Action Signals</CardTitle>
-            <CardDescription>Phase 1 alerts from the five active modules.</CardDescription>
+            <CardDescription>Alerts from the five active modules.</CardDescription>
           </CardHeader>
           <CardContent>
             {analytics.actionItems.length === 0 ? (
               <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground text-center">
-                No urgent Phase 1 performance signals for this period.
+                No urgent performance signals for this period.
               </div>
             ) : (
               <div className="space-y-3">
@@ -548,7 +560,7 @@ export default function PhaseOneOverview({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="border-border/50">
+        <Card className="glass-card border-border/50 shadow-sm hover-lift">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Invoice spend trend</CardTitle>
             <CardDescription>Top category spend over the selected period.</CardDescription>
@@ -572,7 +584,7 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="glass-card border-border/50 shadow-sm hover-lift">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Category distribution</CardTitle>
             <CardDescription>Where invoice spend is concentrated.</CardDescription>
@@ -598,7 +610,7 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="glass-card border-border/50 shadow-sm hover-lift">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Payment status exposure</CardTitle>
             <CardDescription>Paid, scheduled, unpaid, and failed cash-out signals.</CardDescription>
@@ -623,40 +635,6 @@ export default function PhaseOneOverview({
         </Card>
       </div>
 
-      <Card className="border-border/50">
-        <CardHeader className="pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Phase 1 visual graph map</CardTitle>
-              <CardDescription>These are the graphs we will keep production-facing now. Everything else remains Coming Soon.</CardDescription>
-            </div>
-            <Badge variant="outline" className="w-fit">5 active modules</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {[
-              ['Budget vs Actual', 'Invoice/product category targets compared with allocation spend.'],
-              ['Category Spend Trend', 'Daily, weekly, or monthly purchasing movement from invoices.'],
-              ['Payment Exposure', 'Paid, scheduled, unpaid, and failed payment visibility.'],
-              ['Product Price Movers', 'Vendor price increases and estimated cost impact.'],
-              ['Inventory Usage Risk', 'Low stock, value, usage, and waste signals where available.'],
-              ['Recipe Margin Pressure', 'Recipes below target margin because product costs moved.'],
-            ].map(([title, body]) => (
-              <div key={title} className="rounded-lg border border-border/50 p-3 bg-muted/20">
-                <div className="flex items-start gap-2">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">{title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{body}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
-
