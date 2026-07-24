@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Papa from 'papaparse';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useAuth } from '@/lib/AuthContext';
@@ -12,6 +13,7 @@ import {
   Plus,
   Search,
   Download,
+  Upload,
   Edit2,
   Trash2,
   Package,
@@ -335,6 +337,27 @@ const downloadCsv = (filename, headers, rows) => {
   URL.revokeObjectURL(url);
 };
 
+const parseCsvRows = (text) => {
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (header) => String(header || '').trim(),
+  });
+  if (parsed.errors?.length) {
+    throw new Error(parsed.errors[0]?.message || 'CSV could not be parsed');
+  }
+  return (parsed.data || []).filter(row => (
+    row && Object.values(row).some(value => String(value ?? '').trim())
+  ));
+};
+
+const hashText = async (text) => {
+  if (!window.crypto?.subtle) return `${text.length}:${text.slice(0, 128)}`;
+  const bytes = new TextEncoder().encode(text);
+  const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
 const parseReportDate = (value) => {
   if (!value) return null;
   const [year, month, day] = value.split('-').map(Number);
@@ -569,6 +592,8 @@ export default function Products() {
   const [categoryComboboxOpen, setCategoryComboboxOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [importSummary, setImportSummary] = useState(null);
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
   const toggleSelect = (id) => setSelectedIds(prev => {
     const next = new Set(prev);
@@ -810,6 +835,59 @@ export default function Products() {
     },
     onError: () => toast.error('Failed to reject category suggestion'),
   });
+
+  const verifyVendorItemMappingMutation = useMutation({
+    mutationFn: (mappingId) => api.products.verifyVendorItemMapping({ mappingId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_verification_queue'] });
+      toast.success('Vendor mapping verified');
+    },
+    onError: (error) => toast.error(error?.message || 'Failed to verify vendor mapping'),
+  });
+
+  const importProductsMutation = useMutation({
+    mutationFn: async (file) => {
+      const text = await file.text();
+      const rows = parseCsvRows(text);
+      if (rows.length === 0) throw new Error('CSV must include at least one product row');
+      const fileHash = await hashText(text);
+      const staged = await api.products.stageImport({
+        organizationId,
+        brandId,
+        locationId,
+        fileName: file.name,
+        fileHash,
+        rows,
+      });
+      const invalidRows = Number(staged?.summary?.invalid_rows || 0);
+      if (invalidRows > 0) {
+        return { staged, committed: null };
+      }
+      const committed = await api.products.commitImport(staged.job_id);
+      return { staged, committed };
+    },
+    onSuccess: ({ staged, committed }) => {
+      setImportSummary({ ...(staged?.summary || {}), ...(committed || {}) });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventoryMetrics'] });
+      if (committed) {
+        toast.success(`Imported ${committed.committed_rows || 0} product(s)`);
+      } else {
+        toast.error(`${staged?.summary?.invalid_rows || 0} import row(s) need correction`);
+      }
+    },
+    onError: (error) => toast.error(error?.message || 'Failed to import products'),
+  });
+
+  const handleImportFile = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    importProductsMutation.mutate(file);
+  };
 
   useEffect(() => {
     const channel = supabase.channel('products-realtime')
@@ -1097,7 +1175,7 @@ export default function Products() {
     toast.info('Network suggestion loaded for review. Confirm the category before saving.');
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const normalizedFormData = {
       ...formData,
       name: String(formData.name || '').trim().toUpperCase(),
@@ -1111,6 +1189,29 @@ export default function Products() {
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, data: normalizedFormData });
     } else {
+      setIsCheckingDuplicates(true);
+      try {
+        const duplicates = await api.products.findDuplicates({
+          organizationId,
+          name: normalizedFormData.name,
+          limit: 5,
+        });
+        if (duplicates.length > 0) {
+          const sample = duplicates.slice(0, 3).map(item => item.name).join(', ');
+          const proceed = await confirm({
+            title: 'Similar product found',
+            description: `Found ${duplicates.length} similar active product(s): ${sample}. Create this product anyway?`,
+            confirmLabel: 'Create anyway',
+            destructive: false,
+          });
+          if (!proceed) return;
+        }
+      } catch (error) {
+        toast.error(error?.message || 'Could not check for duplicate products');
+        return;
+      } finally {
+        setIsCheckingDuplicates(false);
+      }
       createMutation.mutate(normalizedFormData);
     }
   };
@@ -1336,6 +1437,24 @@ export default function Products() {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
+              <Button
+                asChild
+                variant="outline"
+                className={importProductsMutation.isPending ? 'pointer-events-none opacity-50' : ''}
+              >
+                <label htmlFor="product-csv-import" aria-disabled={importProductsMutation.isPending}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {importProductsMutation.isPending ? 'Importing' : 'Import'}
+                </label>
+              </Button>
+              <input
+                id="product-csv-import"
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                disabled={importProductsMutation.isPending}
+                onChange={handleImportFile}
+              />
               <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-primary hover:bg-primary">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Product
@@ -1344,6 +1463,18 @@ export default function Products() {
           </div>
         )}
       </div>
+
+      {importSummary && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
+          <span className="font-medium text-foreground">Last import</span>
+          <span className="text-muted-foreground">Rows: {importSummary.total_rows ?? 0}</span>
+          <span className="text-muted-foreground">Valid: {importSummary.valid_rows ?? 0}</span>
+          <span className="text-muted-foreground">Invalid: {importSummary.invalid_rows ?? 0}</span>
+          {importSummary.committed_rows !== undefined && (
+            <span className="text-muted-foreground">Committed: {importSummary.committed_rows}</span>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="product-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4" string="progress">
@@ -1972,16 +2103,29 @@ export default function Products() {
                                       Review Network Mapping
                                     </Button>
                                   ) : (
-                                    <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
-                                      if (!p.internal_product_id) {
-                                        handleReviewVendorItemMapping(p);
-                                        return;
-                                      }
-                                      const product = products.find(item => item.id === p.internal_product_id);
-                                      if (product) handleEdit(product);
-                                    }}>
-                                      Review
-                                    </Button>
+                                    <>
+                                      {p.mapping_id && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-xs"
+                                          onClick={() => verifyVendorItemMappingMutation.mutate(p.mapping_id)}
+                                          disabled={verifyVendorItemMappingMutation.isPending}
+                                        >
+                                          Verify
+                                        </Button>
+                                      )}
+                                      <Button size="sm" variant="default" className="text-xs h-7 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+                                        if (!p.internal_product_id) {
+                                          handleReviewVendorItemMapping(p);
+                                          return;
+                                        }
+                                        const product = products.find(item => item.id === p.internal_product_id);
+                                        if (product) handleEdit(product);
+                                      }}>
+                                        Review
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               )}
@@ -2509,9 +2653,15 @@ export default function Products() {
             <Button
               onClick={handleSubmit}
               className="bg-primary hover:bg-primary"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={isCheckingDuplicates || createMutation.isPending || updateMutation.isPending}
             >
-              {updateMutation.isPending ? 'Updating...' : createMutation.isPending ? 'Creating...' : `${editingProduct ? 'Update' : 'Create'} Product`}
+              {updateMutation.isPending
+                ? 'Updating...'
+                : createMutation.isPending
+                  ? 'Creating...'
+                  : isCheckingDuplicates
+                    ? 'Checking...'
+                    : `${editingProduct ? 'Update' : 'Create'} Product`}
             </Button>
           </DialogFooter>
         </DialogContent>

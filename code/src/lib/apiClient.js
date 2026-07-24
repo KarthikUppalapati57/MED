@@ -1727,7 +1727,8 @@ export const api = {
         p_latest_price: payload.latest_price ?? 0,
         p_location_specific: payload.location_specific,
         p_report_unit_quantity: payload.report_unit_quantity ?? null,
-        p_report_unit_source_price: payload.report_unit_source_price ?? null
+        p_report_unit_source_price: payload.report_unit_source_price ?? null,
+        p_expected_version: payload.version_number ?? payload.expected_version ?? null
       });
       if (error) throw error;
       return data;
@@ -1788,6 +1789,100 @@ export const api = {
       });
       if (error) throw error;
       return data;
+    },
+    restoreProduct: async (productId) => {
+      const { data, error } = await supabase.rpc('restore_product', {
+        p_product_id: productId
+      });
+      if (error) throw error;
+      return data;
+    },
+    findDuplicates: async ({ organizationId, name, limit = 10 }) => {
+      const { data, error } = await supabase.rpc('find_duplicate_products', {
+        p_organization_id: organizationId,
+        p_name: name,
+        p_limit: limit
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    listBarcodes: async (productId) => {
+      if (!productId) return [];
+      const { data, error } = await supabase
+        .from('product_barcodes')
+        .select('*')
+        .eq('product_id', productId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+      if (error) {
+        if (error.message?.includes('product_barcodes')) return [];
+        throw error;
+      }
+      return data || [];
+    },
+    upsertBarcode: async ({ productId, barcode, symbology = 'unknown' }) => {
+      const { data, error } = await supabase.rpc('upsert_product_barcode', {
+        p_product_id: productId,
+        p_barcode: barcode,
+        p_symbology: symbology
+      });
+      if (error) throw error;
+      return data;
+    },
+    removeBarcode: async (barcodeId) => {
+      const { data, error } = await supabase.rpc('remove_product_barcode', {
+        p_barcode_id: barcodeId
+      });
+      if (error) throw error;
+      return data;
+    },
+    verifyVendorItemMapping: async ({ mappingId, conversionMultiplier = null }) => {
+      const { data, error } = await supabase.rpc('verify_vendor_item_mapping', {
+        p_mapping_id: mappingId,
+        p_conversion_multiplier: conversionMultiplier
+      });
+      if (error) throw error;
+      return data;
+    },
+    mergeProducts: async ({ sourceProductId, targetProductId, reason = null }) => {
+      const { data, error } = await supabase.rpc('merge_products', {
+        p_source_product_id: sourceProductId,
+        p_target_product_id: targetProductId,
+        p_reason: reason
+      });
+      if (error) throw error;
+      return data;
+    },
+    stageImport: async ({ organizationId, brandId = null, locationId = null, fileName = null, fileHash = null, rows = [] }) => {
+      const { data, error } = await supabase.rpc('stage_product_import', {
+        p_organization_id: organizationId,
+        p_brand_id: brandId,
+        p_location_id: locationId,
+        p_file_name: fileName,
+        p_file_hash: fileHash,
+        p_rows: rows
+      });
+      if (error) throw error;
+      return data;
+    },
+    commitImport: async (jobId) => {
+      const { data, error } = await supabase.rpc('commit_product_import', {
+        p_job_id: jobId
+      });
+      if (error) throw error;
+      return data;
+    },
+    listAuditHistory: async (productId) => {
+      if (!productId) return [];
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .eq('table_name', 'products')
+        .eq('record_id', productId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
     },
     getApprovalSetting: async (organizationId) => {
       const { data, error } = await supabase.rpc('get_product_approval_setting', {

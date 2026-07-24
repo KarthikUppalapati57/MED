@@ -397,6 +397,14 @@ the Phase 3 redesign.
   brand-shared product, not Location A's specific one); `location_manager` (sees both, proving
   the gap fix). All 7 passed.
 
+- **Org-level reference catalog exception restored** (2026-07-22,
+  `20260722000014_org_level_reference_scope_visible.sql`) - supersedes the strict note above
+  for reference rows where both `brand_id` and `location_id` are NULL. `reference_scope_visible()`
+  now allows organization-level `products`/`vendors`/`recipes` rows to be visible to callers in
+  the same organization without requiring an active location, while brand-shared and
+  location-specific rows still require the active-location matching rules described above. This
+  is deliberate catalog visibility behavior, not an undocumented RLS bypass.
+
 ---
 
 ## 8. PENDING PLAN (in dependency order)

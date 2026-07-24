@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -260,6 +261,7 @@ function buildForm(product) {
     report_unit_quantity: Number(product?.report_unit_quantity || 1),
     report_unit_source_price: Number(product?.report_unit_source_price ?? product?.latest_price ?? 0),
     location_specific: product?.location_specific ?? false,
+    version_number: product?.version_number ?? null,
   };
 }
 
@@ -296,7 +298,11 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const [packageReportUnit, setPackageReportUnit] = useState(() => getInitialPackageReportUnit(initialProduct));
   const [sourcePackagePrice, setSourcePackagePrice] = useState(Number(initialProduct?.report_unit_source_price ?? initialProduct?.latest_price ?? 0));
   const [selectedCountSheetId, setSelectedCountSheetId] = useState('');
+  const [barcodeValue, setBarcodeValue] = useState('');
+  const [barcodeSymbology, setBarcodeSymbology] = useState('unknown');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const backTarget = routerLocation.state?.from || `/Products/all-products${window.location.search}`;
+  const { canEdit, canDelete } = usePermissions();
 
   const { data: fetchedProduct, isLoading } = useAuthQuery({
     queryKey: ['product-detail', productId],
@@ -371,6 +377,18 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     queryKey: ['product-detail-count-units', product?.id],
     queryFn: () => api.products.listCountUnits(product.id),
     enabled: !!product?.id,
+  });
+
+  const { data: productBarcodes = [] } = useAuthQuery({
+    queryKey: ['product-detail-barcodes', product?.id],
+    queryFn: () => api.products.listBarcodes(product.id),
+    enabled: !!product?.id,
+  });
+
+  const { data: auditHistory = [] } = useAuthQuery({
+    queryKey: ['product-detail-history', product?.id],
+    queryFn: () => api.products.listAuditHistory(product.id),
+    enabled: historyOpen && !!product?.id,
   });
 
   const { data: countSheets = [] } = useAuthQuery({
@@ -653,6 +671,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       queryClient.invalidateQueries({ queryKey: ['conversion-catalog-products'] });
       queryClient.invalidateQueries({ queryKey: ['product-detail', productId] });
       queryClient.invalidateQueries({ queryKey: ['product-detail-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['product-detail-history', productId] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Product saved');
     },
@@ -667,6 +686,30 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
       navigate(`/Products/all-products${window.location.search}`);
     },
     onError: (error) => toast.error(error?.message || 'Failed to delete product'),
+  });
+
+  const barcodeMutation = useMutation({
+    mutationFn: () => api.products.upsertBarcode({
+      productId,
+      barcode: barcodeValue,
+      symbology: barcodeSymbology,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-barcodes', product?.id] });
+      setBarcodeValue('');
+      setBarcodeSymbology('unknown');
+      toast.success('Barcode saved');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to save barcode'),
+  });
+
+  const removeBarcodeMutation = useMutation({
+    mutationFn: (barcodeId) => api.products.removeBarcode(barcodeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['product-detail-barcodes', product?.id] });
+      toast.success('Barcode removed');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to remove barcode'),
   });
 
   const countUnitMutation = useMutation({
@@ -781,10 +824,10 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           <Button variant="outline" onClick={() => navigate(backTarget)}>
             <X className="mr-2 h-4 w-4" /> Cancel
           </Button>
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+          <Button onClick={() => saveMutation.mutate()} disabled={!canEdit || saveMutation.isPending}>
             <Save className="mr-2 h-4 w-4" /> Save
           </Button>
-          <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+          <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={!canDelete || deleteMutation.isPending}>
             <Trash2 className="mr-2 h-4 w-4" /> Delete
           </Button>
         </div>
@@ -807,7 +850,12 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
         <Section
           title="Category Assignments"
           action={(
-            <Button variant="ghost" className="text-primary">
+            <Button
+              variant="ghost"
+              className="text-primary"
+              disabled={!canEdit}
+              onClick={() => updateCategory('Uncategorized')}
+            >
               <Plus className="mr-2 h-4 w-4" /> Add a category
             </Button>
           )}
@@ -838,7 +886,13 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                 className="rounded-none border-0 text-right shadow-none focus-visible:ring-0"
               />
             </div>
-            <Button variant="ghost" size="icon" aria-label="Remove category">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Remove category"
+              disabled={!canEdit}
+              onClick={() => updateCategory('Uncategorized')}
+            >
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
@@ -1009,7 +1063,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
 
         <Section
           title={`You buy the following types of '${form.name || 'this product'}':`}
-          action={<Button variant="outline">Reassign All</Button>}
+          action={<Button variant="outline" onClick={() => navigate(`/Vendors${window.location.search}`)}>Reassign All</Button>}
         >
           <div className="overflow-auto rounded-md border">
             <table className="w-full min-w-[980px] text-sm">
@@ -1064,15 +1118,16 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                     <TableCell>{formatQuantity(line?.quantity || 1)}</TableCell>
                     <TableCell className="text-right">{money(line?.unit_price ?? form.latest_price)}</TableCell>
                     <TableCell className="text-right">0.0%</TableCell>
-                    <TableCell><Button variant="link" className="px-0">Reassign</Button></TableCell>
+                    <TableCell>
+                      <Button variant="link" className="px-0" onClick={() => navigate(`/Vendors${window.location.search}`)}>
+                        Reassign
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </table>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Vendor mappings are shown as a product-side UI shell. Inventory and vendor mapping hooks can be connected after the related teammate work lands.
-          </p>
         </Section>
 
         <Section
@@ -1170,12 +1225,55 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
         </Section>
 
         <Section title="Barcodes">
-          <p className="text-muted-foreground">No items</p>
+          <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+            <Input
+              value={barcodeValue}
+              onChange={(event) => setBarcodeValue(event.target.value)}
+              placeholder="Enter or scan barcode"
+              disabled={!canEdit}
+            />
+            <Select value={barcodeSymbology} onValueChange={setBarcodeSymbology} disabled={!canEdit}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unknown">Unknown</SelectItem>
+                <SelectItem value="upc">UPC</SelectItem>
+                <SelectItem value="ean">EAN</SelectItem>
+                <SelectItem value="code128">Code 128</SelectItem>
+                <SelectItem value="qr">QR</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              disabled={!canEdit || !barcodeValue.trim() || barcodeMutation.isPending}
+              onClick={() => barcodeMutation.mutate()}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add Barcode
+            </Button>
+          </div>
+          <div className="mt-4 divide-y rounded-md border">
+            {productBarcodes.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">No barcodes saved.</div>
+            ) : productBarcodes.map((barcode) => (
+              <div key={barcode.id} className="grid gap-2 p-3 md:grid-cols-[1fr_auto_auto] md:items-center">
+                <span className="font-mono text-sm">{barcode.barcode}</span>
+                <Badge variant="outline">{barcode.symbology || 'unknown'}</Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Remove barcode"
+                  disabled={!canEdit || removeBarcodeMutation.isPending}
+                  onClick={() => removeBarcodeMutation.mutate(barcode.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         </Section>
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-5">
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            <Button onClick={() => saveMutation.mutate()} disabled={!canEdit || saveMutation.isPending}>
               <Save className="mr-2 h-4 w-4" /> Save
             </Button>
             <Button variant="outline" onClick={() => navigate(`/Products/all-products${window.location.search}`)}>
@@ -1183,13 +1281,34 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
             </Button>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline"><History className="mr-2 h-4 w-4" /> History</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+            <Button variant="outline" onClick={() => setHistoryOpen(true)}><History className="mr-2 h-4 w-4" /> History</Button>
+            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={!canDelete || deleteMutation.isPending}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
           </div>
         </div>
       </div>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Product History</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto rounded-md border">
+            {auditHistory.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">No history records found.</div>
+            ) : auditHistory.map((entry) => (
+              <div key={entry.id} className="border-b p-3 last:border-b-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{entry.action}</span>
+                  <span className="text-xs text-muted-foreground">{entry.created_at ? new Date(entry.created_at).toLocaleString() : ''}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{entry.user_id || 'system'}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(pendingReportUnitOption)} onOpenChange={(open) => {
         if (!open) setPendingReportUnitOption(null);
