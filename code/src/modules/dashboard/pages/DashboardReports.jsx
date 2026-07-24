@@ -160,6 +160,7 @@ export default function DashboardReports() {
   const canManage = isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager;
   const [saving, setSaving] = React.useState(null);
   const [resendingId, setResendingId] = React.useState(null);
+  const [generatingReports, setGeneratingReports] = React.useState(false);
 
   const { data: remotePreferences = null, refetch: refetchPreferences } = useAuthQuery({
     queryKey: ['dashboard-report-module-preferences', scopeContext.orgId, scope, scopeContext.scopeKey],
@@ -378,6 +379,24 @@ export default function DashboardReports() {
     }
   };
 
+  const generateReportsNow = async () => {
+    if (!canManage || !scopeContext.orgId) return;
+    setGeneratingReports(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('schedule-reports', {
+        body: { force: true, report_type: 'both' },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data.error || 'Dashboard report scheduler failed');
+      toast.success('Dashboard reports generated');
+      await refetchDeliveries();
+    } catch (error) {
+      toast.error(error.message || 'Failed to generate dashboard reports');
+    } finally {
+      setGeneratingReports(false);
+    }
+  };
+
   return (
     <div className="dashboard-visual-page space-y-6 p-4 md:p-8" string="progress">
       <section className="dashboard-visual-hero overflow-hidden rounded-2xl border border-border/70 p-6 md:p-8" string="progress">
@@ -471,14 +490,32 @@ export default function DashboardReports() {
           </div>
         </VisualReportShell>
 
-        <VisualReportShell title="Delivery History" description="Recent automated report runs and stored snapshots." action={<Button variant="ghost" size="sm" onClick={() => refetchDeliveries()}><History className="mr-2 h-4 w-4" />Refresh</Button>}>
+        <VisualReportShell
+          title="Delivery History"
+          description="Recent automated report runs and stored snapshots."
+          action={(
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="gap-2" onClick={generateReportsNow} disabled={!canManage || generatingReports}>
+                <BellRing className="h-4 w-4" />
+                {generatingReports ? 'Generating' : 'Generate now'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => refetchDeliveries()}>
+                <History className="mr-2 h-4 w-4" />Refresh
+              </Button>
+            </div>
+          )}
+        >
           {isLoadingDeliveries ? (
             <div className="rounded-lg bg-secondary/30 p-4 text-sm text-muted-foreground">Loading deliveries...</div>
           ) : deliveries.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border/70 p-8 text-center">
               <FileText className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 text-sm font-semibold text-foreground">No deliveries yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">Scheduled runs will appear after the dashboard report scheduler executes.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Generate a report now to create the first saved snapshot for copy, export, and resend.</p>
+              <Button className="mt-4 gap-2" onClick={generateReportsNow} disabled={!canManage || generatingReports}>
+                <BellRing className="h-4 w-4" />
+                {generatingReports ? 'Generating reports' : 'Generate reports now'}
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
