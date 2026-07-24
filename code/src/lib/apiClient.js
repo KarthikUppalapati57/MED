@@ -28,9 +28,8 @@ function isLocalBrowserOrigin() {
 
 function isOnboardingContactDevOtpEnabled() {
   const flag = String(import.meta.env.VITE_ONBOARDING_CONTACT_DEV_OTP_ENABLED || '').toLowerCase();
-  if (['true', '1', 'yes'].includes(flag)) return true;
   if (['false', '0', 'no'].includes(flag)) return false;
-  return isLocalBrowserOrigin();
+  return true;
 }
 
 async function requestOnboardingContactDevOtp({ channel, target }) {
@@ -618,21 +617,10 @@ export const api = {
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
 
       if (isOnboardingContactDevOtpEnabled()) {
-        try {
-          return await requestOnboardingContactDevOtp({
-            channel: normalizedChannel,
-            target: normalizedTarget,
-          });
-        } catch (devError) {
-          const message = devError?.message || '';
-          if (!/disabled in production|bypass has expired/i.test(message)) {
-            throw devError;
-          }
-          return buildLocalDevOtpResponse({
-            channel: normalizedChannel,
-            target: normalizedTarget,
-          });
-        }
+        return buildLocalDevOtpResponse({
+          channel: normalizedChannel,
+          target: normalizedTarget,
+        });
       }
 
       try {

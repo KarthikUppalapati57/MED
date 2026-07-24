@@ -34,24 +34,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 import { registerSW } from 'virtual:pwa-register'
 
-const promptForUpdate = async () => {
-  try {
-    const { toast } = await import('sonner');
-    toast.info('A new version of Restops is ready.', {
-      action: {
-        label: 'Reload',
-        onClick: () => updateSW(true),
-      },
-      duration: 15000,
-    });
-  } catch {
-    console.info('New content available. Reload the page to update.');
-  }
-};
-
 const updateSW = registerSW({
+  immediate: true,
   onNeedRefresh() {
-    promptForUpdate();
+    updateSW(true);
   },
   onOfflineReady() {
     console.log('App ready to work offline')
