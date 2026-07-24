@@ -55,7 +55,6 @@ const DigitalMenu = React.lazy(() => import('./modules/kitchen_displays/pages/Di
 const PayrollExport = React.lazy(() => import('./modules/labor/pages/PayrollExport'));
 const TipPooling = React.lazy(() => import('./modules/labor/pages/TipPooling'));
 const ShiftBoard = React.lazy(() => import('./modules/labor/pages/ShiftBoard'));
-const OrderOnline = React.lazy(() => import('./modules/recipes/pages/OrderOnline'));
 const BusinessVerification = React.lazy(() => import('./modules/setup/pages/BusinessVerification'));
 
 export const mainPage = "Dashboard";
@@ -111,8 +110,7 @@ export const legacyRoutes = {
     "VendorBidding": VendorBidding,
     "ExecutiveBI": ExecutiveBI,
     "TipPooling": TipPooling,
-    "ShiftBoard": ShiftBoard,
-    "OrderOnline": OrderOnline
+    "ShiftBoard": ShiftBoard
 };
 export const canonicalRoutes = [
     { path: "dashboard", pageName: "Dashboard", Page: Dashboard },
@@ -156,7 +154,6 @@ export const canonicalRoutes = [
     { path: "payroll-export/:view?", pageName: "PayrollExport", Page: PayrollExport },
     { path: "tip-pooling/:view?", pageName: "TipPooling", Page: TipPooling },
     { path: "shift-board/:view?", pageName: "ShiftBoard", Page: ShiftBoard },
-    { path: "order-online/:view?", pageName: "OrderOnline", Page: OrderOnline },
 ];
 
 export const setupRoutes = {

@@ -119,9 +119,9 @@ const moduleDefinitions = [
   },
   {
     name: 'Recipes',
-    aliases: ['recipe', 'recipes', 'prepared items', 'menu engineering', 'delivery aggregator', 'order online'],
+    aliases: ['recipe', 'recipes', 'prepared items', 'menu engineering', 'delivery aggregator'],
     moduleDirs: ['recipes'],
-    pages: ['Recipes', 'MenuEngineering', 'DeliveryAggregator', 'OrderOnline'],
+    pages: ['Recipes', 'MenuEngineering', 'DeliveryAggregator'],
     submodules: ['Recipe list', 'Prepared items', 'Menu engineering', 'Setup'],
   },
   {

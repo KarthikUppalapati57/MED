@@ -61,7 +61,6 @@ const DigitalMenu = React.lazy(() => import('./modules/kitchen_displays/pages/Di
 const PayrollExport = React.lazy(() => import('./modules/labor/pages/PayrollExport'));
 const TipPooling = React.lazy(() => import('./modules/labor/pages/TipPooling'));
 const ShiftBoard = React.lazy(() => import('./modules/labor/pages/ShiftBoard'));
-const OrderOnline = React.lazy(() => import('./modules/recipes/pages/OrderOnline'));
 
 export const PAGES = {
     "AutoOrdering": AutoOrdering,
@@ -116,8 +115,7 @@ export const PAGES = {
     "DigitalMenu": DigitalMenu,
     "PayrollExport": PayrollExport,
     "TipPooling": TipPooling,
-    "ShiftBoard": ShiftBoard,
-    "OrderOnline": OrderOnline
+    "ShiftBoard": ShiftBoard
 }
 
 export const pagesConfig = {

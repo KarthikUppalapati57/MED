@@ -144,14 +144,6 @@ const navigation = [
   { name: 'SmartPrep', href: 'SmartPrep', icon: ChefHat, minRole: 'location_manager' },
   { name: 'Commissary', href: 'Commissary', icon: Building2, minRole: 'location_manager' },
   { 
-    name: 'Storefront', 
-    icon: Store, 
-    minRole: 'location_manager',
-    subItems: [
-      { name: 'Consumer Online Ordering', href: 'OrderOnline', icon: Store }
-    ]
-  },
-  { 
     name: 'Recipes', 
     pageKey: 'Recipes',
     icon: ChefHat, 

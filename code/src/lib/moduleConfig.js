@@ -100,7 +100,7 @@ export const MODULE_DEFINITIONS = {
   },
   recipes: {
     label: "Recipes",
-    pages: ["Recipes", "MenuEngineering", "DeliveryAggregator", "OrderOnline"],
+    pages: ["Recipes", "MenuEngineering", "DeliveryAggregator"],
     minRole: "location_manager",
     icon: "ChefHat",
     requiresLocation: true,
