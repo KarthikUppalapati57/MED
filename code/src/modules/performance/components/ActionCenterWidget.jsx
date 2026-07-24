@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +6,30 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Clock, AlertTriangle, MessageSquare, ArrowRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { format } from 'date-fns';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { filterByContext } from '@/lib/contextUtils';
+
+async function getFunctionErrorMessage(error) {
+  const response = error?.context;
+  if (response && typeof response.json === 'function') {
+    try {
+      const body = await response.clone().json();
+      return body?.error || body?.message || error.message;
+    } catch {
+      try {
+        const text = await response.clone().text();
+        if (text) return text;
+      } catch {
+        return error.message;
+      }
+    }
+  }
+  return error?.message || 'AI Performance Analyst could not answer right now.';
+}
 
 export function ActionCenterWidget() {
   const { organization, brand, location } = useAuth();
@@ -50,26 +70,54 @@ export function ActionCenterWidget() {
   const { data: rawInsights, isLoading, refetch } = useAuthQuery({
     queryKey: ['ai_insights_actions', organization?.id],
     queryFn: () => api.entities.AiInsight.list('-created_at'),
-    select: React.useCallback((data) => filterByContext(data, { organization, brand, location })
-      .filter(i => i.metadata?.action), [organization, brand, location]),
+    select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!organization?.id,
   });
 
-  const aiActions = rawInsights || [];
+  // Real actionable insights (exclude system-exception resolve/snooze markers, see below).
+  const aiActions = useMemo(() => (rawInsights || []).filter(i => i.metadata?.action && !i.metadata?.systemKey), [rawInsights]);
+
+  // Resolve/snooze markers for system-generated exceptions. systemExceptions below are
+  // recomputed live from raw data every render (they aren't DB rows), so "resolving" one can't
+  // update a row - instead we record a marker keyed to that exception's day-scoped id and
+  // suppress the exception while an active resolved/snoozed marker exists for its id.
+  const systemExceptionMarkers = useMemo(() => {
+    const map = {};
+    (rawInsights || []).forEach((row) => {
+      const key = row.metadata?.systemKey;
+      if (!key) return;
+      if (!map[key] || new Date(row.created_at) > new Date(map[key].created_at)) map[key] = row;
+    });
+    return map;
+  }, [rawInsights]);
+
+  const isSystemExceptionSuppressed = (id) => {
+    const marker = systemExceptionMarkers[id];
+    if (!marker) return false;
+    if (marker.metadata?.status === 'resolved') return true;
+    if (marker.metadata?.status === 'snoozed') {
+      const until = marker.metadata?.snoozedUntil;
+      return until ? new Date(until) > new Date() : false;
+    }
+    return false;
+  };
 
   // --- EXCEPTION ENGINE (Phase 10) ---
-  const systemExceptions = React.useMemo(() => {
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  const systemExceptions = useMemo(() => {
     const exceptions = [];
     const invoices = rawInvoices || [];
     const sales = rawSales || [];
     const shifts = rawShifts || [];
     const lineItems = rawLineItems || [];
-    
+
     // 1. Mapping Exceptions
     const unmappedItems = lineItems.filter(li => !li.mapped_product_id);
-    if (unmappedItems.length > 0) {
+    const mappingId = `sys-mapping-${todayStr}`;
+    if (unmappedItems.length > 0 && !isSystemExceptionSuppressed(mappingId)) {
       exceptions.push({
-        id: 'sys-mapping',
+        id: mappingId,
         title: `${unmappedItems.length} Unmapped Vendor Items`,
         description: `There are ${unmappedItems.length} new items from recent vendor invoices that need to be mapped to internal products for accurate theoretical usage.`,
         severity: 'high',
@@ -78,16 +126,16 @@ export function ActionCenterWidget() {
     }
 
     // 2. Budget Breaches (Daily Prime Cost > 60%)
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todaysSales = sales.filter(s => (s.sale_date || s.created_at || '').startsWith(todayStr)).reduce((sum, s) => sum + Number(s.total_sales || s.revenue || 0), 0);
+    const todaysSales = sales.filter(s => (s.sale_date || s.date || s.created_at || '').startsWith(todayStr)).reduce((sum, s) => sum + Number(s.total_sales || s.revenue || 0), 0);
     const todaysCogs = invoices.filter(i => (i.invoice_date || i.created_at || '').startsWith(todayStr)).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
     const todaysLabor = shifts.filter(s => (s.shift_start || s.start_time || s.created_at || '').startsWith(todayStr)).reduce((sum, s) => sum + Number(s.labor_cost || 0), 0);
-    
+    const budgetId = `sys-budget-${todayStr}`;
+
     if (todaysSales > 0) {
       const primeCostPct = ((todaysCogs + todaysLabor) / todaysSales) * 100;
-      if (primeCostPct > 60) {
+      if (primeCostPct > 60 && !isSystemExceptionSuppressed(budgetId)) {
         exceptions.push({
-          id: 'sys-budget',
+          id: budgetId,
           title: `Daily Prime Cost Breach (${primeCostPct.toFixed(1)}%)`,
           description: `Today's combined COGS and Labor has exceeded the 60% guardrail limit relative to today's sales.`,
           severity: 'high',
@@ -117,9 +165,10 @@ export function ActionCenterWidget() {
       }
     });
 
-    if (severeHikes > 0) {
+    const priceId = `sys-price-${todayStr}`;
+    if (severeHikes > 0 && !isSystemExceptionSuppressed(priceId)) {
       exceptions.push({
-        id: 'sys-price',
+        id: priceId,
         title: `${severeHikes} Critical Price Hikes Detected`,
         description: `Vendor items have increased in price by more than 5% compared to their previous invoice. This will negatively impact food cost.`,
         severity: 'medium',
@@ -128,18 +177,33 @@ export function ActionCenterWidget() {
     }
 
     return exceptions;
-  }, [rawInvoices, rawSales, rawShifts, rawLineItems]);
+  }, [rawInvoices, rawSales, rawShifts, rawLineItems, todayStr, systemExceptionMarkers]);
 
   const actions = [...systemExceptions, ...aiActions];
 
   const handleResolve = async (id) => {
+    const action = actions.find(a => a.id === id);
+    if (!action) return;
     if (String(id).startsWith('sys-')) {
-      toast.success("System alert marked as resolved");
+      try {
+        await api.entities.AiInsight.create({
+          organization_id: organization?.id,
+          insight_type: 'system_exception',
+          severity: action.severity,
+          title: action.title,
+          description: action.description,
+          metadata: { systemKey: id, status: 'resolved' },
+        });
+        toast.success("System alert marked as resolved");
+        refetch();
+      } catch (e) {
+        toast.error("Failed to resolve alert");
+      }
       return;
     }
     try {
       await api.entities.AiInsight.update(id, {
-        metadata: { ...actions.find(a => a.id === id).metadata, status: 'resolved' }
+        metadata: { ...action.metadata, status: 'resolved' }
       });
       toast.success("Action marked as resolved");
       refetch();
@@ -149,13 +213,28 @@ export function ActionCenterWidget() {
   };
 
   const handleSnooze = async (id) => {
+    const action = actions.find(a => a.id === id);
+    if (!action) return;
     if (String(id).startsWith('sys-')) {
-      toast.success("System alert snoozed for 24 hours");
+      try {
+        await api.entities.AiInsight.create({
+          organization_id: organization?.id,
+          insight_type: 'system_exception',
+          severity: action.severity,
+          title: action.title,
+          description: action.description,
+          metadata: { systemKey: id, status: 'snoozed', snoozedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
+        });
+        toast.success("System alert snoozed for 24 hours");
+        refetch();
+      } catch (e) {
+        toast.error("Failed to snooze alert");
+      }
       return;
     }
     try {
       await api.entities.AiInsight.update(id, {
-        metadata: { ...actions.find(a => a.id === id).metadata, status: 'snoozed' }
+        metadata: { ...action.metadata, status: 'snoozed' }
       });
       toast.success("Action snoozed for 24 hours");
       refetch();
@@ -168,12 +247,46 @@ export function ActionCenterWidget() {
     setSelectedAction(action);
     setInsightText("");
     setIsGenerating(true);
-    
-    // Simulate AI Analyst generating a specific breakdown
-    setTimeout(() => {
-      setInsightText(`Based on the variance data, ${action.title} is likely caused by a combination of a 4% invoice price increase from US Foods and a 2% increase in waste during prep. I recommend reviewing the latest US Foods invoice and checking the prep logs for the grill station.`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-insights-chat', {
+        body: {
+          message: `Analyze this operational alert and suggest a likely root cause and next steps: "${action.title}" -- ${action.description}`,
+          context: {
+            organizationId: organization?.id,
+            brandId: brand?.brand_id || brand?.id || null,
+            locationId: location?.id || null,
+          },
+        },
+      });
+      if (error) throw new Error(await getFunctionErrorMessage(error));
+      if (data?.error) throw new Error(data.error);
+      setInsightText(data?.reply || 'I could not generate an answer from the available context.');
+    } catch (err) {
+      toast.error(err.message || 'AI analysis failed');
+      setInsightText('Unable to generate an analysis right now. Please try again.');
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
+  };
+
+  const handleCreateTicket = async () => {
+    if (!selectedAction) return;
+    try {
+      await api.entities.AiInsight.create({
+        organization_id: organization?.id,
+        insight_type: 'investigation',
+        severity: selectedAction.severity || 'medium',
+        title: `Investigation: ${selectedAction.title}`,
+        description: insightText || selectedAction.description,
+        metadata: { action: { type: 'investigation' }, status: 'pending', dollarImpact: selectedAction.metadata?.dollarImpact ?? null },
+      });
+      toast.success('Investigation ticket created');
+      setSelectedAction(null);
+      refetch();
+    } catch (e) {
+      toast.error('Failed to create investigation ticket');
+    }
   };
 
   if (isLoading) {
@@ -317,7 +430,7 @@ export function ActionCenterWidget() {
           </div>
           <DialogFooter className="sm:justify-between items-center">
             <Button variant="ghost" onClick={() => setSelectedAction(null)}>Close</Button>
-            <Button className="bg-brand text-white hover:bg-brand-dark" disabled={isGenerating}>
+            <Button className="bg-brand text-white hover:bg-brand-dark" disabled={isGenerating || !insightText} onClick={handleCreateTicket}>
               Create Investigation Ticket <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </DialogFooter>

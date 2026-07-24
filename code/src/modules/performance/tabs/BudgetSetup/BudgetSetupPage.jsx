@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
 import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -79,8 +80,20 @@ export default function BudgetSetupPage() {
   const results = useAuthQueries({
     queries: [
       {
+        // Direct client, not api.entities.Product.filter(): the entity client auto-injects the
+        // cached nav-bar location into the query (withActiveScope), which would silently drop
+        // products from every other location/brand before this page's own location selector
+        // (scopeLocationId) ever gets to filter them via the select callback below.
         queryKey: ['budget_setup_products', organization?.id],
-        queryFn: () => api.entities.Product.filter({ organization_id: organization?.id }),
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('organization_id', organization?.id)
+            .is('deleted_at', null);
+          if (error) throw error;
+          return data || [];
+        },
         select: React.useCallback(
           (data) => filterByContext(data || [], { organization, brand, location: null }),
           [organization, brand]
@@ -89,7 +102,14 @@ export default function BudgetSetupPage() {
       },
       {
         queryKey: ['budget_setup_allocations', organization?.id],
-        queryFn: () => api.entities.InvoiceAllocation.filter({ organization_id: organization?.id }),
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('invoice_allocations')
+            .select('*')
+            .eq('organization_id', organization?.id);
+          if (error) throw error;
+          return data || [];
+        },
         select: React.useCallback(
           (data) => filterByContext(data || [], { organization, brand, location: null }),
           [organization, brand]
@@ -114,7 +134,14 @@ export default function BudgetSetupPage() {
           periodStart,
           periodEnd,
         ],
-        queryFn: () => api.entities.BudgetTarget.filter({ organization_id: organization?.id }),
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('budget_targets')
+            .select('*')
+            .eq('organization_id', organization?.id);
+          if (error) throw error;
+          return data || [];
+        },
         select: React.useCallback(
           (data) => {
             const scoped = filterByContext(data || [], { organization, brand, location: null });
@@ -168,6 +195,9 @@ export default function BudgetSetupPage() {
       const amount = Number(targetAmount);
       if (!Number.isFinite(amount) || amount < 0) {
         throw new Error('Enter a valid non-negative budget amount');
+      }
+      if (periodEnd < periodStart) {
+        throw new Error('Period end must be on or after period start');
       }
 
       if (demo) {

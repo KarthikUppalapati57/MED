@@ -24,7 +24,7 @@ export function ComparisonBadge({
   const abs =
     absoluteChange === undefined || absoluteChange === null
       ? null
-      : `${absoluteChange > 0 ? '+' : absoluteChange < 0 ? '−' : ''}${formatMoney(Math.abs(absoluteChange), currency).replace(/^\$/, '$')}`;
+      : `${absoluteChange > 0 ? '+' : absoluteChange < 0 ? '−' : ''}${formatMoney(Math.abs(absoluteChange), currency)}`;
 
   const pct =
     percentageChange === null || percentageChange === undefined

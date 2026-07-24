@@ -434,6 +434,7 @@ BEGIN
         round(COALESCE(sum(quantity), 0)::numeric, 4) AS waste_qty
       FROM public.wastage_logs
       WHERE organization_id = v_org_id
+        AND public.tenant_scope_visible(organization_id, brand_id, location_id)
         AND (created_at AT TIME ZONE v_tz)::date >= p_date_from
         AND (created_at AT TIME ZONE v_tz)::date <= p_date_to
         AND (

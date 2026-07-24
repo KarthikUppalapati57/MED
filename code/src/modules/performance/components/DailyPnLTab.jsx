@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Activity, DollarSign, TrendingDown, TrendingUp, Users, ShoppingCart } from 'lucide-react';
+import { format } from 'date-fns';
 
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
@@ -15,12 +16,12 @@ const sameDate = (value, target) => {
   if (!value || !target) return false;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return false;
-  return parsed.toISOString().slice(0, 10) === target;
+  return format(parsed, 'yyyy-MM-dd') === target;
 };
 
 export default function DailyPnLTab() {
   const { organization, brand, location } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const { data: rawSalesData } = useAuthQuery({
     queryKey: ['pos_sales_data', organization?.id],

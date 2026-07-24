@@ -534,9 +534,7 @@ export default function CategoryReportPage() {
                       <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                       <Tooltip
                         formatter={(value, name) =>
-                          name === 'cumulativePercentage' || name === 'sharePercentage'
-                            ? formatPct(value)
-                            : formatMoney(value, currency)
+                          name === 'Cumulative %' ? formatPct(value) : formatMoney(value, currency)
                         }
                       />
                       <Bar yAxisId="left" dataKey="spend" name="Spend" fill="#0f766e" onClick={(d) => openCategory(d.category)} cursor="pointer" />

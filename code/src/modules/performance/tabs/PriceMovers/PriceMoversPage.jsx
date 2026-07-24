@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -70,6 +71,20 @@ export default function PriceMoversPage() {
   });
 
   const [drillProduct, setDrillProduct] = useState(null);
+
+  const locationsQuery = useAuthQueries({
+    queries: [
+      {
+        queryKey: ['perf_locations', organization?.id],
+        queryFn: async () => {
+          const { api } = await import('@/lib/apiClient');
+          return api.entities.Location.filter({ organization_id: organization?.id });
+        },
+        enabled: !!organization?.id,
+      },
+    ],
+  });
+  const locations = locationsQuery[0]?.data || [];
 
   const {
     summary,
@@ -224,7 +239,7 @@ export default function PriceMoversPage() {
         locationIds={filterState.locationIds}
         categoryIds={filterState.categoryIds}
         vendorIds={filterState.vendorIds}
-        locations={[]}
+        locations={locations}
         categories={filterCategories}
         vendors={filterVendors}
         autoComparison={filterState.autoComparison}

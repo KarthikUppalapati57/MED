@@ -118,7 +118,11 @@ export default function Performance() {
   const variance = budget > 0 ? ((totalSales - budget) / budget) * 100 : 0;
 
   // --- TREND DATA ---
-  const trendData = metricsData.trend_data || [];
+  // The RPC doesn't compute a per-day budget, so split the period target evenly across the
+  // trend's day count (same even-split convention dailyPnl already uses for daily targets).
+  const rawTrendData = metricsData.trend_data || [];
+  const dailyBudget = rawTrendData.length > 0 ? budget / rawTrendData.length : 0;
+  const trendData = rawTrendData.map((point) => ({ ...point, budget: dailyBudget }));
 
   // --- PRICE MOVERS ---
   const moversData = metricsData.movers_data || [];

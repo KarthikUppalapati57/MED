@@ -302,7 +302,7 @@ export const api = {
     InvoiceLineItem: createEntityClient('invoice_line_items'),
     InvoiceAllocation: createEntityClient('invoice_allocations'),
     CreditRequest: createEntityClient('credit_requests'),
-    WastageLog: createEntityClient('wastage_logs', true),
+    WastageLog: createEntityClient('wastage_logs', false),
     User: createEntityClient('profiles'),
     Notification: createEntityClient('notifications'),
     Invitation: createEntityClient('invitations'),

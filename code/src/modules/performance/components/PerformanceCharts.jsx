@@ -9,8 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
   Legend,
 } from 'recharts';
@@ -30,36 +28,13 @@ export function PerformanceTrendChart({ data }) {
         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} tickFormatter={(val) => `$${val / 1000}k`} />
         <Tooltip
           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-          formatter={(value) => [`$${value}`, 'Sales']}
+          formatter={(value, name) => [`$${value}`, name]}
         />
         <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
         <Area type="monotone" dataKey="actual" name="Actual Sales" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" />
+        <Area type="monotone" dataKey="forecast" name="Forecast" stroke="#a855f7" strokeWidth={2} strokeDasharray="3 3" fill="none" />
         <Area type="monotone" dataKey="budget" name="Budget" stroke="#9ca3af" strokeWidth={2} strokeDasharray="5 5" fill="none" />
       </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function PerformanceCategoryPieChart({ data }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={80}
-          paddingAngle={5}
-          dataKey="value"
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={entry.color} />
-          ))}
-        </Pie>
-        <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Spend']} />
-        <Legend layout="vertical" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 12, paddingTop: 20 }} />
-      </PieChart>
     </ResponsiveContainer>
   );
 }
@@ -106,7 +81,7 @@ export function SalesForecastAreaChart({ data }) {
   );
 }
 
-export function VarianceWaterfallChart({ data }) {
+export function VarianceWaterfallChart({ data = [] }) {
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload;

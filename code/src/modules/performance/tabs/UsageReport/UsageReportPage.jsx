@@ -291,7 +291,7 @@ export default function UsageReportPage() {
           empty={showEmpty || !summary?.highestUsageCategory}
           error={showError}
           value={summary?.highestUsageCategory?.category || '—'}
-          sub={
+          sublabel={
             summary?.highestUsageCategory
               ? formatMoney(summary.highestUsageCategory.usageValue, currency)
               : undefined
@@ -303,7 +303,7 @@ export default function UsageReportPage() {
           empty={showEmpty || !summary?.highestWasteProduct}
           error={showError}
           value={summary?.highestWasteProduct?.product || '—'}
-          sub={
+          sublabel={
             summary?.highestWasteProduct
               ? formatMoney(summary.highestWasteProduct.wasteValue, currency)
               : undefined

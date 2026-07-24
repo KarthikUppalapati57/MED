@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Download, Medal, Settings2, Sparkles } from "lucide-react";
+import { RefreshCw, Download, Medal, Settings2 } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
@@ -24,7 +24,7 @@ export default function CrossLocationBenchmarking() {
   const startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
   const endDate = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: benchmarkData = [], refetch, isLoading } = useAuthQuery({
+  const { data: benchmarkData = [], refetch, isLoading, error } = useAuthQuery({
     queryKey: ['location_benchmarks', organization?.id, startDate, endDate],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_location_benchmarks', {
@@ -191,7 +191,13 @@ export default function CrossLocationBenchmarking() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {processedData.length === 0 && !isLoading ? (
+              {error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-rose-600">
+                    Failed to load benchmarks: {error.message || 'Unknown error'}
+                  </TableCell>
+                </TableRow>
+              ) : processedData.length === 0 && !isLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No location data found for the selected period.

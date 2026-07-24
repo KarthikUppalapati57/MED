@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { previousEquivalentPeriod } from '@/modules/performance/services/categoryPerformanceCalculations';
 
 function startOfMonthIso(d = new Date()) {
@@ -29,6 +29,14 @@ export function usePerformanceFilters(defaults = {}) {
   const [categoryIds, setCategoryIds] = useState(defaults.categoryIds || []);
   const [vendorIds, setVendorIds] = useState(defaults.vendorIds || []);
   const [autoComparison, setAutoComparison] = useState(true);
+
+  // Resync to the caller's active-location default whenever it changes (e.g. the user
+  // switches location mid-session). A stale locationIds filter here would otherwise keep
+  // querying a location the backend's exact-location-match scope no longer returns rows for.
+  const defaultLocationIdsKey = JSON.stringify(defaults.locationIds || []);
+  useEffect(() => {
+    setLocationIds(defaults.locationIds || []);
+  }, [defaultLocationIdsKey]);
 
   const syncComparison = useCallback((from, to) => {
     const next = previousEquivalentPeriod(from, to);

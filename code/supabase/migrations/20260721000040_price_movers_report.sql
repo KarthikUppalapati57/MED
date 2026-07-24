@@ -346,6 +346,7 @@ BEGIN
   scatter AS (
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object(
+        'productId', product_id,
         'product', product,
         'percentageChange', percentage_change,
         'estimatedImpact', estimated_impact,
