@@ -600,7 +600,7 @@ export default function Products() {
 
   const handleBulkExport = () => {
     const selected = products.filter(p => selectedIds.has(p.id));
-    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
+    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Vendor Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
     const rows = selected.map(p => [
       p.product_id,
       p.name,
@@ -1133,7 +1133,7 @@ export default function Products() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Item Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
+    const headers = ['Product ID', 'Name', 'Category Type', 'Category', 'Accounting Code', 'Vendor Count', 'On Inventory', 'Tax Exempt', 'Report By Unit', 'Pack', 'Latest Price', 'Last Purchased'];
     const rows = filteredProducts.map(p => [
       p.product_id,
       p.name,
@@ -1471,7 +1471,7 @@ export default function Products() {
                 {renderProductSortHead('Name', 'name', 'w-[250px]')}
                 {renderProductSortHead('Category', 'category', 'w-[210px]')}
                 {renderProductSortHead('Accounting Code', 'accounting_category', 'w-[170px]')}
-                <TableHead className="w-[110px] whitespace-nowrap px-4 py-3 text-right">Item Count</TableHead>
+                <TableHead className="w-[110px] whitespace-nowrap px-4 py-3 text-right">Vendor Count</TableHead>
                 {renderProductSortHead('On Inventory', 'is_inventoried', 'w-[140px]')}
                 {renderProductSortHead('Tax Exempt', 'is_tax_exempt', 'w-[130px]')}
                 {renderProductSortHead('Report By Unit', 'report_by_unit', 'w-[170px]')}
