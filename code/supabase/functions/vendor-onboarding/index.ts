@@ -208,6 +208,14 @@ serve(async (req) => {
       const { vendor_id, type } = payload;
       if (!vendor_id || !type) return jsonResponse({ error: "Missing vendor_id or type" }, 400);
 
+      // Fail before issuing a token (which cancels any prior pending one) rather than silently
+      // emailing a real vendor a link to someone's localhost -- PUBLIC_APP_URL is an edge
+      // function secret (supabase secrets set), never inherited from the frontend's VITE_APP_URL.
+      const baseUrl = Deno.env.get("PUBLIC_APP_URL");
+      if (!baseUrl && isProduction()) {
+        throw new Error("PUBLIC_APP_URL is not configured in this environment's Supabase secrets.");
+      }
+
       let linkResult;
       if (type === "tax" || type === "documents") {
         const { data, error } = await supabase.rpc("issue_vendor_link_token", {
@@ -229,8 +237,7 @@ serve(async (req) => {
 
       const token = linkResult?.token;
       const routeType = type === "documents" ? "tax" : type;
-      const baseUrl = Deno.env.get("PUBLIC_APP_URL") || "http://localhost:5173";
-      const magicLinkUrl = `${baseUrl}/vendor-onboarding/${routeType}/${token}`;
+      const magicLinkUrl = `${baseUrl || "http://localhost:5173"}/vendor-onboarding/${routeType}/${token}`;
 
       const { data: vendorContact, error: contactError } = await supabase
         .from("vendors")
