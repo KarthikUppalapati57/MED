@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { BarChart3, BellRing, CalendarDays, CheckCircle2, Clock, FileText, History, Save, Settings2, ShieldCheck } from 'lucide-react';
+import { BarChart3, BellRing, CalendarDays, CheckCircle2, Clock, Copy, Download, FileText, History, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
@@ -8,6 +8,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabaseClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
+import { createNotification } from '@/lib/notificationService';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -113,6 +114,29 @@ function formatDate(value) {
   try { return format(new Date(value), 'MMM d, yyyy h:mm a'); } catch { return 'Recently'; }
 }
 
+function getReportText(delivery) {
+  const snapshot = delivery?.report_snapshot || {};
+  if (typeof snapshot.reportText === 'string' && snapshot.reportText.trim()) return snapshot.reportText;
+  return [
+    `Restops 360 ${reportTypeLabel(delivery?.report_type)} Report`,
+    `Date: ${delivery?.report_date || 'Not recorded'}`,
+    '',
+    delivery?.error_message ? `Error: ${delivery.error_message}` : 'No report snapshot was stored for this delivery.',
+  ].join('\n');
+}
+
+function downloadTextFile(text, filename) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function VisualReportShell({ title, description, children, action, className }) {
   return (
     <Card className={cn('dashboard-visual-card border-border/70 shadow-sm', className)} string="progress">
@@ -135,6 +159,7 @@ export default function DashboardReports() {
   const scopeContext = React.useMemo(() => getScopeContext(scope, { organization, brand, location }), [brand, location, organization, scope]);
   const canManage = isPlatformAdmin || isTenantSuperAdmin || isOrgManager || isBranchManager || isLocationManager;
   const [saving, setSaving] = React.useState(null);
+  const [resendingId, setResendingId] = React.useState(null);
 
   const { data: remotePreferences = null, refetch: refetchPreferences } = useAuthQuery({
     queryKey: ['dashboard-report-module-preferences', scopeContext.orgId, scope, scopeContext.scopeKey],
@@ -263,6 +288,96 @@ export default function DashboardReports() {
   const togglePreference = (key) => savePreferences({ ...preferences, [key]: !preferences[key] });
   const updateRule = (key, value) => saveRules({ ...rules, [key]: Number(value) });
 
+  React.useEffect(() => {
+    if (!scopeContext.orgId) return undefined;
+    const channel = supabase.channel(`dashboard-reports-module-${scope}-${scopeContext.scopeKey}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_report_preferences', filter: `organization_id=eq.${scopeContext.orgId}` }, () => refetchPreferences())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_escalation_rules', filter: `organization_id=eq.${scopeContext.orgId}` }, () => refetchRules())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dashboard_report_deliveries', filter: `organization_id=eq.${scopeContext.orgId}` }, () => refetchDeliveries())
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [refetchDeliveries, refetchPreferences, refetchRules, scope, scopeContext.orgId, scopeContext.scopeKey]);
+
+  const copyDelivery = async (delivery) => {
+    try {
+      await navigator.clipboard.writeText(getReportText(delivery));
+      toast.success('Report snapshot copied');
+    } catch {
+      toast.error('Could not copy report snapshot');
+    }
+  };
+
+  const downloadDelivery = (delivery) => {
+    downloadTextFile(getReportText(delivery), `restops-${delivery.report_type || 'dashboard'}-report-${delivery.report_date || 'snapshot'}.txt`);
+    toast.success('Report snapshot downloaded');
+  };
+
+  const resendDelivery = async (delivery) => {
+    if (!canManage || !scopeContext.orgId) return;
+    setResendingId(delivery.id);
+    try {
+      const normalized = normalizeReportPreferences({
+        ...preferences,
+        recipientRoles: Array.isArray(delivery.recipient_roles) && delivery.recipient_roles.length
+          ? delivery.recipient_roles
+          : preferences.recipientRoles,
+      });
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, role, organization_id, brand_id, location_id, status')
+        .eq('organization_id', scopeContext.orgId)
+        .in('role', normalized.recipientRoles)
+        .neq('status', 'inactive');
+      if (error) throw error;
+
+      const targets = (profiles || []).filter((profile) => {
+        if (scope === 'brand') {
+          if (['org_manager', 'tenant_super_admin'].includes(profile.role)) return true;
+          return !profile.brand_id || !scopeContext.brandId || profile.brand_id === scopeContext.brandId;
+        }
+        if (scope === 'location') {
+          if (['org_manager', 'tenant_super_admin'].includes(profile.role)) return true;
+          if (profile.role === 'branch_manager') return !profile.brand_id || !scopeContext.brandId || profile.brand_id === scopeContext.brandId;
+          if (profile.role === 'location_manager') return !profile.location_id || !scopeContext.locationId || profile.location_id === scopeContext.locationId;
+          return false;
+        }
+        return true;
+      });
+
+      const reportText = getReportText(delivery);
+      const results = await Promise.all(targets.map((profile) => createNotification({
+        organization_id: scopeContext.orgId,
+        user_id: profile.id,
+        title: delivery.report_type === 'weekly' ? 'Weekly executive dashboard report ready' : 'Daily dashboard handoff ready',
+        message: reportText.slice(0, 950),
+        type: 'system',
+        metadata: {
+          dashboard_scope: scope,
+          report_delivery_id: delivery.id,
+          report_type: delivery.report_type || 'daily',
+          source: 'dashboard_report_resend',
+        },
+      })));
+      const notified = results.filter((result) => result?.success && !result?.skipped).length;
+      await logAudit({
+        action: 'dashboard_report_delivery_resent',
+        entityId: delivery.id,
+        entityType: 'dashboard_report_delivery',
+        module: AUDIT_MODULES.SYSTEM,
+        orgId: scopeContext.orgId,
+        brandId: scopeContext.brandId,
+        locationId: scopeContext.locationId,
+        userId: userProfile?.id,
+        details: { scope, reportType: delivery.report_type, reportDate: delivery.report_date, notified },
+      });
+      toast.success(notified ? `Resent to ${notified} recipient${notified > 1 ? 's' : ''}` : 'No matching recipients found');
+    } catch (error) {
+      toast.error(error.message || 'Failed to resend report');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   return (
     <div className="dashboard-visual-page space-y-6 p-4 md:p-8" string="progress">
       <section className="dashboard-visual-hero overflow-hidden rounded-2xl border border-border/70 p-6 md:p-8" string="progress">
@@ -368,16 +483,32 @@ export default function DashboardReports() {
           ) : (
             <div className="space-y-3">
               {deliveries.slice(0, 6).map((delivery) => (
-                <div key={delivery.id} className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3">
-                  <div>
+                <div key={delivery.id} className="flex flex-col gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={statusClass(delivery.status)}>{delivery.status}</Badge>
                       <p className="text-sm font-semibold text-foreground">{reportTypeLabel(delivery.report_type)}</p>
+                      <Badge variant="secondary">{delivery.report_date}</Badge>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{formatDate(delivery.sent_at || delivery.updated_at || delivery.created_at)} - {delivery.recipient_count || 0} recipients</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDate(delivery.sent_at || delivery.updated_at || delivery.created_at)} - {delivery.recipient_count || 0} recipients - {(delivery.notification_ids || []).length} notifications
+                    </p>
                     {delivery.error_message && <p className="mt-1 text-xs text-resend-red">{delivery.error_message}</p>}
                   </div>
-                  <Badge variant="secondary">{delivery.report_date}</Badge>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => copyDelivery(delivery)}>
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadDelivery(delivery)}>
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => resendDelivery(delivery)} disabled={!canManage || resendingId === delivery.id}>
+                      <RotateCcw className="h-4 w-4" />
+                      {resendingId === delivery.id ? 'Resending' : 'Resend'}
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
