@@ -94,9 +94,9 @@ BEGIN
     SELECT
       'payments'::TEXT AS module,
       CASE p_dimension
-        WHEN 'date' THEN to_char(COALESCE(p.payment_date, p.created_at::DATE, p.due_date)::TIMESTAMP, 'YYYY-MM-DD')
-        WHEN 'week' THEN to_char(date_trunc('week', COALESCE(p.payment_date, p.created_at::DATE, p.due_date)::TIMESTAMP), 'IYYY-IW')
-        WHEN 'month' THEN to_char(date_trunc('month', COALESCE(p.payment_date, p.created_at::DATE, p.due_date)::TIMESTAMP), 'YYYY-MM')
+        WHEN 'date' THEN to_char(COALESCE(p.payment_date, p.created_at::DATE)::TIMESTAMP, 'YYYY-MM-DD')
+        WHEN 'week' THEN to_char(date_trunc('week', COALESCE(p.payment_date, p.created_at::DATE)::TIMESTAMP), 'IYYY-IW')
+        WHEN 'month' THEN to_char(date_trunc('month', COALESCE(p.payment_date, p.created_at::DATE)::TIMESTAMP), 'YYYY-MM')
         WHEN 'location' THEN COALESCE(l.name, 'Unassigned')
         WHEN 'status' THEN COALESCE(NULLIF(p.status, ''), 'unknown')
         WHEN 'category' THEN COALESCE(NULLIF(p.payment_method, ''), 'payment')
@@ -112,7 +112,7 @@ BEGIN
     LEFT JOIN public.locations l ON l.id = p.location_id
     WHERE 'payments' = ANY(v_modules)
       AND p.organization_id = v_org
-      AND COALESCE(p.payment_date, p.created_at::DATE, p.due_date) BETWEEN v_start AND v_end
+      AND COALESCE(p.payment_date, p.created_at::DATE) BETWEEN v_start AND v_end
     GROUP BY 1, 2
   ), product_rows AS (
     SELECT
@@ -374,4 +374,5 @@ REVOKE ALL ON FUNCTION public.run_custom_report(TEXT[], TEXT, DATE, DATE, TEXT[]
 GRANT EXECUTE ON FUNCTION public.run_custom_report(TEXT[], TEXT, DATE, DATE, TEXT[], UUID) TO authenticated, service_role;
 
 COMMIT;
+
 
