@@ -113,6 +113,14 @@ function MiniModule({ icon: Icon, label, value, detail, progress, tone = 'defaul
   );
 }
 
+function EmptyState({ children }) {
+  return (
+    <div className="h-full min-h-[220px] flex items-center justify-center text-sm text-muted-foreground text-center px-6">
+      {children}
+    </div>
+  );
+}
+
 function ComingSoonStrip() {
   const items = [
     'Sales report',
@@ -159,31 +167,41 @@ export default function PhaseOneOverview({
       },
       {
         queryKey: ['phase1_overview_invoices', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: () => api.entities.Invoice.list('-invoice_date'),
+        queryFn: () => api.entities.Invoice.filter({}, {
+          orderBy: '-invoice_date',
+          gte: { invoice_date: periodStart },
+          lte: { invoice_date: periodEnd },
+          limit: 5000,
+        }),
         select: scopedFilter,
         enabled: !!organization?.id,
       },
       {
         queryKey: ['phase1_overview_payments', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: () => api.entities.Payment.list('-payment_date'),
+        queryFn: () => api.entities.Payment.filter({}, {
+          orderBy: '-payment_date',
+          gte: { payment_date: periodStart },
+          lte: { payment_date: periodEnd },
+          limit: 5000,
+        }),
         select: scopedFilter,
         enabled: !!organization?.id,
       },
       {
         queryKey: ['phase1_overview_products', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Product.list('-updated_at'),
+        queryFn: () => api.entities.Product.list('-updated_at', { limit: 5000 }),
         select: scopedFilter,
         enabled: !!organization?.id,
       },
       {
         queryKey: ['phase1_overview_inventory', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Inventory.list('-updated_at'),
+        queryFn: () => api.entities.Inventory.list('-updated_at', { limit: 5000 }),
         select: scopedFilter,
         enabled: !!organization?.id,
       },
       {
         queryKey: ['phase1_overview_recipes', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Recipe.list('-updated_at'),
+        queryFn: () => api.entities.Recipe.list('-updated_at', { limit: 5000 }),
         select: scopedFilter,
         enabled: !!organization?.id,
       },
@@ -200,18 +218,23 @@ export default function PhaseOneOverview({
     ],
   });
 
-  const categoryReport = results[0].data || {};
-  const invoices = (results[1].data || []).filter((row) =>
+  const categoryReport = results[0]?.data || {};
+  const invoices = (results[1]?.data || []).filter((row) =>
     inRange(row.invoice_date || row.created_at, periodStart, periodEnd)
   );
-  const payments = (results[2].data || []).filter((row) =>
+  const payments = (results[2]?.data || []).filter((row) =>
     inRange(row.payment_date || row.created_at, periodStart, periodEnd)
   );
-  const products = results[3].data || [];
-  const inventory = results[4].data || [];
-  const recipes = results[5].data || [];
-  const priceMoversReport = results[6].data || {};
+  const products = results[3]?.data || [];
+  const inventory = results[4]?.data || [];
+  const recipes = results[5]?.data || [];
+  const priceMoversReport = results[6]?.data || {};
   const isLoading = results.some((query) => query.isLoading);
+  const queryErrors = results
+    .map((query, index) => (query?.isError ? {
+      key: ['Category report', 'Invoices', 'Payments', 'Products', 'Inventory', 'Recipes', 'Price movers'][index],
+    } : null))
+    .filter(Boolean);
 
   const analytics = useMemo(() => {
     const summary = categoryReport.summary || {};
@@ -398,7 +421,10 @@ export default function PhaseOneOverview({
     };
   }, [categoryReport, invoices, payments, products, inventory, recipes, priceMoversReport]);
 
-  const chartEmpty = !isLoading && analytics.totalSpend === 0;
+  const budgetEmpty = !isLoading && analytics.budgetRows.length === 0;
+  const trendEmpty = !isLoading && analytics.spendTrend.length === 0;
+  const distributionEmpty = !isLoading && analytics.categoryDistribution.length === 0;
+  const paymentEmpty = !isLoading && analytics.paymentData.length === 0;
 
   return (
     <div className="space-y-6">
@@ -411,6 +437,28 @@ export default function PhaseOneOverview({
         </div>
         <ComingSoonStrip />
       </div>
+
+      {queryErrors.length > 0 ? (
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-amber-900">Some Phase 1 analytics did not load</p>
+                <p className="text-xs text-amber-800 mt-1">
+                  The dashboard is showing all available data and keeping failed sources isolated.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {queryErrors.map((error) => (
+                  <Badge key={error.key} variant="outline" className="bg-white/70 border-amber-300 text-amber-900">
+                    {error.key}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
@@ -463,9 +511,9 @@ export default function PhaseOneOverview({
             </div>
           </CardHeader>
           <CardContent>
-            {chartEmpty ? (
-              <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground text-center">
-                No invoice allocation spend found for this period.
+            {budgetEmpty ? (
+              <div className="h-[320px]">
+                <EmptyState>No saved category budget or invoice allocation spend found for this period.</EmptyState>
               </div>
             ) : (
               <div className="h-[320px]">
@@ -529,15 +577,19 @@ export default function PhaseOneOverview({
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={analytics.spendTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
-                  <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                  <Line type="monotone" dataKey="spend" name="Spend" stroke="#0f766e" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              {trendEmpty ? (
+                <EmptyState>No invoice spend trend is available for the selected period.</EmptyState>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analytics.spendTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
+                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
+                    <Line type="monotone" dataKey="spend" name="Spend" stroke="#0f766e" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -549,17 +601,21 @@ export default function PhaseOneOverview({
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={analytics.categoryDistribution} dataKey="value" nameKey="name" innerRadius={54} outerRadius={84}>
-                    {analytics.categoryDistribution.map((entry, index) => (
-                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              {distributionEmpty ? (
+                <EmptyState>No category distribution is available yet.</EmptyState>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={analytics.categoryDistribution} dataKey="value" nameKey="name" innerRadius={54} outerRadius={84}>
+                      {analytics.categoryDistribution.map((entry, index) => (
+                        <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -571,15 +627,19 @@ export default function PhaseOneOverview({
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.paymentData} layout="vertical" margin={{ top: 10, right: 16, left: 12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
-                  <YAxis type="category" dataKey="name" width={78} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                  <Bar dataKey="value" name="Amount" fill="#1d4ed8" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {paymentEmpty ? (
+                <EmptyState>No paid, scheduled, unpaid, or failed payment exposure found for this period.</EmptyState>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.paymentData} layout="vertical" margin={{ top: 10, right: 16, left: 12, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
+                    <YAxis type="category" dataKey="name" width={78} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
+                    <Bar dataKey="value" name="Amount" fill="#1d4ed8" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -621,3 +681,4 @@ export default function PhaseOneOverview({
     </div>
   );
 }
+

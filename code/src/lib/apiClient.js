@@ -16,6 +16,41 @@ function getOnboardingOtpRedirectUrl() {
   return `${window.location.origin}/business-verification`;
 }
 
+const ONBOARDING_CONTACT_DEV_OTPS = {
+  email: '724913',
+  phone: '381602',
+};
+
+function isLocalBrowserOrigin() {
+  if (typeof window === 'undefined') return false;
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
+function isOnboardingContactDevOtpEnabled() {
+  const flag = String(import.meta.env.VITE_ONBOARDING_CONTACT_DEV_OTP_ENABLED || '').toLowerCase();
+  if (['true', '1', 'yes'].includes(flag)) return true;
+  if (['false', '0', 'no'].includes(flag)) return false;
+  return Boolean(import.meta.env.DEV && isLocalBrowserOrigin());
+}
+
+async function requestOnboardingContactDevOtp({ channel, target }) {
+  const { data, error } = await supabase.rpc('request_onboarding_contact_dev_otp', {
+    p_channel: channel,
+    p_target: target,
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function verifyOnboardingContactDevOtp({ channel, target, code }) {
+  const { data, error } = await supabase.rpc('verify_onboarding_contact_dev_otp', {
+    p_channel: channel,
+    p_target: target,
+    p_code: code,
+  });
+  if (error) throw error;
+  return data;
+}
 const TABLE_SCOPE_COLUMNS = {
   accounting_sync_logs: ['organization_id'],
   ai_insights: ['organization_id'],
@@ -558,6 +593,20 @@ export const api = {
       const normalizedChannel = String(channel || '').toLowerCase();
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
 
+      if (isOnboardingContactDevOtpEnabled()) {
+        try {
+          return await requestOnboardingContactDevOtp({
+            channel: normalizedChannel,
+            target: normalizedTarget,
+          });
+        } catch (devError) {
+          const message = devError?.message || '';
+          if (!/disabled in production|bypass has expired/i.test(message)) {
+            throw devError;
+          }
+        }
+      }
+
       try {
         if (normalizedChannel === 'email') {
           const { error } = await supabase.auth.signInWithOtp({
@@ -596,6 +645,22 @@ export const api = {
       const normalizedChannel = String(channel || '').toLowerCase();
       const normalizedTarget = normalizedChannel === 'email' ? normalizeOtpEmail(target) : normalizeOtpPhone(target);
       const token = String(code || '').trim();
+
+      if (isOnboardingContactDevOtpEnabled() && token === ONBOARDING_CONTACT_DEV_OTPS[normalizedChannel]) {
+        try {
+          return await verifyOnboardingContactDevOtp({
+            channel: normalizedChannel,
+            target: normalizedTarget,
+            code: token,
+          });
+        } catch (devError) {
+          const message = devError?.message || '';
+          if (/disabled in production|bypass has expired/i.test(message)) {
+            throw new Error(message);
+          }
+          throw devError;
+        }
+      }
 
       try {
         if (normalizedChannel === 'email') {

@@ -30,13 +30,23 @@ export function usePerformanceFilters(defaults = {}) {
   const [vendorIds, setVendorIds] = useState(defaults.vendorIds || []);
   const [autoComparison, setAutoComparison] = useState(true);
 
-  // Resync to the caller's active-location default whenever it changes (e.g. the user
-  // switches location mid-session). A stale locationIds filter here would otherwise keep
-  // querying a location the backend's exact-location-match scope no longer returns rows for.
+  // Resync caller-owned defaults whenever the parent context changes. This keeps the
+  // Performance header, active location, and report tabs from drifting out of sync.
   const defaultLocationIdsKey = JSON.stringify(defaults.locationIds || []);
   useEffect(() => {
     setLocationIds(defaults.locationIds || []);
   }, [defaultLocationIdsKey]);
+
+  useEffect(() => {
+    if (!defaults.dateFrom || !defaults.dateTo) return;
+    setDateFrom(defaults.dateFrom);
+    setDateTo(defaults.dateTo);
+    if (autoComparison) {
+      const next = previousEquivalentPeriod(defaults.dateFrom, defaults.dateTo);
+      setComparisonDateFrom(next.comparisonDateFrom);
+      setComparisonDateTo(next.comparisonDateTo);
+    }
+  }, [defaults.dateFrom, defaults.dateTo, autoComparison]);
 
   const syncComparison = useCallback((from, to) => {
     const next = previousEquivalentPeriod(from, to);
@@ -111,3 +121,5 @@ export function usePerformanceFilters(defaults = {}) {
 }
 
 export default usePerformanceFilters;
+
+

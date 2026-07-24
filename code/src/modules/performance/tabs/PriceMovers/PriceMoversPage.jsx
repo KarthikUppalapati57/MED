@@ -63,10 +63,12 @@ const EXPORT_COLUMNS = [
 const PRICE_TOOLTIP =
   'Normalized weighted-average unit cost = line total / (qty × conversion multiplier). Comparisons require the same mapped product and normalized UOM. Not Comparable returns null % change.';
 
-export default function PriceMoversPage() {
+export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
   const navigate = useNavigate();
   const { organization, location } = useAuth();
   const filterState = usePerformanceFilters({
+    dateFrom: periodStart,
+    dateTo: periodEnd,
     locationIds: location?.id ? [location.id] : [],
   });
 
@@ -691,3 +693,4 @@ function SimpleTable({ columns, rows }) {
     </div>
   );
 }
+

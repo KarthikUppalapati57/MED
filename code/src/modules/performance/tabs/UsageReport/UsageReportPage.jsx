@@ -64,10 +64,12 @@ function qty(value) {
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-export default function UsageReportPage() {
+export default function UsageReportPage({ periodStart, periodEnd } = {}) {
   const navigate = useNavigate();
   const { organization, location } = useAuth();
   const filterState = usePerformanceFilters({
+    dateFrom: periodStart,
+    dateTo: periodEnd,
     locationIds: location?.id ? [location.id] : [],
   });
 
@@ -710,3 +712,4 @@ function SimpleTable({ columns, rows }) {
     </div>
   );
 }
+

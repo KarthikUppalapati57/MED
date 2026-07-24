@@ -78,6 +78,7 @@ export default function Performance() {
           <Input
             type="date"
             value={periodStart}
+            max={periodEnd}
             onChange={(event) => setPeriodStart(event.target.value)}
             className="w-[140px] h-9 border-none bg-transparent"
           />
@@ -85,6 +86,7 @@ export default function Performance() {
           <Input
             type="date"
             value={periodEnd}
+            min={periodStart}
             onChange={(event) => setPeriodEnd(event.target.value)}
             className="w-[140px] h-9 border-none bg-transparent"
           />
@@ -121,25 +123,25 @@ export default function Performance() {
 
           <TabsContent value="budget" className="space-y-6 m-0">
             <React.Suspense fallback={<TabFallback />}>
-              <BudgetSetupPage />
+              <BudgetSetupPage periodStart={periodStart} periodEnd={periodEnd} />
             </React.Suspense>
           </TabsContent>
 
           <TabsContent value="category" className="space-y-6 m-0">
             <React.Suspense fallback={<TabFallback />}>
-              <CategoryReportPage />
+              <CategoryReportPage periodStart={periodStart} periodEnd={periodEnd} />
             </React.Suspense>
           </TabsContent>
 
           <TabsContent value="movers" className="space-y-6 m-0">
             <React.Suspense fallback={<TabFallback />}>
-              <PriceMoversPage />
+              <PriceMoversPage periodStart={periodStart} periodEnd={periodEnd} />
             </React.Suspense>
           </TabsContent>
 
           <TabsContent value="usage_report" className="space-y-6 m-0">
             <React.Suspense fallback={<TabFallback />}>
-              <UsageReportPage />
+              <UsageReportPage periodStart={periodStart} periodEnd={periodEnd} />
             </React.Suspense>
           </TabsContent>
 
@@ -211,3 +213,4 @@ export default function Performance() {
     </div>
   );
 }
+

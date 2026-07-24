@@ -44,13 +44,13 @@ function normalizeCategory(value) {
  * Real mode: categories/locations from Products, allocations, Locations.
  * Demo mode (VITE_PERFORMANCE_DEMO=true): in-memory demo only — never written to DB.
  */
-export default function BudgetSetupPage() {
+export default function BudgetSetupPage({ periodStart: initialPeriodStart, periodEnd: initialPeriodEnd } = {}) {
   const demo = import.meta.env.VITE_PERFORMANCE_DEMO === 'true';
   const { organization, brand, location, userProfile } = useAuth();
   const queryClient = useQueryClient();
 
-  const [periodStart, setPeriodStart] = useState(startOfMonthIso());
-  const [periodEnd, setPeriodEnd] = useState(endOfMonthIso());
+  const [periodStart, setPeriodStart] = useState(initialPeriodStart || startOfMonthIso());
+  const [periodEnd, setPeriodEnd] = useState(initialPeriodEnd || endOfMonthIso());
   const [selectedLocationId, setSelectedLocationId] = useState(
     location?.id && !demo ? location.id : ORG_WIDE
   );
@@ -60,6 +60,11 @@ export default function BudgetSetupPage() {
   );
 
   const scopeLocationId = selectedLocationId === ORG_WIDE ? null : selectedLocationId;
+
+  useEffect(() => {
+    if (initialPeriodStart) setPeriodStart(initialPeriodStart);
+    if (initialPeriodEnd) setPeriodEnd(initialPeriodEnd);
+  }, [initialPeriodStart, initialPeriodEnd]);
 
   useEffect(() => {
     if (!demo) return;
@@ -297,6 +302,7 @@ export default function BudgetSetupPage() {
             <Input
               type="date"
               value={periodStart}
+              max={periodEnd}
               onChange={(e) => setPeriodStart(e.target.value)}
               className="w-[160px]"
             />
@@ -306,6 +312,7 @@ export default function BudgetSetupPage() {
             <Input
               type="date"
               value={periodEnd}
+              min={periodStart}
               onChange={(e) => setPeriodEnd(e.target.value)}
               className="w-[160px]"
             />
@@ -435,3 +442,5 @@ export default function BudgetSetupPage() {
     </div>
   );
 }
+
+

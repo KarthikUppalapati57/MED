@@ -67,10 +67,12 @@ function varianceStatus(absoluteChange) {
   return 'neutral';
 }
 
-export default function CategoryReportPage() {
+export default function CategoryReportPage({ periodStart, periodEnd } = {}) {
   const navigate = useNavigate();
   const { organization, location } = useAuth();
   const filterState = usePerformanceFilters({
+    dateFrom: periodStart,
+    dateTo: periodEnd,
     locationIds: location?.id ? [location.id] : [],
   });
 
@@ -745,3 +747,4 @@ function SimpleTable({ columns, rows }) {
     </div>
   );
 }
+
