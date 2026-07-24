@@ -42,6 +42,23 @@ BEGIN
     RAISE EXCEPTION 'Access denied';
   END IF;
 
+  -- Same precondition issue_vendor_banking_link enforces (VO-RULE-005) -- the UI already greys
+  -- this button out via canIssueBanking, but per this codebase's own rule that enforcement must
+  -- be DB-side, not UI-only, the RPC needs its own copy of the check, not just a disabled prop.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.vendor_tax_information vti
+    WHERE vti.vendor_id = p_vendor_id
+      AND vti.verification_status = 'verified'
+      AND vti.deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Business is not verified';
+  END IF;
+
+  IF NOT public.vendor_has_required_onboarding_documents(p_vendor_id) THEN
+    RAISE EXCEPTION 'Required vendor documents are not on file';
+  END IF;
+
   IF regexp_replace(COALESCE(p_account, ''), '\D', '', 'g') !~ '^\d{4,17}$' THEN
     RAISE EXCEPTION 'A valid bank account number (4-17 digits) is required';
   END IF;

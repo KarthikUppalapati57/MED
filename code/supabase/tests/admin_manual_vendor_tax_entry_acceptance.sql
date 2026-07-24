@@ -71,8 +71,10 @@ BEGIN
   END;
 
   -- In-scope manual entry succeeds and produces the same row shape the magic-link path does.
+  -- Dashed at position 3 (12-3456789): must infer 'ein', not 'ssn' -- Postgres position() is
+  -- 1-indexed, unlike the JS indexOf()-based version this mirrors.
   v_result := public.admin_submit_vendor_tax_info(
-    v_vendor, '123456789', 'Manual Entry Legal Name', 'llc', NULL, NULL
+    v_vendor, '12-3456789', 'Manual Entry Legal Name', 'llc', NULL, NULL
   );
   IF (v_result->>'tax_id_last4') <> '6789' THEN
     RAISE EXCEPTION 'expected tax_id_last4 6789, got %', v_result;
@@ -81,6 +83,13 @@ BEGIN
   -- vendor_tax_information is admin-tier-only readable (VO-SEC-002); a location_manager
   -- can call the RPC but can't directly SELECT the row it created, so verify as postgres.
   RESET ROLE;
+
+  SELECT count(*) INTO v_count
+  FROM public.vendor_tax_information
+  WHERE id = (v_result->>'tax_row_id')::uuid AND tax_id_type = 'ein';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'expected a dashed 9-digit tax id to infer tax_id_type=ein, got %', v_count;
+  END IF;
 
   SELECT count(*) INTO v_count
   FROM public.vendor_tax_information
@@ -111,8 +120,8 @@ BEGIN
   -- postgres (the connecting superuser) bypasses grants too, so this doubles as proof the
   -- manually-entered tax id actually made it into the vault, not just a display column.
   SELECT public.get_vendor_tax_for_audit((v_result->>'tax_row_id')::uuid) INTO v_status;
-  IF v_status <> '123456789' THEN
-    RAISE EXCEPTION 'expected vaulted tax id 123456789, got %', v_status;
+  IF v_status <> '12-3456789' THEN
+    RAISE EXCEPTION 'expected vaulted tax id 12-3456789, got %', v_status;
   END IF;
 
   RAISE NOTICE 'admin manual vendor tax entry acceptance assertions passed';

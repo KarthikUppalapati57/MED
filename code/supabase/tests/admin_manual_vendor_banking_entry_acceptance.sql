@@ -11,6 +11,7 @@ DECLARE
   v_manager uuid := gen_random_uuid();
   v_vendor uuid;
   v_other_vendor uuid;
+  v_unverified_vendor uuid;
   v_result jsonb;
   v_count integer;
   v_callback_status text;
@@ -53,8 +54,32 @@ BEGIN
   VALUES (v_other_org, v_other_brand, v_other_location, 'Admin Bank Entry Other Vendor', 'active', 'tax_submitted')
   RETURNING id INTO v_other_vendor;
 
+  -- admin_submit_vendor_banking_info now enforces the same tax-verified + W-9-on-file gate as
+  -- issue_vendor_banking_link (VO-RULE-005) -- satisfy it for the in-scope vendor being tested.
+  INSERT INTO public.vendor_documents (vendor_id, organization_id, brand_id, location_id, document_type, file_name, storage_path, status, uploaded_via)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'w9', 'w9.pdf', 'w9_documents/admin_bank_fmt_test.pdf', 'on_file', 'admin_upload');
+
+  INSERT INTO public.vendor_tax_information (vendor_id, organization_id, brand_id, location_id, verification_status, w9_status)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'verified', 'verified');
+
+  -- In-scope but not tax-verified yet -- proves the DB-side gate, not just the UI's disabled prop.
+  INSERT INTO public.vendors (organization_id, brand_id, location_id, name, status, onboarding_status)
+  VALUES (v_org, v_brand, v_location, 'Admin Bank Entry Unverified Vendor', 'active', 'tax_submitted')
+  RETURNING id INTO v_unverified_vendor;
+
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_manager::text, 'role', 'authenticated')::text, true);
   SET LOCAL ROLE authenticated;
+
+  -- In-scope vendor without a verified tax record is rejected, same gate issue_vendor_banking_link uses.
+  BEGIN
+    PERFORM public.admin_submit_vendor_banking_info(v_unverified_vendor, '000111222333', '021000021', 'add');
+    RAISE EXCEPTION 'manager entered banking info for a tax-unverified vendor';
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF SQLERRM NOT ILIKE '%not verified%' THEN
+        RAISE;
+      END IF;
+  END;
 
   -- Out-of-scope vendor (different org) is rejected.
   BEGIN

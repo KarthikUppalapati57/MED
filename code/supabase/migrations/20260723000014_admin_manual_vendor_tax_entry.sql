@@ -35,6 +35,16 @@ BEGIN
     RAISE EXCEPTION 'Access denied';
   END IF;
 
+  -- Same floor as issue_vendor_link_token -- manual entry is functionally "issue a link and
+  -- redeem it in the same step," so it shouldn't skip the gate the link-issuing path enforces.
+  IF COALESCE(v_vendor.onboarding_status, 'invited') NOT IN (
+    'otp_verified', 'pending_tax', 'tax_submitted', 'business_verified', 'verification_failed',
+    'documents_on_file', 'pending_bank', 'banking_submitted', 'banking_verified',
+    'method_selected', 'pending_approval', 'active', 'completed'
+  ) THEN
+    RAISE EXCEPTION 'Vendor OTP must be verified before entering tax info';
+  END IF;
+
   IF p_w9_document_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.vendor_documents
     WHERE id = p_w9_document_id
@@ -48,7 +58,9 @@ BEGIN
   v_inferred_type := COALESCE(
     NULLIF(p_tax_id_type, ''),
     CASE
-      WHEN regexp_replace(COALESCE(p_tax_id, ''), '\D', '', 'g') ~ '^\d{9}$' AND position('-' in p_tax_id) = 2 THEN 'ein'
+      -- position() is 1-indexed in Postgres (unlike JS indexOf's 0-indexed 2 for "12-3456789") --
+      -- an EIN's dash sits after the first 2 digits, so character position 3.
+      WHEN regexp_replace(COALESCE(p_tax_id, ''), '\D', '', 'g') ~ '^\d{9}$' AND position('-' in p_tax_id) = 3 THEN 'ein'
       ELSE 'ssn'
     END
   );
