@@ -794,3 +794,116 @@
     transform: none;
   }
 }
+
+.invoice-command-hero-compact .invoice-command-grid-balanced {
+  gap: 20px;
+}
+
+@media (min-width: 960px) {
+  .invoice-command-hero-compact .invoice-command-grid-balanced {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+    align-items: center;
+    padding: 28px 32px;
+  }
+}
+
+.invoice-focus-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.34);
+  padding: 16px;
+  backdrop-filter: blur(18px);
+}
+
+.invoice-focus-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(255,255,255,0.14), transparent 42%);
+  pointer-events: none;
+}
+
+.invoice-focus-topline,
+.invoice-focus-list,
+.invoice-focus-meter {
+  position: relative;
+  z-index: 1;
+}
+
+.invoice-focus-topline {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.invoice-focus-topline span {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invoice-focus-topline strong {
+  color: white;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.invoice-focus-meter {
+  height: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.invoice-focus-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14b8a6, #f97316, #ef4444);
+}
+
+.invoice-focus-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.invoice-focus-list div {
+  min-width: 0;
+  background: rgba(15, 23, 42, 0.42);
+  padding: 12px;
+}
+
+.invoice-focus-list span {
+  display: block;
+  color: white;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.invoice-focus-list small {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+@media (max-width: 520px) {
+  .invoice-focus-topline {
+    display: grid;
+  }
+
+  .invoice-focus-list {
+    grid-template-columns: 1fr;
+  }
+}

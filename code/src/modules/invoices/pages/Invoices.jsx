@@ -1391,14 +1391,14 @@ export default function Invoices() {
 
   return (
     <div className="invoice-visual-page space-y-5">
-      <section className="invoice-command-hero" string="progress">
-        <div className="invoice-command-grid">
+      <section className="invoice-command-hero invoice-command-hero-compact" string="progress">
+        <div className="invoice-command-grid invoice-command-grid-balanced">
           <div className="min-w-0 space-y-4">
             <Badge className="invoice-hero-badge">Invoice Control</Badge>
             <div>
               <h1 className="text-3xl font-bold text-white sm:text-4xl">Invoices</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/78 sm:text-base">
-                Capture vendor bills, review exceptions, approve payables, and keep AP moving from one clean workspace.
+                Capture vendor bills, review exceptions, approve payables, and keep AP moving.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -1409,10 +1409,6 @@ export default function Invoices() {
               <Button variant="outline" onClick={handleCreateManualInvoice} className={cn("invoice-hero-secondary", !hasLocation && "opacity-50 cursor-not-allowed")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create
-              </Button>
-              <Button variant="outline" onClick={handleOpenMobileCapture} className={cn("invoice-hero-secondary sm:hidden", !hasLocation && "opacity-50 cursor-not-allowed")}>
-                <Camera className="h-4 w-4 mr-2" />
-                Scan
               </Button>
               <Button variant="outline" className="invoice-hero-secondary hidden sm:inline-flex" onClick={() => setEmailConfigOpen(true)}>
                 <Mail className="h-4 w-4 mr-2" />
@@ -1425,68 +1421,30 @@ export default function Invoices() {
             </div>
           </div>
 
-          <div className="invoice-hero-panel" aria-label="Invoice summary">
-            <div>
-              <span className="text-xs font-medium text-white/62">Open AP</span>
+          <div className="invoice-focus-panel" aria-label="Invoice focus summary">
+            <div className="invoice-focus-topline">
+              <span>Open AP</span>
               <strong>{formatMoney(stats.unpaidAmount)}</strong>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="invoice-hero-mini invoice-signal-orange">
+            <div className="invoice-focus-meter" aria-hidden="true">
+              <span style={{ width: `${Math.min(100, Math.max(8, stats.overdueCount * 12))}%` }} />
+            </div>
+            <div className="invoice-focus-list">
+              <div>
                 <span>{stats.actionRequiredCount}</span>
                 <small>Need action</small>
               </div>
-              <div className="invoice-hero-mini invoice-signal-red">
+              <div>
+                <span>{stats.pendingApprovalCount}</span>
+                <small>Awaiting approval</small>
+              </div>
+              <div>
                 <span>{stats.overdueCount}</span>
-                <small>Overdue</small>
+                <small>Past due</small>
               </div>
             </div>
           </div>
         </div>
-
-        <div className="invoice-intake-rail">
-          {intakeMethods.map(({ label, detail, icon: Icon }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => handleIntakeClick(label)}
-              className={cn("invoice-intake-chip", label !== 'Email' && !hasLocation && "opacity-50 cursor-not-allowed")}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{label}</span>
-              <small>{detail}</small>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="invoice-signal-grid" string="progress" aria-label="Invoice status summary">
-        {[
-          ['Needs Action', stats.actionRequiredCount, 'invoice-signal-orange'],
-          ['Pending Approval', stats.pendingApprovalCount, 'invoice-signal-yellow'],
-          ['Scheduled', formatMoney(stats.scheduledAmount), 'invoice-signal-blue'],
-          ['Open AP', formatMoney(stats.unpaidAmount), 'invoice-signal-green'],
-          ['Overdue', stats.overdueCount, 'invoice-signal-red'],
-        ].map(([label, value, tone]) => (
-          <div key={label} className={cn('invoice-stat-tile', tone)}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </section>
-
-      <section className="invoice-stage-strip" string="progress" aria-label="Invoice workflow filters">
-        {workflowStages.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setApStatusFilter(apStatusFilter === key ? 'all' : key)}
-            className={cn('invoice-stage-chip', apStatusFilter === key && 'is-active')}
-          >
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-            <strong>{stats.stageCounts[key] || 0}</strong>
-          </button>
-        ))}
       </section>
 
       <section className="invoice-filter-bar" string="progress">
