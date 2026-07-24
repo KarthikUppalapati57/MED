@@ -241,6 +241,9 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
       }
       queryClient.invalidateQueries({ queryKey: ['budget_setup_targets'] });
       queryClient.invalidateQueries({ queryKey: ['budget_targets'] });
+      queryClient.invalidateQueries({ queryKey: ['phase1_overview_category_report'] });
+      queryClient.invalidateQueries({ queryKey: ['category_performance_report'] });
+      queryClient.invalidateQueries({ queryKey: ['category_performance_drilldown'] });
       toast.success('Budget target saved');
     },
     onError: (error) => toast.error(error.message || 'Failed to save budget target'),
@@ -268,6 +271,9 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
       }
       queryClient.invalidateQueries({ queryKey: ['budget_setup_targets'] });
       queryClient.invalidateQueries({ queryKey: ['budget_targets'] });
+      queryClient.invalidateQueries({ queryKey: ['phase1_overview_category_report'] });
+      queryClient.invalidateQueries({ queryKey: ['category_performance_report'] });
+      queryClient.invalidateQueries({ queryKey: ['category_performance_drilldown'] });
       toast.success('Budget target cleared');
     },
     onError: (error) => toast.error(error.message || 'Failed to clear budget target'),
@@ -442,5 +448,3 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
     </div>
   );
 }
-
-

@@ -32,25 +32,6 @@ function isOnboardingContactDevOtpEnabled() {
   return true;
 }
 
-async function requestOnboardingContactDevOtp({ channel, target }) {
-  const { data, error } = await supabase.rpc('request_onboarding_contact_dev_otp', {
-    p_channel: channel,
-    p_target: target,
-  });
-  if (error) throw error;
-  return data;
-}
-
-async function verifyOnboardingContactDevOtp({ channel, target, code }) {
-  const { data, error } = await supabase.rpc('verify_onboarding_contact_dev_otp', {
-    p_channel: channel,
-    p_target: target,
-    p_code: code,
-  });
-  if (error) throw error;
-  return data;
-}
-
 async function markOnboardingContactVerified({ channel, target }) {
   const { data, error } = await supabase.rpc('mark_onboarding_contact_verified', {
     p_channel: channel,
@@ -670,22 +651,10 @@ export const api = {
       const token = String(code || '').trim();
 
       if ((isOnboardingContactDevOtpEnabled() || isLocalDevOtpId(otpId)) && token === ONBOARDING_CONTACT_DEV_OTPS[normalizedChannel]) {
-        try {
-          return await verifyOnboardingContactDevOtp({
-            channel: normalizedChannel,
-            target: normalizedTarget,
-            code: token,
-          });
-        } catch (devError) {
-          const message = devError?.message || '';
-          if (!/disabled in production|bypass has expired/i.test(message)) {
-            throw devError;
-          }
-          return markOnboardingContactVerified({
-            channel: normalizedChannel,
-            target: normalizedTarget,
-          });
-        }
+        return markOnboardingContactVerified({
+          channel: normalizedChannel,
+          target: normalizedTarget,
+        });
       }
 
       try {

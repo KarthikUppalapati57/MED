@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { supabase } from '@/lib/supabaseClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { Badge } from '@/components/ui/badge';
@@ -153,25 +154,41 @@ export default function PhaseOneOverview({
       },
       {
         queryKey: ['phase1_overview_invoices', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: () => api.entities.Invoice.filter({}, {
-          orderBy: '-invoice_date',
-          gte: { invoice_date: periodStart },
-          lte: { invoice_date: periodEnd },
-          limit: 5000,
-        }),
+        queryFn: async () => {
+          const startTs = `${periodStart}T00:00:00.000Z`;
+          const endTs = `${periodEnd}T23:59:59.999Z`;
+          const { data, error } = await supabase
+            .from('invoices')
+            .select('*')
+            .eq('organization_id', organization?.id)
+            .is('deleted_at', null)
+            .or(`and(invoice_date.gte.${periodStart},invoice_date.lte.${periodEnd}),and(invoice_date.is.null,created_at.gte.${startTs},created_at.lte.${endTs})`)
+            .order('invoice_date', { ascending: false, nullsFirst: false })
+            .limit(5000);
+          if (error) throw error;
+          return data || [];
+        },
         select: scopedFilter,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && !!periodStart && !!periodEnd,
       },
       {
         queryKey: ['phase1_overview_payments', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: () => api.entities.Payment.filter({}, {
-          orderBy: '-payment_date',
-          gte: { payment_date: periodStart },
-          lte: { payment_date: periodEnd },
-          limit: 5000,
-        }),
+        queryFn: async () => {
+          const startTs = `${periodStart}T00:00:00.000Z`;
+          const endTs = `${periodEnd}T23:59:59.999Z`;
+          const { data, error } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('organization_id', organization?.id)
+            .is('deleted_at', null)
+            .or(`and(payment_date.gte.${periodStart},payment_date.lte.${periodEnd}),and(payment_date.is.null,created_at.gte.${startTs},created_at.lte.${endTs})`)
+            .order('payment_date', { ascending: false, nullsFirst: false })
+            .limit(5000);
+          if (error) throw error;
+          return data || [];
+        },
         select: scopedFilter,
-        enabled: !!organization?.id,
+        enabled: !!organization?.id && !!periodStart && !!periodEnd,
       },
       {
         queryKey: ['phase1_overview_products', organization?.id, brand?.brand_id || brand?.id, location?.id],
