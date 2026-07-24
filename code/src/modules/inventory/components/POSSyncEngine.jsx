@@ -96,10 +96,10 @@ export default function POSSyncEngine() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+      <Card className="border shadow-sm bg-gradient-to-br from-indigo-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/40 dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <DownloadCloud className="h-6 w-6 text-indigo-600" />
+          <CardTitle className="text-xl flex items-center gap-2 text-slate-950 dark:text-slate-50">
+            <DownloadCloud className="h-6 w-6 text-indigo-600 dark:text-indigo-300" />
             End of Day POS Sync
           </CardTitle>
           <CardDescription>
@@ -108,8 +108,8 @@ export default function POSSyncEngine() {
         </CardHeader>
         <CardContent>
           {!pmix ? (
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center flex flex-col items-center justify-center bg-white">
-               <DownloadCloud className="h-12 w-12 text-indigo-300 mb-4" />
+            <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center flex flex-col items-center justify-center bg-white text-slate-950 dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-700">
+               <DownloadCloud className="h-12 w-12 text-indigo-300 dark:text-indigo-400 mb-4" />
                <h3 className="text-lg font-medium mb-2">Upload POS PMIX Report</h3>
                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
                  Export your daily PMIX from Toast, Aloha, or Square as a CSV and upload it here to calculate theoretical depletion.
@@ -136,7 +136,7 @@ export default function POSSyncEngine() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between bg-white p-4 rounded-lg border">
+              <div className="flex items-center justify-between bg-white p-4 rounded-lg border text-slate-950 dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-800">
                 <div>
                   <h3 className="font-semibold">Sync Successful</h3>
                   <p className="text-sm text-muted-foreground">Imported sales for {pmix.length} menu items.</p>
@@ -151,8 +151,8 @@ export default function POSSyncEngine() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* PMIX Table */}
-                <Card className="shadow-none">
-                  <CardHeader className="py-3 bg-secondary/50">
+                <Card className="shadow-none dark:border-slate-800">
+                  <CardHeader className="py-3 bg-secondary/50 dark:bg-slate-900/80">
                     <CardTitle className="text-sm font-semibold">Product Mix (PMIX) Sold</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 h-[400px] overflow-auto">
@@ -167,7 +167,7 @@ export default function POSSyncEngine() {
                         {pmix.map(item => (
                           <TableRow key={`${item.name}-${item.qty}`}>
                             <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell className="text-right font-bold text-indigo-600">{item.qty}</TableCell>
+                            <TableCell className="text-right font-bold text-indigo-600 dark:text-indigo-300">{item.qty}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -176,11 +176,11 @@ export default function POSSyncEngine() {
                 </Card>
 
                 {/* Depletion Table */}
-                <Card className="shadow-none">
-                  <CardHeader className="py-3 bg-secondary/50">
+                <Card className="shadow-none dark:border-slate-800">
+                  <CardHeader className="py-3 bg-secondary/50 dark:bg-slate-900/80">
                     <CardTitle className="text-sm font-semibold flex justify-between">
                       <span>Theoretical Depletion</span>
-                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">Pending</Badge>
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/60 dark:text-orange-200 dark:border-orange-900">Pending</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0 h-[400px] overflow-auto">

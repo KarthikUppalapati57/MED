@@ -92,7 +92,7 @@ export default function AvTDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-0 shadow-sm bg-slate-50">
+        <Card className="border shadow-sm bg-slate-50 text-slate-950 dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Calculator className="w-4 h-4" />
@@ -101,7 +101,7 @@ export default function AvTDashboard() {
             <p className="text-3xl font-bold">${totalActual.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-slate-50">
+        <Card className="border shadow-sm bg-slate-50 text-slate-950 dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <DollarSign className="w-4 h-4" />
@@ -110,15 +110,15 @@ export default function AvTDashboard() {
             <p className="text-3xl font-bold">${totalTheoretical.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-rose-50">
+        <Card className="border shadow-sm bg-rose-50 dark:bg-rose-950/30 dark:border-rose-900/60">
           <CardContent className="p-6">
-            <div className="flex items-center gap-2 text-rose-800 mb-2">
+            <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300 mb-2">
               <AlertTriangle className="w-4 h-4" />
               <h3 className="font-medium">Total Cost Variance</h3>
             </div>
             <div className="flex items-baseline gap-3">
-              <p className="text-3xl font-bold text-rose-700">${totalVariance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-              <Badge variant="outline" className="bg-rose-100 text-rose-800 border-none text-sm">
+              <p className="text-3xl font-bold text-rose-700 dark:text-rose-300">${totalVariance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+              <Badge variant="outline" className="bg-rose-100 text-rose-800 border-none text-sm dark:bg-rose-900/70 dark:text-rose-100">
                 {overallVariancePercent > 0 ? '+' : ''}{overallVariancePercent.toFixed(1)}%
               </Badge>
             </div>
@@ -153,7 +153,7 @@ export default function AvTDashboard() {
                   avtData.map(item => {
                     const isHighVariance = item.variancePercent > 5;
                     return (
-                      <TableRow key={item.id} className={cn(isHighVariance && "bg-rose-50/50")}>
+                      <TableRow key={item.id} className={cn(isHighVariance && "bg-rose-50/50 dark:bg-rose-950/20")}>
                         <TableCell>
                           <div className="font-medium">{item.name}</div>
                           <div className="text-xs text-muted-foreground">{item.unit} @ ${item.unitCost.toFixed(2)}</div>
@@ -169,7 +169,7 @@ export default function AvTDashboard() {
                         <TableCell className="text-right">
                           <Badge variant="outline" className={cn(
                             "border-none",
-                            isHighVariance ? "bg-rose-100 text-rose-800" : "bg-slate-100 text-slate-600"
+                            isHighVariance ? "bg-rose-100 text-rose-800 dark:bg-rose-900/70 dark:text-rose-100" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200"
                           )}>
                             {item.variancePercent.toFixed(1)}%
                           </Badge>
