@@ -57,14 +57,6 @@ BEGIN
   INSERT INTO public.vendor_documents (vendor_id, organization_id, brand_id, location_id, document_type, file_name, storage_path, status, uploaded_via)
   VALUES (v_vendor_b, v_org_b, v_brand_b, v_loc_b, 'w9', 'b.pdf', 'w9_documents/tokB_b.pdf', 'pending_review', 'vendor_magic_link');
 
-  -- Pre-existing, unrelated gap: check_file_security() is SECURITY DEFINER but EXECUTE was
-  -- never granted to authenticated, so it errors (not just returns false) for ANY authenticated
-  -- storage.objects insert in ANY bucket, since the "Tenant Isolation Avatars Insert" policy's
-  -- WITH CHECK gets evaluated alongside every other permissive policy on the table. Granted only
-  -- inside this rolled-back test transaction so the INSERT assertions below can actually reach
-  -- this migration's policies instead of erroring out on an unrelated avatars-bucket policy.
-  EXECUTE 'GRANT EXECUTE ON FUNCTION public.check_file_security(text, jsonb) TO authenticated';
-
   -- storage.objects rows would normally come from the actual file upload; inserted directly
   -- here (as postgres, which bypasses RLS) since the object body itself is irrelevant to a
   -- policy test -- only bucket_id/name matter.

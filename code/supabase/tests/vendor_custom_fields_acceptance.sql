@@ -6,9 +6,10 @@
 -- existing reference_scope_writable() policy governs this new column exactly like every
 -- other vendor column, with no bypass introduced.
 
+-- Framework-free, matching every other acceptance test in this suite (pgTAP isn't installed
+-- here) -- the plan()/ok()/finish() calls this file used to make were the only pgTAP-specific
+-- parts; everything else already used its own plain results-table pattern.
 BEGIN;
-
-SELECT plan(4);
 
 CREATE TEMP TABLE vcf_ids (
   key text PRIMARY KEY,
@@ -114,8 +115,21 @@ FROM public.vendors WHERE id = (SELECT value FROM vcf_ids WHERE key = 'vendor_br
 
 -- ===================== verdict =====================
 
-SELECT ok(passed, test_name) FROM vcf_results ORDER BY test_name;
+DO $$
+DECLARE
+  v_failure record;
+  v_count integer;
+BEGIN
+  SELECT count(*) INTO v_count FROM vcf_results;
+  IF v_count <> 4 THEN
+    RAISE EXCEPTION 'expected 4 recorded checks, got %', v_count;
+  END IF;
 
-SELECT * FROM finish();
+  FOR v_failure IN SELECT test_name, detail FROM vcf_results WHERE NOT passed ORDER BY test_name LOOP
+    RAISE EXCEPTION '% failed: %', v_failure.test_name, v_failure.detail;
+  END LOOP;
+
+  RAISE NOTICE 'vendor custom fields acceptance assertions passed';
+END $$;
 
 ROLLBACK;

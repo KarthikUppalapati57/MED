@@ -73,6 +73,13 @@ export const MODULE_DEFINITIONS = {
     // resolve against the caller's currently active location's brand. No exceptions.
     requiresLocation: true,
   },
+  inventory_management: {
+    label: "Inventory",
+    pages: ["Inventory"],
+    minRole: "ground_staff",
+    icon: "Warehouse",
+    requiresLocation: true,
+  },
   inventory: {
     label: "Inventory",
     pages: ["Inventory", "AvTCosting"],
@@ -98,11 +105,25 @@ export const MODULE_DEFINITIONS = {
     minRole: "location_manager",
     icon: "Building2",
   },
+  recipe_management: {
+    label: "Recipes",
+    pages: ["Recipes"],
+    minRole: "location_manager",
+    icon: "ChefHat",
+    requiresLocation: true,
+  },
   recipes: {
     label: "Recipes",
     pages: ["Recipes", "MenuEngineering", "DeliveryAggregator"],
     minRole: "location_manager",
     icon: "ChefHat",
+    requiresLocation: true,
+  },
+  vendor_management: {
+    label: "Vendors",
+    pages: ["Vendors"],
+    minRole: "location_manager",
+    icon: "Store",
     requiresLocation: true,
   },
   vendors: {
@@ -123,6 +144,18 @@ export const MODULE_DEFINITIONS = {
     pages: ["Accounting"],
     minRole: "org_manager",
     icon: "DollarSign",
+  },
+  organization_management: {
+    label: "Organization Management",
+    pages: ["OrgManagement"],
+    minRole: "org_manager",
+    icon: "Building2",
+  },
+  audit_logs: {
+    label: "Audit Logs",
+    pages: ["AuditLogs"],
+    minRole: "org_manager",
+    icon: "ClipboardList",
   },
   admin: {
     label: "Organization Admin",

@@ -347,6 +347,16 @@ BEGIN
   END;
 
   RESET ROLE;
+
+  -- reference_scope_visible() now requires an exact active location match even for brand-shared
+  -- rows (CLAUDE.md "Require active location for reference data") -- a branch_manager sees
+  -- nothing at all until they've switched into one of their brand's locations, same as the
+  -- ContextSwitcher would do in the real app. v_branch started with location_id NULL, correct
+  -- for a branch_manager who hasn't switched in yet; simulate switching into v_loc1 here so this
+  -- test can still verify what it always verified -- that brand-shared rows are visible to
+  -- branch-tier+ once they're actually looking at that brand.
+  UPDATE public.profiles SET location_id = v_loc1, updated_at = now() WHERE id = v_branch;
+
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_branch::text, 'role', 'authenticated')::text, true);
   SET LOCAL ROLE authenticated;
 

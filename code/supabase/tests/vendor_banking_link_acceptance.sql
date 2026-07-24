@@ -54,6 +54,14 @@ BEGIN
   VALUES (v_org, v_brand, v_location, 'Vendor Link Supplier', 'active')
   RETURNING id INTO v_vendor;
 
+  -- issue_vendor_banking_link now requires tax verification_status='verified' plus an on-file
+  -- W-9 before it will issue a link (VO-RULE-005) -- this test predates that gate.
+  INSERT INTO public.vendor_documents (vendor_id, organization_id, brand_id, location_id, document_type, file_name, storage_path, status, uploaded_via)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'w9', 'w9.pdf', 'w9_documents/banking_link_test.pdf', 'on_file', 'admin_upload');
+
+  INSERT INTO public.vendor_tax_information (vendor_id, organization_id, brand_id, location_id, verification_status, w9_status)
+  VALUES (v_vendor, v_org, v_brand, v_location, 'verified', 'verified');
+
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_user::text, 'role', 'authenticated')::text, true);
   SET LOCAL ROLE authenticated;
 
@@ -144,7 +152,7 @@ BEGIN
     FROM public.notifications
     WHERE user_id = v_user
       AND organization_id = v_org
-      AND title = 'Vendor submitted banking details'
+      AND title = 'Vendor banking callback required'
       AND metadata->>'banking_row_id' = v_bank_id::text
   ) THEN
     RAISE EXCEPTION 'vendor banking submit did not notify creator';

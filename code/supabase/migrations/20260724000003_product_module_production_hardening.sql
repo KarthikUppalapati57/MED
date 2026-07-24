@@ -200,6 +200,7 @@ CREATE TRIGGER capture_product_price_history
 
 -- ===== Rich taxonomy restored =====
 
+DROP FUNCTION IF EXISTS public.derive_product_category_type(text, text, text);
 CREATE OR REPLACE FUNCTION public.derive_product_category_type(
   p_accounting_category text,
   p_category text,
@@ -219,7 +220,7 @@ AS $$
     WHEN accounting = '5230' OR category ~ '(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer)' OR name ~ '(beer|ale|lager|ipa|stout|porter|pilsner|cider|seltzer)' THEN 'Beer'
     WHEN accounting = '5240' OR category ~ '(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel)' OR name ~ '(wine|pinot|chardonnay|cabernet|merlot|sauvignon|riesling|prosecco|champagne|moscato|malbec|zinfandel)' THEN 'Wine'
     WHEN accounting = '5220' OR category ~ '(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur)' OR name ~ '(liquor|spirit|vodka|gin|rum|tequila|whiskey|whisky|bourbon|scotch|brandy|cognac|mezcal|liqueur)' THEN 'Liquor'
-    WHEN accounting IN ('5200','5210') OR category ~ '(n/a bev|na bev|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|water|fountain|syrup)' OR name ~ '(n/a bev|na bev|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|water|fountain|syrup)' THEN 'N/A Bev'
+    WHEN accounting IN ('5200','5210') OR category ~ '(n-a bev|n/a bev|na bev|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|water|fountain|syrup)' OR name ~ '(n-a bev|n/a bev|na bev|non[- ]?alcohol|beverage|soda|juice|tea|coffee|lemonade|water|fountain|syrup)' THEN 'N-A Bev'
     WHEN accounting = '5300' OR category ~ '(retail|merchandise|apparel|shirt|hat|gift ?card|merch)' OR name ~ '(retail|merchandise|apparel|shirt|hat|gift ?card|merch)' THEN 'Retail'
     WHEN accounting LIKE '51%' OR accounting IN ('food','food_cogs','5100') OR category ~ '(bakery|meat|poultry|seafood|dairy|produce|frozen|grocery|food)' THEN 'Food'
     ELSE 'Other'
@@ -227,6 +228,7 @@ AS $$
   FROM src;
 $$;
 
+DROP FUNCTION IF EXISTS public.product_accounting_category_for_type(text, text);
 CREATE OR REPLACE FUNCTION public.product_accounting_category_for_type(p_category_type text, p_category text DEFAULT NULL)
 RETURNS text
 LANGUAGE sql
@@ -236,7 +238,7 @@ AS $$
     WHEN 'Beer' THEN '5230'
     WHEN 'Wine' THEN '5240'
     WHEN 'Liquor' THEN '5220'
-    WHEN 'N/A Bev' THEN '5210'
+    WHEN 'N-A Bev' THEN '5210'
     WHEN 'Retail' THEN '5300'
     WHEN 'Food' THEN CASE
       WHEN lower(COALESCE(p_category, '')) LIKE '%poultry%' THEN '5120'
@@ -807,6 +809,7 @@ $$;
 DROP FUNCTION IF EXISTS public.update_product_details(uuid, text, text, text, text, text, boolean, boolean, text, text, numeric, boolean);
 DROP FUNCTION IF EXISTS public.update_product_details(uuid, text, text, text, text, text, boolean, boolean, text, text, numeric, boolean, numeric, numeric);
 
+DROP FUNCTION IF EXISTS public.create_product_details(text, text, text, text, text, boolean, boolean, text, text, numeric, boolean, uuid, uuid, uuid);
 CREATE OR REPLACE FUNCTION public.create_product_details(
   p_name text,
   p_restops_product_id text DEFAULT NULL,
@@ -1014,6 +1017,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.soft_delete_product_safe(uuid);
 CREATE OR REPLACE FUNCTION public.soft_delete_product_safe(p_product_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql

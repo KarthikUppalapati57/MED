@@ -7,7 +7,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/comp
 import { QrCode, Smartphone, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function MFAEnrollment({ onComplete, onCancel }) {
+export function MFAEnrollment({ onComplete, onCancel, cancelLabel = 'Cancel' }) {
   const { refreshMFAStatus } = useAuth();
   const [step, setStep] = useState(1); // 1: Initialize, 2: Scan QR, 3: Verify
   const [factorId, setFactorId] = useState('');
@@ -47,6 +47,22 @@ export function MFAEnrollment({ onComplete, onCancel }) {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      if (factorId) {
+        await supabase.auth.mfa.unenroll({ factorId });
+      }
+      await refreshMFAStatus();
+    } catch (err) {
+      console.warn('MFA enrollment cleanup error:', err);
+    } finally {
+      setIsLoading(false);
+      if (onCancel) onCancel();
     }
   };
 
@@ -123,8 +139,8 @@ export function MFAEnrollment({ onComplete, onCancel }) {
           </div>
 
           <div className="flex justify-center gap-3">
-            <Button variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setStep(3)}>
+            {onCancel && (<Button variant="outline" onClick={handleCancel} disabled={isLoading}>{cancelLabel}</Button>)}
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => setStep(3)} disabled={isLoading}>
               I've scanned it
             </Button>
           </div>
@@ -171,6 +187,11 @@ export function MFAEnrollment({ onComplete, onCancel }) {
           )}
 
           <div className="flex justify-center gap-3">
+            {onCancel && (
+              <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
+                {cancelLabel}
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setStep(2)} disabled={isLoading}>
               Back to QR
             </Button>
@@ -190,6 +211,11 @@ export function MFAEnrollment({ onComplete, onCancel }) {
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <RefreshCw className="w-8 h-8 text-teal-600 animate-spin" />
           <p className="text-sm text-slate-500 font-medium">Initializing secure enrollment...</p>
+          {onCancel && (
+            <Button variant="ghost" onClick={handleCancel}>
+              {cancelLabel}
+            </Button>
+          )}
         </div>
       )}
 
@@ -198,15 +224,22 @@ export function MFAEnrollment({ onComplete, onCancel }) {
           <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-800 text-left max-w-sm">
             <AlertDescription className="text-xs">{error}</AlertDescription>
           </Alert>
-          <Button 
-            className="bg-teal-600 hover:bg-teal-700 mt-2" 
+          <div className="flex flex-wrap justify-center gap-3">
+            {onCancel && (
+              <Button variant="outline" onClick={handleCancel}>
+                {cancelLabel}
+              </Button>
+            )}
+            <Button 
+              className="bg-teal-600 hover:bg-teal-700 mt-2" 
             onClick={() => {
               initialized.current = false;
               startEnrollment();
             }}
-          >
-            Retry Verification
-          </Button>
+            >
+              Retry Verification
+            </Button>
+          </div>
         </div>
       )}
     </div>

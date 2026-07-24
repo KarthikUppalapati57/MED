@@ -55,6 +55,7 @@ const AppSonnerToaster = React.lazy(() => import('@/components/AppSonnerToaster'
 const INVITE_VALIDATION_TIMEOUT_MS = 15000;
 const PENDING_INVITE_TOKEN_KEY = 'restops_pending_invite_token';
 const PASSWORD_RECOVERY_ACTIVE_KEY = 'restops_password_recovery_active';
+const MFA_SETUP_SKIP_KEY_PREFIX = 'restops_mfa_setup_skipped';
 
 const withTimeout = (promise, timeoutMs, message) => {
   let timeoutId;
@@ -67,6 +68,22 @@ const withTimeout = (promise, timeoutMs, message) => {
 const normalizeInviteToken = (value) => String(value || '').replace(/[\n\r.,!?>\]]+$/, '').trim();
 
 const isAlreadyRegisteredError = (error) => /already registered|already exists|user exists/i.test(String(error?.message || error || ''));
+
+const getMfaSetupSkipKey = (userId) => `${MFA_SETUP_SKIP_KEY_PREFIX}:${userId}`;
+
+const hasSkippedMfaSetup = (userId) => {
+  if (!userId) return false;
+  try {
+    return localStorage.getItem(getMfaSetupSkipKey(userId)) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const saveMfaSetupSkip = (userId) => {
+  if (!userId) return;
+  try { localStorage.setItem(getMfaSetupSkipKey(userId), 'true'); } catch {}
+};
 
 const setPendingInviteToken = (token) => {
   const cleanToken = normalizeInviteToken(token);
@@ -1139,22 +1156,27 @@ const AuthenticatedApp = () => {
   const { isLoadingAuth, user, userProfile, role, mfaLevel, mfaFactors, isMfaReady } = useAuth();
   const location = useLocation();
   const isPasswordRecoveryRoute = isPasswordRecoveryActive(location);
+  const [mfaSetupSkipped, setMfaSetupSkipped] = useState(() => hasSkippedMfaSetup(user?.id));
 
   // Sync URL hierarchy params (?company= / ?store=) with AuthContext
   useUrlHierarchy();
+
+  useEffect(() => {
+    setMfaSetupSkipped(hasSkippedMfaSetup(user?.id));
+  }, [user?.id]);
   
   // MFA Interceptor
   const verifiedFactors = mfaFactors?.filter(f => f.status === 'verified') || [];
   const isEnrolled = verifiedFactors.length > 0;
   
   const highPrivilegeRoles = ['platform_admin', 'tenant_super_admin', 'org_manager', 'branch_manager'];
-  // Platform admins, tenant super admins, org managers, and branch managers MUST set up MFA
+  // High-privilege users are prompted for MFA, but may choose to set it up later.
   const requiresMfaSetup = role && highPrivilegeRoles.includes(role) && !isEnrolled;
   
   // Challenge if they are enrolled (regardless of role) but haven't verified this session
   const needsMFAChallenge = user && mfaLevel.next === 'aal2' && mfaLevel.current === 'aal1' && isEnrolled;
-  // Force setup if they haven't enrolled and their role requires it
-  const needsMFASetup = user && isMfaReady && requiresMfaSetup;
+  // Prompt setup if they haven't enrolled and their role is in the MFA prompt list
+  const needsMFASetup = user && isMfaReady && requiresMfaSetup && !mfaSetupSkipped;
 
   // Check if this device is trusted (MFA remembered for 30 days)
   const isDeviceTrusted = React.useMemo(() => {
@@ -1257,9 +1279,17 @@ const AuthenticatedApp = () => {
     return <MFAChallenge />;
   }
 
-  // Show MFA setup if user is authenticated but has no factors enrolled
+  // Show optional MFA setup if user is authenticated but has no factors enrolled
   if (needsMFASetup) {
-    return lazyElement(<MFASetupPage />, 'Loading MFA setup...');
+    return lazyElement(
+      <MFASetupPage
+        onSkip={() => {
+          saveMfaSetupSkip(user.id);
+          setMfaSetupSkipped(true);
+        }}
+      />,
+      'Loading MFA setup...'
+    );
   }
 
   return (
