@@ -48,6 +48,7 @@ export default function PlatformOrganizations() {
   
   const [isUpdatingBilling, setIsUpdatingBilling] = useState(false);
   const [billingForm, setBillingForm] = useState({
+    billing_location_id: 'all',
     plan_id: 'none',
     subscription_status: 'unprovisioned',
     stripe_customer_id: '',
@@ -318,6 +319,7 @@ export default function PlatformOrganizations() {
     const org = orgs.find(o => o.id === selectedOrgId);
     if (org) {
       setBillingForm({
+        billing_location_id: 'all',
         plan_id: org.plan_id || 'none',
         subscription_status: org.subscription_status || 'unprovisioned',
         stripe_customer_id: org.stripe_customer_id || '',
@@ -327,22 +329,66 @@ export default function PlatformOrganizations() {
     }
   }, [selectedOrgId, orgs]);
 
+  const handleBillingLocationChange = (locationId) => {
+    if (locationId === 'all') {
+      const org = orgs.find(o => o.id === selectedOrgId);
+      setBillingForm(prev => ({
+        ...prev,
+        billing_location_id: 'all',
+        plan_id: org?.plan_id || 'none',
+        subscription_status: org?.subscription_status || 'unprovisioned',
+        stripe_customer_id: org?.stripe_customer_id || '',
+        stripe_subscription_id: org?.stripe_subscription_id || '',
+      }));
+      return;
+    }
+
+    const location = orgLocations.find(loc => loc.id === locationId);
+    setBillingForm(prev => ({
+      ...prev,
+      billing_location_id: locationId,
+      plan_id: location?.plan_id || 'none',
+      subscription_status: location?.subscription_status || 'unprovisioned',
+      stripe_customer_id: location?.stripe_customer_id || '',
+      stripe_subscription_id: location?.stripe_subscription_id || '',
+    }));
+  };
+
   const handleUpdateBilling = async () => {
     if (!selectedOrgId) return;
     setIsUpdatingBilling(true);
     try {
-      const { error } = await supabase
-        .from('organizations')
-        .update({
-          plan_id: billingForm.plan_id === 'none' ? null : billingForm.plan_id,
-          subscription_status: billingForm.subscription_status,
-          stripe_customer_id: billingForm.stripe_customer_id,
-          stripe_subscription_id: billingForm.stripe_subscription_id,
-          enabled_modules: billingForm.enabled_modules
-        })
-        .eq('id', selectedOrgId);
-        
-      if (error) throw error;
+      const billingUpdates = {
+        plan_id: billingForm.plan_id === 'none' ? null : billingForm.plan_id,
+        subscription_status: billingForm.subscription_status,
+        stripe_customer_id: billingForm.stripe_customer_id,
+        stripe_subscription_id: billingForm.stripe_subscription_id,
+      };
+
+      if (billingForm.billing_location_id && billingForm.billing_location_id !== 'all') {
+        const { error: locationBillingError } = await supabase
+          .from('locations')
+          .update(billingUpdates)
+          .eq('id', billingForm.billing_location_id)
+          .eq('organization_id', selectedOrgId);
+        if (locationBillingError) throw locationBillingError;
+
+        const { error: orgModulesError } = await supabase
+          .from('organizations')
+          .update({ enabled_modules: billingForm.enabled_modules })
+          .eq('id', selectedOrgId);
+        if (orgModulesError) throw orgModulesError;
+      } else {
+        const { error } = await supabase
+          .from('organizations')
+          .update({
+            ...billingUpdates,
+            enabled_modules: billingForm.enabled_modules
+          })
+          .eq('id', selectedOrgId);
+        if (error) throw error;
+      }
+
       posthog.capture('workspace_updated');
       toast.success("Billing & configuration updated");
 
@@ -361,6 +407,7 @@ export default function PlatformOrganizations() {
       // Invalidate this page's query
       queryClient.invalidateQueries({ queryKey: ['platform_organizations_all'] });
       queryClient.invalidateQueries({ queryKey: ['platform_tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['platform_org_locations'] });
       // Invalidate Platform Users query
       queryClient.invalidateQueries({ queryKey: ['platform-orgs-lookup'] });
       // Invalidate Platform Plans query
