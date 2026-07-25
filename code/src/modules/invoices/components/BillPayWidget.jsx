@@ -50,10 +50,15 @@ export function BillPayWidget({ invoice }) {
   });
 
   const [isRecording, setIsRecording] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+  const [releaseData, setReleaseData] = useState({
+    payment_account_id: invoice?.payment_account_id || '',
+    payout_method: invoice?.ap_metadata?.scheduled_payout_method || 'stripe_connect_custom'
+  });
   const [recordData, setRecordData] = useState({
     amount: invoice ? (invoice.total_amount - (invoice.paid_amount || 0)).toFixed(2) : '',
     reference: '',
-    method: 'manual'
+    method: 'cheque'
   });
 
   const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
@@ -127,21 +132,22 @@ export function BillPayWidget({ invoice }) {
   });
 
   const releaseFundsMutation = useMutation({
-    mutationFn: async (payoutMethod) => {
-      const fallbackAccountId = accounts.length > 0 ? accounts[0].id : null;
+    mutationFn: async ({ payoutMethod, paymentAccountId }) => {
+      if (!paymentAccountId || paymentAccountId === 'none') throw new Error('Select the operating payment account to fund this payout.');
       const { data, error } = await supabase.functions.invoke('process-payout', {
         body: {
           invoice_id: invoice.id,
           payout_method: payoutMethod,
-          payment_account_id: invoice.payment_account_id || fallbackAccountId
+          payment_account_id: paymentAccountId
         }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: (_data, payoutMethod) => {
-      toast.success(`Funds released via ${PAYOUT_METHOD_LABELS[payoutMethod] || payoutMethod}`);
+    onSuccess: (_data, variables) => {
+      toast.success(`Funds released via ${PAYOUT_METHOD_LABELS[variables.payoutMethod] || variables.payoutMethod}`);
+      setIsReleasing(false);
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
@@ -153,7 +159,25 @@ export function BillPayWidget({ invoice }) {
       queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
     }
   });
+  const openReleaseDialog = (payoutMethod) => {
+    const selectedMethod = PAYOUT_METHODS.find((method) => method.value === payoutMethod);
+    if (!selectedMethod?.enabled) {
+      toast.error(`${selectedMethod?.label || 'This'} payout rail is not configured yet.`);
+      return;
+    }
+    setReleaseData({
+      payment_account_id: invoice.payment_account_id || '',
+      payout_method: payoutMethod
+    });
+    setIsReleasing(true);
+  };
 
+  const handleRelease = () => {
+    releaseFundsMutation.mutate({
+      payoutMethod: releaseData.payout_method,
+      paymentAccountId: releaseData.payment_account_id
+    });
+  };
   const handleSchedule = () => {
     if (!scheduleData.payment_account_id) return toast.error("Select a payment account");
     if (!scheduleData.date) return toast.error("Select a payment date");
@@ -229,7 +253,7 @@ export function BillPayWidget({ invoice }) {
                       <DropdownMenuItem
                         key={method.value}
                         disabled={!method.enabled}
-                        onClick={() => releaseFundsMutation.mutate(method.value)}
+                        onClick={() => openReleaseDialog(method.value)}
                         className="flex items-start gap-2"
                       >
                         <MethodIcon className="mt-0.5 h-4 w-4" />
@@ -308,6 +332,66 @@ export function BillPayWidget({ invoice }) {
         )}
       </CardContent>
 
+      {/* Release Funds Dialog */}
+      <Dialog open={isReleasing} onOpenChange={setIsReleasing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Release Vendor Payment</DialogTitle>
+            <DialogDescription>
+              Choose the operating account and rail before sending funds. Vendor destination details come from the vendor profile/provider connection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border bg-slate-50 p-3 text-sm">
+              <div>
+                <p className="text-slate-500">Vendor</p>
+                <p className="font-semibold text-slate-900">{invoice.vendor_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Amount</p>
+                <p className="font-semibold text-slate-900">${remainingBalance.toFixed(2)}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Account</Label>
+              <Select value={releaseData.payment_account_id} onValueChange={v => setReleaseData({...releaseData, payment_account_id: v})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select funding account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.account_type.replace('_', ' ')})
+                    </SelectItem>
+                  ))}
+                  {accounts.length === 0 && <SelectItem value="none" disabled>No active accounts found</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Rail</Label>
+              <Select value={releaseData.payout_method} onValueChange={v => setReleaseData({...releaseData, payout_method: v})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rail" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYOUT_METHODS.map((method) => (
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
+                      {method.label} - {method.detail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsReleasing(false)}>Cancel</Button>
+            <Button onClick={handleRelease} disabled={releaseFundsMutation.isPending || !releaseData.payment_account_id || releaseData.payment_account_id === 'none'}>
+              {releaseFundsMutation.isPending ? 'Releasing...' : 'Release Funds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Schedule Dialog */}
       <Dialog open={isScheduling} onOpenChange={setIsScheduling}>
         <DialogContent>
@@ -399,10 +483,10 @@ export function BillPayWidget({ invoice }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual / Check</SelectItem>
-                  <SelectItem value="bank_transfer">ACH / Bank Transfer</SelectItem>
-                  <SelectItem value="credit_card">Credit Card</SelectItem>
-                  <SelectItem value="cash">Petty Cash</SelectItem>
+                  <SelectItem value="cheque">Paper Check Already Sent</SelectItem>
+                  <SelectItem value="bank_transfer">ACH Already Sent Outside RestOps</SelectItem>
+                  <SelectItem value="credit_card">Card Paid Outside RestOps</SelectItem>
+                  <SelectItem value="cash">Cash / Other Manual Record</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -426,3 +510,4 @@ export function BillPayWidget({ invoice }) {
     </Card>
   );
 }
+

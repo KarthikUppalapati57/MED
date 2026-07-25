@@ -45,16 +45,6 @@ export async function createPaymentIntent(amount, currency = 'usd', metadata = {
   }
 }
 
-// Bank Transfer
-export const BANK_DETAILS = {
-  bank_name: 'Restops Business Account',
-  account_name: 'Restops Restaurant Solutions Inc.',
-  account_number: '****7890',
-  routing_number: '021000021',
-  swift_code: 'CHASUS33',
-  bank_address: 'JPMorgan Chase, New York, NY',
-  instructions: 'Please include your invoice number as the payment reference.',
-};
 
 export async function recordInvoicePayment({ invoiceId, amount, reference, paymentMethod = 'manual' }) {
   const { data, error } = await supabase.rpc('record_invoice_payment', {

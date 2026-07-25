@@ -286,6 +286,7 @@ export default function Payments() {
   const [paymentHistoryTableScrollTop, setPaymentHistoryTableScrollTop] = useState(0);
   const [scheduleDialogInvoice, setScheduleDialogInvoice] = useState(null);
   const [recordDialogInvoice, setRecordDialogInvoice] = useState(null);
+  const [releaseDialogInvoice, setReleaseDialogInvoice] = useState(null);
   const [scheduleForm, setScheduleForm] = useState({
     payment_account_id: '',
     scheduled_payment_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
@@ -294,7 +295,11 @@ export default function Payments() {
   const [recordForm, setRecordForm] = useState({
     amount: '',
     reference: '',
-    method: 'manual',
+    method: 'cheque',
+  });
+  const [releaseForm, setReleaseForm] = useState({
+    payment_account_id: '',
+    payout_method: 'stripe_connect_custom',
   });
   const [paymentSettings, setPaymentSettings] = useState({
     autoPayApprovedInvoices: false,
@@ -635,7 +640,7 @@ export default function Payments() {
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-payments'] });
       setRecordDialogInvoice(null);
-      setRecordForm({ amount: '', reference: '', method: 'manual' });
+      setRecordForm({ amount: '', reference: '', method: 'cheque' });
       toast.success(result?.status === 'partially_paid' ? 'Partial payment recorded' : 'Payment recorded');
     },
     onError: (error) => toast.error(error.message || 'Failed to record payment'),
@@ -786,28 +791,35 @@ export default function Payments() {
     setRecordForm({
       amount: remaining.toFixed(2),
       reference: '',
-      method: 'manual',
+      method: 'cheque',
     });
   };
 
   const [releasingInvoiceId, setReleasingInvoiceId] = useState(null);
 
-  const handleReleaseFunds = async (invoice, payoutMethod) => {
-    const selectedMethod = VENDOR_PAYOUT_METHODS.find((method) => method.value === payoutMethod);
+  const openReleaseDialog = (invoice, payoutMethod = invoice?.ap_metadata?.scheduled_payout_method || 'stripe_connect_custom') => {
+    setReleaseDialogInvoice(invoice);
+    setReleaseForm({
+      payment_account_id: invoice?.payment_account_id || '',
+      payout_method: payoutMethod,
+    });
+  };
+
+  const submitReleaseFunds = async () => {
+    const invoice = releaseDialogInvoice;
+    if (!invoice) return;
+
+    const selectedMethod = VENDOR_PAYOUT_METHODS.find((method) => method.value === releaseForm.payout_method);
     if (!selectedMethod) {
-      toast.error('Select a valid payment method.');
+      toast.error('Select a valid payment rail.');
       return;
     }
     if (!selectedMethod.enabled) {
       toast.error(selectedMethod.label + ' payouts are not configured yet. Use ACH or check for vendor payments.');
       return;
     }
-
-    const fallbackAccountId = paymentAccounts.length > 0 ? paymentAccounts[0].id : null;
-    const paymentAccountId = invoice.payment_account_id || fallbackAccountId;
-    if (!paymentAccountId) {
-      toast.error('Add an operating payment account before releasing funds.');
-      setActiveTab('setup');
+    if (!releaseForm.payment_account_id || releaseForm.payment_account_id === 'none') {
+      toast.error('Select the operating payment account to fund this payout.');
       return;
     }
 
@@ -817,12 +829,13 @@ export default function Payments() {
         body: {
           invoice_id: invoice.id,
           payout_method: selectedMethod.value,
-          payment_account_id: paymentAccountId,
+          payment_account_id: releaseForm.payment_account_id,
         },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success('Funds released via ' + selectedMethod.detail);
+      setReleaseDialogInvoice(null);
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
@@ -1304,7 +1317,7 @@ export default function Payments() {
                                           <DropdownMenuItem
                                             key={method.value}
                                             disabled={!method.enabled}
-                                            onClick={() => handleReleaseFunds(invoice, method.value)}
+                                            onClick={() => openReleaseDialog(invoice, method.value)}
                                             className="flex items-start gap-2"
                                           >
                                             <MethodIcon className="mt-0.5 h-4 w-4" />
@@ -1994,6 +2007,79 @@ export default function Payments() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!releaseDialogInvoice} onOpenChange={(open) => !open && setReleaseDialogInvoice(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Release Vendor Payment</DialogTitle>
+            <DialogDescription>
+              Select the operating account and payment rail before sending funds to the vendor. Vendor destination details stay on the vendor profile/provider connection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-secondary/40 p-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Vendor</p>
+                <p className="font-semibold">{releaseDialogInvoice?.vendor_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Amount</p>
+                <p className="font-semibold">${Math.max(0, Number(releaseDialogInvoice?.total_amount || 0) - Number(releaseDialogInvoice?.paid_amount || 0)).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Account</Label>
+              <Select
+                value={releaseForm.payment_account_id}
+                onValueChange={(value) => setReleaseForm((prev) => ({ ...prev, payment_account_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select funding account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}{account.account_number_last4 ? ` (...${account.account_number_last4})` : ''}
+                    </SelectItem>
+                  ))}
+                  {paymentAccounts.length === 0 && <SelectItem value="none" disabled>No active payment accounts found</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Rail</Label>
+              <Select
+                value={releaseForm.payout_method}
+                onValueChange={(value) => setReleaseForm((prev) => ({ ...prev, payout_method: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rail..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {VENDOR_PAYOUT_METHODS.map((method) => (
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
+                      {method.label} - {method.detail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ACH uses Stripe Connect. Digital and mailed checks use Checkbook.io. Card vendor payouts are shown but disabled until a card payout adapter exists.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReleaseDialogInvoice(null)}>Cancel</Button>
+            <Button
+              className="bg-primary hover:bg-primary"
+              disabled={!releaseForm.payment_account_id || releaseForm.payment_account_id === 'none' || releasingInvoiceId === releaseDialogInvoice?.id}
+              onClick={submitReleaseFunds}
+            >
+              {releasingInvoiceId === releaseDialogInvoice?.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Release Funds
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!recordDialogInvoice} onOpenChange={(open) => !open && setRecordDialogInvoice(null)}>
         <DialogContent>
@@ -2031,10 +2117,10 @@ export default function Payments() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual / Check</SelectItem>
-                  <SelectItem value="bank_transfer">ACH / Bank Transfer</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="cheque">Paper Check Already Sent</SelectItem>
+                  <SelectItem value="bank_transfer">ACH Already Sent Outside RestOps</SelectItem>
+                  <SelectItem value="credit_card">Card Paid Outside RestOps</SelectItem>
+                  <SelectItem value="cash">Cash / Other Manual Record</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2070,9 +2156,4 @@ export default function Payments() {
     </div>
   );
 }
-
-
-
-
-
 
