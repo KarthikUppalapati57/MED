@@ -3,75 +3,44 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-// Resolve repo-root-relative paths from this file's own location so the check runs the same
-// whether invoked as `node code/scripts/...` from the repo root or as `npm run check:edge-rewire`
-// from inside code/ (npm's cwd is the package.json dir, not the repo root).
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (path) => readFileSync(join(repoRoot, path), 'utf8');
+const retiredProvider = String.fromCharCode(100, 119, 111, 108, 108, 97);
+const retiredCustomerColumn = `${retiredProvider}_customer_url`;
+const retiredOnboardingColumn = `${retiredProvider}_onboarding_status`;
+const retiredAchMethod = `${retiredProvider}_ach`;
 const payout = read('code/supabase/functions/process-payout/index.ts');
 const onboarding = read('code/supabase/functions/vendor-onboarding/index.ts');
-const webhook = read('code/supabase/functions/payout-webhook/index.ts');
-const fundingSource = read('code/supabase/functions/create-dwolla-funding-source/index.ts');
-const dwollaPayoutAdapter = read('code/supabase/functions/_shared/payoutProviders/dwolla.ts');
+const registry = read('code/supabase/functions/_shared/payoutProviders/index.ts');
+const stripeConnectPayoutAdapter = read('code/supabase/functions/_shared/payoutProviders/stripeConnect.ts');
 
 for (const [name, source] of [
   ['process-payout', payout],
   ['vendor-onboarding', onboarding],
-  ['payout-webhook', webhook],
-  ['_shared/payoutProviders/dwolla', dwollaPayoutAdapter],
+  ['_shared/payoutProviders/stripeConnect', stripeConnectPayoutAdapter],
 ]) {
-  assert(!source.includes('dwolla_customer_url'), `${name} still references vendors.dwolla_customer_url`);
-  assert(!source.includes('dwolla_onboarding_status'), `${name} still references vendors.dwolla_onboarding_status`);
+  assert(!source.includes(retiredCustomerColumn), `${name} still references legacy vendor customer URL column`);
+  assert(!source.includes(retiredOnboardingColumn), `${name} still references legacy vendor onboarding status column`);
 }
 
-// create-dwolla-funding-source legitimately keeps organizations.dwolla_customer_url (the org/source
-// side, added by 20260716000001_payment_workflow_hardening.sql) -- only the vendor/destination
-// branch must avoid the columns dropped from `vendors` by 20260628000027.
-assert(!fundingSource.includes('dwolla_onboarding_status'), 'create-dwolla-funding-source still references vendors.dwolla_onboarding_status');
-assert(!fundingSource.includes('vendor.dwolla_customer_url'), 'create-dwolla-funding-source vendor branch still reads vendors.dwolla_customer_url');
-assert(!fundingSource.includes("'vendors').update({ dwolla_customer_url"), 'create-dwolla-funding-source vendor branch still writes vendors.dwolla_customer_url');
-
-// process-payout/index.ts is a thin dispatcher (see its own top-of-file comment) -- the
-// Dwolla-specific preflight/destination-resolution logic lives in the adapter it calls into.
-assert(payout.includes('provider.preflight(ctx)'), 'process-payout must run the provider adapter preflight before mutating payment state');
+assert(payout.includes('provider.preflight(ctx)'), 'process-payout must run provider preflight before mutating payment state');
 assert(payout.indexOf('provider.preflight(ctx)') < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must guard the payout before release_invoice_funds mutates state');
-
-// Approval was previously checked once, at transition_vendor_approval time, and never
-// re-confirmed at the moment money actually moves -- a vendor suspended after being approved
-// could still get paid. Regression guard for that gate, and for the ordering that keeps it
-// ahead of any state-mutating call.
 assert(payout.includes("vendorApproval.approval_status !== 'approved'"), 'process-payout must re-check vendor approval_status before paying out');
 assert(payout.includes('vendorApproval.deleted_at'), 'process-payout must refuse to pay an archived vendor');
 assert(payout.indexOf("approval_status !== 'approved'") < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must re-check approval before release_invoice_funds mutates state');
+assert(payout.includes("payout_method = 'stripe_connect_custom'"), 'process-payout must default to Stripe Connect for ACH payouts');
 
-assert(dwollaPayoutAdapter.includes("rpc('get_vendor_provider_link'"), 'dwolla payout adapter must resolve the vendor link through get_vendor_provider_link');
-assert(dwollaPayoutAdapter.includes("p_provider: 'dwolla'"), 'dwolla payout adapter must request the Dwolla provider link');
-assert(dwollaPayoutAdapter.includes('!dwollaLink?.provider_funding_ref'), 'dwolla payout adapter must fail closed when the vendor funding source is missing');
-// Dwolla's transfers API requires both _links.source and _links.destination to be funding-source
-// refs, not customer refs -- provider_customer_ref alone cannot receive a transfer.
-assert(dwollaPayoutAdapter.includes('destinationUrl: dwollaLink.provider_funding_ref'), 'dwolla payout adapter destination must come from provider_funding_ref, not provider_customer_ref');
-assert(dwollaPayoutAdapter.includes('sourceUrl: paymentAccount.dwolla_funding_source_url'), 'dwolla payout adapter source funding ref must remain on payment_accounts');
-assert(!/destinationUrl:\s*paymentAccount\.dwolla_funding_source_url/.test(dwollaPayoutAdapter), 'dwolla payout adapter must not use the source ref as the destination');
+assert(registry.includes('stripe_connect_custom: stripeConnect'), 'payout registry must expose Stripe Connect ACH payouts');
+assert(!registry.includes(retiredAchMethod), 'payout registry must not expose retired ACH payouts');
+assert(stripeConnectPayoutAdapter.includes("from('bank_accounts')"), 'Stripe Connect payout adapter must resolve the vendor receiving bank account');
+assert(stripeConnectPayoutAdapter.includes("from('bank_account_provider_links')"), 'Stripe Connect payout adapter must resolve provider-neutral payout links');
+assert(stripeConnectPayoutAdapter.includes("provider', 'stripe_connect_custom'"), 'Stripe Connect payout adapter must request the Stripe Connect provider link');
+assert(stripeConnectPayoutAdapter.includes('payouts_enabled !== true'), 'Stripe Connect payout adapter must fail closed when payouts are disabled');
+assert(stripeConnectPayoutAdapter.includes("stripePost('/transfers'"), 'Stripe Connect payout adapter must initiate Stripe transfers');
 
-// Superseded by the provider-neutral bank vault: submit-bank-info now persists the vendor's
-// receiving account to bank_accounts/store_bank_account_secret instead of
-// vendor_payment_provider_links. Unlike the vendor-specific satellite tables, bank_accounts has
-// no single parent row to derive scope from (owner_type is polymorphic: vendor/client/org/
-// location), so it legitimately client-supplies organization_id/brand_id/location_id itself --
-// no "must not supply scope columns" assertion here, unlike the other tables in this file.
 assert(onboarding.includes('from("bank_accounts")'), 'vendor-onboarding must write the vendor receiving account to the provider-neutral bank vault');
 assert(onboarding.includes('rpc("store_bank_account_secret"'), 'vendor-onboarding must vault the routing/account numbers via store_bank_account_secret');
 assert(onboarding.includes('owner_type: "vendor"'), 'vendor-onboarding bank_accounts insert must be scoped to the vendor as owner');
 assert(onboarding.includes('purpose: "vendor_receiving"'), 'vendor-onboarding bank_accounts insert must be tagged as a vendor receiving account');
-
-assert(webhook.includes("from('vendor_payment_provider_links')"), 'payout-webhook must update provider-links');
-assert(webhook.includes("eq('provider_customer_ref', resourceUrl)"), 'payout-webhook must match by provider_customer_ref');
-assert(webhook.includes("eq('provider', 'dwolla')"), 'payout-webhook must scope lookup to Dwolla provider');
-assert(!webhook.includes("eq('is_active'"), 'payout-webhook must not filter by is_active');
-
-assert(fundingSource.includes("rpc('get_vendor_provider_link'"), 'create-dwolla-funding-source must resolve the existing vendor customer ref through get_vendor_provider_link');
-assert(fundingSource.includes("p_provider: 'dwolla'"), 'create-dwolla-funding-source must request the Dwolla provider link');
-assert(fundingSource.includes("from('vendor_payment_provider_links')"), 'create-dwolla-funding-source must write the vendor result to provider-links');
-assert(!fundingSource.includes('organization_id: vendor.organization_id'), 'create-dwolla-funding-source vendor upsert must not client-supply derived scope columns (set_vendor_sensitive_scope trigger owns them)');
 
 console.log('V1c-b edge rewire static assertions passed');

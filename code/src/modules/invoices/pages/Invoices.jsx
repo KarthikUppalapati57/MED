@@ -348,7 +348,7 @@ export default function Invoices() {
     queryKey: ['invoices-dashboard', organization?.id],
     queryFn: () => api.entities.Invoice.list('-created_at', { 
       limit: 500,
-      select: 'id, invoice_number, vendor_name, total_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, brand_id, location_id, file_url, source, payment_account_id, scheduled_payment_date, ap_routing_destination'
+      select: 'id, invoice_number, vendor_name, total_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, created_at, vendor_id, organization_id, brand_id, location_id, file_url, source, payment_account_id, scheduled_payment_date, ap_routing_destination, ap_metadata'
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),

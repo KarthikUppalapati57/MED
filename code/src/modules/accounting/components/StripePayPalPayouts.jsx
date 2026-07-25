@@ -15,11 +15,10 @@ import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
 import JustPayVendorDialog from './JustPayVendorDialog';
 
-// Real payout rails only -- Dwolla ACH and Checkbook.io, the same edge functions
-// BillPayWidget.jsx uses for a single invoice. No Stripe Connect / PayPal Payouts / Lob
-// integration exists anywhere in this codebase, so this screen no longer claims to use them.
+// Real payout rails only -- Stripe Connect ACH and Checkbook.io, the same edge function
+// BillPayWidget.jsx uses for a single invoice.
 const PAYOUT_METHODS = [
-  { value: 'dwolla_ach', label: 'Dwolla ACH', badge: 'Bank Transfer' },
+  { value: 'stripe_connect_custom', label: 'Stripe Connect ACH', badge: 'Bank Transfer' },
   { value: 'checkbook_digital', label: 'Digital Check', badge: 'Checkbook.io' },
   { value: 'checkbook_physical', label: 'Mailed Check', badge: 'Checkbook.io' },
 ];
@@ -28,7 +27,7 @@ export default function StripePayPalPayouts() {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
-  const [payoutMethod, setPayoutMethod] = useState('dwolla_ach');
+  const [payoutMethod, setPayoutMethod] = useState('stripe_connect_custom');
   const [isProcessing, setIsProcessing] = useState(false);
   const [justPayOpen, setJustPayOpen] = useState(false);
   const [creditAmount, setCreditAmount] = useState('');
@@ -70,7 +69,7 @@ export default function StripePayPalPayouts() {
 
     // Sequential, not parallel: each call mutates the invoice's own payment_status/status
     // via release_invoice_funds, and running these concurrently against the same organization's
-    // rate-limited Dwolla/Checkbook credentials is asking for trouble.
+    // rate-limited Stripe/Checkbook credentials is asking for trouble.
     for (const id of selectedInvoices) {
       const inv = invoices.find(i => i.id === id);
       const invTotal = parseFloat(inv.total_amount || 0);
@@ -133,7 +132,7 @@ export default function StripePayPalPayouts() {
               Bulk Vendor Payouts
             </CardTitle>
             <CardDescription className="mt-1">
-              Select approved invoices and release real payouts via Dwolla ACH or Checkbook.io.
+              Select approved invoices and release real payouts via Stripe Connect ACH or Checkbook.io.
             </CardDescription>
           </div>
           <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={() => setJustPayOpen(true)}>
@@ -269,7 +268,7 @@ export default function StripePayPalPayouts() {
                     )}
                   </Button>
                   <p className="text-xs text-center text-muted-foreground mt-3">
-                    Each invoice is a real Dwolla/Checkbook.io call -- failures revert automatically and can be retried.
+                    Each invoice is a real Stripe Connect/Checkbook.io call -- failures revert automatically and can be retried.
                   </p>
                 </div>
               </div>

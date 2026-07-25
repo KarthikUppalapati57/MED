@@ -71,7 +71,7 @@ export async function revertPayoutOnFailure(
   await notifyPaymentFailure(serviceSupabase, { paymentId, invoiceId, reason })
 }
 
-// Shared tail for both payout webhooks (Dwolla's payout-webhook, Checkbook's checkbook-webhook):
+// Shared tail for both payout webhooks (provider payout webhooks, including Checkbook):
 // each webhook does its own signature verification and maps its own provider's status
 // vocabulary to payout_status/newInvoiceStatus, then both call this for the actual DB writes +
 // failure notification so that sequence can't drift out of sync between the two rails.

@@ -5,7 +5,7 @@ import { getPayoutProvider } from '../_shared/payoutProviders/index.ts'
 import { revertPayoutOnFailure } from '../_shared/notifyPaymentFailure.ts'
 
 // Single dispatcher for every payout rail. Which rail runs is a `payout_method` value
-// (dwolla_ach / checkbook_digital / checkbook_physical), not a different function -- see
+// (stripe_connect_custom / checkbook_digital / checkbook_physical), not a different function -- see
 // _shared/payoutProviders/index.ts. Adding a rail means adding an adapter there, not touching
 // this file or any caller.
 serve(async (req) => {
@@ -22,7 +22,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 })
     }
 
-    const { invoice_id, payout_method = 'dwolla_ach', payment_account_id } = await req.json()
+    const { invoice_id, payout_method = 'stripe_connect_custom', payment_account_id } = await req.json()
 
     if (!invoice_id) {
       return new Response(JSON.stringify({ error: 'invoice_id is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
@@ -94,7 +94,7 @@ serve(async (req) => {
     }
 
     // Preflight before release_invoice_funds mutates payment state -- providers with a
-    // destination to validate up front (Dwolla) fail closed here; providers with nothing to
+    // destination to validate up front (Stripe Connect) fail closed here; providers with nothing to
     // check yet (Checkbook) no-op and validate inside initiate() instead.
     let state
     try {

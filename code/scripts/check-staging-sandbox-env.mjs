@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 
 const required = [
   'VITE_SUPABASE_URL',
@@ -6,17 +6,14 @@ const required = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'ROLE_QA_BASE_URL',
   'ONBOARDING_SANDBOX_PASSWORD',
+  'VITE_STRIPE_PUBLISHABLE_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
 ];
 
 const recommended = [
   'ROLE_QA_EMAIL',
   'ROLE_QA_PASSWORD',
-  'VITE_STRIPE_PUBLISHABLE_KEY',
-  'STRIPE_SECRET_KEY',
-  'STRIPE_WEBHOOK_SECRET',
-  'DWOLLA_KEY',
-  'DWOLLA_SECRET',
-  'DWOLLA_ENVIRONMENT',
   'CHECKBOOK_API_KEY',
   'CHECKBOOK_API_SECRET',
   'CHECKBOOK_ENV',
@@ -33,7 +30,6 @@ const warnings = [];
 
 const stripePublishable = value('VITE_STRIPE_PUBLISHABLE_KEY');
 const stripeSecret = value('STRIPE_SECRET_KEY');
-const dwollaEnvironment = value('DWOLLA_ENVIRONMENT').toLowerCase();
 const checkbookEnvironment = value('CHECKBOOK_ENV').toLowerCase();
 const plaidEnvironment = value('PLAID_ENV').toLowerCase();
 
@@ -45,20 +41,12 @@ if (stripeSecret && !stripeSecret.startsWith('sk_test_')) {
   failures.push('STRIPE_SECRET_KEY must be a Stripe test/sandbox key for staging');
 }
 
-if (dwollaEnvironment && dwollaEnvironment !== 'sandbox') {
-  failures.push('DWOLLA_ENVIRONMENT must be sandbox for staging');
-}
-
 if (checkbookEnvironment && !['sandbox', 'demo'].includes(checkbookEnvironment)) {
   failures.push('CHECKBOOK_ENV must be sandbox or demo for staging');
 }
 
 if (plaidEnvironment && plaidEnvironment !== 'sandbox') {
   failures.push('PLAID_ENV must be sandbox for staging');
-}
-
-if (!value('DWOLLA_KEY') || !value('DWOLLA_SECRET')) {
-  warnings.push('Dwolla ACH sandbox is not configured; ACH funding-source calls will fail if exercised.');
 }
 
 if (!value('CHECKBOOK_API_KEY') || !value('CHECKBOOK_API_SECRET')) {
@@ -79,7 +67,6 @@ const report = {
   sandboxGuards: {
     stripePublishableMode: stripePublishable ? stripePublishable.split('_').slice(0, 2).join('_') : null,
     stripeSecretMode: stripeSecret ? stripeSecret.split('_').slice(0, 2).join('_') : null,
-    dwollaEnvironment: dwollaEnvironment || null,
     checkbookEnvironment: checkbookEnvironment || null,
     plaidEnvironment: plaidEnvironment || null,
   },

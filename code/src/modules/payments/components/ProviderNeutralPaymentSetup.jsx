@@ -157,10 +157,10 @@ export default function ProviderNeutralPaymentSetup({
     setSaving(true);
     try {
       await invokePaymentBankAccounts('save_provider_config', { ...scope, ...providerConfig });
-      toast.success('Provider routing saved.');
+      toast.success('Stripe routing saved.');
       await load();
     } catch (err) {
-      toast.error(err.message || 'Could not save provider routing.');
+      toast.error(err.message || 'Could not save Stripe routing.');
     } finally {
       setSaving(false);
     }
@@ -250,17 +250,17 @@ export default function ProviderNeutralPaymentSetup({
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="h-4 w-4" /> Provider-Neutral ACH Foundation
+            <ShieldCheck className="h-4 w-4" /> Stripe ACH & Connect Setup
           </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-lg border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold">Bank vault</p>
+            <p className="text-sm font-semibold">Bank account vault</p>
             <p className="mt-1 text-xs text-muted-foreground">Raw bank details are stored by backend-only vault functions. UI reads only metadata and last 4 digits.</p>
           </div>
           <div className="rounded-lg border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold">Provider adapters</p>
-            <p className="mt-1 text-xs text-muted-foreground">Installed: {data.installed_adapters.join(', ') || 'none'}</p>
+            <p className="text-sm font-semibold">Stripe routing</p>
+            <p className="mt-1 text-xs text-muted-foreground">Collection: Stripe ACH debit. Payouts: Stripe Connect ACH.</p>
           </div>
           <div className="rounded-lg border bg-secondary/40 p-4">
             <p className="text-sm font-semibold">Current scope</p>
@@ -351,7 +351,7 @@ export default function ProviderNeutralPaymentSetup({
               </label>
               <Button type="submit" disabled={saving} className="w-full">
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Landmark className="mr-2 h-4 w-4" />}
-                Save to Platform Vault
+                Save Bank Account
               </Button>
             </form>
           </CardContent>
@@ -370,7 +370,7 @@ export default function ProviderNeutralPaymentSetup({
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
               <AlertCircle className="mr-1.5 inline h-3.5 w-3.5" />
-              Stripe adapters are installed but live calls require API keys. Until then, linking records will show configuration_missing.
+              Stripe live keys are configured in Supabase secrets. Provider links fail closed until Stripe account requirements and payout capability are complete.
             </div>
             <div className="space-y-1.5">
               <Label>Collection provider</Label>
@@ -387,7 +387,7 @@ export default function ProviderNeutralPaymentSetup({
               <Select value={providerConfig.payout_provider} onValueChange={(value) => setProviderConfig((prev) => ({ ...prev, payout_provider: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="stripe_connect_custom">Stripe Connect Custom</SelectItem>
+                  <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
                   <SelectItem value="not_configured">Not configured</SelectItem>
                 </SelectContent>
               </Select>

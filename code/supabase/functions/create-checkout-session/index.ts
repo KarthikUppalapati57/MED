@@ -4,10 +4,6 @@ import Stripe from 'https://esm.sh/stripe@14.17.0?target=deno'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-const dwollaKey = Deno.env.get('DWOLLA_KEY') ?? ''
-const dwollaSecret = Deno.env.get('DWOLLA_SECRET') ?? ''
-const dwollaEnvironment = (Deno.env.get('DWOLLA_ENVIRONMENT') ?? 'sandbox').toLowerCase()
-const dwollaBaseUrl = dwollaEnvironment === 'production' ? 'https://api.dwolla.com' : 'https://api-sandbox.dwolla.com'
 const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, {
       apiVersion: '2023-10-16',
@@ -15,48 +11,63 @@ const stripe = stripeSecretKey
     })
   : null
 
-async function getDwollaAccessToken() {
-  if (!dwollaKey || !dwollaSecret) {
-    throw new Error('Dwolla is not configured. Bank ACH setup requires DWOLLA_KEY and DWOLLA_SECRET.')
+const appBaseUrl = (Deno.env.get('APP_BASE_URL') || Deno.env.get('VITE_APP_BASE_URL') || Deno.env.get('VITE_APP_URL') || '').trim().replace(/\/$/, '')
+const appEnvironment = (Deno.env.get('APP_ENV') || Deno.env.get('ENVIRONMENT') || '').toLowerCase()
+const isProduction = ['production', 'prod'].includes(appEnvironment)
+
+function resolveCheckoutUrl(value: unknown, fallbackPath: string) {
+  if (!appBaseUrl) {
+    if (isProduction) throw new Error('APP_BASE_URL is required for production Stripe checkout redirects')
+    return fallbackPath
   }
 
-  const credentials = btoa(`${dwollaKey}:${dwollaSecret}`)
-  const response = await fetch(`${dwollaBaseUrl}/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/vnd.dwolla.v1.hal+json',
-    },
-    body: 'grant_type=client_credentials',
-  })
+  const base = new URL(appBaseUrl)
+  const fallback = new URL(fallbackPath, base)
+  if (!value || typeof value !== 'string') return fallback.toString()
 
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`Dwolla authentication failed: ${body || response.statusText}`)
+  const candidate = new URL(value, base)
+  if (candidate.origin !== base.origin) {
+    throw new Error('Checkout redirect URL must match the configured app origin')
   }
 
-  const data = await response.json()
-  return data.access_token
+  return candidate.toString()
 }
 
-async function createDwollaResource(path: string, payload: Record<string, unknown>, accessToken: string) {
-  const response = await fetch(`${dwollaBaseUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/vnd.dwolla.v1.hal+json',
-      Accept: 'application/vnd.dwolla.v1.hal+json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`Dwolla request failed: ${body || response.statusText}`)
+async function ensureStripeCustomer(adminClient: ReturnType<typeof createClient>, profile: any, authUser: any, tenantId: string | null, organizationId: string | null) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Payment method collection is required for paid and trial plans.')
   }
 
-  return response.headers.get('location')
+  let org: { id: string; name: string; stripe_customer_id: string | null } | null = null
+  if (organizationId) {
+    const { data: orgData, error: orgError } = await adminClient
+      .from('organizations')
+      .select('id, name, stripe_customer_id')
+      .eq('id', organizationId)
+      .single()
+
+    if (orgError || !orgData) throw new Error('Organization not found')
+    org = orgData
+  }
+
+  let customerId = org?.stripe_customer_id || null
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email: profile.email || authUser.email || undefined,
+      name: org?.name || profile.email || authUser.email || 'RestOps tenant',
+      metadata: {
+        tenant_id: tenantId || '',
+        organization_id: organizationId || '',
+        user_id: authUser.id,
+      },
+    })
+    customerId = customer.id
+    if (organizationId) {
+      await adminClient.from('organizations').update({ stripe_customer_id: customerId }).eq('id', organizationId)
+    }
+  }
+
+  return { customerId, org }
 }
 
 serve(async (req) => {
@@ -199,83 +210,6 @@ serve(async (req) => {
       })
     }
 
-    if (selectedPaymentMethod === 'ach') {
-      const account = bankAccount && typeof bankAccount === 'object' ? bankAccount as Record<string, unknown> : {}
-      const routingNumber = String(account.routingNumber || '').replace(/\D/g, '')
-      const accountNumber = String(account.accountNumber || '').replace(/\D/g, '')
-      const bankAccountType = String(account.accountType || 'checking').toLowerCase()
-      const bankName = String(account.bankName || 'Tenant bank account').trim()
-      const holderName = String(account.accountHolderName || profile.full_name || profile.email || authData.user.email || 'RestOps Tenant').trim()
-      const billingAddress = (account.billingAddress && typeof account.billingAddress === 'object' ? account.billingAddress : {}) as Record<string, unknown>
-      const billingLine1 = String(billingAddress.line1 || '').trim()
-      const billingCity = String(billingAddress.city || '').trim()
-      const billingState = String(billingAddress.state || '').trim()
-      const billingPostalCode = String(billingAddress.postalCode || '').trim()
-
-      if (!/^\d{9}$/.test(routingNumber)) throw new Error('A valid 9-digit routing number is required for ACH setup')
-      if (!/^\d{4,17}$/.test(accountNumber)) throw new Error('A valid bank account number is required for ACH setup')
-      if (!['checking', 'savings'].includes(bankAccountType)) throw new Error('Bank account type must be checking or savings')
-      if (!billingLine1 || !billingCity || !billingState || !billingPostalCode) throw new Error('A complete billing address is required for ACH setup')
-
-      const [firstName, ...lastNameParts] = holderName.split(/\s+/)
-      const lastName = lastNameParts.join(' ') || 'Tenant'
-      const accessToken = await getDwollaAccessToken()
-      const customerUrl = await createDwollaResource('/customers', {
-        firstName: firstName || 'RestOps',
-        lastName,
-        email: profile.email || authData.user.email,
-        type: 'unverified',
-        businessName: holderName,
-        address1: billingLine1,
-        address2: String(billingAddress.line2 || '').trim() || undefined,
-        city: billingCity,
-        state: billingState,
-        postalCode: billingPostalCode,
-      }, accessToken)
-
-      if (!customerUrl) throw new Error('Dwolla customer creation did not return a resource URL')
-      const fundingSourcePath = customerUrl.replace(dwollaBaseUrl, '') + '/funding-sources'
-      const fundingSourceUrl = await createDwollaResource(fundingSourcePath, {
-        routingNumber,
-        accountNumber,
-        bankAccountType,
-        name: bankName,
-      }, accessToken)
-
-      if (!fundingSourceUrl) throw new Error('Dwolla funding source creation did not return a resource URL')
-
-      await adminClient
-        .from('profiles')
-        .update({
-          payment_verified: true,
-          payment_method_type: 'ach',
-          pending_onboarding_plan_id: plan.id,
-          pending_payment_metadata: {
-            provider: 'dwolla',
-            plan_id: plan.id,
-            billing_model: 'per_location',
-            unit_amount_cents: unitAmountCents,
-            location_count: billingLocationCount,
-            monthly_amount_cents: monthlyAmountCents,
-            coupon_code: coupon || '',
-            trial_days: couponTrialDays || 0,
-            dwolla_customer_url: customerUrl,
-            dwolla_funding_source_url: fundingSourceUrl,
-            bank_name: bankName,
-            account_type: bankAccountType,
-            account_last4: accountNumber.slice(-4),
-            billing_address: { line1: billingLine1, line2: String(billingAddress.line2 || '').trim(), city: billingCity, state: billingState, postal_code: billingPostalCode, country: String(billingAddress.country || 'United States').trim() },
-            completed_at: new Date().toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authData.user.id)
-
-      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=ach', ach: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
-    }
     if (!stripe) {
       throw new Error('Stripe is not configured. Payment method collection is required for paid and trial plans.')
     }
@@ -294,34 +228,119 @@ serve(async (req) => {
       resolvedPriceId = price.id
       await adminClient.from('plans').update({ stripe_price_id: resolvedPriceId }).eq('id', plan.id)
     }
-    let org: { id: string; name: string; stripe_customer_id: string | null } | null = null
-    if (organizationId) {
-      const { data: orgData, error: orgError } = await adminClient
-        .from('organizations')
-        .select('id, name, stripe_customer_id')
-        .eq('id', organizationId)
-        .single()
+    if (selectedPaymentMethod === 'ach') {
+      const account = bankAccount && typeof bankAccount === 'object' ? bankAccount as Record<string, unknown> : {}
+      const routingNumber = String(account.routingNumber || '').replace(/\D/g, '')
+      const accountNumber = String(account.accountNumber || '').replace(/\D/g, '')
+      const bankAccountType = String(account.accountType || 'checking').toLowerCase()
+      const bankName = String(account.bankName || 'Tenant bank account').trim()
+      const holderName = String(account.accountHolderName || profile.full_name || profile.email || authData.user.email || 'RestOps Tenant').trim()
+      const billingAddress = (account.billingAddress && typeof account.billingAddress === 'object' ? account.billingAddress : {}) as Record<string, unknown>
+      const billingLine1 = String(billingAddress.line1 || '').trim()
+      const billingCity = String(billingAddress.city || '').trim()
+      const billingState = String(billingAddress.state || '').trim()
+      const billingPostalCode = String(billingAddress.postalCode || '').trim()
 
-      if (orgError || !orgData) throw new Error('Organization not found')
-      org = orgData
-    }
+      if (!/^\d{9}$/.test(routingNumber)) throw new Error('A valid 9-digit routing number is required for ACH setup')
+      if (!/^\d{4,17}$/.test(accountNumber)) throw new Error('A valid bank account number is required for ACH setup')
+      if (!['checking', 'savings'].includes(bankAccountType)) throw new Error('Bank account type must be checking or savings')
+      if (!billingLine1 || !billingCity || !billingState || !billingPostalCode) throw new Error('A complete billing address is required for ACH setup')
+      if (!resolvedPriceId) throw new Error('Stripe price is required before ACH subscription setup')
 
-    let customerId = org?.stripe_customer_id || null
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: profile.email || authData.user.email || undefined,
-        name: org?.name || profile.email || authData.user.email || 'RestOps tenant',
+      const { customerId } = await ensureStripeCustomer(adminClient, profile, authData.user, tenantId, organizationId)
+      const paymentMethod = await stripe.paymentMethods.create({
+        type: 'us_bank_account',
+        billing_details: {
+          name: holderName,
+          email: profile.email || authData.user.email || undefined,
+          address: {
+            line1: billingLine1,
+            line2: String(billingAddress.line2 || '').trim() || undefined,
+            city: billingCity,
+            state: billingState,
+            postal_code: billingPostalCode,
+            country: 'US',
+          },
+        },
+        us_bank_account: {
+          routing_number: routingNumber,
+          account_number: accountNumber,
+          account_holder_type: 'company',
+          account_type: bankAccountType as 'checking' | 'savings',
+        },
         metadata: {
           tenant_id: tenantId || '',
           organization_id: organizationId || '',
           user_id: authData.user.id,
+          plan_id: plan.id,
+          provider: 'stripe_ach_debit',
         },
       })
-      customerId = customer.id
-      if (organizationId) {
-        await adminClient.from('organizations').update({ stripe_customer_id: customerId }).eq('id', organizationId)
-      }
+      await stripe.paymentMethods.attach(paymentMethod.id, { customer: customerId })
+      await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethod.id } })
+
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: resolvedPriceId, quantity: billingLocationCount }],
+        default_payment_method: paymentMethod.id,
+        payment_settings: { payment_method_types: ['us_bank_account'] },
+        ...(couponTrialDays > 0 ? { trial_period_days: couponTrialDays } : {}),
+        expand: ['latest_invoice.payment_intent'],
+        metadata: {
+          tenant_id: tenantId || '',
+          organization_id: organizationId || '',
+          user_id: authData.user.id,
+          plan_id: plan.id,
+          billing_model: 'per_location',
+          location_count: String(billingLocationCount),
+          coupon_code: coupon || '',
+          trial_days: String(couponTrialDays || 0),
+          payment_method_type: 'stripe_ach_debit',
+        },
+      })
+
+      const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null
+      const paymentIntent = (latestInvoice?.payment_intent ?? null) as Stripe.PaymentIntent | null
+      const verified = paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'processing' || ['trialing', 'active'].includes(subscription.status)
+
+      await adminClient
+        .from('profiles')
+        .update({
+          payment_verified: verified,
+          payment_method_type: 'ach',
+          pending_onboarding_plan_id: plan.id,
+          pending_stripe_customer_id: customerId,
+          pending_stripe_subscription_id: subscription.id,
+          pending_payment_metadata: {
+            provider: 'stripe_ach_debit',
+            plan_id: plan.id,
+            billing_model: 'per_location',
+            unit_amount_cents: unitAmountCents,
+            location_count: billingLocationCount,
+            monthly_amount_cents: monthlyAmountCents,
+            coupon_code: coupon || '',
+            trial_days: couponTrialDays || 0,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            stripe_payment_method_id: paymentMethod.id,
+            stripe_payment_intent_id: paymentIntent?.id || null,
+            stripe_payment_status: paymentIntent?.status || subscription.status,
+            bank_name: bankName,
+            account_type: bankAccountType,
+            account_last4: accountNumber.slice(-4),
+            billing_address: { line1: billingLine1, line2: String(billingAddress.line2 || '').trim(), city: billingCity, state: billingState, postal_code: billingPostalCode, country: 'US' },
+            completed_at: verified ? new Date().toISOString() : null,
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', authData.user.id)
+
+      return new Response(JSON.stringify({ success: true, url: successUrl || '/onboarding?checkout=ach', ach: true, stripeAch: true, subscriptionId: subscription.id }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
     }
+    const { customerId } = await ensureStripeCustomer(adminClient, profile, authData.user, tenantId, organizationId)
 
     if (!paymentMethodId) {
       // No inline card token was sent -- this is a caller that still expects the old
@@ -354,8 +373,8 @@ serve(async (req) => {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [{ price: resolvedPriceId, quantity: billingLocationCount }],
-        success_url: successUrl || `${new URL(req.url).origin}/onboarding?checkout=success`,
-        cancel_url: cancelUrl || `${new URL(req.url).origin}/onboarding`,
+        success_url: resolveCheckoutUrl(successUrl, '/onboarding?checkout=success'),
+        cancel_url: resolveCheckoutUrl(cancelUrl, '/onboarding'),
         metadata: {
           tenant_id: tenantId || '',
           organization_id: organizationId || '',

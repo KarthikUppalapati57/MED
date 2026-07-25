@@ -120,7 +120,7 @@ export default function PaymentGatewayModal({
             Process Payment
           </DialogTitle>
           <DialogDescription>
-            Pay ${payment.amount?.toLocaleString()} to {payment.vendor_name}
+            Collect ${payment.amount?.toLocaleString()} for invoice {payment.invoice_number}
           </DialogDescription>
         </DialogHeader>
 
@@ -140,7 +140,7 @@ export default function PaymentGatewayModal({
             <h3 className="text-lg font-semibold text-slate-900">Payment Charged, Recording Failed</h3>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
               {lastPaymentData?.payment_method === 'card'
-                ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details â€” just try recording again.'
+                ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details - just try recording again.'
                 : 'The payment could not be saved. It is safe to try recording it again.'}
             </p>
             <Button className="mt-4" onClick={handleRetryRecording} disabled={processing}>

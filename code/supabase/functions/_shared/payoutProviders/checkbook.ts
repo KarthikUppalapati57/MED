@@ -1,6 +1,6 @@
 // Payout-initiation adapter for Checkbook.io. One API (POST /v3/check) issues either a digital
 // check (emailed) or a physical mailed check -- payoutMethod picks the payload shape. Stateless
-// per-check, no persisted customer/funding-source object like Dwolla has.
+// per-check, no persisted customer/funding-source object like account-based payout rails have.
 
 export const refColumn = 'checkbook_check_id'
 

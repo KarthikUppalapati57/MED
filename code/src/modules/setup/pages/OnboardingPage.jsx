@@ -1145,7 +1145,7 @@ export default function OnboardingPage() {
       ? `$${Number(selectedPlan.price_monthly).toFixed(2)}/location/mo (${billingLocationCount} location${billingLocationCount === 1 ? '' : 's'} = $${monthlyTotal.toFixed(2)}/mo)`
       : 'Free';
     const paymentMethodLabel = !isPaidPlan
-      ? 'no charge â€” free plan'
+      ? 'no charge - free plan'
       : paymentMethod === 'card'
         ? `credit/debit card (cardholder: ${cardHolderName.trim()})`
         : `ACH transfer from ${bankAccount.bankName.trim()} ending in ${String(bankAccount.accountNumber).replace(/\D/g, '').slice(-4)}`;
@@ -1542,7 +1542,7 @@ export default function OnboardingPage() {
                       <button type="button" onClick={() => setPaymentMethod('ach')} className={`rounded-md border p-4 text-left transition hover:border-primary ${paymentMethod === 'ach' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
                         <Landmark className="mb-2 h-5 w-5 text-primary" />
                         <p className="font-semibold text-foreground">Bank ACH</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Secure bank setup through Dwolla.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Secure bank setup through Stripe.</p>
                       </button>
                     </div>
                     {paymentMethod === 'card' && (

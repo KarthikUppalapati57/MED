@@ -127,6 +127,86 @@ async function handleCheckoutCompleted(
   }
 }
 
+async function handleConnectAccountUpdated(
+  supabaseClient: Awaited<ReturnType<typeof getSupabaseSystemClient>>,
+  account: Stripe.Account,
+) {
+  const requirements = account.requirements || {}
+  const currentlyDue = requirements.currently_due || []
+  const pastDue = requirements.past_due || []
+  const providerStatus = account.payouts_enabled
+    ? 'payouts_enabled'
+    : pastDue.length > 0
+      ? 'requirements_past_due'
+      : currentlyDue.length > 0
+        ? 'requirements_due'
+        : 'pending_verification'
+
+  const { data: links, error: linkError } = await supabaseClient
+    .from('bank_account_provider_links')
+    .select('id, tenant_id, organization_id, brand_id, location_id, owner:bank_accounts(owner_type, owner_id), bank_account_id')
+    .eq('provider', 'stripe_connect_custom')
+    .eq('provider_use', 'payout')
+    .eq('provider_owner_ref', account.id)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+
+  if (linkError) throw linkError
+  const activeLinks = links || []
+
+  for (const link of activeLinks) {
+    const owner = Array.isArray(link.owner) ? link.owner[0] : link.owner
+    const { error: updateError } = await supabaseClient
+      .from('bank_account_provider_links')
+      .update({
+        provider_status: providerStatus,
+        payouts_enabled: Boolean(account.payouts_enabled),
+        charges_enabled: Boolean(account.charges_enabled),
+        requirements_due: {
+          currently_due: currentlyDue,
+          past_due: pastDue,
+          eventually_due: requirements.eventually_due || [],
+          disabled_reason: requirements.disabled_reason || null,
+        },
+        metadata: {
+          stripe_object: 'account',
+          stripe_account_id: account.id,
+          details_submitted: Boolean(account.details_submitted),
+          default_currency: account.default_currency || null,
+          country: account.country || null,
+        },
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq('id', link.id)
+
+    if (updateError) throw updateError
+
+    await supabaseClient.rpc('record_payment_provider_event', { p_payload: {
+      tenant_id: link.tenant_id || '',
+      organization_id: link.organization_id || '',
+      brand_id: link.brand_id || '',
+      location_id: link.location_id || '',
+      provider: 'stripe_connect_custom',
+      provider_event_type: 'account.updated',
+      provider_event_ref: account.id,
+      owner_type: owner?.owner_type || '',
+      owner_id: owner?.owner_id || '',
+      bank_account_id: link.bank_account_id || '',
+      status: providerStatus,
+      payload: {
+        payouts_enabled: Boolean(account.payouts_enabled),
+        charges_enabled: Boolean(account.charges_enabled),
+        details_submitted: Boolean(account.details_submitted),
+        requirements: {
+          currently_due: currentlyDue,
+          past_due: pastDue,
+          eventually_due: requirements.eventually_due || [],
+          disabled_reason: requirements.disabled_reason || null,
+        },
+      },
+    }})
+  }
+}
 async function handleInvoicePaymentSucceeded(
   supabaseClient: Awaited<ReturnType<typeof getSupabaseSystemClient>>,
   invoice: Stripe.Invoice,
@@ -224,6 +304,10 @@ serve(async (req) => {
 
     if (event.type === 'invoice.payment_succeeded') {
       await handleInvoicePaymentSucceeded(supabaseClient, event.data.object as Stripe.Invoice)
+    }
+
+    if (event.type === 'account.updated') {
+      await handleConnectAccountUpdated(supabaseClient, event.data.object as Stripe.Account)
     }
 
     await recordWebhookDone(supabaseClient, event, 'processed')

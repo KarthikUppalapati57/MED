@@ -937,16 +937,25 @@ serve(async (req) => {
             if (vendor?.autopay_enabled) {
                console.log(`AutoPay enabled for vendor ${vendor.id}, scheduling payment...`);
 
-               // Auto-trigger the banking-link flow when the vendor has no Dwolla funding
+               const paymentMethod = ['stripe_connect_custom', 'checkbook_digital', 'checkbook_physical'].includes(vendor.default_payment_method)
+                  ? vendor.default_payment_method
+                  : vendor.default_payment_method === 'check'
+                     ? 'checkbook_digital'
+                     : vendor.default_payment_method === 'stripe'
+                        ? 'stripe_connect_custom'
+                        : 'stripe_connect_custom';
+
+               // Auto-trigger the banking-link flow when the vendor has no Stripe Connect account
                // source on file yet, instead of silently scheduling a payment that can never
                // actually be released. Reuses the same funding-source check process-payout
                // already does (get_vendor_provider_link) rather than re-deriving it.
+               if (paymentMethod === 'stripe_connect_custom') {
                try {
-                  const { data: dwollaLink } = await supabaseClient
-                     .rpc('get_vendor_provider_link', { p_vendor_id: vendor.id, p_provider: 'dwolla' })
+                  const { data: stripeConnectLink } = await supabaseClient
+                     .rpc('get_vendor_provider_link', { p_vendor_id: vendor.id, p_provider: 'stripe_connect_custom' })
                      .maybeSingle();
 
-                  if (!dwollaLink?.provider_funding_ref) {
+                  if (!stripeConnectLink?.provider_funding_ref) {
                      const { data: pendingToken } = await supabaseClient
                         .from('vendor_banking_link_tokens')
                         .select('id, expires_at')
@@ -968,17 +977,15 @@ serve(async (req) => {
                            // that block AutoPay scheduling below.
                            console.warn(`Could not auto-issue banking link for vendor ${vendor.id}:`, linkError.message);
                         } else {
-                           console.log(`Auto-issued banking link for vendor ${vendor.id} (missing Dwolla funding source)`);
+                           console.log(`Auto-issued banking link for vendor ${vendor.id} (missing Stripe Connect account)`);
                         }
                      }
                   }
                } catch (bankingLinkError) {
                   console.warn(`Banking link auto-trigger failed for vendor ${vendor.id}:`, bankingLinkError);
                }
+               }
 
-               const paymentMethod = vendor.default_payment_method === 'check'
-                  ? 'cheque'
-                  : (vendor.default_payment_method || 'bank_transfer');
                
                const { error: paymentError } = await supabaseClient
                   .from('payments')
@@ -1006,6 +1013,7 @@ serve(async (req) => {
                         scheduled_payment_date: record.due_date || new Date().toISOString().split('T')[0],
                         status: record.status === 'approved' ? 'scheduled' : record.status,
                         ap_status: record.ap_status === 'approved' ? 'scheduled' : record.ap_status,
+                        ap_metadata: { ...(record.ap_metadata || {}), scheduled_payout_method: paymentMethod },
                         updated_at: new Date().toISOString()
                      })
                      .eq('id', record.id);

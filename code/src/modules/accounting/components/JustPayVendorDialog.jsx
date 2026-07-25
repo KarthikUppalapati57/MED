@@ -40,7 +40,7 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
       // wire you already sent) -- it does not move money itself. There is no in-app rail here
       // for arbitrary vendor payments with no invoice; process-payout/process-checkbook-payout
       // both require a real invoice_id. Use "Bulk Vendor Payouts" or an invoice's "Release
-      // Funds" button for an actual Dwolla/Checkbook.io transfer.
+      // Funds" button for an actual Stripe Connect/Checkbook.io transfer.
       await api.financial.recordAdHocVendorPayment({
         vendorId: formData.vendor_id,
         amount: parseFloat(formData.amount),
@@ -72,7 +72,7 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
             Record Manual Payment
           </DialogTitle>
           <DialogDescription>
-            Log a payment you already sent to this vendor outside the app. This does not send money -- for a real Dwolla/Checkbook.io transfer, use Bulk Vendor Payouts or an invoice's Release Funds button.
+            Log a payment you already sent to this vendor outside the app. This does not send money -- for a real Stripe Connect/Checkbook.io transfer, use Bulk Vendor Payouts or an invoice's Release Funds button.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">

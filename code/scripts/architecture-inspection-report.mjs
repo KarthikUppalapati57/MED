@@ -89,7 +89,7 @@ const rlsFindings = tableFindings.filter((table) => !table.rls_enabled || table.
 const scopeFindings = tableFindings.filter((table) => table.has_organization_id && !table.organization_indexed);
 const securityDefiners = publicFunctions.filter((fn) => fn.security_definer);
 const financialFunctionNames = publicFunctions
-  .filter((fn) => /(invoice|payment|payout|ledger|bill|credit|checkbook|dwolla|stripe|paypal|accounting)/i.test(fn.function_name))
+  .filter((fn) => /(invoice|payment|payout|ledger|bill|credit|checkbook|stripe|paypal|accounting)/i.test(fn.function_name))
   .map((fn) => `${fn.function_name}(${fn.identity_arguments})`)
   .sort();
 
@@ -180,7 +180,7 @@ const plan = [
     actions: [
       'Audit service-role use, CORS, auth checks, org-scope validation, and idempotency in every Edge Function.',
       'Standardize shared helpers for Supabase admin/client creation and request validation.',
-      'Add smoke tests for invoice-processing, payout, Checkbook/Dwolla/Stripe webhooks, POS sync, and webhook dispatcher.',
+      'Add smoke tests for invoice-processing, payout, Checkbook/Stripe webhooks, POS sync, and webhook dispatcher.',
     ],
   },
   {

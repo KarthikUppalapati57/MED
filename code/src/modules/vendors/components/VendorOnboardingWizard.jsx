@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
@@ -75,7 +75,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     setDevOtp(null);
     setFormData({ name: '', email: '', phone: '', contact_name: '' });
     setOtpInput('');
-    setPaymentSettings({ default_payment_method: 'stripe', autopay_enabled: false });
+    setPaymentSettings({ default_payment_method: 'stripe_connect_custom', autopay_enabled: false });
   };
 
   useEffect(() => {
@@ -345,19 +345,19 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                 <>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-resend-green" /> Finalize Configuration</CardTitle>
-                    <CardDescription>Set up default payment preferences while you wait for the vendor to submit their information.</CardDescription>
+                    <CardDescription>Set up explicit payment rail preferences while you wait for the vendor to submit their information.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid gap-6 mt-2 p-6 border rounded-lg bg-muted/10">
                       <div className="space-y-3">
-                        <Label className="text-base font-medium">Default Payment Method</Label>
+                        <Label className="text-base font-medium">Preferred Payment Rail</Label>
                         <Select value={paymentSettings.default_payment_method} onValueChange={v => setPaymentSettings({...paymentSettings, default_payment_method: v})}>
                           <SelectTrigger className="h-11 bg-card w-full max-w-md">
                             <SelectValue placeholder="Select a payment method" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="stripe">Stripe (Card)</SelectItem>
-                            <SelectItem value="dwolla">Dwolla (ACH)</SelectItem>
+                            <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
                             <SelectItem value="check">Check (Checkbook.io)</SelectItem>
                           </SelectContent>
                         </Select>
@@ -368,7 +368,7 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
                       <div className="flex items-center justify-between max-w-md">
                         <div className="pr-4">
                           <Label className="text-base font-medium">Enable AutoPay</Label>
-                          <p className="text-sm text-muted-foreground mt-1">Automatically pay approved invoices from this vendor using the default method.</p>
+                          <p className="text-sm text-muted-foreground mt-1">Automatically pay approved invoices from this vendor using the selected rail.</p>
                         </div>
                         <Switch 
                           checked={paymentSettings.autopay_enabled} 

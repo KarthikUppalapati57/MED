@@ -31,7 +31,8 @@ import {
   ExternalLink,
   Loader2,
   Bell,
-  Plus
+  Plus,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,10 +65,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import PaymentGatewayModal from '@/modules/payments/components/PaymentGatewayModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
 import ProviderNeutralPaymentSetup from '@/modules/payments/components/ProviderNeutralPaymentSetup';
-import { confirmBankTransfer, recordInvoicePayment as recordInvoicePaymentRpc } from '@/lib/paymentService';
+import { confirmBankTransfer } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
 import { AP_STATUS_LABELS, deriveApStatus, isInvoicePaymentReady } from '@/lib/invoiceAp';
@@ -202,8 +208,13 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
 
 const paymentMethodIcons = {
   stripe: CreditCard,
+  stripe_card: CreditCard,
   paypal: Wallet,
   bank_transfer: Building2,
+  ach: Building2,
+  stripe_connect_custom: Building2,
+  checkbook_digital: CheckSquare,
+  checkbook_physical: CheckSquare,
   cheque: CheckSquare,
   cash: Banknote,
   manual: Banknote,
@@ -211,13 +222,26 @@ const paymentMethodIcons = {
 
 const paymentMethodColors = {
   stripe: 'bg-purple-500/50/10 text-purple-400',
+  stripe_card: 'bg-purple-500/50/10 text-purple-400',
   paypal: 'bg-resend-blue/10 text-resend-blue',
   bank_transfer: 'bg-resend-green/10 text-resend-green',
+  ach: 'bg-resend-green/10 text-resend-green',
+  stripe_connect_custom: 'bg-resend-green/10 text-resend-green',
+  checkbook_digital: 'bg-resend-orange/10 text-resend-orange',
+  checkbook_physical: 'bg-resend-orange/10 text-resend-orange',
   cheque: 'bg-resend-orange/10 text-resend-orange',
   cash: 'bg-resend-green/10 text-resend-green',
   manual: 'bg-secondary text-foreground',
 };
 
+const VENDOR_PAYOUT_METHODS = [
+  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Stripe Connect ACH', icon: Building2, enabled: true },
+  { value: 'stripe_card', label: 'Card', detail: 'Stripe card payout rail not configured yet', icon: CreditCard, enabled: false },
+  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Checkbook.io email delivery', icon: CheckSquare, enabled: true },
+  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Checkbook.io physical delivery', icon: Mail, enabled: true },
+];
+
+const PAYOUT_METHOD_LABELS = Object.fromEntries(VENDOR_PAYOUT_METHODS.map((method) => [method.value, method.label]));
 const paymentStatusColors = {
   completed: 'bg-resend-green/10 text-resend-green',
   pending: 'bg-resend-yellow/10 text-resend-yellow',
@@ -255,8 +279,6 @@ export default function Payments() {
   // defaults to soonest/most-overdue-first so invoices close to their due date surface first.
   const [invoiceSortBy, setInvoiceSortBy] = useState('due_date');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const invoiceTableRef = React.useRef(null);
   const paymentHistoryTableRef = React.useRef(null);
@@ -267,6 +289,7 @@ export default function Payments() {
   const [scheduleForm, setScheduleForm] = useState({
     payment_account_id: '',
     scheduled_payment_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    payout_method: 'stripe_connect_custom',
   });
   const [recordForm, setRecordForm] = useState({
     amount: '',
@@ -275,7 +298,7 @@ export default function Payments() {
   });
   const [paymentSettings, setPaymentSettings] = useState({
     autoPayApprovedInvoices: false,
-    defaultPaymentMethod: 'cheque',
+    defaultPaymentMethod: 'stripe_connect_custom',
     approvalThreshold: 1000,
     requireSeparateApprover: false,
     enforceApprovalLimits: false,
@@ -360,7 +383,7 @@ export default function Payments() {
       return await api.entities.Invoice.filter(filters, {
         page: pageParam,
         pageSize: 50,
-        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination',
+        select: 'id, invoice_number, vendor_id, vendor_name, total_amount, paid_amount, status, ap_status, action_required_reason, match_status, payment_status, due_date, invoice_date, scheduled_payment_date, payment_account_id, organization_id, brand_id, location_id, ap_routing_destination, ap_metadata',
         search: activeTab === 'invoices' ? debouncedSearch || undefined : undefined,
         searchColumn: 'invoice_number',
         orderBy: invoiceSortBy
@@ -567,13 +590,20 @@ export default function Payments() {
   };
 
   const schedulePayment = useMutation({
-    mutationFn: async ({ invoice, paymentAccountId, date }) => {
+    mutationFn: async ({ invoice, paymentAccountId, date, payoutMethod }) => {
       const { error } = await supabase.rpc('schedule_invoice_payment', {
         p_invoice_id: invoice.id,
         p_payment_account_id: paymentAccountId,
         p_date: date,
       });
       if (error) throw error;
+
+      const nextMetadata = { ...(invoice.ap_metadata || {}), scheduled_payout_method: payoutMethod };
+      const { error: metadataError } = await supabase
+        .from('invoices')
+        .update({ ap_metadata: nextMetadata })
+        .eq('id', invoice.id);
+      if (metadataError) throw metadataError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
@@ -685,6 +715,7 @@ export default function Payments() {
     setScheduleForm({
       payment_account_id: invoice ? (invoice.payment_account_id || paymentAccounts[0]?.id || '') : (paymentAccounts[0]?.id || ''),
       scheduled_payment_date: invoice ? (invoice.scheduled_payment_date || invoice.due_date || new Date(Date.now() + 86400000).toISOString().slice(0, 10)) : new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      payout_method: invoice?.ap_metadata?.scheduled_payout_method || paymentSettings.defaultPaymentMethod || 'stripe_connect_custom',
     });
   };
 
@@ -711,7 +742,8 @@ export default function Payments() {
         await schedulePayment.mutateAsync({
           invoice: scheduleDialogInvoice,
           paymentAccountId: scheduleForm.payment_account_id,
-          date: scheduleForm.scheduled_payment_date
+          date: scheduleForm.scheduled_payment_date,
+          payoutMethod: scheduleForm.payout_method
         });
       } else {
         // Bulk schedule
@@ -728,6 +760,13 @@ export default function Payments() {
         });
 
         if (error) throw error;
+
+        await Promise.all(selected.map((invoice) => supabase
+          .from('invoices')
+          .update({ ap_metadata: { ...(invoice.ap_metadata || {}), scheduled_payout_method: scheduleForm.payout_method } })
+          .eq('id', invoice.id)
+          .then(({ error: metadataError }) => { if (metadataError) throw metadataError; })
+        ));
 
         queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
         setScheduleDialogInvoice(null);
@@ -751,9 +790,48 @@ export default function Payments() {
     });
   };
 
-  const handlePayNow = (invoice) => {
-    setSelectedInvoice(invoice);
-    setPaymentDialogOpen(true);
+  const [releasingInvoiceId, setReleasingInvoiceId] = useState(null);
+
+  const handleReleaseFunds = async (invoice, payoutMethod) => {
+    const selectedMethod = VENDOR_PAYOUT_METHODS.find((method) => method.value === payoutMethod);
+    if (!selectedMethod) {
+      toast.error('Select a valid payment method.');
+      return;
+    }
+    if (!selectedMethod.enabled) {
+      toast.error(selectedMethod.label + ' payouts are not configured yet. Use ACH or check for vendor payments.');
+      return;
+    }
+
+    const fallbackAccountId = paymentAccounts.length > 0 ? paymentAccounts[0].id : null;
+    const paymentAccountId = invoice.payment_account_id || fallbackAccountId;
+    if (!paymentAccountId) {
+      toast.error('Add an operating payment account before releasing funds.');
+      setActiveTab('setup');
+      return;
+    }
+
+    setReleasingInvoiceId(invoice.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-payout', {
+        body: {
+          invoice_id: invoice.id,
+          payout_method: selectedMethod.value,
+          payment_account_id: paymentAccountId,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Funds released via ' + selectedMethod.detail);
+      queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['accounting-payments'] });
+    } catch (err) {
+      toast.error(err.message || 'Failed to release funds');
+    } finally {
+      setReleasingInvoiceId(null);
+    }
   };
 
   const handleConfirmBankTransfer = async (payment) => {
@@ -796,9 +874,11 @@ export default function Payments() {
     if (!payment.invoice_id) return toast.error('No invoice linked to this payment.');
     setRetryingPaymentId(payment.id);
     try {
-      // Retrying always retries a 'check' payment as a digital check, never re-derives
-      // physical vs. digital -- existing behavior, unchanged here.
-      const payoutMethod = payment.payment_method === 'check' ? 'checkbook_digital' : 'dwolla_ach';
+      const payoutMethod = ['stripe_connect_custom', 'checkbook_digital', 'checkbook_physical'].includes(payment.payment_method)
+        ? payment.payment_method
+        : payment.payment_method === 'check' || payment.payment_method === 'cheque'
+          ? 'checkbook_digital'
+          : 'stripe_connect_custom';
       const { data, error } = await supabase.functions.invoke('process-payout', {
         body: { invoice_id: payment.invoice_id, payout_method: payoutMethod },
       });
@@ -1107,13 +1187,13 @@ export default function Payments() {
                   <TableBody>
                     {invoicesLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           No invoices found
                         </TableCell>
                       </TableRow>
@@ -1205,13 +1285,38 @@ export default function Payments() {
                                   </>
                                 )}
                                 {canPay && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handlePayNow(invoice)}
-                                    className="bg-primary hover:bg-primary h-8 px-3"
-                                  >
-                                    <CreditCard className="h-3 w-3 mr-1" /> Pay Now
-                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        disabled={releasingInvoiceId === invoice.id}
+                                        className="bg-primary hover:bg-primary h-8 px-3"
+                                      >
+                                        {releasingInvoiceId === invoice.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ArrowRightLeft className="h-3 w-3 mr-1" />}
+                                        Release Funds
+                                        <ChevronDown className="h-3 w-3 ml-1" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56">
+                                      {VENDOR_PAYOUT_METHODS.map((method) => {
+                                        const MethodIcon = method.icon;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={method.value}
+                                            disabled={!method.enabled}
+                                            onClick={() => handleReleaseFunds(invoice, method.value)}
+                                            className="flex items-start gap-2"
+                                          >
+                                            <MethodIcon className="mt-0.5 h-4 w-4" />
+                                            <span className="flex min-w-0 flex-col">
+                                              <span>{method.label}</span>
+                                              <span className="text-xs text-muted-foreground">{method.detail}</span>
+                                            </span>
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 )}
                                 {canSchedule && (
                                   <Button
@@ -1287,6 +1392,7 @@ export default function Payments() {
                       <TableHead>Invoice #</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Payment Account</TableHead>
+                      <TableHead>Payment Rail</TableHead>
                       <TableHead>Balance</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
@@ -1295,7 +1401,7 @@ export default function Payments() {
                   <TableBody>
                     {scheduledInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           No scheduled payments yet
                         </TableCell>
                       </TableRow>
@@ -1317,6 +1423,7 @@ export default function Payments() {
                             <TableCell>{invoice.invoice_number || '-'}</TableCell>
                             <TableCell>{invoice.due_date ? format(new Date(invoice.due_date), 'MMM d, yyyy') : '-'}</TableCell>
                             <TableCell>{paymentAccount?.name || 'Unassigned'}</TableCell>
+                            <TableCell>{PAYOUT_METHOD_LABELS[invoice.ap_metadata?.scheduled_payout_method] || 'Not selected'}</TableCell>
                             <TableCell className="font-semibold">${remainingBalance.toLocaleString()}</TableCell>
                             <TableCell>
                               <Badge className={isPastScheduled ? 'bg-resend-red/10 text-resend-red' : 'bg-resend-yellow/10 text-resend-yellow'}>
@@ -1382,13 +1489,13 @@ export default function Payments() {
                   <TableBody>
                     {paymentsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredPayments.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           No payments recorded yet
                         </TableCell>
                       </TableRow>
@@ -1412,7 +1519,7 @@ export default function Payments() {
                             <TableCell>
                               <Badge className={paymentMethodColors[p.payment_method] || 'bg-secondary text-foreground'}>
                                 <MethodIcon className="h-3 w-3 mr-1" />
-                                {p.payment_method?.replace(/_/g, ' ')}
+                                {PAYOUT_METHOD_LABELS[p.payment_method] || p.payment_method?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">
@@ -1521,7 +1628,7 @@ export default function Payments() {
                             <TableCell>
                               <Badge className={paymentMethodColors[p.payment_method] || 'bg-secondary text-foreground'}>
                                 <MethodIcon className="h-3 w-3 mr-1" />
-                                {p.payment_method?.replace(/_/g, ' ')}
+                                {PAYOUT_METHOD_LABELS[p.payment_method] || p.payment_method?.replace(/_/g, ' ')}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
@@ -1605,7 +1712,7 @@ export default function Payments() {
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
                     <p className="font-medium">Auto-Pay Approved Invoices</p>
-                    <p className="text-sm text-muted-foreground">Automatically process payment for approved invoices</p>
+                    <p className="text-sm text-muted-foreground">Automatically release approved invoices through the selected payout rail</p>
                   </div>
                   <Switch
                     checked={paymentSettings.autoPayApprovedInvoices}
@@ -1614,20 +1721,20 @@ export default function Payments() {
                 </div>
                 <div className="p-4 bg-secondary rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-medium">Default Payment Method</p>
-                    <p className="text-sm text-muted-foreground">Method used for automatic payments</p>
+                    <p className="font-medium">Auto-Pay Payment Rail</p>
+                    <p className="text-sm text-muted-foreground">Rail used only when an auto-pay trigger runs</p>
                   </div>
                   <Select
-                    value={paymentSettings.defaultPaymentMethod}
+                    value={['stripe_connect_custom', 'checkbook_digital', 'checkbook_physical'].includes(paymentSettings.defaultPaymentMethod) ? paymentSettings.defaultPaymentMethod : 'stripe_connect_custom'}
                     onValueChange={(value) => setPaymentSettings({ ...paymentSettings, defaultPaymentMethod: value })}
                   >
                     <SelectTrigger className="w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="stripe">Stripe</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
+                      <SelectItem value="checkbook_digital">Digital Check</SelectItem>
+                      <SelectItem value="checkbook_physical">Mailed Check</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1855,6 +1962,24 @@ export default function Payments() {
                 min={new Date().toISOString().slice(0, 10)}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Payment Rail</Label>
+              <Select
+                value={scheduleForm.payout_method}
+                onValueChange={(value) => setScheduleForm(prev => ({ ...prev, payout_method: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select rail..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {VENDOR_PAYOUT_METHODS.map((method) => (
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
+                      {method.label} - {method.detail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setScheduleDialogInvoice(null)}>Cancel</Button>
@@ -1940,45 +2065,6 @@ export default function Payments() {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Gateway Modal */}
-      <PaymentGatewayModal
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        payment={selectedInvoice ? {
-          invoice_id: selectedInvoice.id,
-          vendor_id: selectedInvoice.vendor_id,
-          vendor_name: selectedInvoice.vendor_name,
-          invoice_number: selectedInvoice.invoice_number,
-          amount: selectedInvoice.total_amount,
-          due_date: selectedInvoice.due_date,
-        } : null}
-        onPaymentComplete={async (paymentData) => {
-          if (paymentData.status === 'completed') {
-            const paymentResult = await recordInvoicePaymentRpc({
-              invoiceId: selectedInvoice.id,
-              amount: selectedInvoice.total_amount,
-              reference: paymentData.transaction_id || paymentData.bank_reference || `GATEWAY-${Date.now()}`,
-              paymentMethod: paymentData.payment_method || 'manual',
-            });
-
-            await recordPaymentLedger({
-              invoice: { ...selectedInvoice, organization_id: selectedInvoice.organization_id || organization?.id },
-              paymentRecord: { id: paymentResult?.payment_id, ...paymentData },
-              userId: userProfile?.id,
-            });
-          } else if (paymentData.status === 'pending') {
-            await updateInvoice.mutateAsync({
-              id: selectedInvoice.id,
-              data: { payment_status: 'pending' },
-            });
-          }
-          toast.success(
-            paymentData.status === 'pending'
-              ? 'Bank transfer recorded as pending'
-              : 'Payment processed successfully'
-          );
-        }}
-      />
 
       <ConfirmDialog />
     </div>

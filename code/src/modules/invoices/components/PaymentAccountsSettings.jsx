@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,8 +28,6 @@ export default function PaymentAccountsSettings() {
     account_type: 'checking',
     routing_number_last4: '',
     account_number_last4: '',
-    full_routing_number: '',
-    full_account_number: ''
   });
 
   const { data: accounts = [], isLoading } = useQuery({
@@ -69,26 +66,13 @@ export default function PaymentAccountsSettings() {
         account_number_last4: account.account_number_last4 || null
       });
 
-      if (account.full_routing_number && account.full_account_number) {
-        const { error: dwollaError } = await supabase.functions.invoke('create-dwolla-funding-source', {
-          body: {
-            target_type: 'organization',
-            payment_account_id: created.id,
-            routing_number: account.full_routing_number,
-            account_number: account.full_account_number,
-            bank_account_type: 'checking',
-          }
-        });
-        if (dwollaError) throw new Error(`Account created, but ACH setup failed: ${dwollaError.message}`);
-      }
-
       return created;
     },
     onSuccess: () => {
       toast.success("Payment account created");
       queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });
       setIsAdding(false);
-      setNewAccount({ name: '', account_type: 'checking', routing_number_last4: '', account_number_last4: '', full_routing_number: '', full_account_number: '' });
+      setNewAccount({ name: '', account_type: 'checking', routing_number_last4: '', account_number_last4: '' });
     },
     onError: (err) => toast.error(err.message)
   });
@@ -128,7 +112,7 @@ export default function PaymentAccountsSettings() {
           Payment Accounts
         </CardTitle>
         <CardDescription>
-          Add, replace, or deactivate the operating accounts used for vendor bill-pay. Full ACH details are sent to Dwolla setup and only masked digits are kept here.
+          Add, replace, or deactivate the operating accounts used for vendor bill-pay. Stripe Connect bank setup lives in the payment provider setup flow; only masked digits are kept here.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -218,32 +202,6 @@ export default function PaymentAccountsSettings() {
                   </div>
                 </>
               )}
-              {newAccount.account_type === 'checking' && (
-                <>
-                  <div className="space-y-1 md:col-span-2">
-                    <Label className="text-xs">Enable real Dwolla ACH payouts from this account (optional)</Label>
-                    <p className="text-xs text-muted-foreground">Provide the full routing/account number to create a real Dwolla funding source. Numbers are sent directly to a secure vault, never stored in plain text.</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Full Routing Number</Label>
-                    <Input
-                      value={newAccount.full_routing_number}
-                      onChange={e => setNewAccount({...newAccount, full_routing_number: e.target.value.replace(/\D/g, '').slice(0, 9)})}
-                      placeholder="9 digits"
-                      maxLength={9}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Full Account Number</Label>
-                    <Input
-                      value={newAccount.full_account_number}
-                      onChange={e => setNewAccount({...newAccount, full_account_number: e.target.value.replace(/\D/g, '').slice(0, 17)})}
-                      placeholder="Account number"
-                      maxLength={17}
-                    />
-                  </div>
-                </>
-              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button>
@@ -304,7 +262,7 @@ export default function PaymentAccountsSettings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="dwolla_ach">Dwolla (ACH)</SelectItem>
+                        <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
                         <SelectItem value="checkbook_digital">Digital Check (Checkbook.io)</SelectItem>
                         <SelectItem value="checkbook_physical">Mailed Check (Checkbook.io)</SelectItem>
                       </SelectContent>

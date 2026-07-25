@@ -25,15 +25,18 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
 import { isInvoicePaymentReady } from '@/lib/invoiceAp';
-import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle, Building2, CheckSquare, Mail, CreditCard } from 'lucide-react';
 
 // Labels only -- process-payout dispatches to the right rail off this same string, see
 // _shared/payoutProviders/index.ts.
-const PAYOUT_METHOD_LABELS = {
-  dwolla_ach: 'ACH (Dwolla)',
-  checkbook_digital: 'Digital Check (Checkbook.io)',
-  checkbook_physical: 'Mailed Check (Checkbook.io)',
-};
+const PAYOUT_METHODS = [
+  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Stripe Connect ACH', icon: Building2, enabled: true },
+  { value: 'stripe_card', label: 'Card', detail: 'Stripe card payout rail not configured yet', icon: CreditCard, enabled: false },
+  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Checkbook.io email delivery', icon: CheckSquare, enabled: true },
+  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Checkbook.io physical delivery', icon: Mail, enabled: true },
+];
+
+const PAYOUT_METHOD_LABELS = Object.fromEntries(PAYOUT_METHODS.map((method) => [method.value, method.label]));
 
 export function BillPayWidget({ invoice }) {
   const { organization, profile } = useAuth();
@@ -42,7 +45,8 @@ export function BillPayWidget({ invoice }) {
   const [isScheduling, setIsScheduling] = useState(false);
   const [scheduleData, setScheduleData] = useState({
     payment_account_id: invoice?.payment_account_id || '',
-    date: invoice?.scheduled_payment_date || ''
+    date: invoice?.scheduled_payment_date || '',
+    payout_method: invoice?.ap_metadata?.scheduled_payout_method || 'stripe_connect_custom'
   });
 
   const [isRecording, setIsRecording] = useState(false);
@@ -85,6 +89,13 @@ export function BillPayWidget({ invoice }) {
         p_date: data.date
       });
       if (error) throw error;
+
+      const nextMetadata = { ...(invoice.ap_metadata || {}), scheduled_payout_method: data.payout_method };
+      const { error: metadataError } = await supabase
+        .from('invoices')
+        .update({ ap_metadata: nextMetadata })
+        .eq('id', invoice.id);
+      if (metadataError) throw metadataError;
     },
     onSuccess: () => {
       toast.success("Payment scheduled");
@@ -182,6 +193,7 @@ export function BillPayWidget({ invoice }) {
   const remainingBalance = invoice.total_amount - (invoice.paid_amount || 0);
   const isFullyPaid = remainingBalance <= 0 || invoice.status === 'paid';
   const selectedAccountName = accounts.find(a => a.id === invoice.payment_account_id)?.name || 'Unknown Account';
+  const scheduledRailLabel = PAYOUT_METHOD_LABELS[invoice.ap_metadata?.scheduled_payout_method] || 'Not selected';
 
   return (
     <Card className="border-border shadow-sm">
@@ -210,16 +222,24 @@ export function BillPayWidget({ invoice }) {
                     {releaseFundsMutation.isPending ? 'Releasing...' : 'Release Funds'}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => releaseFundsMutation.mutate('dwolla_ach')}>
-                    Send ACH (Dwolla)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => releaseFundsMutation.mutate('checkbook_digital')}>
-                    Send Digital Check (Checkbook.io)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => releaseFundsMutation.mutate('checkbook_physical')}>
-                    Mail Physical Check (Checkbook.io)
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56">
+                  {PAYOUT_METHODS.map((method) => {
+                    const MethodIcon = method.icon;
+                    return (
+                      <DropdownMenuItem
+                        key={method.value}
+                        disabled={!method.enabled}
+                        onClick={() => releaseFundsMutation.mutate(method.value)}
+                        className="flex items-start gap-2"
+                      >
+                        <MethodIcon className="mt-0.5 h-4 w-4" />
+                        <span className="flex min-w-0 flex-col">
+                          <span>{method.label}</span>
+                          <span className="text-xs text-muted-foreground">{method.detail}</span>
+                        </span>
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -270,7 +290,7 @@ export function BillPayWidget({ invoice }) {
           <div className="flex items-center gap-3 p-3 bg-amber-50 text-amber-900 rounded-lg border border-amber-200">
             <CalendarIcon className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="text-sm">
-              This invoice is scheduled to be paid on <strong>{format(new Date(invoice.scheduled_payment_date), 'MMM dd, yyyy')}</strong> from <strong>{selectedAccountName}</strong>.
+              This invoice is scheduled to be paid on <strong>{format(new Date(invoice.scheduled_payment_date), 'MMM dd, yyyy')}</strong> from <strong>{selectedAccountName}</strong> via <strong>{scheduledRailLabel}</strong>.
             </div>
             <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setIsScheduling(true)}>
               Reschedule
@@ -324,6 +344,21 @@ export function BillPayWidget({ invoice }) {
                 onChange={e => setScheduleData({...scheduleData, date: e.target.value})} 
                 min={new Date().toISOString().split('T')[0]}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Rail</Label>
+              <Select value={scheduleData.payout_method} onValueChange={v => setScheduleData({...scheduleData, payout_method: v})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a rail" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYOUT_METHODS.map((method) => (
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
+                      {method.label} - {method.detail}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
