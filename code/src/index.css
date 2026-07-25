@@ -1074,3 +1074,269 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Performance analytics command center */
+.performance-visual-page [string="progress"] {
+  --progress: 1;
+  animation: performance-reveal 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.performance-command-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.68);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(14, 18, 31, 0.98) 0%, rgba(13, 87, 91, 0.92) 47%, rgba(127, 58, 18, 0.9) 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 78px);
+  box-shadow: 0 24px 70px -44px rgba(0, 0, 0, 0.72);
+}
+
+.performance-command-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(120deg, black, transparent 78%);
+  pointer-events: none;
+}
+
+.performance-command-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 24px;
+  padding: 24px;
+}
+
+@media (min-width: 1024px) {
+  .performance-command-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+    align-items: end;
+    padding: 32px;
+  }
+}
+
+.performance-hero-badge {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-weight: 700;
+}
+
+.performance-hero-badge-live {
+  background: rgba(14, 116, 58, 0.72);
+  color: #dcfce7;
+}
+
+.performance-hero-stat {
+  min-width: 0;
+  border-radius: 8px;
+  border-top: 3px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 14px;
+}
+
+.performance-hero-stat span,
+.performance-hero-stat small {
+  display: block;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.performance-hero-stat strong {
+  display: block;
+  margin-top: 6px;
+  color: white;
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.performance-focus-panel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.36);
+  padding: 16px;
+  backdrop-filter: blur(18px);
+}
+
+.performance-focus-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(255,255,255,0.14), transparent 44%);
+  pointer-events: none;
+}
+
+.performance-focus-topline,
+.performance-focus-meter,
+.performance-date-card,
+.performance-source-list {
+  position: relative;
+  z-index: 1;
+}
+
+.performance-focus-topline {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.performance-focus-topline span {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.performance-focus-topline strong {
+  display: block;
+  color: white;
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.performance-focus-meter {
+  height: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.performance-focus-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14b8a6, #f97316, #ef4444);
+}
+
+.performance-date-card {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  padding: 12px;
+}
+
+@media (min-width: 540px) {
+  .performance-date-card {
+    grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.performance-source-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.performance-source-list div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.42);
+  padding: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.performance-source-list div:first-child {
+  grid-column: span 2;
+}
+
+.performance-tab-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 10px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+@media (min-width: 720px) {
+  .performance-tab-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1180px) {
+  .performance-tab-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.performance-tab-button {
+  display: flex;
+  min-height: 54px;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 8px;
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--secondary) / 0.28) 100%);
+  color: hsl(var(--muted-foreground));
+  padding: 12px;
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.5);
+  transition: border-color 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.performance-tab-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.performance-tab-button:hover,
+.performance-tab-button.is-active {
+  border-color: hsl(var(--primary) / 0.72);
+  color: hsl(var(--primary));
+  transform: translateY(-1px);
+  box-shadow: 0 20px 38px -30px rgba(0, 0, 0, 0.58);
+}
+
+.performance-panel-card {
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 8px;
+  background: linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--secondary) / 0.24) 100%);
+  box-shadow: 0 18px 44px -34px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes performance-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .performance-visual-page [string="progress"],
+  .performance-tab-button {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}

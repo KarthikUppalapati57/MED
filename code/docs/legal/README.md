@@ -37,6 +37,7 @@ These files are kept for launch/compliance implementation tracking and are not p
 
 - [restops_360_legal_launch_checklist.md](restops_360_legal_launch_checklist.md)
 - [website_sms_compliance_implementation.md](website_sms_compliance_implementation.md)
+- [legal_pages_remediation_plan.md](legal_pages_remediation_plan.md) - page-by-page current-state vs. proposed-change plan for the 6 supplementary pages plus `/ai-usage`, `/data-retention`, the site footer, and `/docs`. Draft, pending approval; no code changes applied yet.
 
 ## Generated Data
 
