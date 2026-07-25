@@ -150,6 +150,7 @@ const navigation = [
     minRole: 'location_manager',
     subItems: [
       { name: 'Menu Items', href: 'Recipes/menu-items', icon: BookOpen },
+      { name: 'Operations Toolkit', href: 'Recipes/operations', icon: FileBarChart },
       { name: 'Recipes List', href: 'Recipes/recipes-list', icon: ChefHat },
       { name: 'Prepared Items', href: 'Recipes/prepared-items', icon: Plus },
       { name: 'Bar Items', href: 'Recipes/bar-items', icon: Wine },
@@ -380,9 +381,13 @@ export default function Layout({ children, currentPageName }) {
     const isParentRoleValid = hasMinRole(item.minRole);
 
     if (item.subItems) {
+      const parentPageKey = item.pageKey || item.href?.split('?')[0];
+      const isParentModuleEnabled = parentPageKey
+        ? isPageInEnabledModules(parentPageKey, enabledModules, userRole)
+        : true;
       const filteredSubItems = item.subItems.filter(sub => {
-        const pageKey = sub.href.split('?')[0];
-        if (!isParentRoleValid) return false;
+        const pageKey = item.pageKey || sub.href.split('?')[0];
+        if (!isParentRoleValid || !isParentModuleEnabled) return false;
         return isPageInEnabledModules(pageKey, enabledModules, userRole);
       });
 
@@ -720,6 +725,7 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 }
+
 
 
 

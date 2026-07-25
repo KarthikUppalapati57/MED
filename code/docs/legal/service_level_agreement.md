@@ -1,36 +1,107 @@
 # Service Level Agreement
 
+**Effective date:** July 24, 2026  
 **Last updated:** July 24, 2026
-**Source of truth:** [code/src/modules/public/pages/ServiceLevelAgreement.jsx](../../src/modules/public/pages/ServiceLevelAgreement.jsx) (route `/sla`) — update both if either changes.
 
-## 1. Overview
+This Service Level Agreement (“SLA”) forms part of the agreement between Mindful Tech Solutions Inc., doing business as RestOps-360 (“RestOps-360,” “we,” “us,” or “our”), and a customer with an eligible paid subscription (“Customer”).
 
-This Service Level Agreement ("SLA") describes Restops's availability and support commitments for the Restops platform (the "Platform") and forms part of the Terms of Service. It applies to paid Subscriptions in good standing and does not apply during a trial, or while an account is suspended for nonpayment or Acceptable Use Policy violations.
+This SLA does not apply to free trials, beta or preview features, professional services, third-party services, or accounts suspended under the Agreement.
 
-## 2. Availability Commitment
+## 1. Monthly Availability Commitment
 
-Restops targets 99.9% Platform availability, measured monthly, calculated as total minutes in the period minus Excluded Downtime, divided by total minutes in the period. "Excluded Downtime" includes Scheduled Maintenance (Section 4), Force Majeure events, and issues caused by Customer's equipment, third-party services not provided by Restops, or Customer's breach of the Terms of Service.
+We will use commercially reasonable efforts to make the Core Platform available at least **99.9%** in each calendar month (“Monthly Uptime Percentage”).
 
-## 3. Support
+“Core Platform” means the production web application functions for authenticated access to supported RestOps-360 invoice, vendor, inventory, recipe, and reporting workflows. It excludes optional integrations, third-party payment networks, telecommunications delivery, and features identified as beta, preview, pilot, or experimental.
 
-Support is available 24x7 by email, telephone, and in-app chat. For critical issues, Restops targets an initial response within 10 minutes; this commitment is subject to confirmation of operational readiness before public launch. Severity definitions and response/resolution targets for non-critical issues are being finalized.
+## 2. Calculation
 
-## 4. Scheduled Maintenance
+Monthly Uptime Percentage is calculated as:
 
-Restops may perform scheduled maintenance that temporarily affects availability. Where reasonably possible, Restops will provide advance notice by email or in-app notification (notice period to be finalized). Scheduled Maintenance is excluded from the availability calculation in Section 2.
+`(Total Minutes − Unavailable Minutes − Excluded Downtime) ÷ (Total Minutes − Excluded Downtime) × 100`
 
-## 5. Force Majeure
+“Unavailable” means the Core Platform is broadly unable to accept authenticated requests due to a failure within our reasonable control. Intermittent errors or degraded performance may be treated as Unavailable when they materially prevent normal use.
 
-Restops is not responsible for failing to meet this SLA to the extent caused by events beyond its reasonable control, including natural disasters, internet or utility failures, governmental action, or outages of third-party infrastructure or subprocessors Restops relies on to deliver the Platform.
+## 3. Excluded Downtime
 
-## 6. Service Credits
+Excluded Downtime includes:
 
-The service credit schedule — the percentage of monthly fees credited at each availability shortfall tier, claim process, and claim deadline — is a pending business decision and will be published here before this SLA is presented as binding.
+- scheduled maintenance announced at least 48 hours in advance, where reasonably practicable;
+- emergency maintenance required to address a security, legal, or stability risk;
+- Customer systems, credentials, configuration, networks, devices, data, code, or misuse;
+- third-party services selected by Customer or not controlled by us;
+- internet, telecommunications, carrier, payment-network, banking, or cloud-provider events outside our reasonable control;
+- suspension permitted by the Agreement;
+- force majeure events;
+- beta, preview, pilot, or free services; and
+- inability to use a feature while other material Core Platform functions remain available.
 
-## 7. How to Request a Credit
+We will use reasonable efforts to schedule planned maintenance during lower-usage periods and minimize impact.
 
-Once the schedule in Section 6 is finalized, requests can be sent to [SUPPORT CONTACT EMAIL] within the claim window (to be finalized) of the incident, including the affected dates, times, and a description of the impact.
+## 4. Service Credits
 
-## 8. Changes to This SLA
+If the Monthly Uptime Percentage falls below the commitment, an eligible Customer may request a credit against the monthly recurring fee for the affected Core Platform subscription:
 
-We may update this SLA from time to time. Material changes will be communicated by email or in-app notification before they take effect.
+| Monthly Uptime Percentage | Service Credit |
+|---:|---:|
+| 99.0% to less than 99.9% | 5% |
+| 95.0% to less than 99.0% | 10% |
+| Less than 95.0% | 25% |
+
+Credits:
+
+- apply only to the affected month and affected subscription;
+- exclude taxes, usage charges, third-party fees, implementation fees, and pass-through costs;
+- may not exceed 25% of the affected monthly recurring fee;
+- are not cash refunds;
+- may not be transferred; and
+- are Customer’s sole and exclusive remedy for failure to meet the availability commitment.
+
+## 5. Credit Request Process
+
+Customer must submit a request within **30 days after the end of the affected month** to `contact@mindfultechsol.com` with the subject **SLA Credit Request**.
+
+The request must include:
+
+- Customer and account name;
+- affected restaurant locations;
+- date and approximate time of the incident;
+- description of impact;
+- relevant screenshots, request identifiers, or support ticket numbers; and
+- any other information reasonably needed to validate the request.
+
+We will evaluate service telemetry and the information provided. Approved credits will be applied to a future invoice.
+
+## 6. Support Channels and Hours
+
+Support is available through:
+
+- Email: `contact@mindfultechsol.com`
+- Phone: `+1 (865) 666-7690`
+- In-application support, when enabled
+
+Priority 1 issues may be reported 24x7. Other issues are handled during normal U.S. business hours unless an Order includes enhanced support.
+
+## 7. Severity and Initial Response Targets
+
+| Priority | Description | Initial response target |
+|---|---|---:|
+| P1 — Critical | Broad production outage, confirmed critical security event, or material inability to perform time-sensitive core operations with no reasonable workaround | 30 minutes, 24x7 |
+| P2 — High | Major production degradation or significant feature failure affecting multiple users, with limited workaround | 4 business hours |
+| P3 — Normal | Non-critical defect, intermittent issue, or limited feature impact with a workaround | 1 business day |
+| P4 — Low | General question, configuration request, cosmetic issue, or feature request | 2 business days |
+
+An “initial response” means acknowledgment and commencement of triage, not resolution. Resolution time depends on cause, complexity, Customer cooperation, provider dependencies, and remediation risk.
+
+We may change priority when the reported impact does not match the definition.
+
+## 8. Customer Cooperation
+
+Customer must provide timely access to relevant information, contacts, logs, examples, and reasonable troubleshooting cooperation. Response and resolution targets may be paused while awaiting Customer information or access.
+
+## 9. Security Incidents
+
+Security-incident notice obligations are governed by the Data Processing Addendum and applicable law, not the service-credit schedule.
+
+## 10. Changes to This SLA
+
+We may update this SLA for future subscription periods. Material reductions will not apply during Customer’s then-current committed term unless required for law, security, or a third-party dependency. Updated terms will be posted with a new effective date.

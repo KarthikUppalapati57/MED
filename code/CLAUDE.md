@@ -598,3 +598,34 @@ trace log. Going forward: append a dated entry here, don't just leave it to task
   process actively maintains it — someone should reconcile it.
 - Real dependency license scan for Open Source Notices; formal WCAG audit for the Accessibility
   Statement; footer link/copyright fix above.
+
+## 11. OTHER WORKSTREAM — MARKETING SITE COPY
+
+Also unrelated to the RLS/RBAC hardening work; logged per the same "trace every repo change
+here" rule from §10.
+
+### Completed (2026-07-25)
+
+- **`LandingPage.jsx` Showcase checklist** (~line 338): added two `CheckItem`s — "AI Assist"
+  ("Invoice and inventory recommendations") and "Live KPIs" ("Role-aware dashboards, per
+  location") — turning the existing 1x2 OCR/State-Persistence row into a 2x2 grid. Prompted by
+  a competitor site (ApplyGPT/PortfolioOS) pitch with 4 feature bullets; only these 2 were
+  accurate for this product and got added verbatim-adapted. Two were deliberately **not**
+  added:
+  - "Custom CRM/PM tooling built around the client's workflow" — that's a bespoke-build agency
+    pitch; RestOps is one shared multi-tenant product, not a per-client custom build.
+  - A specific "94% accuracy vs GPT-4" stat from an unrelated medical-AI case study — reusing
+    another company's case-study number here would be a fabricated claim.
+  - Also deliberately scoped "Live KPIs" to **per-location**, not "across your portfolio":
+    §3/§7's 2026-07-21 `require_exact_location_match` decision means `org_manager`/
+    `branch_manager`/`tenant_super_admin` have **no** standing cross-location aggregate view
+    (zero rows without an active location selected) — a "portfolio-wide" dashboard claim would
+    contradict that deliberate RLS decision as it stands today.
+
+- **`LandingPage.jsx` Showcase checklist, follow-up** (same line, 5th `CheckItem`): user asked
+  to reframe the skipped "Custom CRM/PM tooling" bullet instead of dropping it outright —
+  specifically tied to location being "the source of all the data ... that we must follow."
+  Added "Location Scoping" / "Source of truth for every record.", grounded in §3's actual rule
+  ("an invoice's scope comes ONLY from the uploader's context at upload time") rather than the
+  agency/bespoke-build framing of the original bullet. Grid is now 5 items in a 2-col layout
+  (2/2/1) — no layout rework done, not asked for.

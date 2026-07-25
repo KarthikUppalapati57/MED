@@ -271,7 +271,16 @@ export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
   const modulesList = enabledModules || [];
   const normalizedList = modulesList.map(m => String(m).toLowerCase());
-  return normalizedList.includes(moduleInfo.key.toLowerCase());
+  if (normalizedList.includes(moduleInfo.key.toLowerCase())) return true;
+
+  // Some historical plans use alias module keys that point at the same page,
+  // for example `recipes` vs `recipe_management`. Allow the page when any
+  // enabled module definition explicitly includes it instead of trusting only
+  // the first reverse lookup match.
+  return normalizedList.some((moduleKey) => {
+    const enabledModule = MODULE_DEFINITIONS[moduleKey];
+    return enabledModule?.pages?.includes(moduleInfo.pages[0]) || enabledModule?.pages?.includes(normalizePageName(pageName));
+  });
 }
 
 /**

@@ -59,6 +59,8 @@ const MasterSubscriptionAgreement = React.lazy(() => import('./modules/public/pa
 const AccessibilityStatement = React.lazy(() => import('./modules/public/pages/AccessibilityStatement'));
 const AIUsagePolicy = React.lazy(() => import('./modules/public/pages/AIUsagePolicy'));
 const DataRetentionPolicy = React.lazy(() => import('./modules/public/pages/DataRetentionPolicy'));
+const SmsTermsAndConditions = React.lazy(() => import('./modules/public/pages/SmsTermsAndConditions'));
+const SubprocessorList = React.lazy(() => import('./modules/public/pages/SubprocessorList'));
 const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
 const VendorOnboardingTax = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingTax'));
 const VendorOnboardingBank = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingBank'));
@@ -1327,6 +1329,8 @@ const AuthenticatedApp = () => {
       <Route path="/accessibility" element={lazyElement(<AccessibilityStatement />, 'Loading accessibility statement...')} />
       <Route path="/ai-usage" element={lazyElement(<AIUsagePolicy />, 'Loading AI usage policy...')} />
       <Route path="/data-retention" element={lazyElement(<DataRetentionPolicy />, 'Loading data retention policy...')} />
+      <Route path="/sms-terms" element={lazyElement(<SmsTermsAndConditions />, 'Loading SMS terms...')} />
+      <Route path="/subprocessors" element={lazyElement(<SubprocessorList />, 'Loading subprocessor list...')} />
       <Route path="/docs" element={lazyElement(<Documentation />, 'Loading documentation...')} />
       <Route path="/vendor-onboarding/tax/:token" element={lazyElement(<VendorOnboardingTax />, 'Loading secure portal...')} />
       <Route path="/vendor-onboarding/bank/:token" element={lazyElement(<VendorOnboardingBank />, 'Loading secure portal...')} />
@@ -1518,6 +1522,7 @@ function App() {
 }
 
 export default App
+
 
 
 

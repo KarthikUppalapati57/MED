@@ -38,7 +38,7 @@ export default function AIFeaturesAddendum() {
           <ScrollArea className="h-[60vh] pr-6">
             <div className="prose prose-slate prose-sm max-w-none space-y-6">
               <Section title="1. Scope">
-                <p>This addendum supplements the <a href="/terms" className="text-indigo-600 no-underline hover:underline">Terms of Service</a> and applies specifically to Restops's AI-assisted features: invoice data extraction, the AI Assistant, and the optional chatbot, powered by Azure OpenAI. If this addendum conflicts with the Terms of Service on an AI-specific point, this addendum controls.</p>
+                <p>This addendum supplements the <a href="/terms" className="text-indigo-600 underline">Terms of Service</a> and applies specifically to Restops's AI-assisted features: invoice data extraction, the AI Assistant, and the optional chatbot, powered by Azure OpenAI. If this addendum conflicts with the Terms of Service on an AI-specific point, this addendum controls.</p>
               </Section>
 
               <Section title="2. Beta and Experimental Features">
@@ -58,11 +58,11 @@ export default function AIFeaturesAddendum() {
               </Section>
 
               <Section title="6. Data Sent to the AI Provider">
-                <p>To generate extraction results or assistant/chatbot responses, relevant invoice text and operational context may be sent to Azure OpenAI. See the <a href="/privacy" className="text-indigo-600 no-underline hover:underline">Privacy Policy</a> for how Azure OpenAI is used as a subprocessor.</p>
+                <p>To generate extraction results or assistant/chatbot responses, relevant invoice text and operational context may be sent to Azure OpenAI. See the <a href="/privacy" className="text-indigo-600 underline">Privacy Policy</a> for how Azure OpenAI is used as a subprocessor.</p>
               </Section>
 
               <Section title="7. Appropriate Use">
-                <p>AI features are subject to the <a href="/acceptable-use" className="text-indigo-600 no-underline hover:underline">Acceptable Use Policy</a>, including the prohibition on using AI features to generate unlawful or harmful content or to attempt to extract model internals, training data, or system prompts.</p>
+                <p>AI features are subject to the <a href="/acceptable-use" className="text-indigo-600 underline">Acceptable Use Policy</a>, including the prohibition on using AI features to generate unlawful or harmful content or to attempt to extract model internals, training data, or system prompts.</p>
               </Section>
 
               <Section title="8. Changes to AI Features">

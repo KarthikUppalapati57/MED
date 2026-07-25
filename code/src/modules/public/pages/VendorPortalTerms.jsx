@@ -38,7 +38,7 @@ export default function VendorPortalTerms() {
           <ScrollArea className="h-[60vh] pr-6">
             <div className="prose prose-slate prose-sm max-w-none space-y-6">
               <Section title="1. Scope">
-                <p>These Vendor Portal Terms apply to a supplier or payee ("Vendor," "you") invited by a Restops customer organization ("Customer") to submit contact, tax, or banking information through the Restops vendor onboarding portal, typically via a one-time passcode (OTP) or secure link. They are separate from, and do not replace, the <a href="/terms" className="text-indigo-600 no-underline hover:underline">Terms of Service</a> that govern the Customer's own account.</p>
+                <p>These Vendor Portal Terms apply to a supplier or payee ("Vendor," "you") invited by a Restops customer organization ("Customer") to submit contact, tax, or banking information through the Restops vendor onboarding portal, typically via a one-time passcode (OTP) or secure link. They are separate from, and do not replace, the <a href="/terms" className="text-indigo-600 underline">Terms of Service</a> that govern the Customer's own account.</p>
               </Section>
 
               <Section title="2. Your Relationship to Restops">
@@ -58,7 +58,7 @@ export default function VendorPortalTerms() {
               </Section>
 
               <Section title="6. Security">
-                <p>Full tax identifiers and bank account/routing numbers are stored encrypted in a dedicated secrets vault; standard records and staff-facing screens show only the last four digits. See the <a href="/security" className="text-indigo-600 no-underline hover:underline">Security Policy</a> for more detail.</p>
+                <p>Full tax identifiers and bank account/routing numbers are stored encrypted in a dedicated secrets vault; standard records and staff-facing screens show only the last four digits. See the <a href="/security" className="text-indigo-600 underline">Security Policy</a> for more detail.</p>
               </Section>
 
               <Section title="7. Bank Account Changes">

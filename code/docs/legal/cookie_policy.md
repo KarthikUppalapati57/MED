@@ -1,20 +1,58 @@
 # Cookie Policy
 
+**Effective date:** July 24, 2026  
 **Last updated:** July 24, 2026
-**Source of truth:** [code/src/modules/public/pages/CookiePolicy.jsx](../../src/modules/public/pages/CookiePolicy.jsx) (route `/cookies`) — update both if either changes.
 
-## 1. Necessary Storage
+This Cookie Policy explains how Mindful Tech Solutions Inc., doing business as RestOps-360 (“RestOps-360,” “we,” “us,” or “our”), uses cookies, local storage, session storage, and similar browser technologies on `https://restops-360.com` and the RestOps-360 web application.
 
-Restops uses strictly necessary browser storage and cookies to keep users signed in, maintain Supabase authentication sessions, remember local UI preferences, support MFA/session flows, and keep the web application functional.
+## 1. Current Cookie Approach
 
-## 2. Analytics and Tracking
+At launch, we use browser technologies that are strictly necessary or functional for authentication, security, session continuity, tenant routing, application preferences, and reliable operation.
 
-PostHog and Sentry are disabled for production alignment and are not approved production subprocessors. This policy does not claim Plausible analytics or other third-party analytics tracking.
+We do not currently use third-party advertising cookies, cross-site behavioral advertising, or production analytics cookies.
 
-## 3. Local Preferences
+## 2. Technologies We Use
 
-The app may store non-sensitive local preferences such as theme, pending invite metadata, MFA setup skip state, offline/PWA state, and session workflow markers. These values support product functionality and should not be used for cross-site advertising.
+The exact cookie or storage key names may vary by browser, environment, authentication provider, and application release.
 
-## 4. Managing Storage
+| Category | Purpose | Typical duration | Required? |
+|---|---|---:|---|
+| Authentication and session storage | Keep users signed in, maintain Supabase authentication sessions, refresh tokens, and support secure account access | Session or provider-configured duration | Yes |
+| Security and MFA workflow storage | Support multi-factor authentication, account recovery, invite acceptance, rate limiting, and security-flow state | Session or limited duration | Yes |
+| Tenant and application routing | Maintain organization, brand, location, or workflow context needed to operate the application | Session or limited duration | Yes |
+| Functional preferences | Remember theme, display preferences, onboarding state, and other non-sensitive choices | Until deleted or preference expires | Functional |
+| Offline and PWA storage | Support application assets, offline state, update checks, and service-worker functionality | Until cache refresh or deletion | Functional |
+| Consent record | Remember cookie choices if optional technologies are introduced | Until preference expires or is changed | Functional |
 
-Blocking necessary storage may prevent login, MFA, tenant routing, offline support, or secure app workflows from functioning. Optional analytics consent controls are not active because production analytics are currently disabled.
+Sensitive tax identifiers, full bank-account details, passwords, and one-time passcodes should not be stored in ordinary browser preference storage.
+
+## 3. Analytics, Error Monitoring, and Advertising
+
+PostHog, Sentry, and other optional analytics or error-monitoring tools are not represented as active production subprocessors under this policy unless we enable them and update our disclosures.
+
+Before enabling non-essential analytics, advertising, or similar tracking, we will:
+
+- update this Cookie Policy and the Privacy Policy;
+- identify the applicable provider and purposes;
+- implement consent controls where required; and
+- honor applicable opt-out or privacy preference signals.
+
+## 4. Managing Browser Storage
+
+You can configure your browser to block or delete cookies and site data. Blocking necessary storage may prevent login, multi-factor authentication, tenant routing, offline support, preference retention, or other secure workflows from functioning.
+
+Browser controls vary by provider. Clearing storage may sign you out and reset application preferences.
+
+## 5. Do Not Track and Global Privacy Control
+
+Because we do not currently use cross-site behavioral advertising, we do not currently respond differently to browser “Do Not Track” signals.
+
+If we engage in processing that is subject to a legally recognized opt-out signal, such as Global Privacy Control, we will honor the signal as required by applicable law.
+
+## 6. Changes
+
+We may update this Cookie Policy when browser technologies, providers, or legal requirements change. The updated date will appear at the top of the policy.
+
+## 7. Contact
+
+Questions about cookies or browser storage may be sent to `contact@mindfultechsol.com` with the subject **Cookie Policy**.

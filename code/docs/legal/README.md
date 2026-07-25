@@ -1,32 +1,43 @@
-# Legal & Policy Documents
+﻿# Legal & Policy Documents
 
-Markdown mirror of the live legal pages in `code/src/modules/public/pages/`. Each file's "Source of truth" line links back to its JSX page — the JSX is what actually renders to users; these `.md` files are for review, sharing with counsel, and version-controlled diffing.
+Markdown source for the live legal pages in `src/modules/public/pages/`. The package-backed public pages import these Markdown files directly, so the rendered app and counsel-review documents stay aligned.
 
-All documents below still contain `[BRACKETED PLACEHOLDER]` values pending business/legal sign-off. See [platform_legal_privacy_inventory_draft.md](../platform_legal_privacy_inventory_draft.md) for the full outstanding-decisions tracker.
+These are policy drafts from the RestOps-360 Legal Policy Package dated July 24, 2026. They should receive final review by licensed counsel before production publication or contractual reliance.
 
-## Core documents
+## Public Policy Pages
 
-Mapped 1:1 to the Document Mapping table in the platform legal & privacy inventory.
+| Document | File | Route | Source |
+| --- | --- | --- | --- |
+| Terms of Service | [terms_of_service.md](terms_of_service.md) | `/terms` | 2026-07-24 package |
+| Privacy Policy | [privacy_policy.md](privacy_policy.md) | `/privacy` | 2026-07-24 package |
+| SMS Terms and Conditions | [sms_terms_and_conditions.md](sms_terms_and_conditions.md) | `/sms-terms` | 2026-07-24 package |
+| Acceptable Use Policy | [acceptable_use_policy.md](acceptable_use_policy.md) | `/acceptable-use` | 2026-07-24 package |
+| Cookie Policy | [cookie_policy.md](cookie_policy.md) | `/cookies` | 2026-07-24 package |
+| Data Processing Addendum | [data_processing_addendum.md](data_processing_addendum.md) | `/dpa` | 2026-07-24 package |
+| Security Policy | [security_policy.md](security_policy.md) | `/security` | 2026-07-24 package |
+| Service Level Agreement | [service_level_agreement.md](service_level_agreement.md) | `/sla` | 2026-07-24 package |
+| Subprocessor List | [subprocessor_list.md](subprocessor_list.md) | `/subprocessors` | 2026-07-24 package |
+
+## Supplementary Public Pages
+
+These pages remain platform-specific drafts that were already present in the app.
 
 | Document | File | Route | Status |
 | --- | --- | --- | --- |
-| Terms of Service | [terms_of_service.md](terms_of_service.md) | `/terms` | Draft — governing law, venue, arbitration, entity name pending |
-| Privacy Policy | [privacy_policy.md](privacy_policy.md) | `/privacy` | Draft — subprocessor regions, DSAR process pending |
-| Cookie Policy | [cookie_policy.md](cookie_policy.md) | `/cookies` | Draft — accurate as of current (no analytics in production) |
-| Acceptable Use Policy | [acceptable_use_policy.md](acceptable_use_policy.md) | `/acceptable-use` | Draft — contact emails pending |
-| Security Policy | [security_policy.md](security_policy.md) | `/security` | Draft — backup/RPO-RTO, severity matrix pending |
-| Data Processing Addendum | [data_processing_addendum.md](data_processing_addendum.md) | `/dpa` | Draft — legal entity name, transfer mechanism pending |
-| Service Level Agreement | [service_level_agreement.md](service_level_agreement.md) | `/sla` | Draft — service credit schedule is an open business decision |
+| Vendor Portal Terms | [vendor_portal_terms.md](vendor_portal_terms.md) | `/vendor-terms` | Draft |
+| AI Features Addendum | [ai_features_addendum.md](ai_features_addendum.md) | `/ai-terms` | Draft |
+| Open Source & Third-Party Notices | [open_source_notices.md](open_source_notices.md) | `/open-source` | Draft; backed by generated third-party notice data |
+| CCPA Notice at Collection & Privacy Choices | [ccpa_privacy_rights.md](ccpa_privacy_rights.md) | `/ccpa-privacy-rights` | Draft |
+| Master Subscription Agreement | [master_subscription_agreement.md](master_subscription_agreement.md) | `/msa` | Template |
+| Accessibility Statement | [accessibility_statement.md](accessibility_statement.md) | `/accessibility` | Draft |
 
-## Supplementary documents
+## Internal Implementation Notes
 
-Not in the original mapping table; added to round out gaps the inventory itself flags (vendor status, AI/beta terms, open-source attribution, CCPA notice-at-collection) or that are standard for a B2B SaaS launch (MSA, accessibility).
+These files are kept for launch/compliance implementation tracking and are not public routes.
 
-| Document | File | Route | Status |
-| --- | --- | --- | --- |
-| Vendor Portal Terms | [vendor_portal_terms.md](vendor_portal_terms.md) | `/vendor-terms` | Draft — contact emails pending |
-| AI Features Addendum | [ai_features_addendum.md](ai_features_addendum.md) | `/ai-terms` | Draft — contact email pending |
-| Open Source & Third-Party Notices | [open_source_notices.md](open_source_notices.md) | `/open-source` | Placeholder — attribution list not yet auto-generated |
-| CCPA Notice at Collection & Privacy Choices | [ccpa_privacy_rights.md](ccpa_privacy_rights.md) | `/ccpa-privacy-rights` | Draft — authorized-agent process pending |
-| Master Subscription Agreement | [master_subscription_agreement.md](master_subscription_agreement.md) | `/msa` | Template — only applies to Customers with a signed Order Form; renewal/cure periods pending |
-| Accessibility Statement | [accessibility_statement.md](accessibility_statement.md) | `/accessibility` | Draft — formal WCAG audit not yet performed |
+- [restops_360_legal_launch_checklist.md](restops_360_legal_launch_checklist.md)
+- [website_sms_compliance_implementation.md](website_sms_compliance_implementation.md)
+
+## Generated Data
+
+- [third_party_notices.md](third_party_notices.md) - generated package license list backing the Open Source Notices summary. Regenerate before each release rather than hand-editing.

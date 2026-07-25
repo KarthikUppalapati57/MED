@@ -38,7 +38,7 @@ export default function MasterSubscriptionAgreement() {
           <ScrollArea className="h-[60vh] pr-6">
             <div className="prose prose-slate prose-sm max-w-none space-y-6">
               <p className="text-slate-500 text-xs italic border-l-2 border-amber-300 pl-3">
-                This is a negotiated-deal template, not a click-through page. It only governs a Customer that has executed an Order Form referencing it; every other Customer is governed by the standard <a href="/terms" className="text-indigo-600 no-underline hover:underline">Terms of Service</a>.
+                This is a negotiated-deal template, not a click-through page. It only governs a Customer that has executed an Order Form referencing it; every other Customer is governed by the standard <a href="/terms" className="text-indigo-600 underline">Terms of Service</a>.
               </p>
 
               <Section title="1. Structure">

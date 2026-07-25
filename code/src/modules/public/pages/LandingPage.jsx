@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
@@ -338,6 +338,9 @@ export default function LandingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
                   <CheckItem title="Low-latency OCR" desc="Sub-second extraction." />
                   <CheckItem title="State Persistence" desc="Offline-first buffers." />
+                  <CheckItem title="AI Assist" desc="Invoice and inventory recommendations." />
+                  <CheckItem title="Live KPIs" desc="Role-aware dashboards, per location." />
+                  <CheckItem title="Location Scoping" desc="Source of truth for every record." />
                 </div>
               </motion.div>
 
@@ -445,6 +448,7 @@ export default function LandingPage() {
               <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
                 <li><a href="#features" className="hover:text-[#b83316] transition-colors">Core Nodes</a></li>
                 <li><Link to="/security" className="hover:text-[#b83316] transition-colors">Security</Link></li>
+                <li><Link to="/subprocessors" className="hover:text-[#b83316] transition-colors">Subprocessors</Link></li>
               </ul>
             </div>
             <div>
@@ -456,10 +460,12 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
-            <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">(c) 2026 RestOps INC. BUILT FOR SCALE.</p>
-            <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80">
+            <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">(c) 2026 Mindful Tech Solutions Inc.</p>
+            <div className="flex flex-wrap justify-center gap-8 text-[9px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80">
                 <Link to="/privacy" className="hover:text-black dark:hover:text-white transition-colors">Privacy</Link>
                 <Link to="/terms" className="hover:text-black dark:hover:text-white transition-colors">Terms</Link>
+                <Link to="/sms-terms" className="hover:text-black dark:hover:text-white transition-colors">SMS</Link>
+                <Link to="/cookies" className="hover:text-black dark:hover:text-white transition-colors">Cookies</Link>
             </div>
           </div>
         </div>
@@ -546,3 +552,5 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     </div>
   </motion.div>
 );
+
+

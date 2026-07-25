@@ -47,10 +47,11 @@ export default function AccessibilityStatement() {
 
               <Section title="3. Measures Taken">
                 <p>The Platform's interface is built on accessibility-focused component primitives (Radix UI) that provide keyboard navigation, focus management, and screen-reader semantics out of the box, and we follow semantic HTML and color-contrast practices in our own design system on top of them.</p>
+                <p>On July 25, 2026, we ran an automated scan (axe-core via Playwright, WCAG 2.0/2.1 A &amp; AA rules) against the sign-in, sign-up, and all 13 legal/policy pages, and fixed what it found: scrollable content regions were not reachable by keyboard (fixed by making the scroll viewport focusable), and cross-reference links inside body text relied on color alone to be distinguishable, with insufficient contrast against surrounding text (fixed by underlining links by default instead of only on hover). All 16 scanned routes now pass with zero critical or serious violations.</p>
               </Section>
 
               <Section title="4. Known Limitations">
-                <p>[A full accessibility audit has not yet been performed; specific known issues and their remediation timeline will be listed here once that audit is complete.]</p>
+                <p>The July 25, 2026 scan covered only public/unauthenticated routes (sign-in, sign-up, legal pages) using automated tooling, which catches a meaningful subset of accessibility issues but not all of them — manual keyboard-only and screen-reader testing has not been performed, and the authenticated application (dashboards, forms, data tables across ~20+ modules) has not been scanned at all. A full manual audit and authenticated-route coverage remain on the roadmap; this section will be updated as that work is completed.</p>
               </Section>
 
               <Section title="5. Feedback">

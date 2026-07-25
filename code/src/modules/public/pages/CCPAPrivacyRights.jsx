@@ -38,7 +38,7 @@ export default function CCPAPrivacyRights() {
           <ScrollArea className="h-[60vh] pr-6">
             <div className="prose prose-slate prose-sm max-w-none space-y-6">
               <Section title="1. Scope">
-                <p>This notice supplements the <a href="/privacy" className="text-indigo-600 no-underline hover:underline">Privacy Policy</a> and applies to California residents under the California Consumer Privacy Act, as amended by the California Privacy Rights Act (CCPA/CPRA).</p>
+                <p>This notice supplements the <a href="/privacy" className="text-indigo-600 underline">Privacy Policy</a> and applies to California residents under the California Consumer Privacy Act, as amended by the California Privacy Rights Act (CCPA/CPRA).</p>
               </Section>
 
               <Section title="2. Notice at Collection">
