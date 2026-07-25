@@ -1,0 +1,65 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Archive } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const lastUpdated = 'July 24, 2026';
+
+function Section({ title, children }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">{title}</h2>
+      <div className="space-y-2 text-slate-600 leading-relaxed">{children}</div>
+    </section>
+  );
+}
+
+export default function DataRetentionPolicy() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <nav className="border-b bg-white px-6 h-16 flex items-center shrink-0 sticky top-0 z-10">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mr-4 -ml-2 text-slate-500">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
+        </Button>
+        <div className="flex items-center gap-2">
+          <Archive className="w-5 h-5 text-indigo-600" />
+          <span className="font-bold text-slate-900">Restops Platform</span>
+        </div>
+      </nav>
+
+      <div className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-12">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12">
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">Data Retention Policy</h1>
+          <p className="text-sm text-slate-500 mb-8 pb-8 border-b border-slate-100">Last updated: {lastUpdated}</p>
+
+          <ScrollArea className="h-[60vh] pr-6">
+            <div className="prose prose-slate prose-sm max-w-none space-y-6">
+              <Section title="1. General Lifecycle">
+                <p>Sensitive information follows the hierarchy lifecycle unless longer retention is legally required: active hierarchy, 30-day archive after deletion begins, then permanent deletion.</p>
+              </Section>
+
+              <Section title="2. Sensitive Records">
+                <p>Sensitive records include EIN/SSN, W-9s, banking information, ACH authorizations, electronic signatures, tax documents, vendor tax information, vendor banking details, payment events, and audit logs.</p>
+              </Section>
+
+              <Section title="3. Legal Exceptions">
+                <p>Retention exceptions may apply for tax reporting, accounting and financial records, ACH/e-sign authorization proof, payment disputes, security incidents, fraud prevention, contract claims, litigation holds, and other legal obligations.</p>
+              </Section>
+
+              <Section title="4. Electronic Signatures">
+                <p>Electronic signature records are retained for the duration required by applicable contractual, financial, tax, regulatory, and legal recordkeeping requirements.</p>
+              </Section>
+
+              <Section title="5. Deletion Records">
+                <p>Deletion events should record scope, requester, authorization, deletion executor, archive period, permanent deletion timestamp, and retained exceptions. Final operational procedures are documented in the production readiness runbooks.</p>
+              </Section>
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+    </div>
+  );
+}

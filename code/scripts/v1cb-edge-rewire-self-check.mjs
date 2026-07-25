@@ -36,6 +36,14 @@ assert(!fundingSource.includes("'vendors').update({ dwolla_customer_url"), 'crea
 assert(payout.includes('provider.preflight(ctx)'), 'process-payout must run the provider adapter preflight before mutating payment state');
 assert(payout.indexOf('provider.preflight(ctx)') < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must guard the payout before release_invoice_funds mutates state');
 
+// Approval was previously checked once, at transition_vendor_approval time, and never
+// re-confirmed at the moment money actually moves -- a vendor suspended after being approved
+// could still get paid. Regression guard for that gate, and for the ordering that keeps it
+// ahead of any state-mutating call.
+assert(payout.includes("vendorApproval.approval_status !== 'approved'"), 'process-payout must re-check vendor approval_status before paying out');
+assert(payout.includes('vendorApproval.deleted_at'), 'process-payout must refuse to pay an archived vendor');
+assert(payout.indexOf("approval_status !== 'approved'") < payout.indexOf("rpc('release_invoice_funds'"), 'process-payout must re-check approval before release_invoice_funds mutates state');
+
 assert(dwollaPayoutAdapter.includes("rpc('get_vendor_provider_link'"), 'dwolla payout adapter must resolve the vendor link through get_vendor_provider_link');
 assert(dwollaPayoutAdapter.includes("p_provider: 'dwolla'"), 'dwolla payout adapter must request the Dwolla provider link');
 assert(dwollaPayoutAdapter.includes('!dwollaLink?.provider_funding_ref'), 'dwolla payout adapter must fail closed when the vendor funding source is missing');
@@ -45,10 +53,16 @@ assert(dwollaPayoutAdapter.includes('destinationUrl: dwollaLink.provider_funding
 assert(dwollaPayoutAdapter.includes('sourceUrl: paymentAccount.dwolla_funding_source_url'), 'dwolla payout adapter source funding ref must remain on payment_accounts');
 assert(!/destinationUrl:\s*paymentAccount\.dwolla_funding_source_url/.test(dwollaPayoutAdapter), 'dwolla payout adapter must not use the source ref as the destination');
 
-assert(onboarding.includes('from("vendor_payment_provider_links")'), 'vendor-onboarding must write provider-link status');
-assert(onboarding.includes("provider_status: \"unverified\""), 'vendor-onboarding must set unverified on provider-link creation (matches create-dwolla-funding-source and the VO-ST-012 state model)');
-assert(onboarding.includes("provider: \"dwolla\""), 'vendor-onboarding must target the Dwolla provider link');
-assert(!onboarding.includes('organization_id:') && !onboarding.includes('brand_id:') && !onboarding.includes('location_id:'), 'vendor-onboarding insert must not client-supply derived scope columns (set_vendor_sensitive_scope trigger owns them)');
+// Superseded by the provider-neutral bank vault: submit-bank-info now persists the vendor's
+// receiving account to bank_accounts/store_bank_account_secret instead of
+// vendor_payment_provider_links. Unlike the vendor-specific satellite tables, bank_accounts has
+// no single parent row to derive scope from (owner_type is polymorphic: vendor/client/org/
+// location), so it legitimately client-supplies organization_id/brand_id/location_id itself --
+// no "must not supply scope columns" assertion here, unlike the other tables in this file.
+assert(onboarding.includes('from("bank_accounts")'), 'vendor-onboarding must write the vendor receiving account to the provider-neutral bank vault');
+assert(onboarding.includes('rpc("store_bank_account_secret"'), 'vendor-onboarding must vault the routing/account numbers via store_bank_account_secret');
+assert(onboarding.includes('owner_type: "vendor"'), 'vendor-onboarding bank_accounts insert must be scoped to the vendor as owner');
+assert(onboarding.includes('purpose: "vendor_receiving"'), 'vendor-onboarding bank_accounts insert must be tagged as a vendor receiving account');
 
 assert(webhook.includes("from('vendor_payment_provider_links')"), 'payout-webhook must update provider-links');
 assert(webhook.includes("eq('provider_customer_ref', resourceUrl)"), 'payout-webhook must match by provider_customer_ref');

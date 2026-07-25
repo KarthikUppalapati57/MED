@@ -51,6 +51,14 @@ const AcceptableUsePolicy = React.lazy(() => import('./modules/public/pages/Acce
 const SecurityPolicy = React.lazy(() => import('./modules/public/pages/SecurityPolicy'));
 const DataProcessingAddendum = React.lazy(() => import('./modules/public/pages/DataProcessingAddendum'));
 const ServiceLevelAgreement = React.lazy(() => import('./modules/public/pages/ServiceLevelAgreement'));
+const VendorPortalTerms = React.lazy(() => import('./modules/public/pages/VendorPortalTerms'));
+const AIFeaturesAddendum = React.lazy(() => import('./modules/public/pages/AIFeaturesAddendum'));
+const OpenSourceNotices = React.lazy(() => import('./modules/public/pages/OpenSourceNotices'));
+const CCPAPrivacyRights = React.lazy(() => import('./modules/public/pages/CCPAPrivacyRights'));
+const MasterSubscriptionAgreement = React.lazy(() => import('./modules/public/pages/MasterSubscriptionAgreement'));
+const AccessibilityStatement = React.lazy(() => import('./modules/public/pages/AccessibilityStatement'));
+const AIUsagePolicy = React.lazy(() => import('./modules/public/pages/AIUsagePolicy'));
+const DataRetentionPolicy = React.lazy(() => import('./modules/public/pages/DataRetentionPolicy'));
 const Documentation = React.lazy(() => import('./modules/public/pages/Documentation'));
 const VendorOnboardingTax = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingTax'));
 const VendorOnboardingBank = React.lazy(() => import('./pages/vendor-portal/VendorOnboardingBank'));
@@ -1311,6 +1319,14 @@ const AuthenticatedApp = () => {
       <Route path="/security" element={lazyElement(<SecurityPolicy />, 'Loading security policy...')} />
       <Route path="/dpa" element={lazyElement(<DataProcessingAddendum />, 'Loading data processing addendum...')} />
       <Route path="/sla" element={lazyElement(<ServiceLevelAgreement />, 'Loading service level agreement...')} />
+      <Route path="/vendor-terms" element={lazyElement(<VendorPortalTerms />, 'Loading vendor portal terms...')} />
+      <Route path="/ai-terms" element={lazyElement(<AIFeaturesAddendum />, 'Loading AI features addendum...')} />
+      <Route path="/open-source" element={lazyElement(<OpenSourceNotices />, 'Loading open source notices...')} />
+      <Route path="/ccpa-privacy-rights" element={lazyElement(<CCPAPrivacyRights />, 'Loading CCPA privacy rights...')} />
+      <Route path="/msa" element={lazyElement(<MasterSubscriptionAgreement />, 'Loading master subscription agreement...')} />
+      <Route path="/accessibility" element={lazyElement(<AccessibilityStatement />, 'Loading accessibility statement...')} />
+      <Route path="/ai-usage" element={lazyElement(<AIUsagePolicy />, 'Loading AI usage policy...')} />
+      <Route path="/data-retention" element={lazyElement(<DataRetentionPolicy />, 'Loading data retention policy...')} />
       <Route path="/docs" element={lazyElement(<Documentation />, 'Loading documentation...')} />
       <Route path="/vendor-onboarding/tax/:token" element={lazyElement(<VendorOnboardingTax />, 'Loading secure portal...')} />
       <Route path="/vendor-onboarding/bank/:token" element={lazyElement(<VendorOnboardingBank />, 'Loading secure portal...')} />

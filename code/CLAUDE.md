@@ -531,3 +531,70 @@ the Phase 3 redesign.
       (who may create/edit) is unchanged. Frontend: `requiresLocation: true` added to
       `products`/`vendors`/`recipes` in `moduleConfig.js`. See §4, §7. Not yet committed to git
       as of this writing.
+
+---
+
+## 10. OTHER WORKSTREAM — LEGAL & POLICY DOCUMENTATION
+
+Unrelated to the multi-tenant RLS/RBAC hardening this file otherwise documents. Logged here
+starting 2026-07-25 at the user's explicit request: **update this file every time changes are
+made in this repo**, not only for the hardening workstream — this repo has more than one agent
+editing it concurrently (this Claude session + a separate Codex-driven process, per
+`platform_legal_privacy_inventory_draft.md`'s "Prepared By" field, which independently rewrote
+three of the JSX pages below mid-session and has its own edits to that inventory file), so
+`CLAUDE.md` is the one place every agent reads standing context from and doubles as the shared
+trace log. Going forward: append a dated entry here, don't just leave it to task-tracker state.
+
+### Completed (2026-07-25)
+
+- **13 legal/policy documents drafted**, each as a public React page under
+  `code/src/modules/public/pages/` (route registered in `App.jsx`) plus a Markdown mirror under
+  `code/docs/legal/` (indexed in `code/docs/legal/README.md`) for portability/review:
+  - Core 7, mapped to `platform_legal_privacy_inventory_draft.md` §16's Document Mapping table:
+    `TermsOfService.jsx` (`/terms`), `PrivacyPolicy.jsx` (`/privacy`), `CookiePolicy.jsx`
+    (`/cookies`), `AcceptableUsePolicy.jsx` (`/acceptable-use`), `SecurityPolicy.jsx`
+    (`/security`), `DataProcessingAddendum.jsx` (`/dpa`), `ServiceLevelAgreement.jsx` (`/sla`).
+  - 6 supplementary documents, for gaps identified beyond that table: `VendorPortalTerms.jsx`
+    (`/vendor-terms`), `AIFeaturesAddendum.jsx` (`/ai-terms`), `OpenSourceNotices.jsx`
+    (`/open-source`), `CCPAPrivacyRights.jsx` (`/ccpa-privacy-rights`),
+    `MasterSubscriptionAgreement.jsx` (`/msa`), `AccessibilityStatement.jsx` (`/accessibility`).
+  - Shared shell pattern across all 13: fixed `lastUpdated` constant (not `new Date()` — a
+    legal "last updated" date must not silently change on every render), a local
+    `Section({title, children})` helper, same nav/card/`ScrollArea` chrome as the original 3
+    pages this pattern was copied from.
+  - All facts sourced from `platform_legal_privacy_inventory_draft.md` (subscription/ACH terms,
+    AI human-review requirement, subprocessor list, retention hierarchy, role vocabulary) —
+    nothing invented. Any decision not yet finalized there is a bracketed placeholder
+    (`[LEGAL ENTITY NAME]`, `[GOVERNING STATE]`, `[PRIVACY CONTACT EMAIL]`, SLA credit schedule,
+    etc.). **None of these 13 are final** — every bracket needs an actual decision plus
+    outside-counsel review before publication; see `code/docs/legal/README.md` for the
+    per-document status column.
+  - `open_source_notices.md`/`.jsx` is deliberately a placeholder, not a fabricated package
+    list — the real attribution list should come from an actual dependency license scan (e.g.
+    `license-checker`), not hand-typed prose.
+
+### Also present, not authored or reviewed in this workstream
+
+- `code/src/modules/public/pages/AIUsagePolicy.jsx` (`/ai-usage`) and `DataRetentionPolicy.jsx`
+  (`/data-retention`) — two more legal pages, already routed in `App.jsx`, that appeared from
+  the parallel Codex-driven process rather than this session. Content not reviewed here; don't
+  assume it follows the same placeholder conventions as the 13 above without checking.
+
+### Known inconsistency, deliberately not fixed here (out of scope of "draft the documents")
+
+- `LandingPage.jsx` footer (~line 461) still has dead `href="#"` links for Privacy/Terms/
+  Security, and prints "© 2026 RestOps INC." as if the legal entity name were settled — it
+  isn't; `platform_legal_privacy_inventory_draft.md`'s "Outstanding Decisions" section still
+  lists Legal Company Name as unresolved. Flagged to the user, not changed.
+
+### Still open
+
+- Every bracketed placeholder across all 13 documents (contact emails, legal entity name,
+  governing law/venue/arbitration, subprocessor regions, SLA credit schedule, MSA renewal/cure
+  periods, CCPA authorized-agent process) — all business/legal decisions, not drafting work.
+- `platform_legal_privacy_inventory_draft.md` §16's Document Mapping table and §17's last
+  checklist row (*"Decide whether to publish DPA, Security Policy, AUP, and SLA"*) still read
+  as if those four are undrafted. They're not, but that file wasn't edited here since another
+  process actively maintains it — someone should reconcile it.
+- Real dependency license scan for Open Source Notices; formal WCAG audit for the Accessibility
+  Statement; footer link/copyright fix above.

@@ -11,6 +11,7 @@ import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
 import { generateRecipeInsights } from '@/lib/aiService';
 import { calculateIngredientCost, calculateRecipeCost } from '@/modules/recipes/lib/recipeCosting';
+import { buildRecipeOperationsOverview } from '@/modules/recipes/lib/recipeOperations';
 import { buildRecipeModuleReadiness } from '@/modules/recipes/lib/recipeModuleReadiness';
 import MenuItemsOperations from '@/modules/recipes/components/MenuItemsOperations';
 import MenuItemAuthoringPage from '@/modules/recipes/components/MenuItemAuthoringPage';
@@ -41,7 +42,12 @@ import {
   TrendingUp,
   Settings,
   Eye,
-  Sparkles
+  Sparkles,
+  ClipboardCheck,
+  FileText,
+  Tags,
+  ShoppingCart,
+  BarChart3
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,7 +170,7 @@ export default function Recipes() {
   const { confirm } = useConfirmation();
   const confirmLockRef = useRef(false);
   const formBaselineRef = useRef(null);
-  const needsProducts = ['recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer', 'unit-conversions', 'setup'].includes(activeTab) || dialogOpen;
+  const needsProducts = ['operations', 'recipes', 'menu-items', 'prepared-items', 'bar-items', 'menu-analysis', 'recipe-viewer', 'unit-conversions', 'setup'].includes(activeTab) || dialogOpen;
 
   useEffect(() => {
     if (activeTab === 'unit-conversions') {
@@ -241,7 +247,7 @@ export default function Recipes() {
   } = useAuthQuery({
     queryKey: ['recipe-categories', organization?.id],
     queryFn: () => api.recipes.listRecipeCategories(organization?.id),
-    enabled: !!organization?.id && activeTab === 'setup',
+    enabled: !!organization?.id && ['setup', 'operations'].includes(activeTab),
     // Keep Setup usable when RPCs are missing/unavailable (do not throw to a page crash).
     throwOnError: false,
   });
@@ -253,7 +259,7 @@ export default function Recipes() {
   } = useAuthQuery({
     queryKey: ['recipe-category-counts', organization?.id],
     queryFn: () => api.recipes.getRecipeCategoryCounts(organization?.id),
-    enabled: !!organization?.id && activeTab === 'setup',
+    enabled: !!organization?.id && ['setup', 'operations'].includes(activeTab),
     throwOnError: false,
   });
 
@@ -386,6 +392,14 @@ export default function Recipes() {
     recipeTypes,
   }), [recipes, products, unitConversions, recipeTypes]);
 
+  const operationsOverview = React.useMemo(() => buildRecipeOperationsOverview({
+    recipes,
+    products,
+    conversions: unitConversions,
+    recipeTypes,
+    recipeCategories,
+  }), [recipes, products, unitConversions, recipeTypes, recipeCategories]);
+
   const setupChecklist = React.useMemo(() => {
     const productsWithPrice = products.filter((product) => Number(product.latest_price || 0) > 0);
     const productsWithUnit = products.filter((product) => product.base_unit || product.report_by_unit);
@@ -463,6 +477,33 @@ export default function Recipes() {
     }
   }, [navigate, routerLocation.search, setActiveTab]);
 
+  const getOperationsAction = React.useCallback((route) => {
+    switch (route) {
+      case 'products':
+        return () => navigate(`/Products${routerLocation.search}`);
+      case 'inventory':
+        return () => navigate(`/Inventory${routerLocation.search}`);
+      case 'orders':
+        return () => navigate(`/AutoOrdering${routerLocation.search}`);
+      case 'smartprep':
+        return () => navigate(`/SmartPrep${routerLocation.search}`);
+      default:
+        return () => setActiveTab(route);
+    }
+  }, [navigate, routerLocation.search, setActiveTab]);
+
+  const operationIconMap = React.useMemo(() => ({
+    'recipe-book': ChefHat,
+    'food-costing': Calculator,
+    'invoice-price-sync': FileText,
+    inventory: Package,
+    'prep-production': ClipboardCheck,
+    'task-checklists': ClipboardCheck,
+    'nutrition-labels': Tags,
+    training: Users,
+    purchasing: ShoppingCart,
+    analytics: BarChart3,
+  }), []);
   const menuAnalysis = React.useMemo(() => {
     const byCategory = recipes.reduce((acc, r) => {
       const cat = r.category || 'other';
@@ -953,6 +994,11 @@ export default function Recipes() {
               <h1 className="text-2xl font-bold text-foreground">Recipe Setup</h1>
               <p className="text-muted-foreground mt-1">Manage unit conversion rules and recipe categories in one place</p>
             </>
+          ) : activeTab === 'operations' ? (
+            <>
+              <h1 className="text-2xl font-bold text-foreground">Recipe Operations</h1>
+              <p className="text-muted-foreground mt-1">Recipe book, costing, prep, inventory, invoice, nutrition, and reporting workflows in one hub</p>
+            </>
           ) : (
             <>
               <h1 className="text-2xl font-bold text-foreground">Recipe Library</h1>
@@ -1039,7 +1085,7 @@ export default function Recipes() {
         </>
       )}
 
-      {['menu-items', 'recipes', 'prepared-items', 'bar-items', 'setup'].includes(activeTab) && (
+      {['operations', 'menu-items', 'recipes', 'prepared-items', 'bar-items', 'setup'].includes(activeTab) && (
         <Card className="recipe-workflow-card border shadow-sm" string="progress">
           <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1082,6 +1128,74 @@ export default function Recipes() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="recipe-tab-shell space-y-6" string="progress">
 
+        <TabsContent value="operations" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Recipe Records</p>
+                <p className="mt-1 text-2xl font-semibold">{operationsOverview.summary.totalRecipes}</p>
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Costed Recipes</p>
+                <p className="mt-1 text-2xl font-semibold">{operationsOverview.summary.costedRecipes}</p>
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Priced Products</p>
+                <p className="mt-1 text-2xl font-semibold">{operationsOverview.summary.invoicePricedProducts}</p>
+              </CardContent>
+            </Card>
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-sm text-muted-foreground">Prep Sources</p>
+                <p className="mt-1 text-2xl font-semibold">{operationsOverview.summary.preparedItems + operationsOverview.summary.menuItems}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Restaurant Recipe Tools</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Opsi-style operations grouped inside Recipes, with live status from your recipe, product, conversion, and category data.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {operationsOverview.tools.map((tool) => {
+                const ToolIcon = operationIconMap[tool.key] || ChefHat;
+                const live = ['live', 'connected', 'ready'].includes(tool.status);
+                return (
+                  <div key={tool.key} className="flex min-h-48 flex-col justify-between rounded-md border p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                          <ToolIcon className="h-5 w-5" />
+                        </div>
+                        <Badge variant={live ? 'default' : 'secondary'} className="capitalize">{tool.status}</Badge>
+                      </div>
+                      <div>
+                        <h2 className="text-base font-semibold">{tool.title}</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xl font-semibold">{tool.metric}</p>
+                        <p className="text-xs text-muted-foreground">{tool.metricLabel}</p>
+                      </div>
+                      <Button type="button" size="sm" variant={live ? 'outline' : 'secondary'} onClick={getOperationsAction(tool.route)}>
+                        Open
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </TabsContent>
         <TabsContent value="menu-items" className="mt-0">
           <MenuItemsOperations
             recipes={recipes}

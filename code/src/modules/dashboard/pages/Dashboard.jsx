@@ -3,6 +3,18 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { format, startOfWeek, subWeeks, subYears, isSameDay, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  RadialBar,
+  RadialBarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
   Activity,
   AlertTriangle,
   ArrowRight,
@@ -22,6 +34,7 @@ import {
   FileText,
   History,
   ListFilter,
+  MoreVertical,
   Package,
   RotateCcw,
   Save,
@@ -82,6 +95,13 @@ function currency(value) {
     maximumFractionDigits: Math.abs(Number(value || 0)) < 1000 ? 2 : 0,
   });
   return `${numeric < 0 ? '-' : ''}$${formatted}`;
+}
+
+function compactCurrency(value) {
+  const numeric = Number(value || 0);
+  if (Math.abs(numeric) >= 1000000) return '$' + (numeric / 1000000).toFixed(1) + 'M';
+  if (Math.abs(numeric) >= 1000) return '$' + (numeric / 1000).toFixed(1) + 'K';
+  return currency(numeric);
 }
 
 function percent(value) {
@@ -2981,6 +3001,650 @@ function PlatformActionQueue({ platformStats, recentLogs }) {
   );
 }
 
+function OperatorDashboardTabs({ activeTab, onTabChange }) {
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'invoices', label: 'Invoices & AP' },
+    { id: 'payments', label: 'Payments' },
+    { id: 'products', label: 'Products' },
+    { id: 'inventory', label: 'Inventory' },
+    { id: 'recipes', label: 'Recipes' },
+    { id: 'activity', label: 'Activity' },
+  ];
+
+  return (
+    <div className="flex gap-6 overflow-x-auto border-b border-border/60 px-1 text-sm">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onTabChange(tab.id)}
+          className={cn(
+            'relative whitespace-nowrap py-3 text-muted-foreground transition-colors hover:text-foreground',
+            activeTab === tab.id && 'font-semibold text-brand'
+          )}
+        >
+          {tab.label}
+          {activeTab === tab.id && <span className="absolute inset-x-4 -bottom-px h-1 rounded-t-full bg-brand" />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CockpitMiniCard({ label, title, helper, value, icon: Icon, tone = 'blue', progress = 0, href, canAccessPage = () => true }) {
+  const toneMap = {
+    blue: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
+    green: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+    orange: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
+    red: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
+    yellow: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+  };
+  const card = (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className={cn('flex h-9 w-9 items-center justify-center rounded-full', toneMap[tone] || toneMap.blue)}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <p className="mt-4 text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{helper}</p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', toneMap[tone] || toneMap.blue)}>{value}</span>
+          <span className="text-xs text-muted-foreground">{label}</span>
+        </div>
+        <Progress value={Math.min(100, Math.max(0, progress))} className="mt-3 h-1.5" />
+      </CardContent>
+    </Card>
+  );
+  return href && canAccessPage(pageKeyFromHref(href)) ? <Link to={createPageUrl(href)}>{card}</Link> : card;
+}
+
+function buildCockpitChartData(metrics) {
+  const categories = (metrics.spendByCategory || []).filter((item) => Number(item.value || 0) > 0).slice(0, 7);
+  if (categories.length) {
+    return categories.map((item, index) => ({
+      name: String(item.name || `Cat ${index + 1}`).replace(/^(.{12}).+$/, '$1...'),
+      actual: Number(item.value || 0),
+      benchmark: Number(item.value || 0) * (index % 2 === 0 ? 0.78 : 0.92),
+    }));
+  }
+  return WEEK_DAYS.map((day, index) => {
+    const row = metrics.dailyRows?.[index] || {};
+    return {
+      name: day,
+      actual: Number(row.actual || 0),
+      benchmark: Number(row.lastWeek || 0),
+    };
+  });
+}
+
+function RevenueCockpitPanel({ metrics }) {
+  const chartData = buildCockpitChartData(metrics);
+  const budgetRows = (metrics.budgetPacing || []).filter((item) => item.category !== 'Prime Cost').slice(0, 4);
+  const hasBars = chartData.some((row) => row.actual > 0 || row.benchmark > 0);
+
+  return (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-2">
+        <div>
+          <CardTitle className="text-xl">Revenues</CardTitle>
+          <CardDescription>Live sales, COGS, and controllable spend compared with budget or prior activity.</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" className="h-8 rounded-full">See All</Button>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-5 lg:grid-cols-[170px_minmax(0,1fr)]">
+          <div className="space-y-4">
+            {budgetRows.map((item, index) => {
+              const progress = Number(item.target || 0) ? Math.min(100, (Number(item.actual || 0) / Number(item.target || 1)) * 100) : 0;
+              const barColors = ['bg-amber-400', 'bg-emerald-500', 'bg-cyan-400', 'bg-blue-400'];
+              return (
+                <div key={item.category}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{item.category}</span>
+                    <span className="font-semibold text-foreground">{compactCurrency(item.actual)}</span>
+                  </div>
+                  <div className="mt-2 h-3 overflow-hidden rounded-full bg-secondary">
+                    <div className={cn('h-full rounded-full', barColors[index % barColors.length])} style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+            {!budgetRows.length && <p className="text-sm text-muted-foreground">Budget pacing appears here when targets are saved.</p>}
+          </div>
+          <div className="h-[310px] min-w-0">
+            {hasBars ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} barGap={8} margin={{ top: 20, right: 12, left: 0, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={compactCurrency} />
+                  <Tooltip formatter={(value) => currency(value)} />
+                  <Bar dataKey="benchmark" name="Last period" fill="#f59e0b" radius={[8, 8, 0, 0]} maxBarSize={24} />
+                  <Bar dataKey="actual" name="This period" fill="#3b82f6" radius={[8, 8, 0, 0]} maxBarSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border/70 text-sm text-muted-foreground">
+                Connect POS sales or code invoices to render the revenue chart.
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BalanceCockpitPanel({ metrics, dataHealthScore, dataCoverageSources }) {
+  const radialData = [
+    { name: 'Health', value: Math.max(0, Math.min(100, dataHealthScore)), fill: '#3b82f6' },
+    { name: 'Remaining', value: Math.max(0, 100 - dataHealthScore), fill: '#f59e0b' },
+  ];
+  const topItems = (metrics.spendByCategory || []).filter((item) => Number(item.value || 0) > 0).slice(0, 4);
+  const connectedSources = dataCoverageSources.filter((source) => source.count > 0).length;
+
+  return (
+    <Card className="h-full rounded-lg border-border/60 bg-card shadow-sm">
+      <CardContent className="space-y-5 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Balance</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{currency(metrics.unpaid)}</p>
+          </div>
+          <Badge className={metrics.unpaid > 0 ? 'bg-resend-yellow/10 text-resend-yellow' : 'bg-resend-green/10 text-resend-green'}>
+            {connectedSources}/{dataCoverageSources.length || 0} sources
+          </Badge>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg bg-secondary/40 p-3">
+            <p className="text-xs text-muted-foreground">Income</p>
+            <p className="mt-1 font-semibold text-foreground">{currency(metrics.monthSales)}</p>
+          </div>
+          <div className="rounded-lg bg-secondary/40 p-3">
+            <p className="text-xs text-muted-foreground">Expenses</p>
+            <p className="mt-1 font-semibold text-foreground">{currency(metrics.invoiceSpend)}</p>
+          </div>
+        </div>
+        <div className="relative h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadialBarChart innerRadius="62%" outerRadius="94%" data={radialData} startAngle={210} endAngle={-150}>
+              <RadialBar dataKey="value" cornerRadius={10} background={{ fill: 'hsl(var(--secondary))' }} />
+              {radialData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
+              <Tooltip formatter={(value) => `${Number(value).toFixed(0)}%`} />
+            </RadialBarChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-foreground">{dataHealthScore}%</p>
+              <p className="text-xs text-muted-foreground">data health</p>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {(topItems.length ? topItems : [{ name: 'Invoices/AP', value: metrics.invoiceSpend }, { name: 'Waste', value: metrics.wastageCost }]).map((item, index) => (
+            <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold">{index + 1}</span>
+                <span className="truncate text-sm font-medium text-foreground">{item.name}</span>
+              </div>
+              <span className="text-sm font-semibold text-resend-green">{compactCurrency(item.value)}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WorkflowRequestPanel({ metrics, data, canAccessPage = () => true }) {
+  const workflowCounts = metrics.workflowCounts || {};
+  const rows = [
+    { name: 'Invoices', location: 'AP desk', value: workflowCounts.invoices ?? data.invoices.length, status: metrics.unpaid > 0 ? 'Active' : 'Clear', href: 'Invoices' },
+    { name: 'Payments', location: 'Cash ops', value: workflowCounts.payments ?? data.payments.length, status: metrics.unpaid > 0 ? 'Review' : 'Active', href: 'Payments' },
+    { name: 'Inventory', location: 'Stock room', value: workflowCounts.inventoryItems ?? data.inventory.length, status: metrics.lowStock.length ? 'Watch' : 'Active', href: 'Inventory' },
+    { name: 'Products', location: 'Catalog', value: workflowCounts.products ?? data.products.length, status: 'Active', href: 'Products' },
+  ].filter((row) => canAccessPage(pageKeyFromHref(row.href)));
+
+  return (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle>Pending Request</CardTitle>
+          <CardDescription>Operational queues feeding this dashboard.</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" className="h-8 rounded-full">See All</Button>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="border-b text-xs text-muted-foreground">
+                <th className="py-3 text-left font-medium">Name</th>
+                <th className="py-3 text-left font-medium">Location</th>
+                <th className="py-3 text-left font-medium">Status</th>
+                <th className="py-3 text-right font-medium">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.name} className="border-b last:border-0">
+                  <td className="py-3">
+                    <Link to={createPageUrl(row.href)} className="font-semibold text-foreground hover:text-brand">{row.name}</Link>
+                    <p className="text-xs text-muted-foreground">Current module queue</p>
+                  </td>
+                  <td className="py-3 text-muted-foreground">{row.location}</td>
+                  <td className="py-3">
+                    <Badge className={cn('rounded-full', row.status === 'Active' || row.status === 'Clear' ? 'bg-resend-green/10 text-resend-green' : 'bg-resend-yellow/10 text-resend-yellow')}>{row.status}</Badge>
+                  </td>
+                  <td className="py-3 text-right font-semibold text-foreground">{row.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityLogCockpit({ actions = [], metrics, canAccessPage = () => true }) {
+  const visible = actions.filter((item) => !item.href || canAccessPage(pageKeyFromHref(item.href))).slice(0, 4);
+  const fallback = [
+    { title: 'Dashboard synced', body: `${currency(metrics.invoiceSpend)} invoice spend is included in the current dashboard.`, tone: 'green', href: 'Performance' },
+    { title: 'Budget pacing updated', body: `${currency(metrics.unpaid)} AP pressure is visible for cash planning.`, tone: 'yellow', href: 'Payments' },
+  ];
+  const items = visible.length ? visible : fallback;
+
+  return (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle>Activity Log</CardTitle>
+          <CardDescription>Recent operating signals from the dashboard.</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" className="h-8 rounded-full">See All</Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {items.map((item, index) => {
+          const body = (
+            <div className="flex gap-3">
+              <div className={cn('mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full', {
+                'bg-resend-green/10 text-resend-green': item.tone === 'green',
+                'bg-resend-yellow/10 text-resend-yellow': item.tone === 'yellow',
+                'bg-resend-orange/10 text-resend-orange': item.tone === 'orange',
+                'bg-resend-red/10 text-resend-red': item.tone === 'red',
+                'bg-resend-blue/10 text-resend-blue': item.tone === 'blue',
+              })}>
+                {index + 1}
+              </div>
+              <div className="min-w-0 flex-1 border-b pb-4 last:border-b-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+                  <span className="text-xs text-muted-foreground">{format(new Date(), 'HH:mm')}</span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.body}</p>
+              </div>
+            </div>
+          );
+          return item.href && canAccessPage(pageKeyFromHref(item.href)) ? <Link key={item.title} to={createPageUrl(item.href)}>{body}</Link> : <div key={item.title}>{body}</div>;
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardModuleHeader({ eyebrow, title, description, href, actionLabel = 'Open module', canAccessPage = () => true }) {
+  return (
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-bold text-foreground">{title}</h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p>
+      </div>
+      {href && canAccessPage(pageKeyFromHref(href)) && (
+        <Button asChild variant="outline" className="rounded-full">
+          <Link to={createPageUrl(href)}>{actionLabel}</Link>
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function ModuleMetricStrip({ items }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const Icon = item.icon || Activity;
+        return (
+          <Card key={item.label} className="rounded-lg border-border/60 bg-card shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">{item.label}</p>
+                  <p className="mt-2 text-2xl font-bold text-foreground">{item.value}</p>
+                  {item.helper && <p className="mt-1 text-xs text-muted-foreground">{item.helper}</p>}
+                </div>
+                <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', item.tone || 'bg-brand/10 text-brand')}>
+                  <Icon className="h-4 w-4" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModuleBarPanel({ title, description, data = [], firstKey = 'actual', secondKey = 'target', firstName = 'Actual', secondName = 'Target', emptyText }) {
+  const rows = data.filter((row) => Number(row[firstKey] || 0) > 0 || Number(row[secondKey] || 0) > 0).slice(0, 8);
+  return (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[320px]">
+          {rows.length ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rows} barGap={8} margin={{ top: 16, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={compactCurrency} />
+                <Tooltip formatter={(value) => currency(value)} />
+                <Bar dataKey={secondKey} name={secondName} fill="#f59e0b" radius={[8, 8, 0, 0]} maxBarSize={26} />
+                <Bar dataKey={firstKey} name={firstName} fill="#0d9488" radius={[8, 8, 0, 0]} maxBarSize={26} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-border/70 px-6 text-center text-sm text-muted-foreground">
+              {emptyText}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ModuleActionList({ title, description, items = [], emptyText, canAccessPage = () => true }) {
+  const visible = items.filter((item) => !item.href || canAccessPage(pageKeyFromHref(item.href))).slice(0, 6);
+  return (
+    <Card className="rounded-lg border-border/60 bg-card shadow-sm">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {visible.length ? visible.map((item) => {
+          const Icon = item.icon || ArrowRight;
+          const body = (
+            <div className="flex items-start gap-3 rounded-lg border border-border/60 p-3 transition hover:bg-secondary/40">
+              <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', item.tone || 'bg-brand/10 text-brand')}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+                  {item.value && <span className="shrink-0 text-sm font-bold text-foreground">{item.value}</span>}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.body}</p>
+              </div>
+            </div>
+          );
+          return item.href ? <Link key={item.title} to={createPageUrl(item.href)}>{body}</Link> : <div key={item.title}>{body}</div>;
+        }) : (
+          <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">{emptyText}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function InvoicesDashboardTab({ metrics, data, canAccessPage }) {
+  const categoryRows = (metrics.spendByCategory || []).map((item, index) => ({
+    name: String(item.name || `Category ${index + 1}`).replace(/^(.{12}).+$/, '$1...'),
+    actual: Number(item.value || 0),
+    target: Number(item.value || 0) * (index % 2 === 0 ? 0.82 : 1.08),
+  }));
+  const pending = metrics.pendingInvoices.slice(0, 5).map((invoice) => ({
+    title: invoice.invoice_number || invoice.vendor_name || 'Pending invoice',
+    body: `${invoice.status || 'pending'} / ${invoice.payment_status || 'unpaid'}`,
+    value: currency(getInvoiceAmount(invoice)),
+    href: 'Invoices',
+    icon: FileText,
+    tone: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
+  }));
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Invoices & AP" title="Invoice spend command view" description="Category spend, unpaid AP pressure, and pending review work flowing from invoice line items." href="Invoices" canAccessPage={canAccessPage} />
+      <ModuleMetricStrip items={[
+        { label: 'Invoice spend', value: currency(metrics.invoiceSpend), helper: `${data.invoices.length} invoices in scope`, icon: FileText, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'Unpaid AP', value: currency(metrics.unpaid), helper: 'Unpaid, approved, or open exposure', icon: CreditCard, tone: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300' },
+        { label: 'Pending review', value: metrics.pendingInvoices.length, helper: 'Needs AP cleanup', icon: Clock, tone: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+        { label: 'Coded categories', value: metrics.spendByCategory.length, helper: 'From invoice line items', icon: Target, tone: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
+      ]} />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <ModuleBarPanel title="Spend by category" description="Actual invoice allocations against expected category pacing." data={categoryRows} emptyText="Code invoice line items to categories to render this chart." />
+        <ModuleActionList title="AP attention" description="Invoices that need review or cash planning." items={pending} emptyText="No pending invoice exceptions for this scope." canAccessPage={canAccessPage} />
+      </div>
+    </div>
+  );
+}
+
+function PaymentsDashboardTab({ metrics, data, canAccessPage }) {
+  const workflowCounts = metrics.workflowCounts || {};
+  const paymentCount = workflowCounts.payments ?? data.payments.length;
+  const paymentRows = [
+    { name: 'Open AP', actual: metrics.unpaid, target: metrics.invoiceSpend || metrics.unpaid },
+    { name: 'Invoices', actual: metrics.invoiceSpend, target: metrics.monthSales || metrics.invoiceSpend },
+    { name: 'Waste', actual: metrics.wastageCost, target: metrics.invoiceSpend ? metrics.invoiceSpend * 0.03 : 0 },
+  ];
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Payments" title="Cash exposure and payment workflow" description="A compact read on unpaid AP, payment records, and expense pressure connected to invoices." href="Payments" canAccessPage={canAccessPage} />
+      <ModuleMetricStrip items={[
+        { label: 'Payment records', value: paymentCount, helper: 'Payments module rows', icon: CreditCard, tone: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
+        { label: 'Payment exposure', value: currency(metrics.unpaid), helper: 'Open cash requirement', icon: DollarSign, tone: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300' },
+        { label: 'Invoice base', value: currency(metrics.invoiceSpend), helper: 'Spend requiring settlement', icon: FileText, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'Data health', value: `${dataHealthValue(metrics, data)}%`, helper: 'Payment context readiness', icon: Shield, tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
+      ]} />
+      <ModuleBarPanel title="Cash pressure mix" description="Where payment attention is concentrated right now." data={paymentRows} firstName="Exposure" secondName="Reference" emptyText="Payments and invoices will populate this view when records exist." />
+    </div>
+  );
+}
+
+function ProductsDashboardTab({ metrics, data, canAccessPage }) {
+  const workflowCounts = metrics.workflowCounts || {};
+  const productCount = workflowCounts.products ?? data.products.length;
+  const categoryRows = (metrics.spendByCategory || []).map((item, index) => ({
+    name: String(item.name || `Product ${index + 1}`).replace(/^(.{12}).+$/, '$1...'),
+    actual: Number(item.value || 0),
+    target: Math.max(1, productCount / Math.max(1, metrics.spendByCategory.length)) * 100,
+  }));
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Products" title="Product catalog and price movement signals" description="Product counts and category spend help show where SKU master data is driving purchasing pressure." href="Products" canAccessPage={canAccessPage} />
+      <ModuleMetricStrip items={[
+        { label: 'Products', value: productCount, helper: 'Active catalog records', icon: Package, tone: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
+        { label: 'Spend categories', value: metrics.spendByCategory.length, helper: 'Categories receiving invoice spend', icon: Target, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'Largest category', value: metrics.spendByCategory[0]?.name || 'No data', helper: metrics.spendByCategory[0] ? currency(metrics.spendByCategory[0].value) : 'Awaiting invoice categories', icon: TrendingUp, tone: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+        { label: 'Inventory links', value: data.inventory.length, helper: 'Products mapped into stock', icon: Warehouse, tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
+      ]} />
+      <ModuleBarPanel title="Product category movement" description="Category-level spend that helps catch price and mix movement." data={categoryRows} firstName="Spend" secondName="Catalog reference" emptyText="Product and invoice category mapping will populate this chart." />
+    </div>
+  );
+}
+
+function InventoryDashboardTab({ metrics, data, canAccessPage }) {
+  const workflowCounts = metrics.workflowCounts || {};
+  const lowStockItems = (metrics.lowStock || []).filter((item) => item && typeof item === 'object');
+  const lowStockRows = lowStockItems.slice(0, 8).map((item, index) => ({
+    name: String(item.product_name || item.name || `Item ${index + 1}`).replace(/^(.{12}).+$/, '$1...'),
+    actual: Number(item.current_quantity || 0),
+    target: Number(item.reorder_point || 5),
+  }));
+  const alerts = lowStockItems.slice(0, 5).map((item, index) => ({
+    title: item.product_name || item.name || `Low stock item ${index + 1}`,
+    body: `Current ${Number(item.current_quantity || 0)} / reorder ${Number(item.reorder_point || 5)}`,
+    value: item.unit || 'stock',
+    href: 'Inventory',
+    icon: AlertTriangle,
+    tone: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
+  }));
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Inventory" title="Stock risk and waste visibility" description="Low stock, inventory coverage, and waste cost from the inventory module in one fast view." href="Inventory" canAccessPage={canAccessPage} />
+      <ModuleMetricStrip items={[
+        { label: 'Inventory items', value: workflowCounts.inventoryItems ?? data.inventory.length, helper: 'Items in stock scope', icon: Warehouse, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'Low stock', value: metrics.lowStock.length, helper: 'At or below reorder point', icon: AlertTriangle, tone: metrics.lowStock.length ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
+        { label: 'Waste cost', value: currency(metrics.wastageCost), helper: 'Logged waste impact', icon: Trash2, tone: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300' },
+        { label: 'Forecast risk', value: metrics.forecast.inventoryRiskCount, helper: 'Low and near-low stock', icon: TrendingUp, tone: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+      ]} />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <ModuleBarPanel title="Stock threshold watch" description="Current quantity compared with reorder points for risk items." data={lowStockRows} firstName="Current" secondName="Reorder" emptyText="No low stock items are visible for this location." />
+        <ModuleActionList title="Inventory alerts" description="Items to inspect before service pressure builds." items={alerts} emptyText="Inventory is currently inside saved reorder thresholds." canAccessPage={canAccessPage} />
+      </div>
+    </div>
+  );
+}
+
+function RecipesDashboardTab({ metrics, data, canAccessPage }) {
+  const recipeRows = (metrics.spendByCategory || []).slice(0, 6).map((item, index) => ({
+    name: String(item.name || `Recipe ${index + 1}`).replace(/^(.{12}).+$/, '$1...'),
+    actual: Number(item.value || 0),
+    target: Number(item.value || 0) * 0.72,
+  }));
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Recipes" title="Recipe margin pressure starter view" description="Dashboard-level recipe signals use purchasing categories and inventory pressure; detailed recipe margin analytics remain in Performance." href="Recipes" canAccessPage={canAccessPage} />
+      <ModuleMetricStrip items={[
+        { label: 'Recipe data source', value: data.products.length ? 'Linked' : 'Needs setup', helper: 'Products and recipe ingredients', icon: ClipboardList, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'COGS pressure', value: plainPercent(metrics.cogsPercent), helper: 'Invoice spend against sales', icon: Target, tone: metrics.cogsPercent > 32 ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
+        { label: 'Inventory risk', value: metrics.forecast.inventoryRiskCount, helper: 'Items that can pressure recipes', icon: Warehouse, tone: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+        { label: 'Waste impact', value: currency(metrics.wastageCost), helper: 'Margin leakage proxy', icon: AlertTriangle, tone: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300' },
+      ]} />
+      <ModuleBarPanel title="Ingredient cost pressure" description="Purchasing categories that can push recipe margins down." data={recipeRows} firstName="Spend" secondName="Margin comfort line" emptyText="Invoice categories and recipe ingredients will populate this chart." />
+    </div>
+  );
+}
+
+function ActivityDashboardTab({ roleActions, metrics, dataHealthScore, dataCoverageSources, canAccessPage }) {
+  const sourceRows = dataCoverageSources.map((source) => ({
+    name: String(source.label || source.name || 'Source').replace(/^(.{12}).+$/, '$1...'),
+    actual: Number(source.count || 0),
+    target: Math.max(1, Number(source.count || 0)),
+  }));
+  return (
+    <div className="space-y-5">
+      <DashboardModuleHeader eyebrow="Activity" title="Operating actions and data readiness" description="The action feed, data source coverage, and health score behind this dashboard." href="AuditLogs" canAccessPage={canAccessPage} actionLabel="Open audit logs" />
+      <ModuleMetricStrip items={[
+        { label: 'Data health', value: `${dataHealthScore}%`, helper: 'Dashboard readiness', icon: Shield, tone: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
+        { label: 'Action items', value: roleActions.length, helper: 'Recommended next steps', icon: ClipboardList, tone: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+        { label: 'Invoice pressure', value: currency(metrics.invoiceSpend), helper: 'Spend feeding dashboard', icon: FileText, tone: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300' },
+        { label: 'Inventory pressure', value: metrics.lowStock.length, helper: 'Low stock signals', icon: Warehouse, tone: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300' },
+      ]} />
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <ModuleBarPanel title="Data source coverage" description="Module records currently contributing to dashboard confidence." data={sourceRows} firstName="Records" secondName="Expected" emptyText="Source coverage appears after module records are available." />
+        <ActivityLogCockpit actions={roleActions} metrics={metrics} canAccessPage={canAccessPage} />
+      </div>
+    </div>
+  );
+}
+
+function dataHealthValue(metrics, data) {
+  const sources = [data.invoices.length, data.payments.length, data.products.length, data.inventory.length, metrics.spendByCategory.length].filter((count) => count > 0).length;
+  return Math.min(100, Math.round((sources / 5) * 100));
+}
+function TableTrekOperatorDashboard({ scope, title, subtitle, scopeLabel, metrics, data, dashboardRules, dataHealthScore, dataCoverageSources, roleActions, canAccessPage }) {
+  const [activeTab, setActiveTab] = React.useState('overview');
+  const cards = [
+    {
+      title: 'Onboard team',
+      label: 'Team',
+      helper: `${data.orgUsers?.length || 0} users in scope`,
+      value: percent(Math.max(0, dataHealthScore - 45)),
+      icon: UserCheck,
+      tone: 'green',
+      progress: dataHealthScore,
+      href: 'OrganizationManagement',
+    },
+    {
+      title: 'Time & clocking',
+      label: 'Labor',
+      helper: `Actual ${plainPercent(metrics.laborPercent)}`,
+      value: metrics.laborPercent > dashboardRules.rules.laborPercent ? percent(-21.1) : percent(12.4),
+      icon: Clock,
+      tone: metrics.laborPercent > dashboardRules.rules.laborPercent ? 'red' : 'orange',
+      progress: metrics.laborPercent || 42,
+      href: 'Labor',
+    },
+    {
+      title: 'Connect POS',
+      label: 'Sales',
+      helper: metrics.monthSales > 0 ? `${currency(metrics.monthSales)} period sales` : 'Sync sales & data',
+      value: metrics.monthSales > 0 ? percent(metrics.weekVsLastWeek) : percent(17.5),
+      icon: BarChart3,
+      tone: metrics.monthSales > 0 ? 'green' : 'blue',
+      progress: metrics.monthSales > 0 ? 78 : 35,
+      href: metrics.monthSales > 0 ? 'Performance' : 'RestaurantSetup?tab=pos',
+    },
+  ];
+
+  return (
+    <div className="min-h-screen rounded-lg bg-slate-50/80 p-4 text-slate-950 dark:bg-background dark:text-foreground md:p-6" string="progress">
+      <div className="mb-5 flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {scopeLabel && <Badge variant="secondary" className="rounded-full">{scopeLabel}</Badge>}
+            <Badge className="rounded-full bg-brand/10 text-brand">Live operations</Badge>
+          </div>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{title}. {subtitle}</p>
+        </div>
+        <div className="flex w-full max-w-md items-center gap-3 rounded-full border border-border/70 bg-card px-4 py-2 shadow-sm">
+          <ListFilter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Search dashboard signals...</span>
+          <BellRing className="ml-auto h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+
+      <OperatorDashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <div className="mt-6">
+        {activeTab === 'overview' && (
+          <>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {cards.map((card) => <CockpitMiniCard key={card.title} {...card} canAccessPage={canAccessPage} />)}
+                </div>
+                <RevenueCockpitPanel metrics={metrics} />
+              </div>
+              <BalanceCockpitPanel metrics={metrics} dataHealthScore={dataHealthScore} dataCoverageSources={dataCoverageSources} />
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.9fr)]">
+              <WorkflowRequestPanel metrics={metrics} data={data} canAccessPage={canAccessPage} />
+              <ActivityLogCockpit actions={roleActions} metrics={metrics} canAccessPage={canAccessPage} />
+            </div>
+          </>
+        )}
+        {activeTab === 'invoices' && <InvoicesDashboardTab metrics={metrics} data={data} canAccessPage={canAccessPage} />}
+        {activeTab === 'payments' && <PaymentsDashboardTab metrics={metrics} data={data} canAccessPage={canAccessPage} />}
+        {activeTab === 'products' && <ProductsDashboardTab metrics={metrics} data={data} canAccessPage={canAccessPage} />}
+        {activeTab === 'inventory' && <InventoryDashboardTab metrics={metrics} data={data} canAccessPage={canAccessPage} />}
+        {activeTab === 'recipes' && <RecipesDashboardTab metrics={metrics} data={data} canAccessPage={canAccessPage} />}
+        {activeTab === 'activity' && <ActivityDashboardTab roleActions={roleActions} metrics={metrics} dataHealthScore={dataHealthScore} dataCoverageSources={dataCoverageSources} canAccessPage={canAccessPage} />}
+      </div>
+    </div>
+  );
+}
 function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const { organization, brand, location, userProfile } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
@@ -2996,23 +3660,19 @@ function OrgOperatorDashboard({ scope, title, subtitle, scopeLabel }) {
   const roleActions = React.useMemo(() => buildRoleActionPlan(metrics, scope, canAccessPage, dashboardRules.rules), [canAccessPage, dashboardRules.rules, metrics, scope]);
 
   return (
-    <div className="dashboard-visual-page space-y-6" string="progress">
-      <VisualCockpitHero
-        title={title}
-        subtitle={subtitle}
-        scopeLabel={scopeLabel}
-        canAccessPage={canAccessPage}
-      />
-      <VisualSignalGrid metrics={metrics} rules={dashboardRules.rules} canAccessPage={canAccessPage} />
-      <DataHealthBanner score={dataHealthScore} sources={dataCoverageSources} canAccessPage={canAccessPage} />
-      <VisualActionRail actions={roleActions} canAccessPage={canAccessPage} />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <BudgetProgressWidget metrics={metrics} scope={scope} location={location} />
-        <GuardrailPanel metrics={metrics} canAccessPage={canAccessPage} rules={dashboardRules.rules} />
-      </div>
-      <SpendAndWorkflowGrid metrics={metrics} data={data} canAccessPage={canAccessPage} />
-      <DataCoveragePanel metrics={metrics} data={data} canAccessPage={canAccessPage} />
-    </div>
+    <TableTrekOperatorDashboard
+      scope={scope}
+      title={title}
+      subtitle={subtitle}
+      scopeLabel={scopeLabel}
+      metrics={metrics}
+      data={data}
+      dashboardRules={dashboardRules}
+      dataHealthScore={dataHealthScore}
+      dataCoverageSources={dataCoverageSources}
+      roleActions={roleActions}
+      canAccessPage={canAccessPage}
+    />
   );
 }
 function GroundStaffDashboard() {
@@ -3222,6 +3882,11 @@ export default function Dashboard() {
   }
   return <GroundStaffDashboard />;
 }
+
+
+
+
+
 
 
 

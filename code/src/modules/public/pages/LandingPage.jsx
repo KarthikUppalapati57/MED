@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -444,7 +444,7 @@ export default function LandingPage() {
               <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Systems</h5>
               <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
                 <li><a href="#features" className="hover:text-[#b83316] transition-colors">Core Nodes</a></li>
-                <li><a href="#" className="hover:text-[#b83316] transition-colors">Security</a></li>
+                <li><Link to="/security" className="hover:text-[#b83316] transition-colors">Security</Link></li>
               </ul>
             </div>
             <div>
@@ -458,8 +458,8 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
             <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">(c) 2026 RestOps INC. BUILT FOR SCALE.</p>
             <div className="flex gap-16 text-[9px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80">
-                <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Privacy</a>
-                <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Terms</a>
+                <Link to="/privacy" className="hover:text-black dark:hover:text-white transition-colors">Privacy</Link>
+                <Link to="/terms" className="hover:text-black dark:hover:text-white transition-colors">Terms</Link>
             </div>
           </div>
         </div>

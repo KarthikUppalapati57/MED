@@ -59,6 +59,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invoice not found or missing vendor routing information.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 })
     }
 
+    // Approval is checked once, at transition_vendor_approval time, and never again after --
+    // a vendor suspended after being approved could otherwise still get paid, since this was
+    // the only gate release_invoice_funds/the provider adapters ever consulted. Re-check here,
+    // via service role rather than the caller's own RLS view, so this is "is the vendor actually
+    // approved" and not "can the caller currently see this vendor from their active location" --
+    // a different, already-separately-enforced concern.
+    const { data: vendorApproval, error: vendorApprovalError } = await serviceSupabase
+      .from('vendors')
+      .select('approval_status, deleted_at')
+      .eq('id', invoice.vendor_id)
+      .maybeSingle()
+
+    if (vendorApprovalError || !vendorApproval || vendorApproval.deleted_at || vendorApproval.approval_status !== 'approved') {
+      return new Response(JSON.stringify({ error: 'Vendor is not approved for payment.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    }
+
     const finalPaymentAccountId = payment_account_id || invoice.payment_account_id
     if (!finalPaymentAccountId) {
       return new Response(JSON.stringify({ error: 'A payment account is required to release funds.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })

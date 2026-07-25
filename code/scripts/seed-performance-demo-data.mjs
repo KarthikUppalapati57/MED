@@ -580,7 +580,7 @@ async function seedInvoicesPayments(context, tenant, productsByBrand) {
           await must(`allocation ${invoice.invoice_number} ${category}`, supabase
             .from('invoice_allocations')
             .insert({
-              allocation_type: 'category',
+              allocation_type: 'line_items',
               amount,
               category_name: category,
               gl_code: `DEMO-${category.toUpperCase().replace(/\s+/g, '-')}`,

@@ -36,7 +36,9 @@
     "check:architecture:behavior": "node scripts/architecture-behavior-regression.mjs",
     "test": "npm run test:backend && npm run test:frontend",
     "test:a11y": "playwright test tests/e2e/accessibility.spec.js --project=chromium",
-    "seed:performance-demo": "node scripts/seed-performance-demo-data.mjs"
+    "seed:performance-demo": "node scripts/seed-performance-demo-data.mjs",
+    "seed:summit-dummy": "node scripts/seed-summit-dummy-data.mjs",
+    "repair:summit-performance": "node scripts/repair-summit-performance-demo-data.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",
