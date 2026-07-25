@@ -434,7 +434,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="relative py-40 border-t border-black/5 dark:border-white/10 bg-[#FAF8F4] dark:bg-background z-10">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
-          <div className="grid md:grid-cols-4 gap-24 mb-32">
+          <div className="grid gap-16 md:grid-cols-4 xl:grid-cols-5 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
                 <RestopsLogo className="h-24" origin="origin-left" />
@@ -454,8 +454,23 @@ export default function LandingPage() {
             <div>
               <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Resources</h5>
               <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
-                <li><a href="#" className="hover:text-[#b83316] transition-colors">API Docs</a></li>
-                <li><a href="#" className="hover:text-[#b83316] transition-colors">Support</a></li>
+                <li><Link to="/docs" className="hover:text-[#b83316] transition-colors">Documentation</Link></li>
+                <li><Link to="/open-source" className="hover:text-[#b83316] transition-colors">Open Source</Link></li>
+                <li><Link to="/accessibility" className="hover:text-[#b83316] transition-colors">Accessibility</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Policies</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
+                <li><Link to="/acceptable-use" className="hover:text-[#b83316] transition-colors">Acceptable Use</Link></li>
+                <li><Link to="/dpa" className="hover:text-[#b83316] transition-colors">DPA</Link></li>
+                <li><Link to="/sla" className="hover:text-[#b83316] transition-colors">SLA</Link></li>
+                <li><Link to="/vendor-terms" className="hover:text-[#b83316] transition-colors">Vendor Terms</Link></li>
+                <li><Link to="/ai-terms" className="hover:text-[#b83316] transition-colors">AI Terms</Link></li>
+                <li><Link to="/ai-usage" className="hover:text-[#b83316] transition-colors">AI Usage</Link></li>
+                <li><Link to="/data-retention" className="hover:text-[#b83316] transition-colors">Data Retention</Link></li>
+                <li><Link to="/ccpa-privacy-rights" className="hover:text-[#b83316] transition-colors">CCPA Rights</Link></li>
+                <li><Link to="/msa" className="hover:text-[#b83316] transition-colors">MSA</Link></li>
               </ul>
             </div>
           </div>
@@ -552,5 +567,6 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     </div>
   </motion.div>
 );
+
 
 
