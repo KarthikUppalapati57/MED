@@ -58,7 +58,7 @@ export default function BankTransferForm({ amount, vendorName, invoiceNumber, on
       <div className="bg-blue-50 rounded-lg p-4 space-y-2">
         <div className="flex items-center gap-2 text-sm font-medium text-blue-800 mb-3">
           <Building2 className="h-4 w-4" />
-          Transfer to this Account
+          ACH / Bank Transfer to this Account
         </div>
 
         {bankFields.map((field) => (
@@ -96,7 +96,7 @@ export default function BankTransferForm({ amount, vendorName, invoiceNumber, on
       <div className="flex items-start gap-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <span>
-          Please initiate the bank transfer using the details above, then fill in the confirmation below. 
+          Please initiate the ACH or bank transfer using the details above, then fill in the confirmation below. 
           The payment will be marked as <strong>pending</strong> until an admin confirms receipt.
         </span>
       </div>
@@ -113,9 +113,9 @@ export default function BankTransferForm({ amount, vendorName, invoiceNumber, on
           />
         </div>
         <div>
-          <Label>Transfer Reference / Confirmation #</Label>
+          <Label>ACH / Bank Transfer Reference #</Label>
           <Input
-            placeholder="Bank transfer reference number"
+            placeholder="ACH or bank transfer reference number"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             required
@@ -139,7 +139,7 @@ export default function BankTransferForm({ amount, vendorName, invoiceNumber, on
           {processing ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recording...</>
           ) : (
-            <><Building2 className="h-4 w-4 mr-2" /> Confirm Transfer Initiated</>
+            <><Building2 className="h-4 w-4 mr-2" /> Confirm ACH / Bank Transfer Initiated</>
           )}
         </Button>
       </form>

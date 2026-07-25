@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { CreditCard, Building2, FileCheck, Wallet, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,7 @@ export default function PaymentGatewayModal({
   const { organization } = useAuth();
   const [confirmed, setConfirmed] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState('stripe');
+  const [selectedMethod, setSelectedMethod] = useState('card');
   const [processing, setProcessing] = useState(false);
   const [recordingFailed, setRecordingFailed] = useState(false);
   const [lastPaymentData, setLastPaymentData] = useState(null);
@@ -54,6 +54,7 @@ export default function PaymentGatewayModal({
 
   const resetForms = () => {
     setManualForm({ type: 'cheque', cheque_number: '', reference: '', notes: '' });
+    setSelectedMethod('card');
     setConfirmed(false);
     setCompleted(false);
     setProcessing(false);
@@ -91,9 +92,17 @@ export default function PaymentGatewayModal({
   };
 
   const processManualPayment = async () => {
-    setProcessing(true);
+    if (manualForm.type === 'cheque' && !manualForm.cheque_number.trim()) {
+      toast.error('Enter the check number.');
+      return;
+    }
+    if (!manualForm.reference.trim() && manualForm.type !== 'cheque') {
+      toast.error('Enter a reference or transaction ID.');
+      return;
+    }
 
-    const transactionId = `TXN-${crypto.randomUUID()}`;
+    setProcessing(true);
+    const transactionId = manualForm.reference.trim() || manualForm.cheque_number.trim() || `MANUAL-${crypto.randomUUID()}`;
 
     const paymentData = {
       payment_method: manualForm.type,
@@ -117,10 +126,10 @@ export default function PaymentGatewayModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-teal-600" />
-            Process Payment
+            Collect or Record Payment
           </DialogTitle>
           <DialogDescription>
-            Collect ${payment.amount?.toLocaleString()} for invoice {payment.invoice_number}
+            Choose how this invoice payment is collected or recorded.
           </DialogDescription>
         </DialogHeader>
 
@@ -139,7 +148,7 @@ export default function PaymentGatewayModal({
             </div>
             <h3 className="text-lg font-semibold text-slate-900">Payment Charged, Recording Failed</h3>
             <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              {lastPaymentData?.payment_method === 'card'
+              {lastPaymentData?.payment_method === 'stripe'
                 ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details - just try recording again.'
                 : 'The payment could not be saved. It is safe to try recording it again.'}
             </p>
@@ -179,7 +188,7 @@ export default function PaymentGatewayModal({
             {!confirmed ? (
               <div className="mt-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Confirm the details above before choosing a payment method.
+                  Confirm the details above before choosing card, ACH/bank, or manual/check recording.
                 </p>
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1" onClick={handleClose}>
@@ -193,22 +202,22 @@ export default function PaymentGatewayModal({
             ) : (
             <Tabs value={selectedMethod} onValueChange={setSelectedMethod} className="mt-2">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="stripe" className="text-xs gap-1">
+                <TabsTrigger value="card" className="text-xs gap-1">
                   <CreditCard className="h-3.5 w-3.5" />
                   Card
                 </TabsTrigger>
                 <TabsTrigger value="bank_transfer" className="text-xs gap-1">
                   <Building2 className="h-3.5 w-3.5" />
-                  Bank
+                  ACH
                 </TabsTrigger>
                 <TabsTrigger value="manual" className="text-xs gap-1">
                   <FileCheck className="h-3.5 w-3.5" />
-                  Manual
+                  Check
                 </TabsTrigger>
               </TabsList>
 
               {/* Stripe / Card */}
-              <TabsContent value="stripe" className="mt-4">
+              <TabsContent value="card" className="mt-4">
                 <StripePaymentForm
                   amount={payment.amount}
                   invoiceId={payment.invoice_id}
@@ -219,7 +228,7 @@ export default function PaymentGatewayModal({
                 />
               </TabsContent>
 
-              {/* Bank Transfer */}
+              {/* ACH / Bank Transfer */}
               <TabsContent value="bank_transfer" className="mt-4">
                 <BankTransferForm
                   amount={payment.amount}
@@ -229,16 +238,18 @@ export default function PaymentGatewayModal({
                 />
               </TabsContent>
 
-              {/* Manual Payment */}
+              {/* Check / Manual Payment */}
               <TabsContent value="manual" className="mt-4 space-y-3">
                 <div>
-                  <Label>Payment Type</Label>
+                  <Label>Manual Payment Type</Label>
                   <Select value={manualForm.type} onValueChange={(v) => setManualForm({ ...manualForm, type: v })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="cheque">Check</SelectItem>
+                      <SelectItem value="bank_transfer">ACH / Bank Transfer</SelectItem>
+                      <SelectItem value="stripe">External Card</SelectItem>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="manual">Other / Manual Record</SelectItem>
                     </SelectContent>
@@ -246,18 +257,18 @@ export default function PaymentGatewayModal({
                 </div>
                 {manualForm.type === 'cheque' && (
                   <div>
-                    <Label>Cheque Number</Label>
+                    <Label>Check Number</Label>
                     <Input
-                      placeholder="Cheque #"
+                      placeholder="Check #"
                       value={manualForm.cheque_number}
                       onChange={(e) => setManualForm({ ...manualForm, cheque_number: e.target.value })}
                     />
                   </div>
                 )}
                 <div>
-                  <Label>Reference / Transaction ID</Label>
+                  <Label>{manualForm.type === 'cheque' ? 'Reference / Memo' : 'Reference / Transaction ID'}</Label>
                   <Input
-                    placeholder="Reference number"
+                    placeholder={manualForm.type === 'cheque' ? 'Optional memo or reference' : 'Reference number'}
                     value={manualForm.reference}
                     onChange={(e) => setManualForm({ ...manualForm, reference: e.target.value })}
                   />
@@ -277,7 +288,7 @@ export default function PaymentGatewayModal({
                   onClick={processManualPayment}
                 >
                   {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileCheck className="h-4 w-4 mr-2" />}
-                  {processing ? 'Recording...' : 'Record Payment'}
+                  {processing ? 'Recording...' : 'Record Manual Payment'}
                 </Button>
               </TabsContent>
             </Tabs>

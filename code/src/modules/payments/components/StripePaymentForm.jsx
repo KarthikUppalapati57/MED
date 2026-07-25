@@ -89,7 +89,7 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSu
         {processing ? (
           <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
         ) : (
-          <><CreditCard className="h-4 w-4 mr-2" /> Pay ${amount?.toLocaleString()}</>
+          <><CreditCard className="h-4 w-4 mr-2" /> Pay by Card ${amount?.toLocaleString()}</>
         )}
       </Button>
     </form>
