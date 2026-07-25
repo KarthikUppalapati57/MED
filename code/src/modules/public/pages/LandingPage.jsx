@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import InteractiveScene from '@/components/InteractiveScene';
@@ -39,7 +39,7 @@ const LANDING_PLANS = [
     name: 'Starter',
     badge: 'Available now',
     price: 149,
-    description: 'Core location operations for one restaurant, store, or service location.',
+    description: 'Core tools for one restaurant, store, or service location.',
     features: ['Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
   },
   {
@@ -47,7 +47,7 @@ const LANDING_PLANS = [
     name: 'Starter + AI',
     badge: 'Coming soon',
     price: 249,
-    description: 'Starter modules plus AI-assisted operating intelligence.',
+    description: 'Starter tools plus AI-assisted review features as they become available.',
     features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
   },
   {
@@ -55,24 +55,24 @@ const LANDING_PLANS = [
     name: 'Advanced modules',
     badge: 'Coming soon',
     price: 349,
-    description: 'Expanded controls for larger teams and advanced operating workflows.',
+    description: 'Expanded controls for larger teams and multi-location workflows.',
     features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
   },
 ];
 const REVEAL_STEPS = [
   {
-    label: 'Capture',
-    title: 'Every invoice, count, and vendor signal lands in one operating stream.',
+    label: 'Upload',
+    title: 'Add invoices, products, vendor records, inventory counts, and recipe details.',
     metric: '01',
   },
   {
-    label: 'Verify',
-    title: 'Rules, approvals, and audit context surface before spend drifts.',
+    label: 'Review',
+    title: 'Check invoice details, vendor pricing, inventory movement, approvals, and payment status.',
     metric: '02',
   },
   {
-    label: 'Act',
-    title: 'Teams move from variance to purchase order, payment, or recipe update without rework.',
+    label: 'Manage',
+    title: 'Keep restaurant workflows organized by location, team, vendor, and daily task.',
     metric: '03',
   },
 ];
@@ -188,8 +188,8 @@ export default function LandingPage() {
             </div>
             
             <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/70 dark:text-white/80 uppercase">
-              <a href="#features" className="hover:text-[#b83316] transition-colors">Infrastructure</a>
-              <a href="#showcase" className="hover:text-[#b83316] transition-colors">Telemetry</a>
+              <a href="#features" className="hover:text-[#b83316] transition-colors">Features</a>
+              <a href="#showcase" className="hover:text-[#b83316] transition-colors">How it works</a>
               <a href="#pricing" className="hover:text-[#b83316] transition-colors">Pricing</a>
               <div className="h-4 w-[1px] bg-black/10 dark:bg-white/10 mx-2" />
               <ThemeToggle />
@@ -222,42 +222,42 @@ export default function LandingPage() {
           >
             <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-sm bg-[#b83316]/5 border border-[#b83316]/20 text-[10px] font-bold tracking-[3px] uppercase text-[#b83316] mb-12">
               <Sparkles className="h-3 w-3" />
-              Intelligence Orchestration
+              Restaurant operations software
             </div>
             
             <h1 className="text-fluid-h1 text-[clamp(3.35rem,8.8vw,7rem)] md:text-[clamp(4.5rem,9.5vw,8.25rem)] font-bold technical-tracking text-black dark:text-white mb-12 leading-[0.92]">
-              Building <br /> technical <br /> kitchens.
+              Restaurant <br /> operations, <br /> organized.
             </h1>
             
             <p className="max-w-[32rem] text-xl text-black/60 dark:text-white/85 mb-16 leading-relaxed font-medium technical-tracking">
-              RestOps delivers automated logistics, AI-driven inventory telemetry, and sovereign infrastructure for the modern hospitality enterprise.
+              RestOps helps restaurant teams manage invoices, vendors, products, inventory, recipes, payments, and daily performance from one connected system.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <Button size="lg" className="h-14 px-12 bg-[#b83316] text-white hover:bg-black font-bold text-xs tracking-[4px] rounded-sm transition-all shadow-xl shadow-[#b83316]/20 uppercase" onClick={() => setIsDemoModalOpen(true)}>
-                REQUEST ACCESS <ChevronRight className="ml-1 h-4 w-4" />
+                BOOK A DEMO <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
               <Button
                 size="lg"
                 variant="link"
                 className="text-black dark:text-white font-bold text-xs tracking-[3px] uppercase hover:text-[#b83316]"
-                onClick={() => navigate('/docs')}
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
               >
-                VIEW DOCUMENTATION
+                VIEW FEATURES
               </Button>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Stats Bar (Minimal technical style) */}
+      {/* Capability Bar */}
       <section className="relative py-12 border-y border-black/5 dark:border-white/10 z-10 bg-[#F2EEE8]/80 dark:bg-background/50 backdrop-blur-sm">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-16">
-            <StatItem value="99.9%" label="Sync Fidelity" />
-            <StatItem value="0.8ms" label="Latency Delta" />
-            <StatItem value="150+" label="Global Nodes" />
-            <StatItem value="24/7" label="Uptime Metric" />
+            <StatItem value="Invoices" label="Upload and review" />
+            <StatItem value="Inventory" label="Counts and movements" />
+            <StatItem value="Vendors" label="Profiles and items" />
+            <StatItem value="Dashboards" label="Location performance" />
           </div>
         </div>
       </section>
@@ -274,13 +274,13 @@ export default function LandingPage() {
             >
               <div className="mb-8 inline-flex items-center gap-3 border border-black/10 bg-white/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[3px] text-[#b83316] dark:border-white/10 dark:bg-white/5">
                 <Database className="h-3.5 w-3.5" />
-                Scroll Reveal
+                Daily workflow
               </div>
               <h2 className="max-w-3xl text-4xl font-bold leading-[0.98] tracking-tighter text-black dark:text-white md:text-6xl">
-                Operations become visible as the work moves.
+                Keep daily restaurant work in one place.
               </h2>
               <p className="mt-8 max-w-xl text-lg font-medium leading-relaxed text-black/70 dark:text-white/85 technical-tracking">
-                RestOps turns the daily flow of restaurant work into a sequenced control plane, revealing risk, approvals, and next actions exactly when teams need them.
+                RestOps gives teams a shared place to upload records, review operational details, and manage work across invoices, inventory, vendors, recipes, payments, and reporting.
               </p>
             </motion.div>
 
@@ -326,21 +326,21 @@ export default function LandingPage() {
                 className="flex-1 space-y-12"
               >
                 <div className="text-[11px] text-[#b83316] font-bold tracking-[4px] uppercase">
-                  RestOps Logics
+                  How RestOps helps
                 </div>
                 <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-black dark:text-white">
-                  Decentralized <br /> Kitchen Ops.
+                  Built for real <br /> restaurant work.
                 </h2>
                 <p className="text-black/75 dark:text-white/85 text-xl leading-relaxed max-w-lg font-medium technical-tracking">
-                  Our vision-driven interface allows your frontline staff to synchronize physical logistics with high-fidelity digital audits instantly.
+                  Use RestOps to keep invoices, vendor information, products, inventory counts, recipe costs, approvals, and payment records organized by restaurant location.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
-                  <CheckItem title="Low-latency OCR" desc="Sub-second extraction." />
-                  <CheckItem title="State Persistence" desc="Offline-first buffers." />
-                  <CheckItem title="AI Assist" desc="Invoice and inventory recommendations." />
-                  <CheckItem title="Live KPIs" desc="Role-aware dashboards, per location." />
-                  <CheckItem title="Location Scoping" desc="Source of truth for every record." />
+                  <CheckItem title="Invoice review" desc="Upload invoices and check details." />
+                  <CheckItem title="Inventory records" desc="Track counts, waste, and adjustments." />
+                  <CheckItem title="Vendor files" desc="Keep vendor profiles and items organized." />
+                  <CheckItem title="Recipe costing" desc="Build recipes and review item costs." />
+                  <CheckItem title="Location views" desc="See records by restaurant or store." />
                 </div>
               </motion.div>
 
@@ -360,7 +360,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Features Modules */}
+        {/* What RestOps Includes */}
         <section id="features">
           <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <motion.div 
@@ -369,27 +369,27 @@ export default function LandingPage() {
               viewport={{ once: true }}
               className="mb-32"
             >
-              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-black dark:text-white">Infrastructure Modules</h2>
+              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-black dark:text-white">What RestOps Includes</h2>
               <div className="h-0.5 w-16 bg-[#b83316]" />
             </motion.div>
 
             <div className="grid md:grid-cols-3 gap-y-32 gap-x-20">
-              <FeatureCard icon={<Zap />} title="Extraction" description="Transform paper into structured JSON entities via multi-modal analysis." delay={0} />
-              <FeatureCard icon={<BarChart3 />} title="Telemetry" description="Real-time observability into replenishment thresholds." delay={0.1} />
-              <FeatureCard icon={<ShieldCheck />} title="Identity" description="Granular RBAC and audit logging for every single action." delay={0.2} />
-              <FeatureCard icon={<Clock />} title="Lifecycle" description="Automated reconciliation between demand and logistics." delay={0.3} />
-              <FeatureCard icon={<Layers />} title="Orchestration" description="Centralized command for multi-unit ghost kitchen networks." delay={0.4} />
-              <FeatureCard icon={<Sparkles />} title="Intelligence" description="ML-driven delta analysis to optimize procurement costs." delay={0.5} />
+              <FeatureCard icon={<Zap />} title="Invoice Management" description="Upload invoices, review details, track approvals, and keep invoice records in one place." delay={0} />
+              <FeatureCard icon={<BarChart3 />} title="Inventory Tracking" description="Count stock, log waste, adjust quantities, and review inventory movement by location." delay={0.1} />
+              <FeatureCard icon={<ShieldCheck />} title="Vendor Management" description="Organize vendor profiles, products, banking details, documents, and communication history." delay={0.2} />
+              <FeatureCard icon={<Clock />} title="Product Records" description="Maintain products, vendor item mappings, barcodes, categories, and cost details." delay={0.3} />
+              <FeatureCard icon={<Layers />} title="Recipes & Menu Costing" description="Build recipes and menu items, track ingredient costs, and review item-level cost structure." delay={0.4} />
+              <FeatureCard icon={<Sparkles />} title="Payments & Reporting" description="Track payment status, approval steps, accounting export workflows, and restaurant performance views." delay={0.5} />
             </div>
           </div>
         </section>
 
-        {/* Pricing (Technical Card style) */}
+        {/* Pricing */}
         <section id="pricing">
           <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <div className="text-center mb-32">
-              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black dark:text-white">Licensing</h2>
-              <p className="text-black/70 dark:text-white/85 text-lg font-bold tracking-widest uppercase">Select your tier</p>
+              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black dark:text-white">Simple pricing by location</h2>
+              <p className="text-black/70 dark:text-white/85 text-lg font-bold tracking-widest uppercase">Start with the tools your restaurant needs</p>
             </div>
 
             <div className="grid gap-8 lg:grid-cols-3">
@@ -421,7 +421,7 @@ export default function LandingPage() {
                       ))}
                     </ul>
                     <Button className="w-full h-14 bg-black text-white hover:bg-[#b83316] font-bold text-[10px] tracking-[5px] rounded-sm uppercase transition-all shadow-2xl" onClick={() => setIsDemoModalOpen(true)}>
-                      {plan.id === 'starter' ? 'JOIN NOW' : 'REQUEST ACCESS'}
+                      {plan.id === 'starter' ? 'BOOK DEMO' : 'REQUEST INFO'}
                     </Button>
                   </div>
                 </motion.div>
@@ -440,13 +440,13 @@ export default function LandingPage() {
                 <RestopsLogo className="h-24" origin="origin-left" />
               </div>
               <p className="text-black/70 dark:text-white/85 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
-                Sovereign infrastructure for high-performance hospitality logistics and telemetry.
+                Restaurant operations software for invoices, vendors, products, inventory, recipes, payments, and performance tracking.
               </p>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Systems</h5>
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Product</h5>
               <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
-                <li><a href="#features" className="hover:text-[#b83316] transition-colors">Core Nodes</a></li>
+                <li><a href="#features" className="hover:text-[#b83316] transition-colors">Features</a></li>
                 <li><Link to="/security" className="hover:text-[#b83316] transition-colors">Security</Link></li>
                 <li><Link to="/subprocessors" className="hover:text-[#b83316] transition-colors">Subprocessors</Link></li>
               </ul>
@@ -493,28 +493,28 @@ export default function LandingPage() {
           <div className="p-12">
             <DialogHeader className="mb-10">
               <DialogTitle className="text-4xl font-bold tracking-tighter text-black">
-                Request <br /> Deployment
+                Book <br /> a Demo
               </DialogTitle>
               <DialogDescription className="text-black/70 text-sm font-bold tracking-widest uppercase mt-4">
-                Initialize your workspace.
+                Tell us about your restaurant.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleDemoSubmit} className="space-y-8">
               <div className="space-y-3">
-                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Full Identity</Label>
-                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="JOHN DOE" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Full Name</Label>
+                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="John Doe" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Technical Email</Label>
-                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="JOHN@OPS.COM" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Work Email</Label>
+                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="john@restaurant.com" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Enterprise Name</Label>
-                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="ACME LOGISTICS" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Restaurant or Company Name</Label>
+                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="Restaurant name" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <DialogFooter className="pt-8">
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-[#b83316] text-white hover:bg-black font-bold py-8 text-xs tracking-[5px] rounded-none uppercase shadow-2xl">
-                  {isSubmitting ? "INITIALIZING..." : "SUBMIT REQUEST"}
+                  {isSubmitting ? "SUBMITTING..." : "SUBMIT DEMO REQUEST"}
                 </Button>
               </DialogFooter>
             </form>
