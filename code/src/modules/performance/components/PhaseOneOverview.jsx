@@ -34,7 +34,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { formatMoney, formatPct } from '@/modules/performance/services/performanceAnalytics';
 
-const COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#be123c', '#7c3aed', '#047857'];
+const COLORS = ['#14b8a6', '#f97316', '#3b82f6', '#e11d48', '#8b5cf6', '#22c55e'];
+const CHART_GRID = 'hsl(var(--border) / 0.42)';
+const AXIS_TICK = { fontSize: 11, fill: 'hsl(var(--muted-foreground))' };
+const PREMIUM_TOOLTIP = {
+  border: '1px solid hsl(var(--border) / 0.72)',
+  borderRadius: 8,
+  background: 'hsl(var(--card) / 0.96)',
+  boxShadow: '0 18px 45px -28px rgba(0,0,0,0.55)',
+};
 
 function toDateKey(value) {
   if (!value) return '';
@@ -82,7 +90,7 @@ function StatCard({ icon: Icon, label, value, detail, tone = 'default' }) {
   }[tone] || 'bg-muted/40 text-foreground';
 
   return (
-    <Card className="glass-card border-border/50 shadow-sm hover-lift">
+    <Card className="performance-chart-card overflow-hidden" string="progress">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -505,7 +513,7 @@ export default function PhaseOneOverview({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-2 glass-card border-border/50 shadow-sm hover-lift">
+        <Card className="xl:col-span-2 performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div>
@@ -526,13 +534,23 @@ export default function PhaseOneOverview({
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analytics.budgetRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="category" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
-                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                    <Legend />
-                    <Bar dataKey="budget" name="Budget" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="actual" name="Actual" fill="#0f766e" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="4 8" vertical={false} stroke={CHART_GRID} />
+                    <XAxis dataKey="category" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={PREMIUM_TOOLTIP} cursor={{ fill: 'hsl(var(--primary) / 0.08)' }} formatter={(value) => formatMoney(value, 'USD')} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <defs>
+                      <linearGradient id="budgetBarGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#cbd5e1" stopOpacity={0.95} />
+                        <stop offset="100%" stopColor="#64748b" stopOpacity={0.7} />
+                      </linearGradient>
+                      <linearGradient id="actualBarGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2dd4bf" />
+                        <stop offset="100%" stopColor="#0f766e" />
+                      </linearGradient>
+                    </defs>
+                    <Bar dataKey="budget" name="Budget" fill="url(#budgetBarGradient)" radius={[8, 8, 0, 0]} maxBarSize={34} />
+                    <Bar dataKey="actual" name="Actual" fill="url(#actualBarGradient)" radius={[8, 8, 0, 0]} maxBarSize={34} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -540,7 +558,7 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-border/50 shadow-sm hover-lift">
+        <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Action Signals</CardTitle>
             <CardDescription>Alerts from the five active modules.</CardDescription>
@@ -577,7 +595,7 @@ export default function PhaseOneOverview({
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="glass-card border-border/50 shadow-sm hover-lift">
+        <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Invoice spend trend</CardTitle>
             <CardDescription>Top category spend over the selected period.</CardDescription>
@@ -589,11 +607,18 @@ export default function PhaseOneOverview({
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={analytics.spendTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                    <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
-                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                    <Line type="monotone" dataKey="spend" name="Spend" stroke="#0f766e" strokeWidth={2} dot={false} />
+                    <CartesianGrid strokeDasharray="4 8" vertical={false} stroke={CHART_GRID} />
+                    <XAxis dataKey="bucket" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={PREMIUM_TOOLTIP} cursor={{ fill: 'hsl(var(--primary) / 0.08)' }} formatter={(value) => formatMoney(value, 'USD')} />
+                    <defs>
+                      <linearGradient id="spendLineGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#14b8a6" />
+                        <stop offset="55%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#f97316" />
+                      </linearGradient>
+                    </defs>
+                    <Line type="monotone" dataKey="spend" name="Spend" stroke="url(#spendLineGradient)" strokeWidth={4} dot={{ r: 3, fill: '#14b8a6', strokeWidth: 0 }} activeDot={{ r: 7, fill: '#f97316', stroke: 'white', strokeWidth: 2 }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
@@ -601,7 +626,7 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-border/50 shadow-sm hover-lift">
+        <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Category distribution</CardTitle>
             <CardDescription>Where invoice spend is concentrated.</CardDescription>
@@ -613,13 +638,13 @@ export default function PhaseOneOverview({
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={analytics.categoryDistribution} dataKey="value" nameKey="name" innerRadius={54} outerRadius={84}>
+                    <Pie data={analytics.categoryDistribution} dataKey="value" nameKey="name" innerRadius={56} outerRadius={92} paddingAngle={3} stroke="hsl(var(--card))" strokeWidth={3}>
                       {analytics.categoryDistribution.map((entry, index) => (
                         <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                    <Legend />
+                    <Tooltip contentStyle={PREMIUM_TOOLTIP} cursor={{ fill: 'hsl(var(--primary) / 0.08)' }} formatter={(value) => formatMoney(value, 'USD')} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -627,7 +652,7 @@ export default function PhaseOneOverview({
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-border/50 shadow-sm hover-lift">
+        <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Payment status exposure</CardTitle>
             <CardDescription>Paid, scheduled, unpaid, and failed cash-out signals.</CardDescription>
@@ -639,11 +664,17 @@ export default function PhaseOneOverview({
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analytics.paymentData} layout="vertical" margin={{ top: 10, right: 16, left: 12, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} />
-                    <YAxis type="category" dataKey="name" width={78} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value) => formatMoney(value, 'USD')} />
-                    <Bar dataKey="value" name="Amount" fill="#1d4ed8" radius={[0, 4, 4, 0]} />
+                    <CartesianGrid strokeDasharray="4 8" horizontal={false} stroke={CHART_GRID} />
+                    <XAxis type="number" tickFormatter={(v) => `$${Math.round(v / 1000)}k`} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" width={78} tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={PREMIUM_TOOLTIP} cursor={{ fill: 'hsl(var(--primary) / 0.08)' }} formatter={(value) => formatMoney(value, 'USD')} />
+                    <defs>
+                      <linearGradient id="paymentExposureGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#8b5cf6" />
+                      </linearGradient>
+                    </defs>
+                    <Bar dataKey="value" name="Amount" fill="url(#paymentExposureGradient)" radius={[0, 8, 8, 0]} maxBarSize={34} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -655,3 +686,6 @@ export default function PhaseOneOverview({
     </div>
   );
 }
+
+
+

@@ -6,15 +6,15 @@ import { cn } from '@/lib/utils';
 
 export function ChartCard({ title, description, actions, children, className }) {
   return (
-    <Card className={cn('border-border/50', className)}>
-      <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
-        <div>
+    <Card className={cn('performance-chart-card overflow-hidden', className)} string="progress">
+      <CardHeader className="relative z-10 pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
+        <div className="min-w-0">
           <CardTitle className="text-base">{title}</CardTitle>
           {description ? <CardDescription className="mt-1">{description}</CardDescription> : null}
         </div>
         {actions ? <div className="flex items-center gap-2 shrink-0">{actions}</div> : null}
       </CardHeader>
-      <CardContent className="pt-2">{children}</CardContent>
+      <CardContent className="relative z-10 pt-2">{children}</CardContent>
     </Card>
   );
 }
