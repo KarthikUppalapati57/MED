@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // app's actual modules, so the Notifications page can offer per-module tabs alongside "All".
 const NOTIFICATION_MODULES = [
   { key: 'invoices', label: 'Invoices', types: ['invoice', 'approval', 'invoice_approved'] },
-  { key: 'payments', label: 'Payments', types: ['payment', 'payment_failed'] },
+  { key: 'payments', label: 'Payments', types: ['payment', 'payment_failed', 'billing'] },
   { key: 'inventory', label: 'Inventory', types: ['inventory', 'low_inventory', 'order'] },
   { key: 'vendors', label: 'Vendors', types: ['vendor_update'] },
   { key: 'labor', label: 'Labor', types: ['labor_alert'] },
@@ -45,7 +45,7 @@ const DELIVERY_CHANNELS = [
   { key: 'phone_enabled', label: 'SMS', icon: MessageSquare },
 ];
 
-const NOTIFICATION_SETTING_MODULE_KEYS = ['dashboard', 'invoices', 'payments', 'inventory', 'vendors', 'labor'];
+const MODULE_SETTING_ALIAS_KEYS = new Set(['inventory_management', 'recipe_management', 'vendor_management']);
 
 const isMissingPreferenceTable = (error) => {
   const message = String(error?.message || '');
@@ -116,18 +116,23 @@ export default function Notifications() {
   const accessibleModules = React.useMemo(() => {
     const enabledModules = organization?.enabled_modules;
     const userRole = userProfile?.role;
+    const seenLabels = new Set();
 
-    return NOTIFICATION_SETTING_MODULE_KEYS
-      .map((moduleKey) => {
-        const definition = MODULE_DEFINITIONS[moduleKey];
-        if (!definition) return null;
+    return Object.entries(MODULE_DEFINITIONS)
+      .map(([moduleKey, definition]) => {
+        if (!definition || MODULE_SETTING_ALIAS_KEYS.has(moduleKey)) return null;
         if (!hasMinRole(definition.minRole)) return null;
-        if (isPlatformAdmin && moduleKey !== 'dashboard') return null;
         const primaryPage = definition.pages?.[0] || moduleKey;
         if (!isPlatformAdmin && !isPageInEnabledModules(primaryPage, enabledModules, userRole)) return null;
+
+        const label = MODULE_LABEL_OVERRIDES[moduleKey] || definition.label;
+        const labelKey = label.toLowerCase();
+        if (seenLabels.has(labelKey)) return null;
+        seenLabels.add(labelKey);
+
         return {
           key: moduleKey,
-          label: MODULE_LABEL_OVERRIDES[moduleKey] || definition.label,
+          label,
           minRole: definition.minRole,
         };
       })
@@ -405,7 +410,7 @@ export default function Notifications() {
         <div className="flex flex-col gap-2 border-b border-border/50 p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Notification Settings</h2>
-            <p className="mt-1 text-sm text-muted-foreground">App, email, SMS, and priority filtering by notification area.</p>
+            <p className="mt-1 text-sm text-muted-foreground">App, email, SMS, and priority filtering for every module this user can access.</p>
           </div>
           {preferencesError && !isMissingPreferenceTable(preferencesError) && (
             <Badge variant="destructive">Settings unavailable</Badge>

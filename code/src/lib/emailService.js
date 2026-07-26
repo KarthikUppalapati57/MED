@@ -1,14 +1,13 @@
 /**
  * Production-safe email facade.
  *
- * Client-side EmailJS is not an approved production technology. Transactional
- * mail should go through Supabase Edge Functions backed by Resend. Existing
- * callers keep using this facade, but it no-ops instead of exposing email data
- * to an unapproved browser-side processor.
+ * Client-side EmailJS is not an approved production technology. Transactional mail goes
+ * through the `send-transactional-email` Supabase Edge Function, which is backed by Resend.
  */
+import { supabase } from '@/lib/supabaseClient';
 
 /**
- * Sends an email via EmailJS.
+ * Sends an email via the send-transactional-email Edge Function (Resend-backed).
  * @param {Object} params
  * @param {string} params.to_email   - Recipient email
  * @param {string} params.to_name    - Recipient name
@@ -18,14 +17,23 @@
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export async function sendEmail({ to_email, to_name, subject, message, from_name = 'Restops Platform' }) {
-  console.info('[EmailService] Browser email disabled; route transactional mail through Resend Edge Functions.', {
-    to_email,
-    to_name,
-    subject,
-    from_name,
-    message_length: String(message || '').length,
-  });
-  return { success: false, error: 'Browser email disabled; use Resend Edge Functions.' };
+  try {
+    const { data, error } = await supabase.functions.invoke('send-transactional-email', {
+      body: { to_email, to_name, subject, message, from_name },
+    });
+    if (error) {
+      console.warn('[EmailService] send-transactional-email invoke failed:', error.message);
+      return { success: false, error: error.message };
+    }
+    if (!data?.success) {
+      console.warn('[EmailService] send-transactional-email reported failure:', data?.error);
+      return { success: false, error: data?.error || 'Email delivery failed' };
+    }
+    return { success: true };
+  } catch (err) {
+    console.warn('[EmailService] Exception invoking send-transactional-email:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 // Pre-built email templates 

@@ -95,3 +95,9 @@ verify_enabled = true
 
 [functions.onboarding-contact-otp]
 verify_jwt = false
+
+[functions.send-transactional-email]
+verify_jwt = false
+
+[functions.notify-channel-dispatch]
+verify_jwt = false

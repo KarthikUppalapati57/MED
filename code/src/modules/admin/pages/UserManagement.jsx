@@ -96,7 +96,7 @@ function RoleBadges({ member, maxVisible = 2 }) {
 }
 
 
-// MemberRow ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â single member, rendered inside a brand/location hierarchy group
+// MemberRow - single member, rendered inside a brand/location hierarchy group
 function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
   const queryClient = useQueryClient();
   const status = member.status || 'active';

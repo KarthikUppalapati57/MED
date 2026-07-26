@@ -138,21 +138,10 @@ export default function LandingPage() {
 
       if (error) throw error;
 
-      // Fire-and-forget: notify platform admins via Edge Function
-      try {
-        await supabase.functions.invoke('notify-demo-request', {
-          body: {
-            full_name: demoForm.fullName,
-            email: demoForm.email,
-            company_name: demoForm.companyName,
-            phone: demoForm.phone,
-            plan: demoForm.plan,
-          }
-        });
-      } catch (_notifyErr) {
-        // Non-blocking: notification failure shouldn't affect the user flow
-        console.warn('Demo notification dispatch failed (non-critical):', _notifyErr);
-      }
+      // The demo_requests insert itself fires trg_demo_requests_webhook -> process-onboarding,
+      // which sends the requester confirmation + admin notification emails server-side. No
+      // separate client-side notify call needed (a prior one duplicated this row and never
+      // sent email anyway).
 
       toast.success("Demo request submitted! Our team will contact you soon.");
       setIsDemoModalOpen(false);

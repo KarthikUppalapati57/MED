@@ -12,6 +12,7 @@ const TYPE_TO_MODULE = {
   invoice_approved: 'invoices',
   payment: 'payments',
   payment_failed: 'payments',
+  billing: 'payments',
   inventory: 'inventory',
   low_inventory: 'inventory',
   order: 'inventory',

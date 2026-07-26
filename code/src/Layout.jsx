@@ -430,7 +430,7 @@ export default function Layout({ children, currentPageName }) {
   const canUseAiInsights = !isPlatformAdmin && hasMinRole('location_manager') && isPageInEnabledModules('AiInsights', enabledModules, userRole);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-shell bg-background">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -441,7 +441,7 @@ export default function Layout({ children, currentPageName }) {
 
  {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen",
+        "app-sidebar fixed inset-y-0 left-0 z-50 bg-background border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 flex flex-col h-screen max-h-dvh",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Brand */}
@@ -581,9 +581,9 @@ export default function Layout({ children, currentPageName }) {
       </aside>
 
  {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="app-main-frame lg:pl-64">
  {/* Top header glass effect */}
-        <header className="sticky top-0 z-30 h-16 glass-header border-b border-border flex items-center justify-between px-4 lg:px-6">
+        <header className="app-header sticky top-0 z-30 glass-header border-b border-border flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 lg:px-6">
           <button
             type="button"
             aria-label="Open navigation menu"
@@ -593,7 +593,7 @@ export default function Layout({ children, currentPageName }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1 flex items-center px-4 gap-4">
+          <div className="min-w-0 flex-1 flex items-center gap-2 px-2 sm:gap-4 sm:px-4">
             {!isPlatformAdmin && <ContextSwitcher />}
             {!isOnline && (
               <Badge variant="destructive" className="animate-pulse">
@@ -603,7 +603,7 @@ export default function Layout({ children, currentPageName }) {
             <PwaInstallPrompt variant="outline" size="sm" className="hidden md:flex h-8 ml-auto" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <Button variant="ghost" size="sm" aria-label="Toggle language" onClick={() => {
               const newLang = i18n.language === 'en' ? 'es' : 'en';
               i18n.changeLanguage(newLang);
@@ -710,7 +710,7 @@ export default function Layout({ children, currentPageName }) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="app-page">
           {currentPageName !== 'Dashboard' && (
             <Button 
               variant="ghost" 

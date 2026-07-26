@@ -15,11 +15,21 @@
         "type": "string",
         "enum": [
           "invoice",
+          "approval",
+          "invoice_approved",
           "payment",
+          "payment_failed",
           "order",
           "inventory",
+          "low_inventory",
+          "AI_alert",
+          "vendor_update",
+          "labor_alert",
           "system",
-          "alert"
+          "alert",
+          "warning",
+          "error",
+          "billing"
         ]
       },
       "priority": {
