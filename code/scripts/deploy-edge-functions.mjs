@@ -1,13 +1,17 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const functionsRoot = 'supabase/functions';
-const defaultFunctions = existsSync(functionsRoot)
+const functionDirectories = existsSync(functionsRoot)
   ? readdirSync(functionsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
     .map((entry) => entry.name)
     .sort()
   : [];
+
+const defaultFunctions = functionDirectories.filter((name) => existsSync(join(functionsRoot, name, 'index.ts')));
+const skippedFunctions = functionDirectories.filter((name) => !existsSync(join(functionsRoot, name, 'index.ts')));
 
 const requestedFunctions = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 const functionsToDeploy = requestedFunctions.length ? requestedFunctions : defaultFunctions;

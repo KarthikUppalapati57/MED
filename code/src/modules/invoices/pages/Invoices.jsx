@@ -1983,7 +1983,7 @@ export default function Invoices() {
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogContent
-          className="p-0 gap-0 w-[95vw] h-[90vh] min-w-[480px] min-h-[400px] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden resize"
+          className="p-0 gap-0 w-[95vw] h-[90vh] min-w-0 sm:min-w-[480px] min-h-[400px] max-w-[95vw] max-h-[95vh] flex flex-col overflow-hidden resize"
         >
           <DialogHeader className="px-6 py-4 border-b shrink-0">
             <DialogTitle>

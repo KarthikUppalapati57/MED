@@ -253,6 +253,48 @@
     hyphens: auto;
   }
 
+  .app-page > *,
+  .app-page section,
+  .app-page article,
+  .app-page aside,
+  .app-page form,
+  .app-page fieldset,
+  .app-page [role="tabpanel"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-page .recharts-responsive-container,
+  .app-page .recharts-wrapper,
+  .app-page .recharts-surface {
+    max-width: 100%;
+  }
+
+  .app-page [role="tablist"] {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-page input,
+  .app-page select,
+  .app-page textarea {
+    max-width: 100%;
+  }
+
+  .app-page pre,
+  .app-page code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 640px) {
+    .app-page .recharts-legend-wrapper {
+      position: static !important;
+      width: 100% !important;
+    }
+  }
+
 
   @media (min-width: 1920px) {
     .app-page {

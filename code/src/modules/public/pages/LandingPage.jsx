@@ -176,28 +176,60 @@ export default function LandingPage() {
               <RestopsLogo className="h-16 ml-4 mt-2" origin="origin-left" />
             </div>
             
-            <div className="hidden md:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/70 dark:text-white/80 uppercase">
+            <div className="hidden lg:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/70 dark:text-white/80 uppercase">
               <a href="#features" className="hover:text-[#b83316] transition-colors">Features</a>
               <a href="#showcase" className="hover:text-[#b83316] transition-colors">How it works</a>
               <a href="#pricing" className="hover:text-[#b83316] transition-colors">Pricing</a>
-              <div className="h-4 w-[1px] bg-black/10 dark:bg-white/10 mx-2" />
-              <ThemeToggle />
-              <button className="hover:text-black dark:hover:text-white transition-colors" onClick={() => navigate('/login')}>Log in</button>
-              <Button 
-                className="bg-black dark:bg-white text-white dark:text-black hover:bg-[#b83316] dark:hover:bg-[#b83316] dark:hover:text-white font-bold text-[10px] tracking-[2px] h-8 px-4 rounded-sm transition-all uppercase"
-                onClick={() => setIsDemoModalOpen(true)}
-              >
-                BOOK DEMO
-              </Button>
             </div>
 
-            <div className="md:hidden">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-black/70">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
+              <button
+                type="button"
+                className="h-9 px-2 text-[10px] font-bold uppercase tracking-[1.5px] text-black transition-colors hover:text-[#b83316] dark:text-white sm:px-3 sm:text-[11px] sm:tracking-[2px]"
+                onClick={() => navigate('/login')}
+              >
+                Log in
+              </button>
+              <Button
+                className="hidden h-9 rounded-sm bg-black px-3 text-[10px] font-bold uppercase tracking-[1.5px] text-white transition-all hover:bg-[#b83316] dark:bg-white dark:text-black dark:hover:bg-[#b83316] dark:hover:text-white sm:inline-flex lg:px-4 lg:tracking-[2px]"
+                onClick={() => setIsDemoModalOpen(true)}
+              >
+                Book Demo
+              </Button>
+              <button
+                type="button"
+                aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={isMenuOpen}
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="inline-flex h-9 w-9 items-center justify-center text-black/70 dark:text-white/80 lg:hidden"
+              >
                 {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
             </div>
           </div>
         </div>
+
+        {isMenuOpen && (
+          <div className="border-t border-black/5 bg-[#FAF8F4]/95 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-background/95 lg:hidden">
+            <div className="grid gap-2 text-[11px] font-bold uppercase tracking-[2px] text-black/75 dark:text-white/85">
+              <a href="#features" className="py-3" onClick={() => setIsMenuOpen(false)}>Features</a>
+              <a href="#showcase" className="py-3" onClick={() => setIsMenuOpen(false)}>How it works</a>
+              <a href="#pricing" className="py-3" onClick={() => setIsMenuOpen(false)}>Pricing</a>
+              <Button
+                className="mt-2 h-11 w-full bg-black text-[10px] font-bold uppercase tracking-[2px] text-white hover:bg-[#b83316] dark:bg-white dark:text-black dark:hover:bg-[#b83316] dark:hover:text-white"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsDemoModalOpen(true);
+                }}
+              >
+                Book Demo
+              </Button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
