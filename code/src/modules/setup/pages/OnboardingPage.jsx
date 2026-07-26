@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, MapPin, Plus, Save, Sparkles, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Mail, MapPin, MessageSquare, Plus, Save, Sparkles, Trash2, Upload } from 'lucide-react';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -60,6 +60,8 @@ const createLocation = () => ({ name: '', businessAddressSource: 'custom', busin
 const createBrand = () => ({ name: '', addressEnabled: false, addressSource: 'custom', address: emptyAddress(), locations: [createLocation()] });
 const createOrganization = () => ({ name: '', slug: '', slugManual: false, addressEnabled: false, businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress(), brands: [createBrand()] });
 const createBusinessIdentity = () => ({ companyName: '', ownershipModel: 'corporate', website: 'https://', businessAddress: emptyAddress(), mailingSameAsBusiness: true, mailingAddress: emptyAddress() });
+const createCommunicationPreferences = () => ({ email_enabled: false, phone_enabled: false });
+const ONBOARDING_NOTIFICATION_MODULE_KEYS = ['dashboard', 'invoices', 'payments', 'inventory', 'vendors', 'labor'];
 const normalizeAddress = (address) => ({ ...emptyAddress(), ...(address && typeof address === 'object' ? address : {}) });
 const normalizeLocation = (location = {}) => ({ ...createLocation(), ...location, businessAddressSource: location.businessAddressSource || 'custom', businessAddress: normalizeAddress(location.businessAddress), mailingAddress: normalizeAddress(location.mailingAddress), mailingSameAsBusiness: location.mailingSameAsBusiness !== false });
 const normalizeBrand = (brand = {}) => ({ ...createBrand(), ...brand, addressSource: brand.addressSource || 'custom', address: normalizeAddress(brand.address), locations: Array.isArray(brand.locations) && brand.locations.length ? brand.locations.map(normalizeLocation) : [createLocation()] });
@@ -76,6 +78,11 @@ const normalizeOrganization = (org = {}) => {
   };
 };
 const normalizeBusinessIdentity = (identity = {}) => ({ ...createBusinessIdentity(), ...identity, businessAddress: normalizeAddress(identity.businessAddress), mailingAddress: normalizeAddress(identity.mailingAddress), mailingSameAsBusiness: identity.mailingSameAsBusiness !== false });
+const normalizeCommunicationPreferences = (preferences = {}) => ({
+  ...createCommunicationPreferences(),
+  email_enabled: preferences.email_enabled === true,
+  phone_enabled: preferences.phone_enabled === true,
+});
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 const normalizePlanId = (value) => normalizeKey(value).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const buildOnboardingPlanOptions = (dbPlans = []) => ONBOARDING_PLAN_CATALOG.map((catalogPlan) => {
@@ -586,6 +593,7 @@ export default function OnboardingPage() {
   const [couponResult, setCouponResult] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [businessIdentity, setBusinessIdentity] = useState(createBusinessIdentity());
+  const [communicationPreferences, setCommunicationPreferences] = useState(createCommunicationPreferences());
   const [organizations, setOrganizations] = useState([createOrganization()]);
   const [hierarchyMode, setHierarchyMode] = useState('manual');
   const [hierarchyView, setHierarchyView] = useState('build');
@@ -601,6 +609,7 @@ export default function OnboardingPage() {
     try {
       const draft = JSON.parse(saved);
       if (draft.businessIdentity) setBusinessIdentity((prev) => normalizeBusinessIdentity({ ...prev, ...draft.businessIdentity }));
+      if (draft.communicationPreferences) setCommunicationPreferences(normalizeCommunicationPreferences(draft.communicationPreferences));
       if (Array.isArray(draft.organizations) && draft.organizations.length > 0) setOrganizations(draft.organizations.map(normalizeOrganization));
       if (draft.step) setStep(Math.min(Math.max(draft.step, 1), 4));
       if (draft.selectedPlan) setSelectedPlan(draft.selectedPlan);
@@ -682,6 +691,7 @@ export default function OnboardingPage() {
   const onboardingPlanOptions = useMemo(() => buildOnboardingPlanOptions(plans), [plans]);
 
   const updateBusinessIdentity = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: value }));
+  const updateCommunicationPreference = (field, value) => setCommunicationPreferences((prev) => ({ ...prev, [field]: value === true }));
   const updateBankAccount = (field, value) => setBankAccount((prev) => ({ ...prev, [field]: value }));
   const updateBankBillingAddress = (value) => setBankAccount((prev) => ({ ...prev, billingAddress: normalizeAddress(value) }));
   const updateBusinessIdentityAddress = (field, value) => setBusinessIdentity((prev) => ({ ...prev, [field]: normalizeAddress(value) }));
@@ -874,7 +884,7 @@ export default function OnboardingPage() {
   };
 
   const saveDraft = (nextStep = step, showToast = true) => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, organizations, selectedPlan, paymentMethod, bankAccount: { ...bankAccount, accountNumber: '', routingNumber: '' }, couponCode: normalizeCouponCodeInput(couponCode), hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: nextStep, businessIdentity, communicationPreferences, organizations, selectedPlan, paymentMethod, bankAccount: { ...bankAccount, accountNumber: '', routingNumber: '' }, couponCode: normalizeCouponCodeInput(couponCode), hierarchyMode, hierarchyView, updatedAt: new Date().toISOString() }));
     if (showToast) toast.success('Onboarding draft saved.');
   };
 
@@ -1034,6 +1044,23 @@ export default function OnboardingPage() {
     return null;
   };
 
+  const saveNotificationDeliveryPreferences = async () => {
+    if (!user?.id) return;
+    const rows = ONBOARDING_NOTIFICATION_MODULE_KEYS.map((moduleKey) => ({
+      user_id: user.id,
+      organization_id: userProfile?.organization_id || null,
+      module_key: moduleKey,
+      in_app_enabled: true,
+      email_enabled: communicationPreferences.email_enabled,
+      phone_enabled: communicationPreferences.phone_enabled,
+      critical_only: false,
+    }));
+
+    const { error } = await supabase
+      .from('notification_delivery_preferences')
+      .upsert(rows, { onConflict: 'user_id,module_key' });
+    if (error) throw error;
+  };
   const buildHierarchyPayload = () => organizations.map((org) => {
     const orgBusinessAddress = org.addressEnabled ? addressPayloadOrUndefined(org.businessAddress) : undefined;
     const orgMailingAddress = org.addressEnabled ? addressPayloadOrUndefined(org.mailingSameAsBusiness ? org.businessAddress : org.mailingAddress) : undefined;
@@ -1081,6 +1108,12 @@ export default function OnboardingPage() {
     try {
       const hierarchy = buildHierarchyPayload();
       await api.onboarding.submitHierarchyForReview(user.id, hierarchy);
+      try {
+        await saveNotificationDeliveryPreferences();
+      } catch (preferenceError) {
+        console.warn('Failed to save onboarding notification preferences:', preferenceError);
+        toast.warning('Workspace submitted, but notification preferences could not be saved. You can update them later in Notifications settings.');
+      }
       hierarchy.forEach((org) => posthog.capture('workspace_submitted_for_review', { orgName: org.name }));
 
       toast.success('Submitted for review. A platform admin will confirm your workspace shortly.');
@@ -1446,6 +1479,35 @@ export default function OnboardingPage() {
                   {!businessIdentity.mailingSameAsBusiness && (
                     <AddressFields idPrefix="tenant-mailing-address" value={businessIdentity.mailingAddress} onChange={(value) => updateBusinessIdentityAddress('mailingAddress', value)} required line1Label="Mailing Address" />
                   )}
+                </div>
+
+                <div className="space-y-3 border-t border-border/70 pt-5">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Notification Delivery</h3>
+                    <p className="text-xs text-muted-foreground">Email and SMS notifications are off by default. Turn on only the channels this user wants to receive.</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Email notifications</p>
+                          <p className="text-xs text-muted-foreground">Send notification updates to the account email.</p>
+                        </div>
+                      </div>
+                      <Switch checked={communicationPreferences.email_enabled} onCheckedChange={(checked) => updateCommunicationPreference('email_enabled', checked)} aria-label="Enable email notifications" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">SMS notifications</p>
+                          <p className="text-xs text-muted-foreground">Send notification updates by text message.</p>
+                        </div>
+                      </div>
+                      <Switch checked={communicationPreferences.phone_enabled} onCheckedChange={(checked) => updateCommunicationPreference('phone_enabled', checked)} aria-label="Enable SMS notifications" />
+                    </div>
+                  </div>
                 </div>
 
               </CardContent>

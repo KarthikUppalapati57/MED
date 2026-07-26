@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Check, Trash2, ShieldAlert, Sparkles, AlertCircle, Info, Clock, CheckCircle2, MonitorCheck, SlidersHorizontal } from "lucide-react";
+import { Bell, Check, Trash2, ShieldAlert, Sparkles, AlertCircle, Info, Clock, CheckCircle2, Mail, MessageSquare, MonitorCheck, SlidersHorizontal } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,7 +41,11 @@ const MODULE_LABEL_OVERRIDES = {
 
 const DELIVERY_CHANNELS = [
   { key: 'in_app_enabled', label: 'App', icon: MonitorCheck },
+  { key: 'email_enabled', label: 'Email', icon: Mail },
+  { key: 'phone_enabled', label: 'SMS', icon: MessageSquare },
 ];
+
+const NOTIFICATION_SETTING_MODULE_KEYS = ['dashboard', 'invoices', 'payments', 'inventory', 'vendors', 'labor'];
 
 const isMissingPreferenceTable = (error) => {
   const message = String(error?.message || '');
@@ -113,18 +117,21 @@ export default function Notifications() {
     const enabledModules = organization?.enabled_modules;
     const userRole = userProfile?.role;
 
-    return Object.entries(MODULE_DEFINITIONS)
-      .filter(([moduleKey, definition]) => {
-        if (!hasMinRole(definition.minRole)) return false;
-        if (isPlatformAdmin) return moduleKey === 'dashboard' || moduleKey === 'platform';
+    return NOTIFICATION_SETTING_MODULE_KEYS
+      .map((moduleKey) => {
+        const definition = MODULE_DEFINITIONS[moduleKey];
+        if (!definition) return null;
+        if (!hasMinRole(definition.minRole)) return null;
+        if (isPlatformAdmin && moduleKey !== 'dashboard') return null;
         const primaryPage = definition.pages?.[0] || moduleKey;
-        return isPageInEnabledModules(primaryPage, enabledModules, userRole);
+        if (!isPlatformAdmin && !isPageInEnabledModules(primaryPage, enabledModules, userRole)) return null;
+        return {
+          key: moduleKey,
+          label: MODULE_LABEL_OVERRIDES[moduleKey] || definition.label,
+          minRole: definition.minRole,
+        };
       })
-      .map(([moduleKey, definition]) => ({
-        key: moduleKey,
-        label: MODULE_LABEL_OVERRIDES[moduleKey] || definition.label,
-        minRole: definition.minRole,
-      }))
+      .filter(Boolean)
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [hasMinRole, isPlatformAdmin, organization?.enabled_modules, userProfile?.role]);
 
@@ -398,7 +405,7 @@ export default function Notifications() {
         <div className="flex flex-col gap-2 border-b border-border/50 p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Notification Settings</h2>
-            <p className="mt-1 text-sm text-muted-foreground">In-app delivery and priority filtering by accessible module.</p>
+            <p className="mt-1 text-sm text-muted-foreground">App, email, SMS, and priority filtering by notification area.</p>
           </div>
           {preferencesError && !isMissingPreferenceTable(preferencesError) && (
             <Badge variant="destructive">Settings unavailable</Badge>
