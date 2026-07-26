@@ -420,10 +420,10 @@ export default function Invoices() {
   };
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts', organization?.id],
-    queryFn: () => api.entities.PaymentAccount.list('name'),
+    queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id }, { orderBy: 'name' }),
     select: React.useCallback(
-      (data) => filterByContext(data, { organization, brand, location }).filter((account) => account.is_active !== false),
-      [organization, brand, location]
+      (data) => (data || []).filter((account) => account.is_active !== false),
+      []
     ),
     enabled: !!organization?.id,
   });
@@ -2104,4 +2104,5 @@ export default function Invoices() {
     </div>
   );
 }
+
 

@@ -107,8 +107,6 @@ serve(async (req) => {
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
       if (scope.organization_id) bankQuery = bankQuery.eq('organization_id', scope.organization_id)
-      if (scope.brand_id) bankQuery = bankQuery.eq('brand_id', scope.brand_id)
-      if (scope.location_id) bankQuery = bankQuery.eq('location_id', scope.location_id)
 
       const { data: bankAccounts, error: bankError } = await bankQuery
       if (bankError) throw bankError
@@ -172,7 +170,7 @@ serve(async (req) => {
           routing_last4: routingNumber.slice(-4),
           account_last4: accountNumber.slice(-4),
           fingerprint_hash: hash,
-          default_for_owner: payload.default_for_owner !== false,
+          default_for_owner: payload.default_for_owner === true,
           verification_status: 'pending',
           created_by_user_id: user.id,
           created_by_role: profile.role,
@@ -357,6 +355,8 @@ serve(async (req) => {
     return json({ error: error.message || 'Unexpected payment bank account error' }, error.message === 'Unauthorized' ? 401 : 500)
   }
 })
+
+
 
 
 

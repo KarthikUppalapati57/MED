@@ -55,6 +55,7 @@ export default function PlatformOrganizations() {
     stripe_subscription_id: '',
     enabled_modules: []
   });
+  const [paymentSetupLocationId, setPaymentSetupLocationId] = useState('');
 
   const [isDeletingOrg, setIsDeletingOrg] = useState(false);
   const [isHierarchyModalOpen, setIsHierarchyModalOpen] = useState(false);
@@ -167,6 +168,12 @@ export default function PlatformOrganizations() {
     },
     enabled: selectedTenantOrgIds.length > 0
   });
+
+  const paymentSetupLocations = React.useMemo(
+    () => orgLocations.filter((loc) => loc.organization_id === selectedOrgId),
+    [orgLocations, selectedOrgId]
+  );
+  const selectedPaymentSetupLocation = paymentSetupLocations.find((loc) => loc.id === paymentSetupLocationId) || null;
 
   const { data: orgUsers = [] } = useAuthQuery({
     queryKey: ['platform_org_users', selectedTenantId, selectedTenantOrgIds.join(',')],
@@ -314,6 +321,14 @@ export default function PlatformOrganizations() {
       supabase.removeChannel(channel);
     };
   }, [invalidateBrands, invalidateLocations, invalidateOrganizations, invalidatePlans, invalidateUsers, invalidateOnboardingReviews]);
+
+  React.useEffect(() => {
+    if (paymentSetupLocations.length > 0 && !paymentSetupLocations.some((location) => location.id === paymentSetupLocationId)) {
+      setPaymentSetupLocationId(paymentSetupLocations[0].id);
+    } else if (paymentSetupLocations.length === 0 && paymentSetupLocationId) {
+      setPaymentSetupLocationId('');
+    }
+  }, [paymentSetupLocationId, paymentSetupLocations]);
 
   React.useEffect(() => {
     const org = orgs.find(o => o.id === selectedOrgId);
@@ -1484,18 +1499,41 @@ export default function PlatformOrganizations() {
                                />
                              </div>
                            </div>
-                           <div className="md:col-span-2 pt-4 border-t border-border mt-4">
-                             <ProviderNeutralPaymentSetup
-                               scopeOverride={{
-                                 tenant_id: selectedTenantId || selectedOrg?.tenant_id || null,
-                                 organization_id: selectedOrgId,
-                                 brand_id: null,
-                                 location_id: null,
-                               }}
-                               showBankAccounts={false}
-                               showProviderRouting={false}
-                               feePolicyEditable={true}
-                             />
+                           <div className="md:col-span-2 pt-4 border-t border-border mt-4 space-y-4">
+                             <div>
+                               <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">Payment Setup Location</Label>
+                               <Select value={paymentSetupLocationId || 'none'} onValueChange={(value) => setPaymentSetupLocationId(value === 'none' ? '' : value)}>
+                                 <SelectTrigger className="w-full bg-secondary/50 border-border">
+                                   <SelectValue placeholder="Select location" />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   {paymentSetupLocations.map((location) => (
+                                     <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                                   ))}
+                                   {paymentSetupLocations.length === 0 && <SelectItem value="none" disabled>No locations found</SelectItem>}
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                             {selectedPaymentSetupLocation ? (
+                               <ProviderNeutralPaymentSetup
+                                 key={selectedPaymentSetupLocation.id}
+                                 scopeOverride={{
+                                   tenant_id: selectedTenantId || selectedOrg?.tenant_id || null,
+                                   organization_id: selectedOrgId,
+                                   brand_id: selectedPaymentSetupLocation.brand_id || null,
+                                   location_id: selectedPaymentSetupLocation.id,
+                                 }}
+                                 showBankAccounts={false}
+                                 showProviderRouting={true}
+                                 showFeePolicy={true}
+                                 showOverview={false}
+                                 feePolicyEditable={true}
+                               />
+                             ) : (
+                               <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                                 Add a location before configuring provider routing and fee policy.
+                               </div>
+                             )}
                            </div>
                            <div className="md:col-span-2 pt-4 border-t border-border mt-4">
                              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-4">Enabled Modules (Tenant/Organization Entitlements)</Label>
@@ -1898,8 +1936,4 @@ export default function PlatformOrganizations() {
     </div>
   );
 }
-
-
-
-
 

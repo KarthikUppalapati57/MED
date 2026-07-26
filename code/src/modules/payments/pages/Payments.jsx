@@ -72,7 +72,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
-import ProviderNeutralPaymentSetup from '@/modules/payments/components/ProviderNeutralPaymentSetup';
 import { confirmBankTransfer } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
@@ -435,10 +434,10 @@ export default function Payments() {
 
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts', organization?.id],
-    queryFn: () => api.entities.PaymentAccount.list('name'),
+    queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id }, { orderBy: 'name' }),
     select: React.useCallback(
-      (data) => filterByContext(data, { organization, brand, location }).filter((account) => account.is_active !== false),
-      [organization, brand, location]
+      (data) => (data || []).filter((account) => account.is_active !== false),
+      []
     ),
     enabled: !!organization?.id && ['invoices', 'schedule', 'setup'].includes(activeTab),
   });
@@ -1706,10 +1705,6 @@ export default function Payments() {
                 </CardContent>
               </Card>
             )}
-
-            <div className="lg:col-span-2">
-              <ProviderNeutralPaymentSetup />
-            </div>
 
             <div className="lg:col-span-2">
               <PaymentAccountsSettings />

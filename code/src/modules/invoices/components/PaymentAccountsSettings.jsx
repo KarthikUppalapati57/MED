@@ -112,7 +112,7 @@ export default function PaymentAccountsSettings() {
           Payment Accounts
         </CardTitle>
         <CardDescription>
-          Add, replace, or deactivate the operating accounts used for vendor bill-pay. Stripe Connect bank setup lives in the payment provider setup flow; only masked digits are kept here.
+          Add, replace, or deactivate shared operating accounts used for vendor bill-pay. Users choose one of these accounts when releasing payments by ACH, card, or check.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -290,5 +290,4 @@ export default function PaymentAccountsSettings() {
     </div>
   );
 }
-
 

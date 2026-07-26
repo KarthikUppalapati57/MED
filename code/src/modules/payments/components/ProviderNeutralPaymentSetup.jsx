@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,28 +10,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Banknote, CheckCircle2, Landmark, Link2, Loader2, ShieldCheck } from 'lucide-react';
+import { Banknote, CheckCircle2, Landmark, Link2, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-const purposeLabels = {
-  platform_billing: 'Client pays platform',
-  vendor_funding: 'Client funds vendor payments',
-  vendor_receiving: 'Vendor receives payments',
-  backup: 'Backup account',
-  location_specific: 'Location-specific account',
-};
-
-const addablePurposeLabels = Object.fromEntries(Object.entries(purposeLabels).filter(([value]) => value !== 'vendor_receiving'));
-
 const defaultBankForm = {
-  purpose: 'vendor_funding',
   nickname: '',
   bank_name: '',
   account_holder_name: '',
   account_type: 'checking',
   routing_number: '',
   account_number: '',
-  default_for_owner: true,
 };
 
 function money(cents) {
@@ -52,9 +42,12 @@ export default function ProviderNeutralPaymentSetup({
   scopeOverride = null,
   showBankAccounts = true,
   showProviderRouting = true,
+  showFeePolicy = true,
+  showOverview = true,
   feePolicyEditable = null,
 } = {}) {
   const { userProfile, organization, brand, location } = useAuth();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linkingId, setLinkingId] = useState(null);
@@ -67,7 +60,7 @@ export default function ProviderNeutralPaymentSetup({
   });
   const [bankForm, setBankForm] = useState(() => ({
     ...defaultBankForm,
-    account_holder_name: userProfile?.full_name || organization?.name || '',
+    account_holder_name: organization?.name || userProfile?.full_name || '',
   }));
   const [providerConfig, setProviderConfig] = useState({
     collection_provider: 'stripe_ach_debit',
@@ -136,15 +129,45 @@ export default function ProviderNeutralPaymentSetup({
     }
     setSaving(true);
     try {
-      await invokePaymentBankAccounts('create_bank_account', {
-        ...scope,
+      const sharedScope = {
+        tenant_id: scope.tenant_id,
+        organization_id: scope.organization_id,
+        brand_id: null,
+        location_id: null,
+      };
+      const createdVaultAccount = await invokePaymentBankAccounts('create_bank_account', {
+        ...sharedScope,
         ...bankForm,
+        purpose: 'vendor_funding',
+        default_for_owner: false,
         owner_type: 'organization',
         owner_id: scope.organization_id,
         source: 'payment_setup',
       });
-      toast.success('Bank account stored in the provider-neutral vault.');
-      setBankForm({ ...defaultBankForm, account_holder_name: userProfile?.full_name || organization?.name || '' });
+
+      await api.financial.createPaymentAccount({
+        organization_id: scope.organization_id,
+        brand_id: null,
+        location_id: null,
+        name: bankForm.nickname || bankForm.bank_name || `${bankForm.account_type} account ****${bankForm.account_number.slice(-4)}`,
+        account_type: bankForm.account_type,
+        payment_method: 'bank_account',
+        provider: 'stripe_connect_custom',
+        provider_reference: createdVaultAccount.bank_account?.id || null,
+        last_four: bankForm.account_number.slice(-4),
+        routing_number_last4: bankForm.routing_number.slice(-4),
+        account_number_last4: bankForm.account_number.slice(-4),
+        is_default: false,
+        metadata: {
+          provider_neutral_bank_account_id: createdVaultAccount.bank_account?.id || null,
+          shared_across_locations: true,
+          source: 'payment_setup',
+        },
+      });
+
+      toast.success('Shared bank account added.');
+      queryClient.invalidateQueries({ queryKey: ['payment-accounts'] });
+      setBankForm({ ...defaultBankForm, account_holder_name: organization?.name || userProfile?.full_name || '' });
       await load();
     } catch (err) {
       toast.error(err.message || 'Could not save bank account.');
@@ -189,16 +212,6 @@ export default function ProviderNeutralPaymentSetup({
       setFeePreview((prev) => ({ ...prev, estimate: result.estimate }));
     } catch (err) {
       toast.error(err.message || 'Could not estimate fee.');
-    }
-  };
-
-  const setDefault = async (bankAccountId) => {
-    try {
-      await invokePaymentBankAccounts('set_default', { bank_account_id: bankAccountId });
-      toast.success('Default account updated.');
-      await load();
-    } catch (err) {
-      toast.error(err.message || 'Could not update default account.');
     }
   };
 
@@ -247,6 +260,7 @@ export default function ProviderNeutralPaymentSetup({
 
   return (
     <div className="space-y-6">
+      {showOverview && (
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -256,18 +270,19 @@ export default function ProviderNeutralPaymentSetup({
         <CardContent className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-lg border bg-secondary/40 p-4">
             <p className="text-sm font-semibold">Bank account vault</p>
-            <p className="mt-1 text-xs text-muted-foreground">Raw bank details are stored by backend-only vault functions. UI reads only metadata and last 4 digits.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Raw bank details are stored by backend-only vault functions. All operating accounts are shared across the organization and selected at payout time.</p>
           </div>
           <div className="rounded-lg border bg-secondary/40 p-4">
             <p className="text-sm font-semibold">Stripe routing</p>
             <p className="mt-1 text-xs text-muted-foreground">Collection: Stripe ACH debit. Payouts: Stripe Connect ACH.</p>
           </div>
           <div className="rounded-lg border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold">Current scope</p>
-            <p className="mt-1 text-xs text-muted-foreground">{organization?.name || 'Organization'}{location?.name ? ` / ${location.name}` : ''}</p>
+            <p className="text-sm font-semibold">Shared account scope</p>
+            <p className="mt-1 text-xs text-muted-foreground">{organization?.name || 'Organization'} shared accounts</p>
           </div>
         </CardContent>
       </Card>
+      )}
 
       {showBankAccounts && (
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -279,7 +294,7 @@ export default function ProviderNeutralPaymentSetup({
           </CardHeader>
           <CardContent className="space-y-3">
             {data.bank_accounts.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No provider-neutral bank accounts yet.</div>
+              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No shared bank accounts yet.</div>
             ) : (
               data.bank_accounts.map((account) => (
                 <div key={account.id} className="rounded-lg border p-4">
@@ -287,8 +302,7 @@ export default function ProviderNeutralPaymentSetup({
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold">{account.nickname || account.bank_name || 'Bank account'} ****{account.account_last4}</p>
-                        {account.default_for_owner && <Badge variant="outline">Default</Badge>}
-                        <Badge>{purposeLabels[account.purpose] || account.purpose}</Badge>
+                        <Badge variant="outline">Shared</Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">{account.account_type} account, routing ****{account.routing_last4}</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -300,9 +314,6 @@ export default function ProviderNeutralPaymentSetup({
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {!account.default_for_owner && (
-                        <Button size="sm" variant="outline" onClick={() => setDefault(account.id)}>Set default</Button>
-                      )}
                       <Button size="sm" variant="outline" onClick={() => linkProvider(account)} disabled={linkingId === account.id}>
                         {linkingId === account.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
                         Link provider
@@ -319,20 +330,11 @@ export default function ProviderNeutralPaymentSetup({
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Banknote className="h-4 w-4" /> Add Bank Account
+              <Banknote className="h-4 w-4" /> Add Shared Bank Account
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={createBankAccount} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Purpose</Label>
-                <Select value={bankForm.purpose} onValueChange={(value) => updateBank('purpose', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(addablePurposeLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
               <Input placeholder="Nickname" value={bankForm.nickname} onChange={(e) => updateBank('nickname', e.target.value)} />
               <Input placeholder="Bank name" value={bankForm.bank_name} onChange={(e) => updateBank('bank_name', e.target.value)} />
               <Input placeholder="Account holder name" value={bankForm.account_holder_name} onChange={(e) => updateBank('account_holder_name', e.target.value)} required />
@@ -345,10 +347,6 @@ export default function ProviderNeutralPaymentSetup({
               </Select>
               <Input placeholder="Routing number" inputMode="numeric" value={bankForm.routing_number} onChange={(e) => updateBank('routing_number', e.target.value)} required />
               <Input placeholder="Account number" inputMode="numeric" value={bankForm.account_number} onChange={(e) => updateBank('account_number', e.target.value)} required />
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input type="checkbox" checked={bankForm.default_for_owner} onChange={(e) => updateBank('default_for_owner', e.target.checked)} />
-                Make default for this purpose
-              </label>
               <Button type="submit" disabled={saving} className="w-full">
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Landmark className="mr-2 h-4 w-4" />}
                 Save Bank Account
@@ -359,6 +357,7 @@ export default function ProviderNeutralPaymentSetup({
       </div>
       )}
 
+      {(showProviderRouting || showFeePolicy) && (
       <div className="grid gap-6 lg:grid-cols-2">
         {showProviderRouting && (
         <Card className="border-0 shadow-sm">
@@ -368,10 +367,6 @@ export default function ProviderNeutralPaymentSetup({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
-              <AlertCircle className="mr-1.5 inline h-3.5 w-3.5" />
-              Stripe live keys are configured in Supabase secrets. Provider links fail closed until Stripe account requirements and payout capability are complete.
-            </div>
             <div className="space-y-1.5">
               <Label>Collection provider</Label>
               <Select value={providerConfig.collection_provider} onValueChange={(value) => setProviderConfig((prev) => ({ ...prev, collection_provider: value }))}>
@@ -403,7 +398,7 @@ export default function ProviderNeutralPaymentSetup({
           </CardContent>
         </Card>
         )}
-
+        {showFeePolicy && (
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -462,9 +457,10 @@ export default function ProviderNeutralPaymentSetup({
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
+      )}
     </div>
   );
 }
-
 
