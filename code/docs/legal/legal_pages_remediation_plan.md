@@ -23,6 +23,19 @@ pre-resolution draft. This document lists exactly what's wrong on each one, what
 be, and **why it matters**, so items can be approved individually rather than as an
 all-or-nothing batch.
 
+## Execution status (updated July 25, 2026)
+
+Every item tagged **READY** below, plus the no-dependency **SUGGESTED** items (brand name,
+Effective date line, contact block, and the AI Usage Policy §1 rewrite), have been applied.
+Before applying anything, current file state was re-checked rather than trusting this document
+as written — `LandingPage.jsx`'s footer links turned out to already be fixed by the time this
+ran, so no change was needed there after all; that section below is left as a historical record
+of what was found, not a live to-do.
+
+Everything tagged **NEEDS YOUR INPUT** or **NEEDS YOUR CONFIRMATION** is still open exactly as
+described — none of those were touched, since none had an answer to apply. See "Decisions
+needed from you" near the end for the consolidated list.
+
 ## Status legend
 
 | Tag | Meaning |

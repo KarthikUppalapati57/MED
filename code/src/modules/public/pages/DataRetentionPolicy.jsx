@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Archive } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const effectiveDate = 'July 24, 2026';
 const lastUpdated = 'July 24, 2026';
 
 function Section({ title, children }) {
@@ -26,13 +27,14 @@ export default function DataRetentionPolicy() {
         </Button>
         <div className="flex items-center gap-2">
           <Archive className="w-5 h-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">Restops Platform</span>
+          <span className="font-bold text-slate-900">RestOps-360</span>
         </div>
       </nav>
 
       <div className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-12">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">Data Retention Policy</h1>
+          <p className="text-sm text-slate-500 mb-1">Effective date: {effectiveDate}</p>
           <p className="text-sm text-slate-500 mb-8 pb-8 border-b border-slate-100">Last updated: {lastUpdated}</p>
 
           <ScrollArea className="h-[60vh] pr-6">
@@ -55,6 +57,15 @@ export default function DataRetentionPolicy() {
 
               <Section title="5. Deletion Records">
                 <p>Deletion events should record scope, requester, authorization, deletion executor, archive period, permanent deletion timestamp, and retained exceptions. Final operational procedures are documented in the production readiness runbooks.</p>
+              </Section>
+
+              <Section title="6. Contact">
+                <p>Questions about this Data Retention Policy can be sent to contact@mindfultechsol.com.</p>
+                <p className="pt-2">
+                  <strong>Mindful Tech Solutions Inc., doing business as RestOps-360</strong><br />
+                  224 S Peters Road, Knoxville, Tennessee 37923, United States<br />
+                  Phone: +1 (865) 666-7690
+                </p>
               </Section>
             </div>
           </ScrollArea>

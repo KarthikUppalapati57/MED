@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import InventoryAudit from '@/modules/accounting/components/InventoryAudit';
 import TenantMigrationPanel from '@/modules/platform/components/TenantMigrationPanel';
+import PlatformFeedbackSettings from '@/modules/platform/components/PlatformFeedbackSettings';
 import { sendEmail, sendInvitationEmail } from '@/lib/emailService';
 import posthog from '@/lib/posthog';
 
@@ -1723,6 +1724,9 @@ The Restops Platform Team
           <TabsContent value="tenant-migration" className="mt-0 outline-none">
             <TenantMigrationPanel />
           </TabsContent>
+          <TabsContent value="feedback-settings" className="mt-0 outline-none">
+            <PlatformFeedbackSettings />
+          </TabsContent>
 
           <TabsContent value="ocr">
             <Card className="border-0 shadow-sm border-t-4 border-t-resend-yellow">
@@ -1940,5 +1944,3 @@ The Restops Platform Team
     </div>
   );
 }
-
-

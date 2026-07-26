@@ -80,6 +80,15 @@ import { AP_STATUS_LABELS, deriveApStatus, isInvoicePaymentReady } from '@/lib/i
 import { useConfirm } from '@/hooks/useConfirm';
 import { runApprovalGate } from '@/modules/invoices/lib/invoiceValidation';
 
+function formatVendorAddress(vendor) {
+  if (!vendor) return '';
+  const line1 = vendor.remittance_address_line1 || vendor.mailing_address_line1 || vendor.address;
+  const line2 = vendor.remittance_address_line2 || vendor.mailing_address_line2 || '';
+  const city = vendor.remittance_city || vendor.mailing_city || vendor.city;
+  const state = vendor.remittance_state || vendor.mailing_state || vendor.state;
+  const zip = vendor.remittance_zip_code || vendor.mailing_zip_code || vendor.zip_code;
+  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' • ');
+}
 function CreateCheckDialog({ open, onClose, organization, brand, location }) {
   const queryClient = useQueryClient();
   const { hasLocation, warnIfMissing } = useRequireLocation();
@@ -100,6 +109,25 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
     enabled: open && !!organization?.id,
   });
 
+  const vendorIdsForPayments = React.useMemo(
+    () => Array.from(new Set(invoices.map((invoice) => invoice.vendor_id).filter(Boolean))),
+    [invoices]
+  );
+
+  const { data: paymentVendors = [] } = useAuthQuery({
+    queryKey: ['payment-vendors', organization?.id, vendorIdsForPayments.join(',')],
+    queryFn: () => api.entities.Vendor.filter(
+      { organization_id: organization?.id },
+      { select: 'id, name, email, phone, address, city, state, zip_code, remittance_address_line1, remittance_address_line2, remittance_city, remittance_state, remittance_zip_code, mailing_address_line1, mailing_address_line2, mailing_city, mailing_state, mailing_zip_code' }
+    ),
+    select: React.useCallback((rows) => (rows || []).filter((vendor) => vendorIdsForPayments.includes(vendor.id)), [vendorIdsForPayments]),
+    enabled: !!organization?.id && vendorIdsForPayments.length > 0,
+  });
+
+  const paymentVendorById = React.useMemo(
+    () => new Map(paymentVendors.map((vendor) => [vendor.id, vendor])),
+    [paymentVendors]
+  );
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts-for-check', organization?.id],
     queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id, is_active: true }, { orderBy: 'name' }),
@@ -433,6 +461,25 @@ export default function Payments() {
     return filterByContext(paymentsData.pages.flat(), { organization, brand, location });
   }, [paymentsData, organization, brand, location]);
 
+  const vendorIdsForPayments = React.useMemo(
+    () => Array.from(new Set(invoices.map((invoice) => invoice.vendor_id).filter(Boolean))),
+    [invoices]
+  );
+
+  const { data: paymentVendors = [] } = useAuthQuery({
+    queryKey: ['payment-vendors', organization?.id, vendorIdsForPayments.join(',')],
+    queryFn: () => api.entities.Vendor.filter(
+      { organization_id: organization?.id },
+      { select: 'id, name, email, phone, address, city, state, zip_code, remittance_address_line1, remittance_address_line2, remittance_city, remittance_state, remittance_zip_code, mailing_address_line1, mailing_address_line2, mailing_city, mailing_state, mailing_zip_code' }
+    ),
+    select: React.useCallback((rows) => (rows || []).filter((vendor) => vendorIdsForPayments.includes(vendor.id)), [vendorIdsForPayments]),
+    enabled: !!organization?.id && vendorIdsForPayments.length > 0,
+  });
+
+  const paymentVendorById = React.useMemo(
+    () => new Map(paymentVendors.map((vendor) => [vendor.id, vendor])),
+    [paymentVendors]
+  );
   const { data: paymentAccounts = [] } = useAuthQuery({
     queryKey: ['payment-accounts', organization?.id],
     queryFn: () => api.entities.PaymentAccount.filter({ organization_id: organization?.id }, { orderBy: 'name' }),
@@ -2029,10 +2076,20 @@ export default function Payments() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-secondary/40 p-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-secondary/40 p-3 text-sm md:grid-cols-[1.4fr_0.6fr]">
               <div>
-                <p className="text-muted-foreground">Vendor</p>
+                <p className="text-muted-foreground">Vendor destination</p>
                 <p className="font-semibold">{releaseDialogInvoice?.vendor_name || '-'}</p>
+                {(() => {
+                  const vendor = paymentVendorById.get(releaseDialogInvoice?.vendor_id);
+                  const address = formatVendorAddress(vendor);
+                  return (
+                    <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      {address ? <p>{address}</p> : <p>No vendor address on file.</p>}
+                      {(vendor?.email || vendor?.phone) && <p>{[vendor.email, vendor.phone].filter(Boolean).join(' • ')}</p>}
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <p className="text-muted-foreground">Amount</p>

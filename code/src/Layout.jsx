@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   FileText,
+  Mail,
   CreditCard,
   Package,
   Warehouse,
@@ -40,7 +41,8 @@ import {
   RefreshCcw,
   Calculator,
   Wine,
-  FileBarChart
+  FileBarChart,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +78,7 @@ const navigation = [
   { name: 'Custom Reports', href: 'CustomReports', icon: FileText, minRole: 'manager' },
   { name: 'Food Safety (HACCP)', href: 'FoodSafety', icon: ShieldCheck, minRole: 'manager' },
   { name: 'Notifications', href: 'Notifications', icon: Bell, minRole: 'ground_staff' },
+  { name: 'Issue & Suggestions', href: 'IssueSuggestions', icon: MessageSquare, minRole: 'ground_staff' },
   { 
     name: 'Platform Console', 
     icon: Shield, 
@@ -83,7 +86,8 @@ const navigation = [
     subItems: [
       { name: 'Requests', href: 'PlatformAdmin/requests', icon: ShieldAlert },
       { name: 'Invite Clients', href: 'PlatformAdmin/invite', icon: UserPlus },
-      { name: 'Accounting', href: 'PlatformAdmin/accounting', icon: DollarSign }
+      { name: 'Accounting', href: 'PlatformAdmin/accounting', icon: DollarSign },
+      { name: 'Issue Routing', href: 'PlatformAdmin/feedback-settings', icon: Mail }
     ]
   },
   { name: 'All Users', href: 'PlatformUsers', icon: Users, minRole: 'platform_admin' },
@@ -725,7 +729,3 @@ export default function Layout({ children, currentPageName }) {
     </div>
   );
 }
-
-
-
-

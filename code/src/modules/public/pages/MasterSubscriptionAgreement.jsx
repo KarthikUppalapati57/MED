@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, FileSignature } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const effectiveDate = 'July 24, 2026';
 const lastUpdated = 'July 24, 2026';
 
 function Section({ title, children }) {
@@ -26,13 +27,14 @@ export default function MasterSubscriptionAgreement() {
         </Button>
         <div className="flex items-center gap-2">
           <FileSignature className="w-5 h-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">Restops Platform</span>
+          <span className="font-bold text-slate-900">RestOps-360</span>
         </div>
       </nav>
 
       <div className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-12">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">Master Subscription Agreement</h1>
+          <p className="text-sm text-slate-500 mb-1">Effective date: {effectiveDate}</p>
           <p className="text-sm text-slate-500 mb-8 pb-8 border-b border-slate-100">Last updated: {lastUpdated}</p>
 
           <ScrollArea className="h-[60vh] pr-6">
@@ -42,7 +44,7 @@ export default function MasterSubscriptionAgreement() {
               </p>
 
               <Section title="1. Structure">
-                <p>This Master Subscription Agreement ("MSA") governs a Customer's use of the Restops platform when the Customer and [LEGAL ENTITY NAME] ("Restops") have executed an Order Form that references this MSA. It does not apply to Customers who sign up through the standard self-serve flow; those Customers are governed by the Terms of Service.</p>
+                <p>This Master Subscription Agreement ("MSA") governs a Customer's use of the Restops platform when the Customer and Mindful Tech Solutions Inc., doing business as RestOps-360 ("Restops") have executed an Order Form that references this MSA. It does not apply to Customers who sign up through the standard self-serve flow; those Customers are governed by the Terms of Service.</p>
               </Section>
 
               <Section title="2. Order Forms">
@@ -66,7 +68,7 @@ export default function MasterSubscriptionAgreement() {
               </Section>
 
               <Section title="7. Termination">
-                <p>Either party may terminate for the other's uncured material breach on written notice and a [CURE PERIOD TBD]-day cure period. Termination for nonpayment follows the Terms of Service. Any deal-specific termination rights (for example, termination for convenience) must be stated in the Order Form to apply.</p>
+                <p>Either party may terminate for the other's uncured material breach on written notice and a 30-day cure period. Termination for nonpayment follows the Terms of Service. Any deal-specific termination rights (for example, termination for convenience) must be stated in the Order Form to apply.</p>
               </Section>
 
               <Section title="8. Confidentiality, IP, Warranty, Liability, and Indemnity">
@@ -74,7 +76,7 @@ export default function MasterSubscriptionAgreement() {
               </Section>
 
               <Section title="9. Governing Law">
-                <p>This MSA is governed by the laws of [GOVERNING STATE], with venue in [VENUE], consistent with the Terms of Service.</p>
+                <p>This MSA is governed by the laws of Tennessee, with venue in Knox County, Tennessee, consistent with the Terms of Service.</p>
               </Section>
 
               <Section title="10. Signatures">
@@ -91,6 +93,15 @@ export default function MasterSubscriptionAgreement() {
                   <li>Any negotiated deviations from the MSA (liability cap, SLA credits, termination rights)</li>
                   <li>Effective date and signature block</li>
                 </ul>
+              </Section>
+
+              <Section title="11. Contact">
+                <p>Questions about this Master Subscription Agreement template, outside of a specific Order Form, can be sent to contact@mindfultechsol.com.</p>
+                <p className="pt-2">
+                  <strong>Mindful Tech Solutions Inc., doing business as RestOps-360</strong><br />
+                  224 S Peters Road, Knoxville, Tennessee 37923, United States<br />
+                  Phone: +1 (865) 666-7690
+                </p>
               </Section>
             </div>
           </ScrollArea>

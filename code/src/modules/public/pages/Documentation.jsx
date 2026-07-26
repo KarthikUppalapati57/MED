@@ -292,7 +292,7 @@ export default function Documentation() {
               <ChevronLeft className="h-3 w-3 mr-1" /> RETURN TO HOME
             </Link>
             <p className="text-[9px] text-black/30 dark:text-white/40 font-bold tracking-[5px] uppercase">
-              © 2026 RESTOPS INC. ARCHITECTURE DOCS.
+              © 2026 MINDFUL TECH SOLUTIONS INC. ARCHITECTURE DOCS.
             </p>
           </div>
         </div>

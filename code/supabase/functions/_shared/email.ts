@@ -1,5 +1,15 @@
-﻿// Shared Resend email helper for Edge Functions.
-export async function sendTransactionalEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
+// Shared Resend email helper for Edge Functions.
+export async function sendTransactionalEmail({
+  to,
+  cc,
+  subject,
+  text,
+}: {
+  to: string | string[];
+  cc?: string | string[];
+  subject: string;
+  text: string;
+}) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("VENDOR_ONBOARDING_FROM_EMAIL") || Deno.env.get("VENDOR_ONBOARDING_EMAIL_FROM") || Deno.env.get("RESEND_FROM_EMAIL") || "Restops <onboarding@restops.app>";
 
@@ -13,7 +23,7 @@ export async function sendTransactionalEmail({ to, subject, text }: { to: string
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from, to, subject, text }),
+    body: JSON.stringify({ from, to, cc, subject, text }),
   });
 
   if (!response.ok) {

@@ -28,6 +28,15 @@ import { isInvoicePaymentReady } from '@/lib/invoiceAp';
 import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle, Building2, CheckSquare, Mail, CreditCard } from 'lucide-react';
 import StripePaymentForm from '@/modules/payments/components/StripePaymentForm';
 
+function formatVendorAddress(vendor) {
+  if (!vendor) return '';
+  const line1 = vendor.remittance_address_line1 || vendor.mailing_address_line1 || vendor.address;
+  const line2 = vendor.remittance_address_line2 || vendor.mailing_address_line2 || '';
+  const city = vendor.remittance_city || vendor.mailing_city || vendor.city;
+  const state = vendor.remittance_state || vendor.mailing_state || vendor.state;
+  const zip = vendor.remittance_zip_code || vendor.mailing_zip_code || vendor.zip_code;
+  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' • ');
+}
 // Labels only -- process-payout dispatches to the right rail off this same string, see
 // _shared/payoutProviders/index.ts.
 const PAYOUT_METHODS = [
@@ -62,6 +71,14 @@ export function BillPayWidget({ invoice }) {
     method: 'cheque'
   });
 
+  const { data: vendorDetails = null } = useQuery({
+    queryKey: ['bill-pay-vendor-details', invoice?.vendor_id],
+    queryFn: async () => {
+      if (!invoice?.vendor_id) return null;
+      return api.entities.Vendor.get(invoice.vendor_id);
+    },
+    enabled: !!invoice?.vendor_id,
+  });
   const { data: accounts = [], isLoading: loadingAccounts } = useQuery({
     queryKey: ['payment-accounts', organization?.id],
     queryFn: () => api.entities.PaymentAccount.filter(
@@ -356,10 +373,14 @@ export function BillPayWidget({ invoice }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-3 rounded-lg border bg-slate-50 p-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 rounded-lg border bg-slate-50 p-3 text-sm md:grid-cols-[1.4fr_0.6fr]">
               <div>
-                <p className="text-slate-500">Vendor</p>
+                <p className="text-slate-500">Vendor destination</p>
                 <p className="font-semibold text-slate-900">{invoice.vendor_name || '-'}</p>
+                <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                  {formatVendorAddress(vendorDetails) ? <p>{formatVendorAddress(vendorDetails)}</p> : <p>No vendor address on file.</p>}
+                  {(vendorDetails?.email || vendorDetails?.phone) && <p>{[vendorDetails.email, vendorDetails.phone].filter(Boolean).join(' • ')}</p>}
+                </div>
               </div>
               <div>
                 <p className="text-slate-500">Amount</p>

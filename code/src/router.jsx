@@ -56,6 +56,7 @@ const PayrollExport = React.lazy(() => import('./modules/labor/pages/PayrollExpo
 const TipPooling = React.lazy(() => import('./modules/labor/pages/TipPooling'));
 const ShiftBoard = React.lazy(() => import('./modules/labor/pages/ShiftBoard'));
 const BusinessVerification = React.lazy(() => import('./modules/setup/pages/BusinessVerification'));
+const IssueSuggestions = React.lazy(() => import('./modules/feedback/pages/IssueSuggestions'));
 
 export const mainPage = "Dashboard";
 
@@ -110,7 +111,8 @@ export const legacyRoutes = {
     "VendorBidding": VendorBidding,
     "ExecutiveBI": ExecutiveBI,
     "TipPooling": TipPooling,
-    "ShiftBoard": ShiftBoard
+    "ShiftBoard": ShiftBoard,
+    "IssueSuggestions": IssueSuggestions
 };
 export const canonicalRoutes = [
     { path: "dashboard", pageName: "Dashboard", Page: Dashboard },
@@ -154,6 +156,7 @@ export const canonicalRoutes = [
     { path: "payroll-export/:view?", pageName: "PayrollExport", Page: PayrollExport },
     { path: "tip-pooling/:view?", pageName: "TipPooling", Page: TipPooling },
     { path: "shift-board/:view?", pageName: "ShiftBoard", Page: ShiftBoard },
+    { path: "issue-suggestions/:view?", pageName: "IssueSuggestions", Page: IssueSuggestions },
 ];
 
 export const setupRoutes = {
@@ -161,7 +164,3 @@ export const setupRoutes = {
     OnboardingPage,
     CompleteOnboarding,
 };
-
-
-
-

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Handshake } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const effectiveDate = 'July 24, 2026';
 const lastUpdated = 'July 24, 2026';
 
 function Section({ title, children }) {
@@ -26,13 +27,14 @@ export default function VendorPortalTerms() {
         </Button>
         <div className="flex items-center gap-2">
           <Handshake className="w-5 h-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">Restops Platform</span>
+          <span className="font-bold text-slate-900">RestOps-360</span>
         </div>
       </nav>
 
       <div className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-12">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 md:p-12">
           <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">Vendor Portal Terms</h1>
+          <p className="text-sm text-slate-500 mb-1">Effective date: {effectiveDate}</p>
           <p className="text-sm text-slate-500 mb-8 pb-8 border-b border-slate-100">Last updated: {lastUpdated}</p>
 
           <ScrollArea className="h-[60vh] pr-6">
@@ -54,7 +56,7 @@ export default function VendorPortalTerms() {
               </Section>
 
               <Section title="5. Manual Entry by Customer Staff">
-                <p>If a Customer's staff member enters your tax or banking information on your behalf (for example, information you provided by phone or email), the platform requires that staff member to confirm you authorized the entry, and records that confirmation along with audit metadata. If you did not authorize an entry made on your behalf, contact the Customer directly and [PRIVACY CONTACT EMAIL].</p>
+                <p>If a Customer's staff member enters your tax or banking information on your behalf (for example, information you provided by phone or email), the platform requires that staff member to confirm you authorized the entry, and records that confirmation along with audit metadata. If you did not authorize an entry made on your behalf, contact the Customer directly and contact@mindfultechsol.com.</p>
               </Section>
 
               <Section title="6. Security">
@@ -70,7 +72,7 @@ export default function VendorPortalTerms() {
               </Section>
 
               <Section title="9. Your Rights and Requests">
-                <p>To ask what information a Customer has submitted about you, request a correction, or ask about deletion, contact the Customer directly or [PRIVACY CONTACT EMAIL]. Because the Customer controls the underlying vendor relationship, some requests may need to be handled through them.</p>
+                <p>To ask what information a Customer has submitted about you, request a correction, or ask about deletion, contact the Customer directly or contact@mindfultechsol.com. Because the Customer controls the underlying vendor relationship, some requests may need to be handled through them.</p>
               </Section>
 
               <Section title="10. Changes">
@@ -78,7 +80,12 @@ export default function VendorPortalTerms() {
               </Section>
 
               <Section title="11. Contact">
-                <p>Questions about the vendor portal can be sent to [SUPPORT CONTACT EMAIL]. Privacy-specific questions can be sent to [PRIVACY CONTACT EMAIL].</p>
+                <p>Questions about the vendor portal can be sent to contact@mindfultechsol.com. Privacy-specific questions can be sent to contact@mindfultechsol.com.</p>
+                <p className="pt-2">
+                  <strong>Mindful Tech Solutions Inc., doing business as RestOps-360</strong><br />
+                  224 S Peters Road, Knoxville, Tennessee 37923, United States<br />
+                  Phone: +1 (865) 666-7690
+                </p>
               </Section>
             </div>
           </ScrollArea>

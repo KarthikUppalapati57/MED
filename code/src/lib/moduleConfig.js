@@ -202,6 +202,12 @@ export const MODULE_DEFINITIONS = {
     minRole: "manager",
     icon: "Sparkles",
   },
+  feedback: {
+    label: "Issue & Suggestions",
+    pages: ["IssueSuggestions"],
+    minRole: "ground_staff",
+    icon: "MessageSquare",
+  },
   platform: {
     label: "Platform Console",
     pages: [
