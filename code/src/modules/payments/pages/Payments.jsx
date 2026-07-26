@@ -72,6 +72,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import PaymentAccountsSettings from '@/modules/invoices/components/PaymentAccountsSettings';
+import StripePaymentForm from '@/modules/payments/components/StripePaymentForm';
 import { confirmBankTransfer } from '@/lib/paymentService';
 import { ensureLedgerBill, recordPaymentLedger } from '@/lib/workflowService';
 import { isPaymentQueueRouted } from '@/lib/apRouting';
@@ -139,7 +140,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       return data;
     },
     onSuccess: () => {
-      toast.success('Check issued via Checkbook.io');
+      toast.success('Check issued');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       reset();
@@ -153,7 +154,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Write a Check</DialogTitle>
-          <DialogDescription>Issue a one-off check via Checkbook.io, outside the normal invoice-approval queue.</DialogDescription>
+          <DialogDescription>Issue a one-off check outside the normal invoice-approval queue.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -234,10 +235,10 @@ const paymentMethodColors = {
 };
 
 const VENDOR_PAYOUT_METHODS = [
-  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Stripe Connect ACH', icon: Building2, enabled: true },
-  { value: 'stripe_card', label: 'Card', detail: 'Stripe card payout rail not configured yet', icon: CreditCard, enabled: false },
-  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Checkbook.io email delivery', icon: CheckSquare, enabled: true },
-  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Checkbook.io physical delivery', icon: Mail, enabled: true },
+  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Bank transfer', icon: Building2, enabled: true },
+  { value: 'stripe_card', label: 'Card', detail: 'Card payment', icon: CreditCard, enabled: true, schedulable: false },
+  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Email delivery', icon: CheckSquare, enabled: true },
+  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Postal delivery', icon: Mail, enabled: true },
 ];
 
 const PAYOUT_METHOD_LABELS = Object.fromEntries(VENDOR_PAYOUT_METHODS.map((method) => [method.value, method.label]));
@@ -804,6 +805,23 @@ export default function Payments() {
     });
   };
 
+  const handleCardReleaseSuccess = async (paymentData) => {
+    const invoice = releaseDialogInvoice;
+    if (!invoice) return;
+    const amount = Math.max(0, Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0));
+    try {
+      await recordInvoicePayment.mutateAsync({
+        invoice,
+        amount,
+        reference: paymentData.transaction_id,
+        method: 'stripe',
+      });
+      setReleaseDialogInvoice(null);
+      toast.success('Funds released via Card');
+    } catch (err) {
+      toast.error(err.message || 'Card payment succeeded, but recording failed.');
+    }
+  };
   const submitReleaseFunds = async () => {
     const invoice = releaseDialogInvoice;
     if (!invoice) return;
@@ -833,7 +851,7 @@ export default function Payments() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Funds released via ' + selectedMethod.detail);
+      toast.success('Funds released via ' + selectedMethod.label);
       setReleaseDialogInvoice(null);
       queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
@@ -1740,7 +1758,7 @@ export default function Payments() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
+                      <SelectItem value="stripe_connect_custom">ACH</SelectItem>
                       <SelectItem value="checkbook_digital">Digital Check</SelectItem>
                       <SelectItem value="checkbook_physical">Mailed Check</SelectItem>
                     </SelectContent>
@@ -1981,8 +1999,8 @@ export default function Payments() {
                 </SelectTrigger>
                 <SelectContent>
                   {VENDOR_PAYOUT_METHODS.map((method) => (
-                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
-                      {method.label} - {method.detail}
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled || method.schedulable === false}>
+                      {method.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2021,25 +2039,27 @@ export default function Payments() {
                 <p className="font-semibold">${Math.max(0, Number(releaseDialogInvoice?.total_amount || 0) - Number(releaseDialogInvoice?.paid_amount || 0)).toLocaleString()}</p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Payment Account</Label>
-              <Select
-                value={releaseForm.payment_account_id}
-                onValueChange={(value) => setReleaseForm((prev) => ({ ...prev, payment_account_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select funding account..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}{account.account_number_last4 ? ` (...${account.account_number_last4})` : ''}
-                    </SelectItem>
-                  ))}
-                  {paymentAccounts.length === 0 && <SelectItem value="none" disabled>No active payment accounts found</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
+            {releaseForm.payout_method !== 'stripe_card' && (
+              <div className="space-y-2">
+                <Label>Payment Account</Label>
+                <Select
+                  value={releaseForm.payment_account_id}
+                  onValueChange={(value) => setReleaseForm((prev) => ({ ...prev, payment_account_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select funding account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}{account.account_number_last4 ? ` (...${account.account_number_last4})` : ''}
+                      </SelectItem>
+                    ))}
+                    {paymentAccounts.length === 0 && <SelectItem value="none" disabled>No active payment accounts found</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Payment Rail</Label>
               <Select
@@ -2052,27 +2072,47 @@ export default function Payments() {
                 <SelectContent>
                   {VENDOR_PAYOUT_METHODS.map((method) => (
                     <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
-                      {method.label} - {method.detail}
+                      {method.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <p className="text-xs text-muted-foreground">
-              ACH uses Stripe Connect. Digital and mailed checks use Checkbook.io. Card vendor payouts are shown but disabled until a card payout adapter exists.
+              ACH and checks release from an operating account. Card charges the entered card and sends the funds to the vendor payment destination.
             </p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReleaseDialogInvoice(null)}>Cancel</Button>
-            <Button
-              className="bg-primary hover:bg-primary"
-              disabled={!releaseForm.payment_account_id || releaseForm.payment_account_id === 'none' || releasingInvoiceId === releaseDialogInvoice?.id}
-              onClick={submitReleaseFunds}
-            >
-              {releasingInvoiceId === releaseDialogInvoice?.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Release Funds
-            </Button>
-          </DialogFooter>
+          {releaseForm.payout_method === 'stripe_card' ? (
+            <>
+              <div className="pb-2">
+                <StripePaymentForm
+                  amount={Math.max(0, Number(releaseDialogInvoice?.total_amount || 0) - Number(releaseDialogInvoice?.paid_amount || 0))}
+                  invoiceId={releaseDialogInvoice?.id}
+                  vendorName={releaseDialogInvoice?.vendor_name}
+                  invoiceNumber={releaseDialogInvoice?.invoice_number}
+                  metadata={{ payout_method: 'stripe_card' }}
+                  buttonLabel={`Pay by Card $${Math.max(0, Number(releaseDialogInvoice?.total_amount || 0) - Number(releaseDialogInvoice?.paid_amount || 0)).toLocaleString()}`}
+                  onSuccess={handleCardReleaseSuccess}
+                  onError={(err) => toast.error(err?.message || 'Card payment failed')}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setReleaseDialogInvoice(null)}>Cancel</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReleaseDialogInvoice(null)}>Cancel</Button>
+              <Button
+                className="bg-primary hover:bg-primary"
+                disabled={!releaseForm.payment_account_id || releaseForm.payment_account_id === 'none' || releasingInvoiceId === releaseDialogInvoice?.id}
+                onClick={submitReleaseFunds}
+              >
+                {releasingInvoiceId === releaseDialogInvoice?.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Release Funds
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -262,9 +262,9 @@ export default function PaymentAccountsSettings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="stripe_connect_custom">Stripe Connect ACH</SelectItem>
-                        <SelectItem value="checkbook_digital">Digital Check (Checkbook.io)</SelectItem>
-                        <SelectItem value="checkbook_physical">Mailed Check (Checkbook.io)</SelectItem>
+                        <SelectItem value="stripe_connect_custom">ACH</SelectItem>
+                        <SelectItem value="checkbook_digital">Digital Check</SelectItem>
+                        <SelectItem value="checkbook_physical">Mailed Check</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

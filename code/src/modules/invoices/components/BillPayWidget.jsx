@@ -26,14 +26,15 @@ import { toast } from 'sonner';
 import { getApRoutingLabel, isPaymentQueueRouted } from '@/lib/apRouting';
 import { isInvoicePaymentReady } from '@/lib/invoiceAp';
 import { Calendar as CalendarIcon, DollarSign, CheckCircle2, AlertTriangle, Building2, CheckSquare, Mail, CreditCard } from 'lucide-react';
+import StripePaymentForm from '@/modules/payments/components/StripePaymentForm';
 
 // Labels only -- process-payout dispatches to the right rail off this same string, see
 // _shared/payoutProviders/index.ts.
 const PAYOUT_METHODS = [
-  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Stripe Connect ACH', icon: Building2, enabled: true },
-  { value: 'stripe_card', label: 'Card', detail: 'Stripe card payout rail not configured yet', icon: CreditCard, enabled: false },
-  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Checkbook.io email delivery', icon: CheckSquare, enabled: true },
-  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Checkbook.io physical delivery', icon: Mail, enabled: true },
+  { value: 'stripe_connect_custom', label: 'ACH', detail: 'Bank transfer', icon: Building2, enabled: true },
+  { value: 'stripe_card', label: 'Card', detail: 'Card payment', icon: CreditCard, enabled: true, schedulable: false },
+  { value: 'checkbook_digital', label: 'Digital Check', detail: 'Email delivery', icon: CheckSquare, enabled: true },
+  { value: 'checkbook_physical', label: 'Mailed Check', detail: 'Postal delivery', icon: Mail, enabled: true },
 ];
 
 const PAYOUT_METHOD_LABELS = Object.fromEntries(PAYOUT_METHODS.map((method) => [method.value, method.label]));
@@ -177,6 +178,19 @@ export function BillPayWidget({ invoice }) {
       payoutMethod: releaseData.payout_method,
       paymentAccountId: releaseData.payment_account_id
     });
+  };
+  const handleCardReleaseSuccess = async (paymentData) => {
+    try {
+      await recordMutation.mutateAsync({
+        amount: remainingBalance.toFixed(2),
+        reference: paymentData.transaction_id,
+        method: 'stripe',
+      });
+      setIsReleasing(false);
+      toast.success('Funds released via Card');
+    } catch (err) {
+      toast.error(err.message || 'Card payment succeeded, but recording failed.');
+    }
   };
   const handleSchedule = () => {
     if (!scheduleData.payment_account_id) return toast.error("Select a payment account");
@@ -352,22 +366,24 @@ export function BillPayWidget({ invoice }) {
                 <p className="font-semibold text-slate-900">${remainingBalance.toFixed(2)}</p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Payment Account</Label>
-              <Select value={releaseData.payment_account_id} onValueChange={v => setReleaseData({...releaseData, payment_account_id: v})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select funding account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map(acc => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.account_type.replace('_', ' ')})
-                    </SelectItem>
-                  ))}
-                  {accounts.length === 0 && <SelectItem value="none" disabled>No active accounts found</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
+            {releaseData.payout_method !== 'stripe_card' && (
+              <div className="space-y-2">
+                <Label>Payment Account</Label>
+                <Select value={releaseData.payment_account_id} onValueChange={v => setReleaseData({...releaseData, payment_account_id: v})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select funding account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.account_type.replace('_', ' ')})
+                      </SelectItem>
+                    ))}
+                    {accounts.length === 0 && <SelectItem value="none" disabled>No active accounts found</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Payment Rail</Label>
               <Select value={releaseData.payout_method} onValueChange={v => setReleaseData({...releaseData, payout_method: v})}>
@@ -377,19 +393,39 @@ export function BillPayWidget({ invoice }) {
                 <SelectContent>
                   {PAYOUT_METHODS.map((method) => (
                     <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
-                      {method.label} - {method.detail}
+                      {method.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsReleasing(false)}>Cancel</Button>
-            <Button onClick={handleRelease} disabled={releaseFundsMutation.isPending || !releaseData.payment_account_id || releaseData.payment_account_id === 'none'}>
-              {releaseFundsMutation.isPending ? 'Releasing...' : 'Release Funds'}
-            </Button>
-          </DialogFooter>
+          {releaseData.payout_method === 'stripe_card' ? (
+            <>
+              <div className="pb-2">
+                <StripePaymentForm
+                  amount={remainingBalance}
+                  invoiceId={invoice.id}
+                  vendorName={invoice.vendor_name}
+                  invoiceNumber={invoice.invoice_number}
+                  metadata={{ payout_method: 'stripe_card' }}
+                  buttonLabel={`Pay by Card $${remainingBalance.toFixed(2)}`}
+                  onSuccess={handleCardReleaseSuccess}
+                  onError={(err) => toast.error(err?.message || 'Card payment failed')}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsReleasing(false)}>Cancel</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setIsReleasing(false)}>Cancel</Button>
+              <Button onClick={handleRelease} disabled={releaseFundsMutation.isPending || !releaseData.payment_account_id || releaseData.payment_account_id === 'none'}>
+                {releaseFundsMutation.isPending ? 'Releasing...' : 'Release Funds'}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
       {/* Schedule Dialog */}
@@ -437,8 +473,8 @@ export function BillPayWidget({ invoice }) {
                 </SelectTrigger>
                 <SelectContent>
                   {PAYOUT_METHODS.map((method) => (
-                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled}>
-                      {method.label} - {method.detail}
+                    <SelectItem key={method.value} value={method.value} disabled={!method.enabled || method.schedulable === false}>
+                      {method.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

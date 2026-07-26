@@ -18,7 +18,7 @@ const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
 };
 
-function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSuccess, onError }) {
+function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, metadata = {}, buttonLabel = null, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -34,6 +34,7 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSu
     try {
       // 1. Create PaymentIntent via edge function
       const { clientSecret } = await createPaymentIntent(amount, 'usd', {
+        ...metadata,
         invoice_id: invoiceId,
         vendor_name: vendorName,
         invoice_number: invoiceNumber,
@@ -89,14 +90,14 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, onSu
         {processing ? (
           <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
         ) : (
-          <><CreditCard className="h-4 w-4 mr-2" /> Pay by Card ${amount?.toLocaleString()}</>
+          <><CreditCard className="h-4 w-4 mr-2" /> {buttonLabel || `Pay by Card $${amount?.toLocaleString()}`}</>
         )}
       </Button>
     </form>
   );
 }
 
-export default function StripePaymentForm({ amount, invoiceId, vendorName, invoiceNumber, onSuccess, onError }) {
+export default function StripePaymentForm({ amount, invoiceId, vendorName, invoiceNumber, metadata = {}, buttonLabel = null, onSuccess, onError }) {
   const stripePromise = getStripe();
 
   if (!stripePromise) {
@@ -118,9 +119,12 @@ export default function StripePaymentForm({ amount, invoiceId, vendorName, invoi
         invoiceId={invoiceId}
         vendorName={vendorName}
         invoiceNumber={invoiceNumber}
+        metadata={metadata}
+        buttonLabel={buttonLabel}
         onSuccess={onSuccess}
         onError={onError}
       />
     </Elements>
   );
 }
+
