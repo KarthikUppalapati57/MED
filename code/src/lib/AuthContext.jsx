@@ -490,6 +490,11 @@ export const AuthProvider = ({ children }) => {
             }
 
             if (currentUser) {
+              // Keep authenticated routing suspended until the matching profile is loaded.
+              // Without this, SIGNED_IN briefly exposes user + null profile and can
+              // misroute existing users into business verification.
+              setIsLoadingAuth(true);
+
               // 0. Safety Check: If the user ID has changed, or we're starting fresh, clear the stale cache
               const currentCache = getCachedProfile();
               if (!currentCache || currentCache.id !== currentUser.id) {

@@ -1254,14 +1254,7 @@ const AuthenticatedApp = () => {
     !userProfile?.banking_onboarding_completed;
 
   if (isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-border border-t-foreground rounded-full animate-spin"></div>
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Loading..." />;
   }
 
   // Password recovery sessions are allowed to reach the reset form before MFA.
@@ -1275,18 +1268,18 @@ const AuthenticatedApp = () => {
       </Routes>
     );
   }
+
+  // Never route an authenticated user through setup gates until the database
+  // profile has loaded. A null profile means "unknown", not "unassigned".
+  if (user && !userProfile) {
+    return <PageLoader label="Loading account..." />;
+  }
+
   // For new users (unassigned), wait for MFA status before rendering anything.
   // This prevents the flash where the user briefly sees payment verification
   // before being redirected to MFA setup.
   if (user && isUnassignedUser && !isMfaReady && !isPlatformAdmin) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-border border-t-foreground rounded-full animate-spin"></div>
-          <p className="text-sm text-muted-foreground">Setting up your account...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Setting up your account..." />;
   }
 
   // Show MFA challenge if session is enrolled but not yet verified with a second factor
