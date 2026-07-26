@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Store, ArrowRightLeft, Plus, CheckCircle, Clock, XCircle, FileText } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import { toast } from "sonner";
 export default function Commissary() {
   const { organization, location, userProfile } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [activeTab, setActiveTab] = useState('orders');
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [viewOrder, setViewOrder] = useState(null);
@@ -438,8 +440,19 @@ export default function Commissary() {
               {isCurrentLocationCommissary && viewOrder.status === 'pending' && (
                 <div className="flex justify-end pt-4 border-t gap-3">
                   <Button variant="outline" onClick={() => setViewOrder(null)}>Close</Button>
-                  <Button 
-                    onClick={() => fulfillOrderMutation.mutate(viewOrder.id)}
+                  <Button
+                    onClick={async () => {
+                      const proceed = await confirm({
+                        title: 'Fulfill this order and post to GL?',
+                        description: 'This immediately moves live inventory from the commissary to the requesting location and posts the corresponding GL entries. This action cannot be undone.',
+                        confirmText: 'Fulfill Order & Post to GL',
+                        cancelText: 'Cancel',
+                        variant: 'destructive',
+                        severity: 'high',
+                      });
+                      if (!proceed) return;
+                      fulfillOrderMutation.mutate(viewOrder.id);
+                    }}
                     disabled={fulfillOrderMutation.isPending}
                   >
                     Fulfill Order & Post to GL

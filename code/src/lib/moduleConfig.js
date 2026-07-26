@@ -29,6 +29,7 @@ export const MODULE_DEFINITIONS = {
     pages: ["Performance"],
     minRole: "location_manager",
     icon: "Activity",
+    requiresLocation: true,
   },
   executive_bi: {
     label: "Executive BI",

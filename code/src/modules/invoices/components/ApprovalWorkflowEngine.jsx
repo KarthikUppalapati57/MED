@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ export function ApprovalWorkflowEngine({ invoice }) {
   const currentRole = userProfile?.role || 'user';
   const queryClient = useQueryClient();
   const [comments, setComments] = useState('');
+  const { confirm } = useConfirmation();
 
   // Fetch the active instance and its steps
   const { data: instanceData, isLoading } = useQuery({
@@ -119,8 +121,18 @@ export function ApprovalWorkflowEngine({ invoice }) {
   const myActionableSteps = pendingSteps.filter(s => roleAtOrAbove(currentRole, s.required_role));
   const canApprove = myActionableSteps.length > 0;
 
-  const handleAction = (status) => {
+  const handleAction = async (status) => {
     if (!canApprove) return;
+    if (status === 'rejected') {
+      const ok = await confirm({
+        title: 'Reject invoice?',
+        description: 'This will reject the invoice at this approval step and notify the uploader. This cannot be undone.',
+        confirmText: 'Reject',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return;
+    }
     // We approve the first actionable step for this role
     executeStepMutation.mutate({ stepId: myActionableSteps[0].id, status });
   };

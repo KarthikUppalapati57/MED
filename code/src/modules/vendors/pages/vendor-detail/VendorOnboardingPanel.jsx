@@ -2,6 +2,7 @@ import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +53,7 @@ function StepCard({ icon: Icon, title, description, status, children }) {
 
 export default function VendorOnboardingPanel({ vendorId }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [taxNotes, setTaxNotes] = React.useState('');
   const [taxFailureReason, setTaxFailureReason] = React.useState('');
   const [callbackNotes, setCallbackNotes] = React.useState({});
@@ -357,7 +359,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
                 <Button onClick={() => reviewTaxMutation.mutate({ status: 'verified' })} disabled={reviewTaxMutation.isPending}>
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Verify Business
                 </Button>
-                <Button variant="destructive" onClick={() => reviewTaxMutation.mutate({ status: 'failed' })} disabled={reviewTaxMutation.isPending}>
+                <Button variant="destructive" onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Reject tax verification?',
+                    description: "This will mark this vendor's tax/W-9 verification as failed. The vendor will not be payable until it is corrected and re-verified.",
+                    confirmText: 'Reject Verification',
+                    cancelText: 'Cancel',
+                    variant: 'warning',
+                  });
+                  if (!ok) return;
+                  reviewTaxMutation.mutate({ status: 'failed' });
+                }} disabled={reviewTaxMutation.isPending}>
                   <XCircle className="mr-2 h-4 w-4" /> Reject Verification
                 </Button>
               </div>
@@ -379,7 +391,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
                 <div className="flex items-center gap-2">
                   <StatusBadge value={doc.status} />
                   <Button size="sm" variant="outline" onClick={() => updateDocumentMutation.mutate({ documentId: doc.id, status: 'on_file' })}>On File</Button>
-                  <Button size="sm" variant="destructive" onClick={() => updateDocumentMutation.mutate({ documentId: doc.id, status: 'rejected' })}>Reject</Button>
+                  <Button size="sm" variant="destructive" onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Reject document?',
+                      description: 'This will reject this uploaded vendor compliance document. The vendor will need to upload a corrected copy.',
+                      confirmText: 'Reject',
+                      cancelText: 'Cancel',
+                      variant: 'warning',
+                    });
+                    if (!ok) return;
+                    updateDocumentMutation.mutate({ documentId: doc.id, status: 'rejected' });
+                  }}>Reject</Button>
                 </div>
               </div>
             ))}
@@ -447,7 +469,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
                     <Textarea value={callbackNotes[request.id] || ''} onChange={(e) => setCallbackNotes({ ...callbackNotes, [request.id]: e.target.value })} placeholder="Callback notes" />
                     <Textarea value={overrideReasons[request.id] || ''} onChange={(e) => setOverrideReasons({ ...overrideReasons, [request.id]: e.target.value })} placeholder="Override reason" />
                     <Button onClick={() => confirmCallbackMutation.mutate(request.id)} disabled={confirmCallbackMutation.isPending}>Confirm Callback</Button>
-                    <Button variant="destructive" onClick={() => overrideCallbackMutation.mutate(request.id)} disabled={overrideCallbackMutation.isPending}>Override</Button>
+                    <Button variant="destructive" onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Override callback verification?',
+                        description: 'This bypasses the required phone-callback verification for this vendor banking change. Only proceed if the change has been independently verified through another trusted channel.',
+                        confirmText: 'Override',
+                        cancelText: 'Cancel',
+                        variant: 'warning',
+                      });
+                      if (!ok) return;
+                      overrideCallbackMutation.mutate(request.id);
+                    }} disabled={overrideCallbackMutation.isPending}>Override</Button>
                   </div>
                 )}
               </div>
@@ -506,7 +538,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => approvalMutation.mutate('pending_approval')} disabled={approvalMutation.isPending || data.vendor.approval_status !== 'draft'}>Submit for Approval</Button>
               <Button onClick={() => approvalMutation.mutate('approved')} disabled={approvalMutation.isPending || !canApprove || data.vendor.approval_status === 'approved'}>Approve Vendor</Button>
-              <Button variant="destructive" onClick={() => approvalMutation.mutate('rejected')} disabled={approvalMutation.isPending || data.vendor.approval_status !== 'pending_approval'}>Reject</Button>
+              <Button variant="destructive" onClick={async () => {
+                const ok = await confirm({
+                  title: 'Reject vendor?',
+                  description: "This will reject this vendor's approval/onboarding. This cannot be undone.",
+                  confirmText: 'Reject',
+                  cancelText: 'Cancel',
+                  variant: 'warning',
+                });
+                if (!ok) return;
+                approvalMutation.mutate('rejected');
+              }} disabled={approvalMutation.isPending || data.vendor.approval_status !== 'pending_approval'}>Reject</Button>
             </div>
           </div>
         </StepCard>

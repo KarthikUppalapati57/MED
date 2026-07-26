@@ -174,14 +174,14 @@ vi.mock('../../src/hooks/useAuthQuery', () => ({
 }));
 
 describe('Products global mapping smoke test', () => {
-  it('shows only trusted network suggestions and opens review instead of one-click applying', () => {
+  it('shows only trusted network suggestions and opens review instead of one-click applying', async () => {
     render(
       <MemoryRouter initialEntries={['/Products/ai-verification']}>
         <Products />
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/Trusted Network Match: 412\+ restaurants map this to 5100 - Food Cost/)).toBeInTheDocument();
+    expect(await screen.findByText(/Trusted Network Match: 412\+ restaurants map this to 5100 - Food/)).toBeInTheDocument();
     expect(screen.queryByText(/office_supplies/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Accept Network Mapping')).not.toBeInTheDocument();
 

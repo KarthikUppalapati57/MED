@@ -242,6 +242,7 @@ export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
         categoryIds={filterState.categoryIds}
         vendorIds={filterState.vendorIds}
         locations={locations}
+        locationLocked
         categories={filterCategories}
         vendors={filterVendors}
         autoComparison={filterState.autoComparison}

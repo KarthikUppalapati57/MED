@@ -22,6 +22,11 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
+vi.mock('../../src/hooks/useConfirmation', () => ({
+  useConfirmation: () => ({
+    confirm: vi.fn(async () => true),
+  }),
+}));
 // Mock the custom hooks
 vi.mock('../../src/hooks/useAuthQuery', () => ({
   useAuthQuery: ({ queryKey }) => {

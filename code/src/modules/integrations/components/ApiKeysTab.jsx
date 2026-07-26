@@ -8,8 +8,10 @@ import { api } from '@/lib/apiClient';
 import { Plus, Trash, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function ApiKeysTab() {
+  const { confirm } = useConfirmation();
   const { activeOrg } = useAuth();
   const organizationId = activeOrg?.id;
   const [keys, setKeys] = useState([]);
@@ -57,6 +59,14 @@ export default function ApiKeysTab() {
   }
 
   async function handleRevoke(id) {
+    const ok = await confirm({
+      title: 'Revoke this API key?',
+      description: 'Any external caller using this key will immediately lose access. This cannot be undone.',
+      confirmText: 'Revoke',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.entities.ApiKey.delete(id);
       toast.success("API key revoked");

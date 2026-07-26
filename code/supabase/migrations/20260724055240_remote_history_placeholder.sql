@@ -1,0 +1,1 @@
+-- Remote migration 20260724055240 exists in the linked Supabase project. Placeholder keeps local migration history aligned for forward-only pushes.

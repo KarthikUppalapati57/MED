@@ -6,6 +6,7 @@ import { AUDIT_MODULES, logAudit } from '@/lib/audit';
 import { notifyManagers } from '@/lib/notificationService';
 import { toast } from 'sonner';
 import { PASSWORD_POLICY_DESCRIPTION, validatePasswordConfirmation, validatePasswordPolicy } from '@/lib/passwordPolicy';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ function isValidPhone(value) {
 }
 export default function Profile() {
   const { user, userProfile, role, organization, refreshProfile } = useAuth();
+  const { confirm } = useConfirmation();
   
   // Profile edit states
   const [fullName, setFullName] = useState('');
@@ -274,6 +276,14 @@ export default function Profile() {
 
   const handleAccountDeletion = async () => {
     if (!user?.id) return;
+    const ok = await confirm({
+      title: 'Request account deletion?',
+      description: 'This will submit a request to delete your account. Your managers will be notified.',
+      confirmText: 'Request Deletion',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setIsRequestingDeletion(true);
     try {
       await logAudit({

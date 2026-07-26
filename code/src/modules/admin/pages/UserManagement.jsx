@@ -218,6 +218,7 @@ function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
 // UserDetailDrawer
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const { role: currentUserRole, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("role");
   const [form, setForm] = useState({
@@ -241,6 +242,18 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   });
 
   const handleSave = async () => {
+    const memberLabel = member.profiles?.email || member.email || 'this user';
+    const roleLabel = Restops_ROLES[form.role]?.label || form.role;
+    const statusLabel = STATUS_CONFIG[form.status]?.label || form.status;
+    const proceed = await confirm({
+      title: 'Save these updates?',
+      description: `This will change ${memberLabel}'s role to ${roleLabel} and status to ${statusLabel}.`,
+      confirmText: 'Save Changes',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
+
     setSaving(true);
 
     try {

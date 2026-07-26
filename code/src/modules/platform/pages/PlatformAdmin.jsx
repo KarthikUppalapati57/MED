@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useDebouncedQueryInvalidation } from '@/hooks/useDebouncedQueryInvalidation';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +73,7 @@ const ACCESS_LEVELS = [
 
 export default function PlatformAdmin() {
   const { user, role: userRole } = useAuth();
+  const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
 
   const navigate = useNavigate();
@@ -568,6 +570,15 @@ The Restops Platform Team
   };
 
   const handleRejectDemo = async (request) => {
+    const ok = await confirm({
+      title: 'Reject this demo request?',
+      description: `This will mark the demo request from ${request.full_name} as rejected and email them a decline notice.`,
+      confirmText: 'Reject Request',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     const toastId = toast.loading(`Declining request from ${request.full_name}...`);
     setProcessingRequests(prev => { const n = new Set(prev); n.add(request.id); return n; });
 
@@ -650,8 +661,16 @@ The Restops Platform Team
     handleAcceptDemo(request);
   };
 
-  const handleRequestReject = (request, type) => {
+  const handleRequestReject = async (request, type) => {
     if (type === 'contact') {
+      const ok = await confirm({
+        title: 'Reject this inquiry?',
+        description: `This will mark the inquiry from ${request.full_name || request.name || request.email} as rejected.`,
+        confirmText: 'Reject Inquiry',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return;
       updateContactRequestStatus(request, 'rejected');
       return;
     }
@@ -1820,6 +1839,14 @@ The Restops Platform Team
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditingOrgModules(null)}>Cancel</Button>
             <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-8" onClick={async () => {
+              const ok = await confirm({
+                title: 'Save module configuration?',
+                description: `This changes which modules ${editingOrgModules?.name} can access.`,
+                confirmText: 'Save Configuration',
+                cancelText: 'Cancel',
+                variant: 'warning',
+              });
+              if (!ok) return;
               await supabase.from('organizations').update({ enabled_modules: selectedModules }).eq('id', editingOrgModules.id);
               queryClient.invalidateQueries({ queryKey: ['organizations'] });
               toast.success("Modules updated");

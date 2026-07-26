@@ -87,7 +87,7 @@ function formatVendorAddress(vendor) {
   const city = vendor.remittance_city || vendor.mailing_city || vendor.city;
   const state = vendor.remittance_state || vendor.mailing_state || vendor.state;
   const zip = vendor.remittance_zip_code || vendor.mailing_zip_code || vendor.zip_code;
-  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' • ');
+  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' ï¿½ ');
 }
 function CreateCheckDialog({ open, onClose, organization, brand, location }) {
   const queryClient = useQueryClient();
@@ -712,6 +712,12 @@ export default function Payments() {
   };
 
   const handleReject = async (invoice) => {
+    if (!(await confirm({
+      title: 'Reject invoice?',
+      description: 'This will mark the invoice as rejected and remove it from the payment queue. This cannot be undone.',
+      confirmLabel: 'Reject',
+      destructive: false,
+    }))) return;
     try {
       await updateInvoice.mutateAsync({ id: invoice.id, data: { status: 'rejected', ap_status: 'rejected' } });
       toast.success('Invoice rejected');
@@ -2072,7 +2078,7 @@ export default function Payments() {
                   return (
                     <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                       {address ? <p>{address}</p> : <p>No vendor address on file.</p>}
-                      {(vendor?.email || vendor?.phone) && <p>{[vendor.email, vendor.phone].filter(Boolean).join(' • ')}</p>}
+                      {(vendor?.email || vendor?.phone) && <p>{[vendor.email, vendor.phone].filter(Boolean).join(' ï¿½ ')}</p>}
                     </div>
                   );
                 })()}

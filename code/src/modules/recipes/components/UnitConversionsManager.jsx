@@ -143,12 +143,23 @@ export default function UnitConversionsManager({
 
   const toggleActive = async (row) => {
     if (!canManageRecipes) return;
+    const isActive = row.is_active !== false;
+    if (isActive) {
+      const proceed = await confirm({
+        title: 'Deactivate this conversion rule?',
+        description: 'Recipes using this conversion may be affected. This can be re-activated later.',
+        confirmText: 'Deactivate',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!proceed) return;
+    }
     try {
       await api.entities.RecipeUnitConversion.update(row.id, {
-        is_active: !(row.is_active !== false),
+        is_active: !isActive,
         updated_at: new Date().toISOString(),
       });
-      toast.success(row.is_active === false ? 'Conversion rule activated' : 'Conversion rule deactivated');
+      toast.success(isActive ? 'Conversion rule deactivated' : 'Conversion rule activated');
       await invalidate();
     } catch (toggleError) {
       toast.error(toggleError?.message || 'Unable to update conversion rule');

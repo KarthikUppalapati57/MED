@@ -3,11 +3,13 @@ import { ArrowLeft, ArrowRight, Check, X, AlertCircle, ScanBarcode, Camera } fro
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function ActiveCountSession({ sheet, inventory, onComplete, onCancel }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [counts, setCounts] = useState({});
   const [isScanning, setIsScanning] = useState(false);
+  const { confirm } = useConfirmation();
 
   // Auto-sort items by location zone to mimic walk-path
   const sortedItems = useMemo(() => {
@@ -39,11 +41,24 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
     setCounts({ ...counts, [currentItem.product_id]: '' });
   };
 
+  const handleComplete = async () => {
+    const proceed = await confirm({
+      title: 'Finish count session?',
+      description: 'This locks in the counted quantities, overwrites live inventory, and posts variance/GL entries for every counted item. This action cannot be undone.',
+      confirmText: 'Finish Count',
+      cancelText: 'Keep Counting',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (!proceed) return;
+    onComplete(counts);
+  };
+
   const handleNext = () => {
     if (currentIndex < sortedItems.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      onComplete(counts);
+      handleComplete();
     }
   };
 
@@ -72,7 +87,7 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             <Button variant="outline" size="icon" onClick={() => setIsScanning(!isScanning)}>
               <ScanBarcode className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onComplete(counts)} className="text-primary font-medium">Done</Button>
+            <Button variant="ghost" size="sm" onClick={handleComplete} className="text-primary font-medium">Done</Button>
           </div>
         </div>
 

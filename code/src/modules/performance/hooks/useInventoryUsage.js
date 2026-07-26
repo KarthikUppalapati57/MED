@@ -35,7 +35,6 @@ export function useInventoryUsage({
       }),
     enabled: Boolean(enabled && filters?.dateFrom && filters?.dateTo && (demo || organizationId)),
     staleTime: 30_000,
-    placeholderData: (prev) => prev,
   });
 
   const report = query.data || null;

@@ -10,6 +10,7 @@ import Papa from 'papaparse';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function POSSyncEngine() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -17,6 +18,7 @@ export default function POSSyncEngine() {
   const [depletionPreview, setDepletionPreview] = useState(null);
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -75,7 +77,17 @@ export default function POSSyncEngine() {
 
   const processDepletion = async () => {
     if (!depletionPreview || depletionPreview.length === 0) return;
-    
+
+    const proceed = await confirm({
+      title: 'Process inventory depletion?',
+      description: 'This will permanently deduct inventory levels based on theoretical usage and post GL entries. This action cannot be undone.',
+      confirmText: 'Process Inventory Depletion',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+      severity: 'critical',
+    });
+    if (!proceed) return;
+
     try {
       const { error } = await supabase.rpc('execute_inventory_depletion', {
         p_org_id: organization.id,

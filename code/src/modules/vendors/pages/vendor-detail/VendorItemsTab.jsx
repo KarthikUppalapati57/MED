@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 export default function VendorItemsTab({ vendorId }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -246,7 +248,17 @@ export default function VendorItemsTab({ vendorId }) {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
                           <Edit2 className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(item.id)}>
+                        <Button variant="ghost" size="icon" onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Delete vendor item?',
+                            description: `Permanently delete "${item.vendor_item_name}" from this vendor's catalog? This cannot be undone.`,
+                            confirmText: 'Delete',
+                            cancelText: 'Cancel',
+                            variant: 'destructive',
+                          });
+                          if (!ok) return;
+                          deleteMutation.mutate(item.id);
+                        }}>
                           <Trash2 className="h-4 w-4 text-resend-red/70 hover:text-resend-red" />
                         </Button>
                       </div>

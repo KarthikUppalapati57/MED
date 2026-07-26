@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Package, Store, Smartphone, ExternalLink, PowerOff, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ import {
 export default function DeliveryAggregator() {
   const { organization, location } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const { data: channels = [], isLoading: loadingChannels } = useQuery({
     queryKey: ['delivery_channels', location?.id],
@@ -68,7 +70,15 @@ export default function DeliveryAggregator() {
     }
   });
 
-  const handle86Item = (recipeId) => {
+  const handle86Item = async (recipeId) => {
+    const proceed = await confirm({
+      title: 'Mark this item out of stock everywhere?',
+      description: 'This immediately pushes an out-of-stock update to every connected delivery platform (DoorDash, UberEats, Grubhub). The item can be un-86\'d later, but the change goes live on customer-facing menus right away.',
+      confirmText: '86 Everywhere',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     toast.promise(syncMenuMutation.mutateAsync({ recipe_id: recipeId, action: '86_item' }), {
       loading: 'Pushing out-of-stock update to delivery partners...',
       success: 'Item successfully 86\'d across all channels!',

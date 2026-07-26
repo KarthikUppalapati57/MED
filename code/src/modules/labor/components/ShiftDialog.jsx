@@ -7,12 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function ShiftDialog({ open, onOpenChange, shift, employeeId, date }) {
   const { organization, location } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
@@ -109,7 +111,23 @@ export default function ShiftDialog({ open, onOpenChange, shift, employeeId, dat
         </div>
         <DialogFooter className="flex justify-between sm:justify-between items-center w-full">
           {shift ? (
-            <Button variant="destructive" size="sm" onClick={() => deleteShift.mutate()} disabled={deleteShift.isPending}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                const proceed = await confirm({
+                  title: 'Delete this shift?',
+                  description: 'This employee\'s scheduled shift will be permanently deleted. This action cannot be undone.',
+                  confirmText: 'Delete',
+                  cancelText: 'Cancel',
+                  variant: 'destructive',
+                  severity: 'high',
+                });
+                if (!proceed) return;
+                deleteShift.mutate();
+              }}
+              disabled={deleteShift.isPending}
+            >
               Delete
             </Button>
           ) : <div />}

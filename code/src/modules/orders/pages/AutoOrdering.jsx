@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthQuery, useAuthInfiniteQuery } from '@/hooks/useAuthQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useRequireLocation } from '@/hooks/useRequireLocation';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
 import { filterByContext } from '@/lib/contextUtils';
@@ -117,6 +118,7 @@ export default function AutoOrdering() {
   const queryClient = useQueryClient();
   const { organization, brand, location, userProfile } = useAuth();
   const { hasLocation, warnIfMissing } = useRequireLocation();
+  const { confirm } = useConfirmation();
   const needsOrderList = ['all-orders', 'place-order', 'invoice-approval', 'receiving'].includes(activeTab);
   const needsInventory = ['all-orders', 'place-order', 'transfers'].includes(activeTab) || newTransferOpen;
   const needsVendors = ['all-orders', 'place-order'].includes(activeTab);
@@ -486,6 +488,14 @@ export default function AutoOrdering() {
   };
 
   const handleReject = async (order) => {
+    const ok = await confirm({
+      title: 'Reject order?',
+      description: 'This will cancel this auto-generated order. This cannot be undone.',
+      confirmText: 'Reject',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     await updateMutation.mutateAsync({
       id: order.id,
       data: { status: 'cancelled' }

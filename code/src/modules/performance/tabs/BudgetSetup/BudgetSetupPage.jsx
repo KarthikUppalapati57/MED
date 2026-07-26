@@ -6,6 +6,7 @@ import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { filterByContext } from '@/lib/contextUtils';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +48,7 @@ function normalizeCategory(value) {
 export default function BudgetSetupPage({ periodStart: initialPeriodStart, periodEnd: initialPeriodEnd } = {}) {
   const demo = import.meta.env.VITE_PERFORMANCE_DEMO === 'true';
   const { organization, brand, location, userProfile } = useAuth();
+  const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
 
   const [periodStart, setPeriodStart] = useState(initialPeriodStart || startOfMonthIso());
@@ -59,12 +61,16 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
     getBudgetSetupDemoSeedTargets(startOfMonthIso(), endOfMonthIso())
   );
 
-  const scopeLocationId = selectedLocationId === ORG_WIDE ? null : selectedLocationId;
+  const scopeLocationId = location?.id || null;
 
   useEffect(() => {
     if (initialPeriodStart) setPeriodStart(initialPeriodStart);
     if (initialPeriodEnd) setPeriodEnd(initialPeriodEnd);
   }, [initialPeriodStart, initialPeriodEnd]);
+
+  useEffect(() => {
+    if (location?.id) setSelectedLocationId(location.id);
+  }, [location?.id]);
 
   useEffect(() => {
     if (!demo) return;
@@ -298,8 +304,7 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Period & location</CardTitle>
           <CardDescription>
-            Targets apply to the selected date range and location scope. Leave location as
-            organization-wide for org-level budgets.
+            Targets apply to the selected date range and the active location. Switch location from the main context control to view or edit another location.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3 items-end">
@@ -325,12 +330,11 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
           </div>
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Location</label>
-            <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+            <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled>
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ORG_WIDE}>Organization-wide</SelectItem>
                 {locations.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id}>
                     {loc.name || loc.id}
@@ -423,7 +427,15 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
                               size="sm"
                               variant="ghost"
                               disabled={clearTarget.isPending}
-                              onClick={() => {
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: 'Clear this budget target?',
+                                  description: `This removes the saved budget for ${category}. This cannot be undone.`,
+                                  confirmText: 'Clear',
+                                  cancelText: 'Cancel',
+                                  variant: 'destructive',
+                                });
+                                if (!ok) return;
                                 setDrafts((prev) => {
                                   const next = { ...prev };
                                   delete next[category];

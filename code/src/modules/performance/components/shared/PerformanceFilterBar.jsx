@@ -24,6 +24,7 @@ export function PerformanceFilterBar({
   categoryIds = [],
   vendorIds = [],
   locations = [],
+  locationLocked = false,
   categories = [],
   vendors = [],
   autoComparison = true,
@@ -82,19 +83,27 @@ export function PerformanceFilterBar({
         <div className="space-y-1 min-w-[160px]">
           <Label className="text-xs text-muted-foreground">Location</Label>
           <Select
-            value={locationIds[0] || 'all'}
-            onValueChange={(v) => onLocationChange?.(v === 'all' ? [] : [v])}
+            value={locationIds[0] || (locationLocked ? 'none' : 'all')}
+            disabled={locationLocked}
+            onValueChange={(v) => {
+              if (locationLocked) return;
+              onLocationChange?.(v === 'all' ? [] : [v]);
+            }}
           >
             <SelectTrigger className="h-9">
-              <SelectValue placeholder="All locations" />
+              <SelectValue placeholder={locationLocked ? 'Active location required' : 'All locations'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
+              {locationLocked ? null : <SelectItem value="all">All locations</SelectItem>}
+              {locationIds[0] && !locations.some((loc) => loc.id === locationIds[0]) ? (
+                <SelectItem value={locationIds[0]}>Active location</SelectItem>
+              ) : null}
               {locations.map((loc) => (
                 <SelectItem key={loc.id} value={loc.id}>
                   {loc.name}
                 </SelectItem>
               ))}
+              {locationLocked && !locationIds[0] ? <SelectItem value="none">No active location</SelectItem> : null}
             </SelectContent>
           </Select>
         </div>

@@ -1301,7 +1301,18 @@ export default function Recipes() {
                         <Calculator className="h-4 w-4 mr-2" /> Calculate Cost
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => deleteMutation.mutate(recipe.id)}
+                        onClick={async () => {
+                          const proceed = await confirm({
+                            title: `Delete ${recipe.name}?`,
+                            description: 'This recipe will be permanently deleted. This action cannot be undone.',
+                            confirmText: 'Delete Recipe',
+                            cancelText: 'Keep Recipe',
+                            variant: 'destructive',
+                            severity: 'critical',
+                          });
+                          if (!proceed) return;
+                          deleteMutation.mutate(recipe.id);
+                        }}
                         className="text-resend-red"
                       >
                         <Trash2 className="h-4 w-4 mr-2" /> Delete

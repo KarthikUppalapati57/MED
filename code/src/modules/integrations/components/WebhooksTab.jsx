@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { Plus, Trash, Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const AVAILABLE_EVENTS = [
   { id: 'profiles.insert', label: 'Customer Created' },
@@ -18,6 +19,7 @@ const AVAILABLE_EVENTS = [
 ];
 
 export default function WebhooksTab() {
+  const { confirm } = useConfirmation();
   const { activeOrg } = useAuth();
   const organizationId = activeOrg?.id;
   const [endpoints, setEndpoints] = useState([]);
@@ -68,6 +70,16 @@ export default function WebhooksTab() {
 
   async function handleToggleStatus(id, currentStatus) {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    if (newStatus === 'inactive') {
+      const ok = await confirm({
+        title: 'Deactivate this webhook?',
+        description: 'This endpoint will stop receiving event deliveries until it is re-enabled.',
+        confirmText: 'Deactivate',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return;
+    }
     try {
       await api.entities.WebhookEndpoint.update(id, { organization_id: organizationId, status: newStatus });
       fetchEndpoints();
@@ -77,6 +89,14 @@ export default function WebhooksTab() {
   }
 
   async function handleDelete(id) {
+    const ok = await confirm({
+      title: 'Delete this webhook endpoint?',
+      description: 'This permanently deletes the endpoint and it will stop receiving event deliveries. This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.entities.WebhookEndpoint.delete(id);
       toast.success("Webhook deleted");

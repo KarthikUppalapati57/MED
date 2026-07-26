@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -48,6 +49,7 @@ export default function ProviderNeutralPaymentSetup({
 } = {}) {
   const { userProfile, organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linkingId, setLinkingId] = useState(null);
@@ -318,7 +320,17 @@ export default function ProviderNeutralPaymentSetup({
                         {linkingId === account.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
                         Link provider
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => disable(account.id)}>Disable</Button>
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        const ok = await confirm({
+                          title: 'Disable bank account?',
+                          description: `This will disable "${account.nickname || account.bank_name || 'this bank account'}" (****${account.account_last4}) for payouts and collections across the organization. Any provider links using it will stop moving real money until it is re-enabled.`,
+                          confirmText: 'Disable',
+                          cancelText: 'Cancel',
+                          variant: 'warning',
+                        });
+                        if (!ok) return;
+                        disable(account.id);
+                      }}>Disable</Button>
                     </div>
                   </div>
                 </div>

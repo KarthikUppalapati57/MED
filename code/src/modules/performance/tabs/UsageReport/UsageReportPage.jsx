@@ -203,6 +203,7 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
         categoryIds={filterState.categoryIds}
         vendorIds={[]}
         locations={filterLocations}
+        locationLocked
         categories={filterCategories}
         vendors={[]}
         autoComparison={filterState.autoComparison}

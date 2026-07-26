@@ -33,9 +33,10 @@ export function usePerformanceFilters(defaults = {}) {
   // Resync caller-owned defaults whenever the parent context changes. This keeps the
   // Performance header, active location, and report tabs from drifting out of sync.
   const defaultLocationIdsKey = JSON.stringify(defaults.locationIds || []);
+  const defaultLocationIds = useMemo(() => defaults.locationIds || [], [defaultLocationIdsKey]);
   useEffect(() => {
-    setLocationIds(defaults.locationIds || []);
-  }, [defaultLocationIdsKey]);
+    setLocationIds(defaultLocationIds);
+  }, [defaultLocationIds]);
 
   useEffect(() => {
     if (!defaults.dateFrom || !defaults.dateTo) return;
@@ -69,11 +70,11 @@ export function usePerformanceFilters(defaults = {}) {
     setDateFrom(from);
     setDateTo(to);
     syncComparison(from, to);
-    setLocationIds([]);
+    setLocationIds(defaultLocationIds);
     setCategoryIds([]);
     setVendorIds([]);
     setAutoComparison(true);
-  }, [syncComparison]);
+  }, [syncComparison, defaultLocationIds]);
 
   const filters = useMemo(
     () => ({

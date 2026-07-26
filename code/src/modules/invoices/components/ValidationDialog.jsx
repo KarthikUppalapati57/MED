@@ -12,6 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { runInvoiceValidationChecks, summarizeValidationIssues, VALIDATION_CHECK_LABELS } from '../lib/invoiceValidation';
 
 const CHECKING_RESULTS = Object.fromEntries(
@@ -80,6 +81,7 @@ export default function ValidationDialog({
   const [validating, setValidating] = useState(true);
   const [approvalNotes, setApprovalNotes] = useState('');
   const [results, setResults] = useState(CHECKING_RESULTS);
+  const { confirm } = useConfirmation();
 
   const lastValidatedRef = useRef(null);
 
@@ -137,7 +139,15 @@ export default function ValidationDialog({
     onOpenChange(false);
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
+    const ok = await confirm({
+      title: 'Reject invoice?',
+      description: 'This will mark the invoice as rejected. This cannot be undone.',
+      confirmText: 'Reject',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     onSave({
       ...invoice,
       validation_results: results,

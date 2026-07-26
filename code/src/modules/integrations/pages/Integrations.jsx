@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import posthog from '@/lib/posthog';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const INTEGRATION_TYPES = {
   MCP: 'mcp',
@@ -177,6 +178,7 @@ const INTEGRATIONS = [
 
 export default function Integrations() {
   const navigate = useNavigate();
+  const { confirm } = useConfirmation();
   const [activeTab, setActiveTab] = useState(INTEGRATION_TYPES.MCP);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -251,6 +253,14 @@ export default function Integrations() {
       (i.provider === 'other' && i.metadata?.originalId === integrationId)
     );
     if (dbInt) {
+      const ok = await confirm({
+        title: `Disconnect ${name}?`,
+        description: `Historical sync will stop and ${name} will no longer send or receive data until reconnected.`,
+        confirmText: 'Disconnect',
+        cancelText: 'Cancel',
+        variant: 'destructive',
+      });
+      if (!ok) return;
       try {
         await api.entities.Integration.delete(dbInt.id);
         queryClient.invalidateQueries(['integrations']);

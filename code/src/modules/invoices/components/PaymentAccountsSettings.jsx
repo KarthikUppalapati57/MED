@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,8 @@ import { Switch } from "@/components/ui/switch";
 export default function PaymentAccountsSettings() {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
-  
+  const { confirm } = useConfirmation();
+
   const [isAdding, setIsAdding] = useState(false);
   const [newAccount, setNewAccount] = useState({
     name: '',
@@ -139,7 +141,17 @@ export default function PaymentAccountsSettings() {
                   variant="ghost" 
                   size="sm" 
                   className="text-red-500 hover:text-red-700 hover:bg-destructive/10 h-8 w-8 p-0 shrink-0"
-                  onClick={() => deleteAccountMutation.mutate(account.id)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Deactivate payment account?',
+                      description: `This will deactivate "${account.name}" for the entire organization. No one will be able to use it to release vendor payments anymore. This cannot be undone.`,
+                      confirmText: 'Deactivate',
+                      cancelText: 'Cancel',
+                      variant: 'warning',
+                    });
+                    if (!ok) return;
+                    deleteAccountMutation.mutate(account.id);
+                  }}
                   disabled={deleteAccountMutation.isPending}
                 >
                   <Trash2 className="w-4 h-4" />

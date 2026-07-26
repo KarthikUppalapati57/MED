@@ -1093,6 +1093,12 @@ export default function Invoices() {
   };
 
   const handleReject = async (invoice) => {
+    if (!(await confirm({
+      title: 'Reject invoice?',
+      description: `Mark invoice ${invoice.invoice_number} as rejected? The uploader will need to review and resubmit it.`,
+      confirmLabel: 'Reject',
+      destructive: false,
+    }))) return;
     await updateMutation.mutateAsync({
       id: invoice.id,
       data: { status: 'rejected', ap_status: 'rejected' }

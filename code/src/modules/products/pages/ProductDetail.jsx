@@ -14,6 +14,7 @@ import {
 import { api } from '@/lib/apiClient';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -283,6 +284,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
   const { '*': splat } = useParams();
   const productId = suppliedProductId || splat?.split('/')[1] || initialProduct?.id;
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [form, setForm] = useState(() => buildForm(initialProduct));
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [pendingReportUnitOption, setPendingReportUnitOption] = useState(null);
@@ -688,6 +690,18 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
     onError: (error) => toast.error(error?.message || 'Failed to delete product'),
   });
 
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete product?',
+      description: 'Permanently delete this product record? This cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    deleteMutation.mutate();
+  };
+
   const barcodeMutation = useMutation({
     mutationFn: () => api.products.upsertBarcode({
       productId,
@@ -827,7 +841,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           <Button onClick={() => saveMutation.mutate()} disabled={!canEdit || saveMutation.isPending}>
             <Save className="mr-2 h-4 w-4" /> Save
           </Button>
-          <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={!canDelete || deleteMutation.isPending}>
+          <Button variant="destructive" onClick={handleDelete} disabled={!canDelete || deleteMutation.isPending}>
             <Trash2 className="mr-2 h-4 w-4" /> Delete
           </Button>
         </div>
@@ -1181,7 +1195,17 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                             variant="link"
                             className="h-auto px-0 text-destructive"
                             disabled={removeCountUnitMutation.isPending}
-                            onClick={() => removeCountUnitMutation.mutate(row)}
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Remove count unit?',
+                                description: `Remove the count unit "${row.name}" from this product? This cannot be undone.`,
+                                confirmText: 'Remove',
+                                cancelText: 'Cancel',
+                                variant: 'warning',
+                              });
+                              if (!ok) return;
+                              removeCountUnitMutation.mutate(row);
+                            }}
                           >
                             Remove
                           </Button>
@@ -1262,7 +1286,17 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
                   size="icon"
                   aria-label="Remove barcode"
                   disabled={!canEdit || removeBarcodeMutation.isPending}
-                  onClick={() => removeBarcodeMutation.mutate(barcode.id)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Remove barcode?',
+                      description: `Remove the barcode mapping "${barcode.barcode}" from this product? This cannot be undone.`,
+                      confirmText: 'Remove',
+                      cancelText: 'Cancel',
+                      variant: 'warning',
+                    });
+                    if (!ok) return;
+                    removeBarcodeMutation.mutate(barcode.id);
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -1282,7 +1316,7 @@ export default function ProductDetail({ initialProduct = null, categoryOptions =
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setHistoryOpen(true)}><History className="mr-2 h-4 w-4" /> History</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={!canDelete || deleteMutation.isPending}>
+            <Button variant="destructive" onClick={handleDelete} disabled={!canDelete || deleteMutation.isPending}>
               <Trash2 className="mr-2 h-4 w-4" /> Delete
             </Button>
           </div>

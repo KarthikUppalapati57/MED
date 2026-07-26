@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,8 @@ import { toast } from 'sonner';
 export default function ApprovalPolicySettings() {
   const { user, organization } = useAuth();
   const queryClient = useQueryClient();
-  
+  const { confirm } = useConfirmation();
+
   const [isAdding, setIsAdding] = useState(false);
   const [newPolicy, setNewPolicy] = useState({
     min_amount: '',
@@ -98,7 +100,17 @@ export default function ApprovalPolicySettings() {
                 variant="ghost" 
                 size="sm" 
                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                onClick={() => deletePolicyMutation.mutate(policy.id)}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Delete approval policy?',
+                    description: 'This will permanently delete this approval policy rule. This cannot be undone.',
+                    confirmText: 'Delete',
+                    cancelText: 'Cancel',
+                    variant: 'destructive',
+                  });
+                  if (!ok) return;
+                  deletePolicyMutation.mutate(policy.id);
+                }}
                 disabled={deletePolicyMutation.isPending}
               >
                 <Trash2 className="w-4 h-4" />
