@@ -8,7 +8,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, role, org_id, organization_id, onboarding_type } = await req.json()
+    const { email, role, org_id, organization_id, onboarding_type, metadata, permissions, modules } = await req.json()
     const targetOrganizationId = organization_id || org_id
 
     if (!email || !targetOrganizationId) {
@@ -17,6 +17,11 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization')
     const supabase = getSupabaseClient(authHeader)
+    const inviteMetadata = {
+      ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {}),
+      ...(permissions && typeof permissions === 'object' && !Array.isArray(permissions) ? { permissions } : {}),
+      ...(Array.isArray(modules) ? { modules } : {}),
+    }
 
     // Insert invitation
     const { data: invite, error } = await supabase
@@ -26,7 +31,8 @@ serve(async (req) => {
         role: role || 'ground_staff',
         organization_id: targetOrganizationId,
         onboarding_type: onboarding_type || 'invited',
-        status: 'pending'
+        status: 'pending',
+        metadata: inviteMetadata
       })
       .select()
       .single()

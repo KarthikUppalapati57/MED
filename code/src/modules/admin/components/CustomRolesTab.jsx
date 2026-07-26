@@ -12,8 +12,42 @@ import { toast } from 'sonner';
 import { Shield, Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirmation } from '@/hooks/useConfirmation';
+import { MODULE_PERMISSION_OPTIONS, PERMISSION_ACTIONS, defaultPermissionMatrix, normalizePermissionMatrix } from '@/lib/accessPermissions';
+import { Switch } from '@/components/ui/switch';
 
 
+function PermissionMatrixEditor({ value, onChange }) {
+  const updatePermission = (moduleKey, actionKey, checked) => {
+    const next = normalizePermissionMatrix(value);
+    next[moduleKey] = { ...(next[moduleKey] || {}), [actionKey]: checked };
+    onChange(next);
+  };
+
+  return (
+    <div className="rounded-xl border border-border overflow-hidden">
+      <div className="grid grid-cols-[1fr_repeat(3,72px)] items-center bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground">
+        <span>Module</span>
+        {PERMISSION_ACTIONS.map(action => <span key={action.key} className="text-center">{action.label}</span>)}
+      </div>
+      <div className="max-h-72 overflow-y-auto divide-y divide-border">
+        {MODULE_PERMISSION_OPTIONS.map(module => (
+          <div key={module.key} className="grid grid-cols-[1fr_repeat(3,72px)] items-center px-3 py-2">
+            <span className="text-sm font-medium text-foreground">{module.label}</span>
+            {PERMISSION_ACTIONS.map(action => (
+              <div key={action.key} className="flex justify-center">
+                <Switch
+                  checked={Boolean(value?.[module.key]?.[action.key])}
+                  onCheckedChange={(checked) => updatePermission(module.key, action.key, checked)}
+                  aria-label={`${module.label} ${action.label}`}
+                />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 export default function CustomRolesTab() {
   const { organization, role: authRole } = useAuth();
   const { confirm } = useConfirmation();
@@ -24,6 +58,7 @@ export default function CustomRolesTab() {
   // Form State
   const [roleName, setRoleName] = useState('');
   const [roleDesc, setRoleDesc] = useState('');
+  const [rolePermissions, setRolePermissions] = useState(() => defaultPermissionMatrix('ground_staff'));
 
   const { data: roles, isLoading } = useQuery({
     queryKey: ['roles', organization?.id],
@@ -40,12 +75,14 @@ export default function CustomRolesTab() {
       if (roleData.id) {
         return api.client.from('roles').update({
           name: roleData.name,
-          description: roleData.description
+          description: roleData.description,
+          default_page_permissions: roleData.default_page_permissions
         }).eq('id', roleData.id);
       } else {
         return api.client.from('roles').insert({
           name: roleData.name,
           description: roleData.description,
+          default_page_permissions: roleData.default_page_permissions,
           organization_id: organization.id,
           is_system: false
         });
@@ -82,6 +119,7 @@ export default function CustomRolesTab() {
     setSelectedRole(role);
     setRoleName(role ? role.name : '');
     setRoleDesc(role ? (role.description || '') : '');
+    setRolePermissions(normalizePermissionMatrix(role?.default_page_permissions, role?.name || 'ground_staff'));
     setIsDialogOpen(true);
   };
 
@@ -93,7 +131,8 @@ export default function CustomRolesTab() {
     saveRoleMutation.mutate({
       id: selectedRole?.id,
       name: roleName.trim(),
-      description: roleDesc.trim()
+      description: roleDesc.trim(),
+      default_page_permissions: rolePermissions
     });
   };
 
@@ -194,6 +233,10 @@ export default function CustomRolesTab() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Default Read, Write, Update Access</Label>
+              <PermissionMatrixEditor value={rolePermissions} onChange={setRolePermissions} />
+            </div>
             </div>
 
           <DialogFooter>
@@ -207,5 +250,3 @@ export default function CustomRolesTab() {
     </div>
   );
 }
-
-

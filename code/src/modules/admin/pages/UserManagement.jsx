@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { logAudit } from '@/lib/audit';
+import { MODULE_PERMISSION_OPTIONS, PERMISSION_ACTIONS, defaultPermissionMatrix, enabledModulesFromPermissions, normalizePermissionMatrix } from '@/lib/accessPermissions';
 import { sendInvitationEmail } from '@/lib/emailService';
 import posthog from '@/lib/posthog';
 import { Button } from "@/components/ui/button";
@@ -95,7 +96,7 @@ function RoleBadges({ member, maxVisible = 2 }) {
 }
 
 
-// MemberRow — single member, rendered inside a brand/location hierarchy group
+// MemberRow ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â single member, rendered inside a brand/location hierarchy group
 function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
   const queryClient = useQueryClient();
   const status = member.status || 'active';
@@ -226,6 +227,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
     status: member.status || 'active',
     invoice_approval_limit: member.profiles?.invoice_approval_limit || 0,
     has_unlimited_approval: member.profiles?.has_unlimited_approval || false,
+    access_permissions: normalizePermissionMatrix(member.profiles?.access_permissions || member.access_permissions, member.role || member.capabilities?.role || 'ground_staff'),
   });
   const [saving, setSaving] = useState(false);
 
@@ -240,6 +242,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
 
   const handleSave = async () => {
     setSaving(true);
+
     try {
       // Use secure RPC to update role and account status
       const userId = member.user_id || member.profiles?.id || member.id;
@@ -248,7 +251,8 @@ function UserDetailDrawer({ member, orgId, onClose }) {
         new_role: form.role,
         new_status: form.status,
         new_department: form.department,
-        new_location: form.location
+        new_location: form.location,
+        new_access_permissions: form.access_permissions
       });
       if (error) throw error;
 
@@ -279,7 +283,7 @@ function UserDetailDrawer({ member, orgId, onClose }) {
           organization_id: orgId,
           brand_id: member.brand_id || member.profiles?.brand_id || null,
           location_id: member.location_id || member.profiles?.location_id || null,
-          details: { role: form.role, status: form.status },
+          details: { role: form.role, status: form.status, access_permissions: form.access_permissions },
         });
       } catch { /* audit is non-critical */ }
 
@@ -447,6 +451,14 @@ function UserDetailDrawer({ member, orgId, onClose }) {
               </div>
 
               <div className="space-y-3">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Access Permissions</Label>
+                <PermissionMatrixEditor
+                  value={form.access_permissions}
+                  onChange={(nextPermissions) => setForm({ ...form, access_permissions: nextPermissions })}
+                />
+              </div>
+
+              <div className="space-y-3">
                 <Label className="text-xs font-bold text-muted-foreground uppercase">Account Status</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(STATUS_CONFIG).filter(([k]) => k !== 'no_access').map(([s, def]) => (
@@ -493,12 +505,45 @@ function UserDetailDrawer({ member, orgId, onClose }) {
   );
 }
 
+function PermissionMatrixEditor({ value, onChange, compact = false }) {
+  const updatePermission = (moduleKey, actionKey, checked) => {
+    const next = normalizePermissionMatrix(value);
+    next[moduleKey] = { ...(next[moduleKey] || {}), [actionKey]: checked };
+    onChange(next);
+  };
+
+  return (
+    <div className="rounded-2xl border border-border overflow-hidden bg-card">
+      <div className="grid grid-cols-[1fr_repeat(3,64px)] items-center bg-secondary/60 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span>Module</span>
+        {PERMISSION_ACTIONS.map(action => <span key={action.key} className="text-center">{action.label}</span>)}
+      </div>
+      <div className={compact ? 'max-h-56 overflow-y-auto divide-y divide-border' : 'divide-y divide-border'}>
+        {MODULE_PERMISSION_OPTIONS.map(module => (
+          <div key={module.key} className="grid grid-cols-[1fr_repeat(3,64px)] items-center px-3 py-2">
+            <span className="text-sm font-semibold text-foreground">{module.label}</span>
+            {PERMISSION_ACTIONS.map(action => (
+              <div key={action.key} className="flex justify-center">
+                <Switch
+                  checked={Boolean(value?.[module.key]?.[action.key])}
+                  onCheckedChange={(checked) => updatePermission(module.key, action.key, checked)}
+                  aria-label={`${module.label} ${action.label}`}
+                />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 // InviteDialog 
 function InviteDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
   const { user: currentUser, role: currentUserRole, userProfile } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('ground_staff');
+  const [permissions, setPermissions] = useState(() => defaultPermissionMatrix('ground_staff'));
   const [sending, setSending] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
 
@@ -522,6 +567,8 @@ function InviteDialog({ open, onClose, orgId }) {
           role,
           organization_id: orgId || userProfile?.organization_id,
           onboarding_type: 'invited',
+          permissions,
+          modules: enabledModulesFromPermissions(permissions),
         }
       });
 
@@ -537,6 +584,7 @@ function InviteDialog({ open, onClose, orgId }) {
             invited_by: currentUser?.id,
             organization_id: orgId || userProfile?.organization_id,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            metadata: { permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)) },
           }])
           .select('token')
           .single();
@@ -554,7 +602,7 @@ function InviteDialog({ open, onClose, orgId }) {
           entityType: 'User',
           entityId: email,
           organization_id: orgId || userProfile?.organization_id,
-          details: { role, org_id: orgId },
+          details: { role, org_id: orgId, permissions, modules: enabledModulesFromPermissions(permissions) },
         });
       } catch { /* audit non-critical */ }
 
@@ -562,7 +610,7 @@ function InviteDialog({ open, onClose, orgId }) {
       queryClient.invalidateQueries({ queryKey: ['users'] });
 
       // Optimistic update so it shows immediately
-      queryClient.setQueryData(['team-members', activeOrgId, activeBrandId, activeLocationId, false], (old) => {
+      queryClient.setQueryData(['team-members', orgId || userProfile?.organization_id, userProfile?.brand_id, userProfile?.location_id, false], (old) => {
         if (!old) return old;
         return [...old, {
           id: 'inv_temp_' + Date.now(),
@@ -600,7 +648,7 @@ function InviteDialog({ open, onClose, orgId }) {
       } else {
         posthog.capture('team_member_invited', { role, method: 'email' });
         toast.success(`Invitation sent to ${email}`);
-        setEmail(''); setRole('ground_staff');
+        setEmail(''); setRole('ground_staff'); setPermissions(defaultPermissionMatrix('ground_staff'));
         onClose();
       }
     } catch (err) {
@@ -642,7 +690,7 @@ function InviteDialog({ open, onClose, orgId }) {
             <Button 
               className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-12"
               onClick={() => {
-                setGeneratedLink(''); setEmail(''); setRole('ground_staff');
+                setGeneratedLink(''); setEmail(''); setRole('ground_staff'); setPermissions(defaultPermissionMatrix('ground_staff'));
                 onClose();
               }}
             >
@@ -667,7 +715,7 @@ function InviteDialog({ open, onClose, orgId }) {
           {/* Step 1: Role */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Role</Label>
-            <Select value={role} onValueChange={setRole}>
+            <Select value={role} onValueChange={(nextRole) => { setRole(nextRole); setPermissions(defaultPermissionMatrix(nextRole)); }}>
               <SelectTrigger className="h-12 rounded-2xl border-border">
                 <SelectValue />
               </SelectTrigger>
@@ -685,6 +733,11 @@ function InviteDialog({ open, onClose, orgId }) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Read, Write, Update Access</Label>
+            <PermissionMatrixEditor value={permissions} onChange={setPermissions} compact />
           </div>
         </div>
 
@@ -745,13 +798,14 @@ function CSVUploadDialog({ open, onClose, orgId }) {
         if (!email) continue;
 
         const { error: fnError } = await supabase.functions.invoke('invite-user', {
-          body: { email, role, organization_id: orgId, onboarding_type: 'invited' }
+          body: { email, role, organization_id: orgId, onboarding_type: 'invited', permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)) }
         });
         if (fnError) {
           // Fallback
           await supabase.from("invitations").insert([{
             email, role, organization_id: orgId,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            metadata: { permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)) },
           }]);
         }
         posthog.capture('team_member_invited', { role, method: 'csv' });
@@ -926,7 +980,7 @@ export default function UserManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, updated_at, location_id, brand_id, role, status, invoice_approval_limit, has_unlimited_approval')
+        .select('id, email, full_name, updated_at, location_id, brand_id, role, status, invoice_approval_limit, has_unlimited_approval, access_permissions')
         .eq('organization_id', activeOrgId);
 
       if (error) throw error;
@@ -941,7 +995,7 @@ export default function UserManagement() {
       // Merge pending invitations
       try {
         const { data: invs } = await supabase.from('invitations')
-          .select('id, email, role, token, created_at')
+          .select('id, email, role, token, created_at, metadata')
           .eq('organization_id', activeOrgId)
           .is('accepted_at', null);
           
@@ -957,7 +1011,7 @@ export default function UserManagement() {
                 role: inv.role,
                 status: 'invited',
                 token: inv.token,
-                profiles: { email: inv.email, full_name: 'Pending Invite' },
+                profiles: { email: inv.email, full_name: 'Pending Invite', access_permissions: inv.metadata?.permissions || inv.metadata?.access || {} },
                 created_at: inv.created_at
               });
             }
@@ -1315,4 +1369,3 @@ export default function UserManagement() {
     </div>
   );
 }
-

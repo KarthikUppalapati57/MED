@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/apiClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
 import { notifyManagers } from '@/lib/notificationService';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ import {
   EyeOff, 
   KeyRound, 
   ShieldCheck, 
+  CheckCircle2,
   Loader2, 
   Building, 
   Briefcase,
@@ -27,6 +29,16 @@ import {
   Database
 } from 'lucide-react';
 
+function normalizePhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return String(value || '').trim();
+}
+
+function isValidPhone(value) {
+  return String(value || '').replace(/\D/g, '').length >= 10;
+}
 export default function Profile() {
   const { user, userProfile, role, organization, refreshProfile } = useAuth();
   
@@ -34,6 +46,7 @@ export default function Profile() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [phoneOtp, setPhoneOtp] = useState({ otpId: null, code: '', verifiedTarget: '', sending: false, verifying: false });
 
   // Password change states
   const [currentPassword, setCurrentPassword] = useState('');
@@ -49,6 +62,7 @@ export default function Profile() {
     if (userProfile) {
       setFullName(userProfile.full_name || '');
       setPhone(userProfile.phone || '');
+      setPhoneOtp({ otpId: null, code: '', verifiedTarget: normalizePhone(userProfile.phone || ''), sending: false, verifying: false });
     }
   }, [userProfile]);
 
@@ -59,13 +73,28 @@ export default function Profile() {
       return;
     }
 
+    const normalizedPhone = normalizePhone(phone);
+    const originalPhone = normalizePhone(userProfile?.phone || '');
+    const phoneChanged = normalizedPhone !== originalPhone;
+
+    if (phoneChanged && normalizedPhone) {
+      if (!isValidPhone(normalizedPhone)) {
+        toast.error('Enter a valid mobile number before saving.');
+        return;
+      }
+      if (phoneOtp.verifiedTarget !== normalizedPhone) {
+        toast.error('Verify the new mobile number with OTP before saving.');
+        return;
+      }
+    }
+
     setIsSavingProfile(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: fullName.trim(),
-          phone: phone.trim(),
+          phone: normalizedPhone,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -79,6 +108,46 @@ export default function Profile() {
       toast.error(err.message || 'Failed to update profile.');
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleRequestPhoneOtp = async () => {
+    const normalizedPhone = normalizePhone(phone);
+    if (!isValidPhone(normalizedPhone)) {
+      toast.error('Enter a valid mobile number first.');
+      return;
+    }
+    setPhoneOtp((prev) => ({ ...prev, sending: true, otpId: null, code: '', verifiedTarget: '' }));
+    try {
+      const result = await api.onboarding.requestContactOtp({ channel: 'phone', target: normalizedPhone });
+      setPhoneOtp({ otpId: result.otp_id, code: '', verifiedTarget: '', sending: false, verifying: false });
+      toast.success('Phone OTP sent.');
+    } catch (err) {
+      console.error('Phone OTP request failed:', err);
+      toast.error(err.message || 'Failed to send phone OTP.');
+      setPhoneOtp((prev) => ({ ...prev, sending: false }));
+    }
+  };
+
+  const handleVerifyPhoneOtp = async () => {
+    const normalizedPhone = normalizePhone(phone);
+    if (!phoneOtp.otpId) {
+      toast.error('Send an OTP first.');
+      return;
+    }
+    if (!String(phoneOtp.code || '').trim()) {
+      toast.error('Enter the 6-digit OTP code.');
+      return;
+    }
+    setPhoneOtp((prev) => ({ ...prev, verifying: true }));
+    try {
+      await api.onboarding.verifyContactOtp({ channel: 'phone', target: normalizedPhone, code: phoneOtp.code, otpId: phoneOtp.otpId });
+      setPhoneOtp({ otpId: phoneOtp.otpId, code: '', verifiedTarget: normalizedPhone, sending: false, verifying: false });
+      toast.success('Mobile number verified.');
+    } catch (err) {
+      console.error('Phone OTP verification failed:', err);
+      toast.error(err.message || 'Invalid OTP code.');
+      setPhoneOtp((prev) => ({ ...prev, verifying: false }));
     }
   };
 
@@ -309,10 +378,33 @@ export default function Profile() {
                       type="tel"
                       placeholder="e.g., +1 (123) 456-7890"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => {
+                        const nextPhone = e.target.value;
+                        setPhone(nextPhone);
+                        setPhoneOtp((prev) => ({ ...prev, code: '', otpId: null, verifiedTarget: normalizePhone(nextPhone) === normalizePhone(userProfile?.phone || '') ? normalizePhone(nextPhone) : '' }));
+                      }}
                       className="pl-9 h-10.5 rounded-lg border-border focus:ring-2 focus:ring-ring/20 focus:border-primary"
                     />
                   </div>
+                  {normalizePhone(phone) !== normalizePhone(userProfile?.phone || '') && normalizePhone(phone) && (
+                    <div className="mt-2 space-y-2 rounded-lg border border-border/70 bg-secondary/30 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">Verify this mobile number before saving profile changes.</p>
+                        <Button type="button" variant={phoneOtp.verifiedTarget === normalizePhone(phone) ? 'secondary' : 'outline'} size="sm" onClick={handleRequestPhoneOtp} disabled={phoneOtp.sending} className="gap-2">
+                          {phoneOtp.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneOtp.verifiedTarget === normalizePhone(phone) ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                          {phoneOtp.sending ? 'Sending' : phoneOtp.verifiedTarget === normalizePhone(phone) ? 'Verified' : phoneOtp.otpId ? 'Resend OTP' : 'Send OTP'}
+                        </Button>
+                      </div>
+                      {phoneOtp.otpId && phoneOtp.verifiedTarget !== normalizePhone(phone) && (
+                        <div className="flex gap-2">
+                          <Input value={phoneOtp.code} onChange={(e) => setPhoneOtp((prev) => ({ ...prev, code: e.target.value }))} placeholder="Phone OTP" inputMode="numeric" className="h-9" />
+                          <Button type="button" onClick={handleVerifyPhoneOtp} disabled={phoneOtp.verifying} className="shrink-0 h-9">
+                            {phoneOtp.verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -788,15 +788,22 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = useCallback(async (email) => {
     setAuthError(null);
     try {
-      // Use APP_URL to ensure the redirect goes to the correct domain
-      // (not Vercel's default). The Supabase Dashboard must also list
-      // this URL under Authentication > URL Configuration > Redirect URLs.
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: passwordRecoveryUrl(),
+      const { data, error } = await supabase.functions.invoke('password-reset-email', {
+        body: {
+          email,
+          // Keep recovery links on the runtime app domain. The Edge Function
+          // generates the Supabase recovery link and sends it through Resend.
+          redirectTo: passwordRecoveryUrl(),
+        },
       });
       if (error) {
         setAuthError(error);
         return { data: null, error };
+      }
+      if (data?.error) {
+        const fnError = new Error(data.error);
+        setAuthError(fnError);
+        return { data: null, error: fnError };
       }
       posthog.capture('password_reset_requested');
       return { data, error: null };
