@@ -376,7 +376,7 @@ export default function Layout({ children, currentPageName }) {
   const filteredNavigation = navigation.reduce((acc, item) => {
     // Platform admins should ONLY see Dashboard and platform_admin specific items
     if (isPlatformAdmin) {
-      if (item.minRole === 'platform_admin' || item.name === 'Dashboard') {
+      if (item.minRole === 'platform_admin' || item.name === 'Dashboard' || item.href === 'IssueSuggestions') {
         acc.push(item);
       }
       return acc;

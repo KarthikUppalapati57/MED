@@ -232,7 +232,7 @@ export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 const UNGATED_AUTH_PAGES = new Set(["BusinessVerification", "CompleteOnboarding", "OnboardingPage"]);
 
 // Core modules that are always accessible regardless of subscription plan.
-const CORE_MODULE_KEYS = ["dashboard", "setup"];
+const CORE_MODULE_KEYS = ["dashboard", "setup", "feedback"];
 
 function normalizePageName(pageName) {
   if (!pageName) return "";
@@ -313,3 +313,4 @@ export function getModulesForPlan(planFeatures) {
     .filter(key => MODULE_DEFINITIONS[key])
     .map(key => ({ key, ...MODULE_DEFINITIONS[key] }));
 }
+

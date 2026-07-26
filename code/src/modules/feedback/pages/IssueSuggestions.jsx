@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle2, Lightbulb, Loader2, Mail, Send } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +21,8 @@ const FEEDBACK_COPY = {
     title: 'Raise an Issue',
     subjectPlaceholder: 'Example: Invoice upload is failing',
     messagePlaceholder: 'Tell us what happened, what you expected, and any steps that reproduce the problem.',
-    success: 'Issue sent to the support team.',
+    successTitle: 'Issue received',
+    success: 'Our team will take care of it and follow up if we need more details.',
   },
   suggestion: {
     label: 'Suggestion',
@@ -29,7 +31,8 @@ const FEEDBACK_COPY = {
     title: 'Share a Suggestion',
     subjectPlaceholder: 'Example: Add a weekly vendor spend comparison',
     messagePlaceholder: 'Describe the idea, the workflow it improves, and who would benefit from it.',
-    success: 'Suggestion sent to the product team.',
+    successTitle: 'Suggestion received',
+    success: 'Thank you for sharing your suggestion. We truly appreciate your ideas and will review it with the product team.',
   },
 };
 
@@ -39,6 +42,7 @@ function FeedbackForm({ type }) {
   const config = FEEDBACK_COPY[type];
   const Icon = config.icon;
   const [draft, setDraft] = React.useState(initialDraft);
+  const [showSuccess, setShowSuccess] = React.useState(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -55,7 +59,7 @@ function FeedbackForm({ type }) {
       return data;
     },
     onSuccess: () => {
-      toast.success(config.success);
+      setShowSuccess(true);
       setDraft(initialDraft);
     },
     onError: (error) => toast.error(error.message || 'Unable to submit right now'),
@@ -64,6 +68,7 @@ function FeedbackForm({ type }) {
   const canSubmit = draft.subject.trim().length >= 4 && draft.message.trim().length >= 10 && !mutation.isPending;
 
   return (
+    <>
     <Card className="border-0 shadow-sm">
       <CardHeader className="border-b border-border/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -136,6 +141,24 @@ function FeedbackForm({ type }) {
         </div>
       </CardContent>
     </Card>
+
+    <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader className="items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 className="h-7 w-7" />
+          </div>
+          <DialogTitle className="text-xl">{config.successTitle}</DialogTitle>
+          <DialogDescription className="text-base">{config.success}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="sm:justify-center">
+          <Button onClick={() => setShowSuccess(false)} className="w-full sm:w-auto">
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -172,3 +195,6 @@ export default function IssueSuggestions() {
     </div>
   );
 }
+
+
+

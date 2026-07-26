@@ -31,10 +31,11 @@ export default function ProtectedModule({ pageName, children }) {
   // Platform Admins are STRICTLY restricted to only Platform Admin modules and Dashboard
   if (isPlatformAdmin) {
     const isDashboard = pageName === 'Dashboard';
+    const isFeedback = moduleInfo?.key === 'feedback';
     if (!moduleInfo) {
       return isUngatedAuthPage(pageName) ? <>{children}</> : <AccessDenied reason="module" moduleName="Unmapped module" />;
     }
-    if (!isDashboard && moduleInfo.minRole !== 'platform_admin') {
+    if (!isDashboard && !isFeedback && moduleInfo.minRole !== 'platform_admin') {
       return <AccessDenied reason="role" requiredRole="tenant_user" />;
     }
     return <>{children}</>;
