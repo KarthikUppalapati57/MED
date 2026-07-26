@@ -34,8 +34,8 @@ export default function LaborSchedules() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Labor & Scheduling</h1>
-          <p className="text-slate-500">Manage employee shifts and AI-driven labor forecasts</p>
+          <h1 className="text-3xl font-bold text-foreground">Labor & Scheduling</h1>
+          <p className="text-muted-foreground">Manage employee shifts and AI-driven labor forecasts</p>
         </div>
         <Button onClick={handleGenerateForecast} disabled={loading} className="bg-purple-600 hover:bg-purple-700">
           <Sparkles className="w-4 h-4 mr-2" />
@@ -52,16 +52,16 @@ export default function LaborSchedules() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
-              <p className="text-sm text-slate-500 font-medium">Predicted Sales</p>
-              <p className="text-2xl font-bold text-slate-900">${forecast.predicted_sales}</p>
+            <div className="bg-card p-4 rounded-lg shadow-sm border border-purple-100">
+              <p className="text-sm text-muted-foreground font-medium">Predicted Sales</p>
+              <p className="text-2xl font-bold text-foreground">${forecast.predicted_sales}</p>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
-              <p className="text-sm text-slate-500 font-medium">Recommended Labor</p>
-              <p className="text-2xl font-bold text-slate-900">{forecast.recommended_labor_hours} hrs</p>
+            <div className="bg-card p-4 rounded-lg shadow-sm border border-purple-100">
+              <p className="text-sm text-muted-foreground font-medium">Recommended Labor</p>
+              <p className="text-2xl font-bold text-foreground">{forecast.recommended_labor_hours} hrs</p>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-purple-100">
-              <p className="text-sm text-slate-500 font-medium">Target Labor %</p>
+            <div className="bg-card p-4 rounded-lg shadow-sm border border-purple-100">
+              <p className="text-sm text-muted-foreground font-medium">Target Labor %</p>
               <p className="text-2xl font-bold text-green-600">20.0%</p>
             </div>
           </CardContent>
@@ -73,8 +73,8 @@ export default function LaborSchedules() {
           <CardTitle>Upcoming Shifts</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-slate-500">
-            <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+          <div className="text-center py-12 text-muted-foreground">
+            <Calendar className="w-12 h-12 mx-auto text-muted-foreground/60 mb-4" />
             <p>No shifts scheduled yet.</p>
             <Button variant="outline" className="mt-4">Create Schedule</Button>
           </div>

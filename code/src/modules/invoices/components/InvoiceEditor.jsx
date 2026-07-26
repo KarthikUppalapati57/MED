@@ -298,7 +298,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 value={invoice.payment_status || 'unpaid'}
                 onValueChange={(val) => handleFieldChange('payment_status', val)}
               >
-                <SelectTrigger id="invoice-payment-status" className="w-full bg-white border-slate-200">
+                <SelectTrigger id="invoice-payment-status" className="w-full bg-card border-border">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -451,7 +451,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                           {item.ai_confidence}% OCR
                         </div>
                       ) : (
-                        <div className="text-[10px] text-slate-400 text-center">n/a</div>
+                        <div className="text-[10px] text-muted-foreground/70 text-center">n/a</div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -514,7 +514,7 @@ export default function InvoiceEditor({ invoice, onChange }) {
                 ))}
                 {(!invoice.line_items || invoice.line_items.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       No line items. Click "Add Item" to add products.
                     </TableCell>
                   </TableRow>
@@ -525,32 +525,32 @@ export default function InvoiceEditor({ invoice, onChange }) {
 
           {/* Totals */}
           <div className="mt-4 flex justify-end">
-            <div className="w-72 space-y-2 bg-slate-50 rounded-lg p-4">
+            <div className="w-72 space-y-2 bg-muted/40 rounded-lg p-4">
                <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Subtotal:</span>
+                <span className="text-muted-foreground">Subtotal:</span>
                 <span className="font-medium">${calculateTotal().toFixed(2)}</span>
               </div>
               {(asNumber(invoice.tax_amount) > 0) && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Tax:</span>
+                  <span className="text-muted-foreground">Tax:</span>
                   <span className="font-medium">${asNumber(invoice.tax_amount).toFixed(2)}</span>
                 </div>
               )}
               {(asNumber(invoice.fuel_surcharge) > 0) && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Fuel Surcharge:</span>
+                  <span className="text-muted-foreground">Fuel Surcharge:</span>
                   <span className="font-medium">${asNumber(invoice.fuel_surcharge).toFixed(2)}</span>
                 </div>
               )}
               {(asNumber(invoice.delivery_fee) > 0) && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Delivery Fee:</span>
+                  <span className="text-muted-foreground">Delivery Fee:</span>
                   <span className="font-medium">${asNumber(invoice.delivery_fee).toFixed(2)}</span>
                 </div>
               )}
               {(asNumber(invoice.other_charges) > 0) && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Other Charges:</span>
+                  <span className="text-muted-foreground">Other Charges:</span>
                   <span className="font-medium">${asNumber(invoice.other_charges).toFixed(2)}</span>
                 </div>
               )}

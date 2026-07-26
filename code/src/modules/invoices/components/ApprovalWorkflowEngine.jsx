@@ -109,7 +109,7 @@ export function ApprovalWorkflowEngine({ invoice }) {
   });
 
   if (invoice.status !== 'pending_approval' && invoice.status !== 'approved' && invoice.status !== 'rejected') return null;
-  if (isLoading) return <div className="p-4 text-slate-500 animate-pulse">Loading approval workflow...</div>;
+  if (isLoading) return <div className="p-4 text-muted-foreground animate-pulse">Loading approval workflow...</div>;
   if (!instanceData) return null;
 
   // Check if current user can approve any pending steps
@@ -130,13 +130,13 @@ export function ApprovalWorkflowEngine({ invoice }) {
       case 'approved': return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case 'rejected': return <XCircle className="h-5 w-5 text-red-500" />;
       case 'pending': return <Clock className="h-5 w-5 text-amber-500" />;
-      default: return <AlertTriangle className="h-5 w-5 text-slate-500" />;
+      default: return <AlertTriangle className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
   return (
     <Card className={`border-2 ${instanceData.status === 'approved' ? 'border-green-200' : instanceData.status === 'rejected' ? 'border-red-200' : 'border-amber-200'}`}>
-      <CardHeader className="bg-slate-50 border-b pb-4">
+      <CardHeader className="bg-muted/40 border-b pb-4">
         <CardTitle className="text-lg flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-teal-600" />
           Approval Workflow
@@ -147,24 +147,24 @@ export function ApprovalWorkflowEngine({ invoice }) {
       </CardHeader>
       <CardContent className="pt-4 space-y-6">
         <div className="space-y-4">
-          <h4 className="text-sm font-medium text-slate-500">Required Approvals</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Required Approvals</h4>
           {instanceData.steps.map((step, i) => (
-            <div key={step.id} className="flex items-start gap-3 p-3 rounded-lg border bg-white shadow-sm">
+            <div key={step.id} className="flex items-start gap-3 p-3 rounded-lg border bg-card shadow-sm">
               <div className="mt-0.5">{getStatusIcon(step.status)}</div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold capitalize">{step.required_role.replace('_', ' ')} Approval</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-muted-foreground">
                     {step.acted_at ? new Date(step.acted_at).toLocaleString() : 'Waiting...'}
                   </span>
                 </div>
                 {step.status !== 'pending' && step.approver && (
-                  <p className="text-sm text-slate-600 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     By: {step.approver.user_metadata?.full_name || step.approver.email}
                   </p>
                 )}
                 {step.comments && (
-                  <p className="text-sm italic text-slate-500 mt-2 bg-slate-50 p-2 rounded">
+                  <p className="text-sm italic text-muted-foreground mt-2 bg-muted/40 p-2 rounded">
                     "{step.comments}"
                   </p>
                 )}
@@ -177,12 +177,12 @@ export function ApprovalWorkflowEngine({ invoice }) {
           <div className="pt-4 border-t">
             {canApprove ? (
               <div className="space-y-3">
-                <p className="text-sm font-medium text-slate-700">Your Action Required</p>
+                <p className="text-sm font-medium text-muted-foreground">Your Action Required</p>
                 <Textarea 
                   placeholder="Add optional comments before approving or rejecting..." 
                   value={comments}
                   onChange={(e) => setComments(e.target.value)}
-                  className="bg-white"
+                  className="bg-card"
                 />
                 <div className="flex gap-3">
                   <Button 

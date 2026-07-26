@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
@@ -47,7 +47,7 @@ export default function DigitalMenu() {
         <div className="relative h-full flex flex-col items-center justify-center p-12 text-center">
           <p className="text-lg uppercase tracking-[0.35em] text-brand mb-6">Digital Menu</p>
           <h1 className="text-5xl md:text-7xl font-black tracking-tight max-w-5xl">No active menu items</h1>
-          <p className="mt-8 text-2xl text-slate-300 max-w-3xl">Publish recipes with menu pricing to show them on this display.</p>
+          <p className="mt-8 text-2xl text-muted-foreground/60 max-w-3xl">Publish recipes with menu pricing to show them on this display.</p>
         </div>
       </div>
     );
@@ -69,10 +69,10 @@ export default function DigitalMenu() {
         {menuPrice ? (
           <div className="text-6xl font-bold text-brand mb-12 drop-shadow-xl">{menuPrice}</div>
         ) : cost ? (
-          <div className="text-2xl font-semibold text-slate-300 mb-12 drop-shadow-xl">Cost per {currentItem.yield_unit || 'serving'}: {cost}</div>
+          <div className="text-2xl font-semibold text-muted-foreground/60 mb-12 drop-shadow-xl">Cost per {currentItem.yield_unit || 'serving'}: {cost}</div>
         ) : null}
         
-        <p className="text-4xl text-slate-300 max-w-4xl leading-snug font-light">
+        <p className="text-4xl text-muted-foreground/60 max-w-4xl leading-snug font-light">
           {currentItem.instructions || 'Prepared fresh by our kitchen team.'}
         </p>
 

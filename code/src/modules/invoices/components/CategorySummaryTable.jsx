@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -120,7 +120,7 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
           <TableBody>
             {allocations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-slate-500">
+                <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                   No allocations generated yet. Click "Auto-Calculate" to pull from line items.
                 </TableCell>
               </TableRow>
@@ -130,11 +130,11 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
                   <TableCell className="capitalize">{a.allocation_type.replace('_', ' ')}</TableCell>
                   <TableCell>
                     {a.gl_code ? <span className="font-medium mr-2">{a.gl_code}</span> : null}
-                    <span className="text-slate-600">{a.category_name || 'Uncategorized'}</span>
+                    <span className="text-muted-foreground">{a.category_name || 'Uncategorized'}</span>
                   </TableCell>
                   <TableCell className="text-right font-medium">${(parseFloat(a.amount) || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openSplitDialog(a)} className="text-slate-500 hover:text-teal-600">
+                    <Button variant="ghost" size="sm" onClick={() => openSplitDialog(a)} className="text-muted-foreground hover:text-teal-600">
                       <SplitSquareHorizontal className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -147,17 +147,17 @@ export function CategorySummaryTable({ invoiceId, totalAmount = 0 }) {
 
       <div className="flex justify-end gap-6 text-sm">
         <div className="text-right">
-          <p className="text-slate-500 font-medium">Allocated</p>
-          <p className="font-semibold text-slate-900">${allocatedTotal.toFixed(2)}</p>
+          <p className="text-muted-foreground font-medium">Allocated</p>
+          <p className="font-semibold text-foreground">${allocatedTotal.toFixed(2)}</p>
         </div>
         <div className="text-right">
-          <p className="text-slate-500 font-medium">Uncategorized</p>
-          <p className={`font-semibold ${uncategorizedAmount > 0.05 ? 'text-amber-600' : 'text-slate-900'}`}>
+          <p className="text-muted-foreground font-medium">Uncategorized</p>
+          <p className={`font-semibold ${uncategorizedAmount > 0.05 ? 'text-amber-600' : 'text-foreground'}`}>
             ${uncategorizedAmount.toFixed(2)}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-slate-500 font-medium">Invoice Total</p>
+          <p className="text-muted-foreground font-medium">Invoice Total</p>
           <p className="font-semibold text-teal-700">${(parseFloat(totalAmount) || 0).toFixed(2)}</p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -92,7 +92,7 @@ export default function AvTDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border shadow-sm bg-slate-50 text-slate-950 dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
+        <Card className="border shadow-sm bg-muted/40 text-foreground dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <Calculator className="w-4 h-4" />
@@ -101,7 +101,7 @@ export default function AvTDashboard() {
             <p className="text-3xl font-bold">${totalActual.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
           </CardContent>
         </Card>
-        <Card className="border shadow-sm bg-slate-50 text-slate-950 dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
+        <Card className="border shadow-sm bg-muted/40 text-foreground dark:bg-slate-900/80 dark:text-slate-50 dark:border-slate-800">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-muted-foreground mb-2">
               <DollarSign className="w-4 h-4" />
@@ -169,7 +169,7 @@ export default function AvTDashboard() {
                         <TableCell className="text-right">
                           <Badge variant="outline" className={cn(
                             "border-none",
-                            isHighVariance ? "bg-rose-100 text-rose-800 dark:bg-rose-900/70 dark:text-rose-100" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                            isHighVariance ? "bg-rose-100 text-rose-800 dark:bg-rose-900/70 dark:text-rose-100" : "bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-200"
                           )}>
                             {item.variancePercent.toFixed(1)}%
                           </Badge>

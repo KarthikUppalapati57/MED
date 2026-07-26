@@ -210,7 +210,7 @@ export default function MobileReceiptCapture({ open, onOpenChange, onInvoiceExtr
           {!capturedImage ? (
             <Button 
               size="lg" 
-              className="rounded-full h-16 w-16 bg-white hover:bg-zinc-200 border-4 border-zinc-400 p-0"
+              className="rounded-full h-16 w-16 bg-card hover:bg-zinc-200 border-4 border-zinc-400 p-0"
               onClick={handleCapture}
               disabled={hasCameraError}
             >

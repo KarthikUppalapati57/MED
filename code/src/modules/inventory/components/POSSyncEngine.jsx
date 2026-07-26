@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Calculator, DownloadCloud, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -98,7 +98,7 @@ export default function POSSyncEngine() {
     <div className="space-y-6">
       <Card className="border shadow-sm bg-gradient-to-br from-indigo-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/40 dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2 text-slate-950 dark:text-slate-50">
+          <CardTitle className="text-xl flex items-center gap-2 text-foreground dark:text-slate-50">
             <DownloadCloud className="h-6 w-6 text-indigo-600 dark:text-indigo-300" />
             End of Day POS Sync
           </CardTitle>
@@ -108,7 +108,7 @@ export default function POSSyncEngine() {
         </CardHeader>
         <CardContent>
           {!pmix ? (
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center flex flex-col items-center justify-center bg-white text-slate-950 dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-700">
+            <div className="border-2 border-dashed border-border rounded-xl p-12 text-center flex flex-col items-center justify-center bg-card text-foreground dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-700">
                <DownloadCloud className="h-12 w-12 text-indigo-300 dark:text-indigo-400 mb-4" />
                <h3 className="text-lg font-medium mb-2">Upload POS PMIX Report</h3>
                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
@@ -136,7 +136,7 @@ export default function POSSyncEngine() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center justify-between bg-white p-4 rounded-lg border text-slate-950 dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-800">
+              <div className="flex items-center justify-between bg-card p-4 rounded-lg border text-foreground dark:bg-slate-950/70 dark:text-slate-50 dark:border-slate-800">
                 <div>
                   <h3 className="font-semibold">Sync Successful</h3>
                   <p className="text-sm text-muted-foreground">Imported sales for {pmix.length} menu items.</p>

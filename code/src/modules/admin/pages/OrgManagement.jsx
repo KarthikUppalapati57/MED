@@ -482,7 +482,7 @@ export default function OrgManagement() {
           ) : orgs.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                <Building2 className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
                 <p className="text-muted-foreground">No organizations yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Complete onboarding to create your first organization</p>
               </CardContent>
@@ -623,7 +623,7 @@ export default function OrgManagement() {
           ) : orgs.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <Building2 className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                <Building2 className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
                 <p className="text-muted-foreground">No organizations yet</p>
               </CardContent>
             </Card>

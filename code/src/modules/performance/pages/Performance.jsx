@@ -109,7 +109,7 @@ function PerformanceHero({ periodStart, periodEnd, setPeriodStart, setPeriodEnd,
           <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-white md:text-5xl">
             Turn spend, inventory, and recipe pressure into decisions.
           </h1>
-          <p className="mt-3 max-w-3xl text-sm text-white/78 md:text-base">
+          <p className="mt-3 max-w-3xl text-sm text-white/80 md:text-base">
             A sharper analytics cockpit for budgets, category spend, product movement, payment exposure, inventory usage, and recipe margin signals.
           </p>
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -137,7 +137,7 @@ function PerformanceHero({ periodStart, periodEnd, setPeriodStart, setPeriodEnd,
               <span>Analytics coverage</span>
               <strong>Active layer</strong>
             </div>
-            <Badge className="bg-white/14 text-white border border-white/20">{activeLiveCount}/12 tabs</Badge>
+            <Badge className="bg-white/15 text-white border border-white/20">{activeLiveCount}/12 tabs</Badge>
           </div>
           <div className="performance-focus-meter">
             <span style={{ width: `${Math.round((activeLiveCount / TAB_ITEMS.length) * 100)}%` }} />

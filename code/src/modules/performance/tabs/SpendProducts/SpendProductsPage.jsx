@@ -19,7 +19,7 @@ function FocusCard({ tone, title, body, meta }) {
             <p className="text-sm font-semibold">{title}</p>
             <p className="text-xs mt-1 opacity-80 leading-relaxed">{body}</p>
           </div>
-          <Badge variant="secondary" className="shrink-0 bg-white/70 text-current border border-current/10">
+          <Badge variant="secondary" className="shrink-0 bg-card/80 text-current border border-current/10">
             {meta}
           </Badge>
         </div>

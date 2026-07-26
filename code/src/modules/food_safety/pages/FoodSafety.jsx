@@ -1,4 +1,4 @@
-ï»¿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -82,7 +82,7 @@ export default function FoodSafety() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'online': return 'bg-teal-50 text-teal-700 border-teal-200';
-      case 'offline': return 'bg-slate-50 text-slate-700 border-slate-200';
+      case 'offline': return 'bg-muted/40 text-muted-foreground border-border';
       case 'maintenance': return 'bg-amber-50 text-amber-700 border-amber-200';
       default: return 'bg-secondary text-muted-foreground';
     }
@@ -110,7 +110,7 @@ export default function FoodSafety() {
             <div>
               <h3 className="font-bold text-rose-800">Critical Temperature Alerts</h3>
               <p className="text-sm text-rose-700 mt-1">
-                {activeAlerts.length} temperature logs have exceeded the safety threshold (41Â°F) in the last 24 hours. Please inspect the equipment immediately to prevent spoilage.
+                {activeAlerts.length} temperature logs have exceeded the safety threshold (41°F) in the last 24 hours. Please inspect the equipment immediately to prevent spoilage.
               </p>
             </div>
           </CardContent>
@@ -151,7 +151,7 @@ export default function FoodSafety() {
                   
                   <div className="flex items-end gap-2 mb-2">
                     <span className={`text-4xl font-black tracking-tighter ${isLatestAlert ? 'text-rose-600' : 'text-foreground'}`}>
-                      {latestLog ? latestLog.temperature_f : '--'}Â°
+                      {latestLog ? latestLog.temperature_f : '--'}°
                     </span>
                     <span className="text-muted-foreground mb-1 text-sm font-medium">F</span>
                   </div>
@@ -198,13 +198,13 @@ export default function FoodSafety() {
                     </TableCell>
                     <TableCell>{log.iot_sensors?.name}</TableCell>
                     <TableCell className="font-mono">
-                      {log.temperature_f}Â°F
+                      {log.temperature_f}°F
                     </TableCell>
                     <TableCell>
                       {log.is_alert ? (
                         <Badge variant="outline" className="text-rose-600 border-rose-200 bg-rose-50">
                           <AlertTriangle className="h-3 w-3 mr-1" />
-                          WARNING ( &gt; 41Â°F )
+                          WARNING ( &gt; 41°F )
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-teal-600 border-teal-200 bg-teal-50">

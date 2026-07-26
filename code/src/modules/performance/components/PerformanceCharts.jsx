@@ -86,7 +86,7 @@ export function VarianceWaterfallChart({ data = [] }) {
     if (active && payload && payload.length) {
       const item = payload[0].payload;
       return (
-        <div className="bg-white p-3 border rounded shadow-md text-sm">
+        <div className="bg-card p-3 border rounded shadow-md text-sm">
           <p className="font-semibold mb-1">{item.category}</p>
           <p className={`font-bold ${item.value > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
             ${Math.abs(item.value).toFixed(2)} {item.value > 0 ? 'Favorable' : 'Unfavorable'}

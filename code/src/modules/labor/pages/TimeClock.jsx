@@ -57,14 +57,14 @@ export default function TimeClock() {
     <div className="p-6 max-w-md mx-auto space-y-6 mt-12">
       <div className="text-center mb-8">
         <Clock className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-        <h1 className="text-3xl font-bold text-slate-900">Time Clock</h1>
-        <p className="text-slate-500">Enter your PIN to clock in or out</p>
+        <h1 className="text-3xl font-bold text-foreground">Time Clock</h1>
+        <p className="text-muted-foreground">Enter your PIN to clock in or out</p>
       </div>
 
       <Card className="shadow-lg border-t-4 border-t-blue-600">
         <CardContent className="pt-6 space-y-6">
           <div className="relative">
-            <KeyRound className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+            <KeyRound className="absolute left-3 top-3 h-5 w-5 text-muted-foreground/70" />
             <Input
               type="password"
               placeholder="Enter PIN"

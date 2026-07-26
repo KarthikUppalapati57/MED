@@ -41,7 +41,7 @@ export default function InventoryAudit() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Inventory Asset</p>
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-wider">Total Inventory Asset</p>
                 <h3 className="text-3xl font-black mt-2">${totalValue.toLocaleString()}</h3>
                 <div className="flex items-center gap-1 text-emerald-400 text-[10px] mt-2 font-bold">
                   <ArrowUpRight className="w-3 h-3" />
@@ -59,9 +59,9 @@ export default function InventoryAudit() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Stock Accuracy</p>
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-wider">Stock Accuracy</p>
                 <h3 className="text-3xl font-black mt-2">98.2%</h3>
-                <div className="flex items-center gap-1 text-slate-400 text-[10px] mt-2 font-bold">
+                <div className="flex items-center gap-1 text-muted-foreground/70 text-[10px] mt-2 font-bold">
                   <span>Based on 124 spot checks</span>
                 </div>
               </div>
@@ -76,7 +76,7 @@ export default function InventoryAudit() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">COGS Impact (Est.)</p>
+                <p className="text-xs font-bold text-muted-foreground/70 uppercase tracking-wider">COGS Impact (Est.)</p>
                 <h3 className="text-3xl font-black mt-2">24.5%</h3>
                 <div className="flex items-center gap-1 text-rose-500 text-[10px] mt-2 font-bold">
                   <ArrowUpRight className="w-3 h-3" />
@@ -94,12 +94,12 @@ export default function InventoryAudit() {
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Asset Valuation by Account Code</CardTitle>
-          <p className="text-xs text-slate-400">Standardized auditing breakdown for P&L reconciliation</p>
+          <p className="text-xs text-muted-foreground/70">Standardized auditing breakdown for P&L reconciliation</p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50/50">
+              <TableRow className="bg-muted/40">
                 <TableHead className="text-[11px] font-bold">ACCOUNT CODE</TableHead>
                 <TableHead className="text-[11px] font-bold">ITEMS</TableHead>
                 <TableHead className="text-[11px] font-bold">VALUATION</TableHead>
@@ -108,19 +108,19 @@ export default function InventoryAudit() {
             </TableHeader>
             <TableBody>
               {auditData.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-12 text-slate-400">No data available for audit</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground/70">No data available for audit</TableCell></TableRow>
               ) : auditData.sort((a,b) => b.value - a.value).map(row => (
                 <TableRow key={row.code}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center font-mono text-[10px] font-bold text-slate-400">
+                      <div className="w-8 h-8 bg-muted/40 rounded-lg flex items-center justify-center font-mono text-[10px] font-bold text-muted-foreground/70">
                         {row.code}
                       </div>
-                      <p className="font-bold text-sm text-slate-900">{row.label}</p>
+                      <p className="font-bold text-sm text-foreground">{row.label}</p>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm font-medium text-slate-600">{row.count} items</TableCell>
-                  <TableCell className="font-black text-slate-900">${row.value.toLocaleString()}</TableCell>
+                  <TableCell className="text-sm font-medium text-muted-foreground">{row.count} items</TableCell>
+                  <TableCell className="font-black text-foreground">${row.value.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="secondary" className="font-mono text-[10px]">
                       {((row.value / totalValue) * 100).toFixed(1)}%

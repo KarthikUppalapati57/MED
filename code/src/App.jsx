@@ -1,4 +1,4 @@
-﻿import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, useParams, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
@@ -557,7 +557,7 @@ function SignupPage() {
             >
               {loading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin mr-2" />
+                  <div className="w-4 h-4 border-2 border-border border-t-black rounded-full animate-spin mr-2" />
                   Creating account...
                 </>
               ) : inviteLoading ? 'Validating invite...' : 'Create Account'}

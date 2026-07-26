@@ -298,7 +298,7 @@ export function ActionCenterWidget() {
   const resolvedActions = actions.filter(a => a.metadata?.status === 'resolved');
 
   const ActionRow = ({ action, isPending }) => (
-    <TableRow key={action.id} className="hover:bg-slate-50/50 transition-colors">
+    <TableRow key={action.id} className="hover:bg-muted/60 transition-colors">
       <TableCell>
         <div className="flex items-center gap-2">
           {action.severity === 'high' ? <AlertTriangle className="w-4 h-4 text-resend-red" /> : <AlertTriangle className="w-4 h-4 text-amber-500" />}
@@ -332,7 +332,7 @@ export function ActionCenterWidget() {
             </Button>
           </div>
         ) : (
-          <Badge className="bg-slate-100 text-slate-700 capitalize border-none">{action.metadata?.status}</Badge>
+          <Badge className="bg-muted text-muted-foreground capitalize border-none">{action.metadata?.status}</Badge>
         )}
       </TableCell>
     </TableRow>
@@ -356,7 +356,7 @@ export function ActionCenterWidget() {
             <Badge className="bg-resend-red/10 text-resend-red border-none">{stats.high} Critical</Badge>
             <Badge className="bg-amber-500/10 text-amber-600 border-none">{stats.medium} Warnings</Badge>
             {stats.totalImpact > 0 && (
-              <Badge className="bg-slate-100 text-slate-800 border-none">${stats.totalImpact} at Risk</Badge>
+              <Badge className="bg-muted text-foreground border-none">${stats.totalImpact} at Risk</Badge>
             )}
           </div>
         </CardHeader>
@@ -416,7 +416,7 @@ export function ActionCenterWidget() {
               Deep dive into: {selectedAction?.title}
             </DialogDescription>
           </DialogHeader>
-          <div className="p-4 bg-slate-50 rounded-lg min-h-[120px] text-sm text-slate-800 border">
+          <div className="p-4 bg-muted/40 rounded-lg min-h-[120px] text-sm text-foreground border">
             {isGenerating ? (
               <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
                 <div className="w-2 h-2 bg-brand rounded-full animate-bounce"></div>

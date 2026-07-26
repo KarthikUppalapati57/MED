@@ -384,7 +384,7 @@ export default function Integrations() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="bg-white hover:bg-emerald-50" onClick={() => navigate('/Accounting?tab=dashboard')}>
+              <Button variant="outline" className="bg-card hover:bg-emerald-50" onClick={() => navigate('/Accounting?tab=dashboard')}>
                 View Sync Logs
               </Button>
             </div>
@@ -445,8 +445,8 @@ export default function Integrations() {
                <p className="text-sm font-bold">Secure Webhook Endpoints & Legacy Agents</p>
                <p className="text-xs mt-1">When connecting a POS system, all inbound traffic is routed through our secure `pos-webhook` Edge Function to guarantee payload authenticity.</p>
                <div className="mt-3 flex items-center gap-2">
-                 <Input readOnly value="https://api.restops.com/v1/webhooks/pos/{location_id}" className="bg-white text-xs font-mono h-8" />
-                 <Button size="sm" variant="outline" className="h-8 shrink-0 bg-white" onClick={() => {
+                 <Input readOnly value="https://api.restops.com/v1/webhooks/pos/{location_id}" className="bg-card text-xs font-mono h-8" />
+                 <Button size="sm" variant="outline" className="h-8 shrink-0 bg-card" onClick={() => {
                    navigator.clipboard.writeText("https://api.restops.com/v1/webhooks/pos/{location_id}");
                    toast.success("Webhook URL copied to clipboard");
                  }}>

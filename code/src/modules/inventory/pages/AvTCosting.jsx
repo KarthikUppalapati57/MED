@@ -142,7 +142,7 @@ export default function AvTCosting() {
   };
 
   return (
-    <div className="p-6 space-y-8 min-h-screen bg-slate-50/50 dark:bg-slate-900/50">
+    <div className="p-6 space-y-8 min-h-screen bg-muted/40 dark:bg-slate-900/50">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-500/20">
@@ -203,7 +203,7 @@ export default function AvTCosting() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Overall Variance %</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black text-slate-900">{overallVariancePercent.toFixed(1)}%</div>
+            <div className="text-4xl font-black text-foreground">{overallVariancePercent.toFixed(1)}%</div>
             <p className="text-sm font-medium text-emerald-600 flex items-center mt-2">
               <TrendingDown className="w-4 h-4 mr-1" /> Based on current report range
             </p>
@@ -263,7 +263,7 @@ export default function AvTCosting() {
               {topBleeders.slice(0, 4).map((item) => (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-card shadow-sm border border-rose-100 dark:border-rose-900/50">
                   <div>
-                    <p className="font-bold text-sm text-slate-900">{item.ingredient}</p>
+                    <p className="font-bold text-sm text-foreground">{item.ingredient}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       +{item.varianceQty.toFixed(1)} {item.unit} wasted
                     </p>
@@ -287,7 +287,7 @@ export default function AvTCosting() {
       </div>
 
       <Card className="border-border shadow-sm overflow-hidden">
-        <CardHeader className="bg-slate-50/50 border-b border-border">
+        <CardHeader className="bg-muted/40 border-b border-border">
           <CardTitle>Ingredient Variance Breakdown</CardTitle>
           <CardDescription>Detailed comparison of theoretical recipe usage vs actual inventory movements.</CardDescription>
         </CardHeader>
@@ -315,7 +315,7 @@ export default function AvTCosting() {
               {varianceData.map((item) => {
                 const metrics = calculateMetrics(item);
                 return (
-                  <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                  <TableRow key={item.id} className="hover:bg-muted/60 transition-colors">
                     <TableCell className="font-medium">{item.ingredient}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {item.theoretical.toFixed(1)} {item.unit}

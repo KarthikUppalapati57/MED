@@ -1143,7 +1143,7 @@ The Restops Platform Team
                 if (isAccepted || hasProfile) {
                   statusBadge = <Badge className="bg-emerald-100 text-emerald-700 text-[9px] font-bold border-none">Accepted</Badge>;
                 } else if (isExpired) {
-                  statusBadge = <Badge className="bg-slate-100 text-slate-700 text-[9px] font-bold border-none">Expired / Revoked</Badge>;
+                  statusBadge = <Badge className="bg-muted text-muted-foreground text-[9px] font-bold border-none">Expired / Revoked</Badge>;
                 }
 
                 return (

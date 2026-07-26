@@ -270,6 +270,41 @@
     max-width: 100%;
   }
 
+  .app-page .recharts-cartesian-axis-tick-value,
+  .app-page .recharts-polar-angle-axis-tick-value,
+  .app-page .recharts-polar-radius-axis-tick-value,
+  .app-page .recharts-legend-item-text {
+    fill: hsl(var(--muted-foreground)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .app-page .recharts-cartesian-grid line,
+  .app-page .recharts-polar-grid-angle line,
+  .app-page .recharts-polar-grid-concentric path {
+    stroke: hsl(var(--border)) !important;
+    opacity: 0.72;
+  }
+
+  .app-page .recharts-tooltip-wrapper {
+    color: hsl(var(--foreground));
+    outline: none;
+  }
+
+  .app-page .recharts-default-tooltip {
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 8px !important;
+    background: hsl(var(--popover)) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.55);
+  }
+
+  .app-page .recharts-tooltip-label,
+  .app-page .recharts-tooltip-item,
+  .app-page .recharts-tooltip-item-name,
+  .app-page .recharts-tooltip-item-value {
+    color: hsl(var(--popover-foreground)) !important;
+  }
+
   .app-page [role="tablist"] {
     max-width: 100%;
     overscroll-behavior-inline: contain;
@@ -444,6 +479,7 @@
   .dashboard-visual-hero {
     position: relative;
     overflow: hidden;
+    color: #ffffff;
     border: 1px solid hsl(var(--border) / 0.62);
     border-radius: 8px;
     background:
@@ -636,6 +672,7 @@
 .invoice-command-hero {
   position: relative;
   overflow: hidden;
+  color: #ffffff;
   border: 1px solid hsl(var(--border) / 0.68);
   border-radius: 8px;
   background:
@@ -1230,12 +1267,31 @@
 .performance-command-hero {
   position: relative;
   overflow: hidden;
+  color: #ffffff;
   border: 1px solid hsl(var(--border) / 0.68);
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(14, 18, 31, 0.98) 0%, rgba(13, 87, 91, 0.92) 47%, rgba(127, 58, 18, 0.9) 100%),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 78px);
   box-shadow: 0 24px 70px -44px rgba(0, 0, 0, 0.72);
+}
+
+.dashboard-visual-hero .text-muted-foreground,
+.invoice-command-hero .text-muted-foreground,
+.performance-command-hero .text-muted-foreground {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.dashboard-visual-hero h1,
+.dashboard-visual-hero h2,
+.dashboard-visual-hero h3,
+.invoice-command-hero h1,
+.invoice-command-hero h2,
+.invoice-command-hero h3,
+.performance-command-hero h1,
+.performance-command-hero h2,
+.performance-command-hero h3 {
+  color: #ffffff;
 }
 
 .performance-command-hero::before {

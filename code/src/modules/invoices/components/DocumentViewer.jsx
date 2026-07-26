@@ -174,7 +174,7 @@ export default function DocumentViewer({ fileUrl, fileType }) {
 
   if (!signedUrl) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-slate-50 text-slate-400 rounded-lg border border-dashed">
+      <div className="flex flex-col items-center justify-center h-full bg-muted/40 text-muted-foreground/70 rounded-lg border border-dashed">
         <ImageIcon className="h-12 w-12 mb-2" />
         <p>{fileUrl ? "Loading document..." : "No document attached"}</p>
       </div>
@@ -183,7 +183,7 @@ export default function DocumentViewer({ fileUrl, fileType }) {
 
   return (
     <div className="flex flex-col h-full bg-slate-100/50 rounded-xl overflow-hidden border">
-      <div className="flex items-center justify-end p-2 bg-white border-b gap-2 z-10 shadow-sm">
+      <div className="flex items-center justify-end p-2 bg-card border-b gap-2 z-10 shadow-sm">
         <Button variant="outline" size="icon" onClick={handleZoomOut} className="h-8 w-8"><ZoomOut className="h-4 w-4" /></Button>
         <span className="text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
         <Button variant="outline" size="icon" onClick={handleZoomIn} className="h-8 w-8"><ZoomIn className="h-4 w-4" /></Button>
@@ -210,27 +210,27 @@ export default function DocumentViewer({ fileUrl, fileType }) {
       >
         {isPdf ? (
           pdfError ? (
-            <div className="m-auto flex flex-col items-center gap-2 text-slate-400 p-8">
+            <div className="m-auto flex flex-col items-center gap-2 text-muted-foreground/70 p-8">
               <AlertTriangle className="h-8 w-8" />
               <p className="text-sm">{pdfError}</p>
               <Button variant="outline" size="sm" onClick={handleDownload}>Download instead</Button>
             </div>
           ) : !pdfDoc ? (
-            <Loader2 className="m-auto h-6 w-6 animate-spin text-slate-400" />
+            <Loader2 className="m-auto h-6 w-6 animate-spin text-muted-foreground/70" />
           ) : (
             <div className="m-auto flex flex-col items-center gap-3">
               {Array.from({ length: pdfDoc.numPages }).map((_, i) => (
                 <canvas
                   key={i}
                   ref={(el) => { canvasRefs.current[i] = el; }}
-                  className="shadow-xl rounded-sm bg-white block"
+                  className="shadow-xl rounded-sm bg-card block"
                 />
               ))}
             </div>
           )
         ) : (
           <div
-            className="m-auto transition-transform duration-200 origin-center shadow-xl rounded-sm bg-white"
+            className="m-auto transition-transform duration-200 origin-center shadow-xl rounded-sm bg-card"
             style={{ transform: `scale(${zoom}) rotate(${rotation}deg)` }}
           >
             <img

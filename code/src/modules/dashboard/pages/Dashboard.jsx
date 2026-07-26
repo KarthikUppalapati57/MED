@@ -3597,7 +3597,7 @@ function TableTrekOperatorDashboard({ scope, title, subtitle, scopeLabel, metric
   ];
 
   return (
-    <div className="min-h-screen rounded-lg bg-slate-50/80 p-4 text-slate-950 dark:bg-background dark:text-foreground md:p-6" string="progress">
+    <div className="min-h-screen rounded-lg bg-muted/40 p-4 text-foreground dark:bg-background dark:text-foreground md:p-6" string="progress">
       <div className="mb-5 flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

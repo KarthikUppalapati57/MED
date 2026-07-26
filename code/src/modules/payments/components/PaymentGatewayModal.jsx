@@ -134,16 +134,16 @@ export default function PaymentGatewayModal({
             <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4 animate-in zoom-in-50">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">Payment Successful!</h3>
-            <p className="text-sm text-slate-500 mt-1">Transaction has been recorded.</p>
+            <h3 className="text-lg font-semibold text-foreground">Payment Successful!</h3>
+            <p className="text-sm text-muted-foreground mt-1">Transaction has been recorded.</p>
           </div>
         ) : recordingFailed ? (
           <div className="py-8 text-center">
             <div className="h-16 w-16 rounded-full bg-resend-red/10 flex items-center justify-center mx-auto mb-4">
               <FileCheck className="h-8 w-8 text-resend-red" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">Payment Charged, Recording Failed</h3>
-            <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+            <h3 className="text-lg font-semibold text-foreground">Payment Charged, Recording Failed</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
               {lastPaymentData?.payment_method === 'stripe'
                 ? 'Your card was already charged, but we could not save the payment record. Do not re-enter card details - just try recording again.'
                 : 'The payment could not be saved. It is safe to try recording it again.'}

@@ -154,7 +154,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] dark:bg-background text-black dark:text-foreground selection:bg-[#b83316]/30 font-sans antialiased overflow-x-hidden selection:text-white">
+    <div className="min-h-screen bg-[#FAF8F4] dark:bg-background text-foreground dark:text-foreground selection:bg-[#b83316]/30 font-sans antialiased overflow-x-hidden selection:text-white">
       
       {/* 3D BACKBONE (Sticky Backdrop) */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -169,14 +169,14 @@ export default function LandingPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/5 bg-[#FAF8F4]/80 dark:bg-background/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-border dark:border-white/5 bg-[#FAF8F4]/80 dark:bg-background/80 backdrop-blur-xl">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2">
               <RestopsLogo className="h-16 ml-4 mt-2" origin="origin-left" />
             </div>
             
-            <div className="hidden lg:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-black/70 dark:text-white/80 uppercase">
+            <div className="hidden lg:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-muted-foreground dark:text-white/80 uppercase">
               <a href="#features" className="hover:text-[#b83316] transition-colors">Features</a>
               <a href="#showcase" className="hover:text-[#b83316] transition-colors">How it works</a>
               <a href="#pricing" className="hover:text-[#b83316] transition-colors">Pricing</a>
@@ -188,7 +188,7 @@ export default function LandingPage() {
               </div>
               <button
                 type="button"
-                className="h-9 px-2 text-[10px] font-bold uppercase tracking-[1.5px] text-black transition-colors hover:text-[#b83316] dark:text-white sm:px-3 sm:text-[11px] sm:tracking-[2px]"
+                className="h-9 px-2 text-[10px] font-bold uppercase tracking-[1.5px] text-foreground transition-colors hover:text-[#b83316] dark:text-white sm:px-3 sm:text-[11px] sm:tracking-[2px]"
                 onClick={() => navigate('/login')}
               >
                 Log in
@@ -204,7 +204,7 @@ export default function LandingPage() {
                 aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
                 aria-expanded={isMenuOpen}
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="inline-flex h-9 w-9 items-center justify-center text-black/70 dark:text-white/80 lg:hidden"
+                className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground dark:text-white/80 lg:hidden"
               >
                 {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
               </button>
@@ -213,8 +213,8 @@ export default function LandingPage() {
         </div>
 
         {isMenuOpen && (
-          <div className="border-t border-black/5 bg-[#FAF8F4]/95 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-background/95 lg:hidden">
-            <div className="grid gap-2 text-[11px] font-bold uppercase tracking-[2px] text-black/75 dark:text-white/85">
+          <div className="border-t border-border bg-[#FAF8F4]/95 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-background/95 lg:hidden">
+            <div className="grid gap-2 text-[11px] font-bold uppercase tracking-[2px] text-muted-foreground dark:text-white/85">
               <a href="#features" className="py-3" onClick={() => setIsMenuOpen(false)}>Features</a>
               <a href="#showcase" className="py-3" onClick={() => setIsMenuOpen(false)}>How it works</a>
               <a href="#pricing" className="py-3" onClick={() => setIsMenuOpen(false)}>Pricing</a>
@@ -246,11 +246,11 @@ export default function LandingPage() {
               Restaurant operations software
             </div>
             
-            <h1 className="text-fluid-h1 text-[clamp(3.35rem,8.8vw,7rem)] md:text-[clamp(4.5rem,9.5vw,8.25rem)] font-bold technical-tracking text-black dark:text-white mb-12 leading-[0.92]">
+            <h1 className="text-fluid-h1 text-[clamp(3.35rem,8.8vw,7rem)] md:text-[clamp(4.5rem,9.5vw,8.25rem)] font-bold technical-tracking text-foreground dark:text-white mb-12 leading-[0.92]">
               Restaurant <br /> operations, <br /> organized.
             </h1>
             
-            <p className="max-w-[32rem] text-xl text-black/60 dark:text-white/85 mb-16 leading-relaxed font-medium technical-tracking">
+            <p className="max-w-[32rem] text-xl text-muted-foreground dark:text-white/85 mb-16 leading-relaxed font-medium technical-tracking">
               RestOps helps restaurant teams manage invoices, vendors, products, inventory, recipes, payments, and daily performance from one connected system.
             </p>
 
@@ -261,7 +261,7 @@ export default function LandingPage() {
               <Button
                 size="lg"
                 variant="link"
-                className="text-black dark:text-white font-bold text-xs tracking-[3px] uppercase hover:text-[#b83316]"
+                className="text-foreground dark:text-white font-bold text-xs tracking-[3px] uppercase hover:text-[#b83316]"
                 onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 VIEW FEATURES
@@ -272,7 +272,7 @@ export default function LandingPage() {
       </section>
 
       {/* Capability Bar */}
-      <section className="relative py-12 border-y border-black/5 dark:border-white/10 z-10 bg-[#F2EEE8]/80 dark:bg-background/50 backdrop-blur-sm">
+      <section className="relative py-12 border-y border-border dark:border-white/10 z-10 bg-[#F2EEE8]/80 dark:bg-background/50 backdrop-blur-sm">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-16">
             <StatItem value="Invoices" label="Upload and review" />
@@ -283,7 +283,7 @@ export default function LandingPage() {
         </div>
       </section>
       {/* Reveal-on-scroll narrative */}
-      <section className="relative z-10 overflow-hidden border-b border-black/5 dark:border-white/10 bg-[#FAF8F4]/90 dark:bg-background/80 py-28 md:py-36">
+      <section className="relative z-10 overflow-hidden border-b border-border dark:border-white/10 bg-[#FAF8F4]/90 dark:bg-background/80 py-28 md:py-36">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid gap-16 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <motion.div
@@ -293,14 +293,14 @@ export default function LandingPage() {
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
               className="lg:sticky lg:top-28"
             >
-              <div className="mb-8 inline-flex items-center gap-3 border border-black/10 bg-white/45 px-3 py-1 text-[10px] font-bold uppercase tracking-[3px] text-[#b83316] dark:border-white/10 dark:bg-white/5">
+              <div className="mb-8 inline-flex items-center gap-3 border border-border bg-card/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[3px] text-[#b83316] dark:border-white/10 dark:bg-white/5">
                 <Database className="h-3.5 w-3.5" />
                 Daily workflow
               </div>
-              <h2 className="max-w-3xl text-4xl font-bold leading-[0.98] tracking-tighter text-black dark:text-white md:text-6xl">
+              <h2 className="max-w-3xl text-4xl font-bold leading-[0.98] tracking-tighter text-foreground dark:text-white md:text-6xl">
                 Keep daily restaurant work in one place.
               </h2>
-              <p className="mt-8 max-w-xl text-lg font-medium leading-relaxed text-black/70 dark:text-white/85 technical-tracking">
+              <p className="mt-8 max-w-xl text-lg font-medium leading-relaxed text-muted-foreground dark:text-white/85 technical-tracking">
                 RestOps gives teams a shared place to upload records, review operational details, and manage work across invoices, inventory, vendors, recipes, payments, and reporting.
               </p>
             </motion.div>
@@ -313,15 +313,15 @@ export default function LandingPage() {
                   whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                   viewport={{ once: true, amount: 0.55 }}
                   transition={{ duration: 0.8, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
-                  className="group border border-black/10 bg-[#F2EEE8]/75 p-8 transition-all duration-500 hover:border-[#b83316]/35 hover:bg-white/70 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] md:p-10"
+                  className="group border border-border bg-[#F2EEE8]/75 p-8 transition-all duration-500 hover:border-[#b83316]/35 hover:bg-card dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] md:p-10"
                 >
                   <div className="mb-14 flex items-center justify-between gap-6">
-                    <span className="text-[11px] font-bold uppercase tracking-[4px] text-black/60 dark:text-white/75">
+                    <span className="text-[11px] font-bold uppercase tracking-[4px] text-muted-foreground dark:text-white/75">
                       {step.label}
                     </span>
                     <span className="font-mono text-sm text-[#b83316]">{step.metric}</span>
                   </div>
-                  <h3 className="max-w-2xl text-2xl font-bold leading-tight tracking-tighter text-black dark:text-white md:text-4xl">
+                  <h3 className="max-w-2xl text-2xl font-bold leading-tight tracking-tighter text-foreground dark:text-white md:text-4xl">
                     {step.title}
                   </h3>
                   <div className="mt-10 h-[2px] w-12 bg-[#b83316] transition-all duration-500 group-hover:w-28" />
@@ -349,10 +349,10 @@ export default function LandingPage() {
                 <div className="text-[11px] text-[#b83316] font-bold tracking-[4px] uppercase">
                   How RestOps helps
                 </div>
-                <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-black dark:text-white">
+                <h2 className="text-5xl md:text-7xl font-bold tracking-tighter leading-[1] text-foreground dark:text-white">
                   Built for real <br /> restaurant work.
                 </h2>
-                <p className="text-black/75 dark:text-white/85 text-xl leading-relaxed max-w-lg font-medium technical-tracking">
+                <p className="text-muted-foreground dark:text-white/85 text-xl leading-relaxed max-w-lg font-medium technical-tracking">
                   Use RestOps to keep invoices, vendor information, products, inventory counts, recipe costs, approvals, and payment records organized by restaurant location.
                 </p>
                 
@@ -390,7 +390,7 @@ export default function LandingPage() {
               viewport={{ once: true }}
               className="mb-32"
             >
-              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-black dark:text-white">What RestOps Includes</h2>
+              <h2 className="text-4xl font-bold tracking-tighter mb-4 text-foreground dark:text-white">What RestOps Includes</h2>
               <div className="h-0.5 w-16 bg-[#b83316]" />
             </motion.div>
 
@@ -409,8 +409,8 @@ export default function LandingPage() {
         <section id="pricing">
           <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
             <div className="text-center mb-32">
-              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-black dark:text-white">Simple pricing by location</h2>
-              <p className="text-black/70 dark:text-white/85 text-lg font-bold tracking-widest uppercase">Start with the tools your restaurant needs</p>
+              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-foreground dark:text-white">Simple pricing by location</h2>
+              <p className="text-muted-foreground dark:text-white/85 text-lg font-bold tracking-widest uppercase">Start with the tools your restaurant needs</p>
             </div>
 
             <div className="grid gap-8 lg:grid-cols-3">
@@ -425,17 +425,17 @@ export default function LandingPage() {
                 >
                   <div className="flex h-full flex-col p-10 bg-[#F2EEE8] dark:bg-white/5 dark:border dark:border-white/10 mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
                     <div className="mb-10 flex items-center justify-between gap-4">
-                      <h3 className="text-2xl font-bold tracking-tight text-black dark:text-white">{plan.name}</h3>
+                      <h3 className="text-2xl font-bold tracking-tight text-foreground dark:text-white">{plan.name}</h3>
                       <span className="shrink-0 text-[9px] font-bold px-3 py-1 bg-black text-white uppercase tracking-[3px]">{plan.badge}</span>
                     </div>
-                    <p className="min-h-[60px] text-sm font-semibold leading-relaxed text-black/65 dark:text-white/80">{plan.description}</p>
+                    <p className="min-h-[60px] text-sm font-semibold leading-relaxed text-muted-foreground dark:text-white/80">{plan.description}</p>
                     <div className="my-10 flex items-baseline gap-2">
-                      <span className="text-7xl font-bold tracking-tighter text-black dark:text-white">${plan.price}</span>
-                      <span className="text-black/70 dark:text-white/80 font-bold text-xs uppercase tracking-[3px]">USD / Location / Mo</span>
+                      <span className="text-7xl font-bold tracking-tighter text-foreground dark:text-white">${plan.price}</span>
+                      <span className="text-muted-foreground dark:text-white/80 font-bold text-xs uppercase tracking-[3px]">USD / Location / Mo</span>
                     </div>
                     <ul className="mb-12 flex-1 space-y-5">
                       {plan.features.map((item) => (
-                        <li key={item} className="flex items-center gap-4 text-black/60 dark:text-white/85 text-xs font-bold uppercase tracking-widest">
+                        <li key={item} className="flex items-center gap-4 text-muted-foreground dark:text-white/85 text-xs font-bold uppercase tracking-widest">
                           <div className="h-1 w-1 bg-[#b83316]" />
                           {item}
                         </li>
@@ -453,36 +453,36 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="relative py-40 border-t border-black/5 dark:border-white/10 bg-[#FAF8F4] dark:bg-background z-10">
+      <footer className="relative py-40 border-t border-border dark:border-white/10 bg-[#FAF8F4] dark:bg-background z-10">
         <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
           <div className="grid gap-16 md:grid-cols-4 xl:grid-cols-5 mb-32">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-10">
                 <RestopsLogo className="h-24" origin="origin-left" />
               </div>
-              <p className="text-black/70 dark:text-white/85 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
+              <p className="text-muted-foreground dark:text-white/85 text-lg max-w-xs leading-relaxed font-medium technical-tracking">
                 Restaurant operations software for invoices, vendors, products, inventory, recipes, payments, and performance tracking.
               </p>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Product</h5>
-              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-muted-foreground dark:text-white/80 mb-10">Product</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-muted-foreground dark:text-white/85 uppercase tracking-widest">
                 <li><a href="#features" className="hover:text-[#b83316] transition-colors">Features</a></li>
                 <li><Link to="/security" className="hover:text-[#b83316] transition-colors">Security</Link></li>
                 <li><Link to="/subprocessors" className="hover:text-[#b83316] transition-colors">Subprocessors</Link></li>
               </ul>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Resources</h5>
-              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-muted-foreground dark:text-white/80 mb-10">Resources</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-muted-foreground dark:text-white/85 uppercase tracking-widest">
                 <li><Link to="/docs" className="hover:text-[#b83316] transition-colors">Documentation</Link></li>
                 <li><Link to="/open-source" className="hover:text-[#b83316] transition-colors">Open Source</Link></li>
                 <li><Link to="/accessibility" className="hover:text-[#b83316] transition-colors">Accessibility</Link></li>
               </ul>
             </div>
             <div>
-              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80 mb-10">Policies</h5>
-              <ul className="space-y-6 text-[11px] font-bold text-black/60 dark:text-white/85 uppercase tracking-widest">
+              <h5 className="text-[10px] font-bold uppercase tracking-[5px] text-muted-foreground dark:text-white/80 mb-10">Policies</h5>
+              <ul className="space-y-6 text-[11px] font-bold text-muted-foreground dark:text-white/85 uppercase tracking-widest">
                 <li><Link to="/acceptable-use" className="hover:text-[#b83316] transition-colors">Acceptable Use</Link></li>
                 <li><Link to="/dpa" className="hover:text-[#b83316] transition-colors">DPA</Link></li>
                 <li><Link to="/sla" className="hover:text-[#b83316] transition-colors">SLA</Link></li>
@@ -495,9 +495,9 @@ export default function LandingPage() {
               </ul>
             </div>
           </div>
-          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-black/5 dark:border-white/10 gap-8">
-            <p className="text-[9px] text-black/70 font-bold tracking-[5px] uppercase">(c) 2026 Mindful Tech Solutions Inc.</p>
-            <div className="flex flex-wrap justify-center gap-8 text-[9px] font-bold uppercase tracking-[5px] text-black/70 dark:text-white/80">
+          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-border dark:border-white/10 gap-8">
+            <p className="text-[9px] text-muted-foreground font-bold tracking-[5px] uppercase">(c) 2026 Mindful Tech Solutions Inc.</p>
+            <div className="flex flex-wrap justify-center gap-8 text-[9px] font-bold uppercase tracking-[5px] text-muted-foreground dark:text-white/80">
                 <Link to="/privacy" className="hover:text-black dark:hover:text-white transition-colors">Privacy</Link>
                 <Link to="/terms" className="hover:text-black dark:hover:text-white transition-colors">Terms</Link>
                 <Link to="/sms-terms" className="hover:text-black dark:hover:text-white transition-colors">SMS</Link>
@@ -509,29 +509,29 @@ export default function LandingPage() {
 
       {/* Demo Request Modal */}
       <Dialog open={isDemoModalOpen} onOpenChange={setIsDemoModalOpen}>
-        <DialogContent className="sm:max-w-[450px] bg-[#FAF8F4] border-black/10 text-black p-0 overflow-hidden rounded-sm">
+        <DialogContent className="sm:max-w-[450px] bg-[#FAF8F4] border-border text-foreground p-0 overflow-hidden rounded-sm">
           <div className="h-1 bg-[#b83316] w-full" />
           <div className="p-12">
             <DialogHeader className="mb-10">
-              <DialogTitle className="text-4xl font-bold tracking-tighter text-black">
+              <DialogTitle className="text-4xl font-bold tracking-tighter text-foreground">
                 Book <br /> a Demo
               </DialogTitle>
-              <DialogDescription className="text-black/70 text-sm font-bold tracking-widest uppercase mt-4">
+              <DialogDescription className="text-muted-foreground text-sm font-bold tracking-widest uppercase mt-4">
                 Tell us about your restaurant.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleDemoSubmit} className="space-y-8">
               <div className="space-y-3">
-                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Full Name</Label>
-                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="John Doe" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
+                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Full Name</Label>
+                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="John Doe" className="bg-[#F2EEE8] border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Work Email</Label>
-                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="john@restaurant.com" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
+                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Work Email</Label>
+                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="john@restaurant.com" className="bg-[#F2EEE8] border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/70">Restaurant or Company Name</Label>
-                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="Restaurant name" className="bg-[#F2EEE8] border-black/5 h-12 text-black placeholder:text-black/60 focus:ring-[#b83316] rounded-none text-xs font-bold" />
+                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Restaurant or Company Name</Label>
+                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="Restaurant name" className="bg-[#F2EEE8] border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#b83316] rounded-none text-xs font-bold" />
               </div>
               <DialogFooter className="pt-8">
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-[#b83316] text-white hover:bg-black font-bold py-8 text-xs tracking-[5px] rounded-none uppercase shadow-2xl">
@@ -553,8 +553,8 @@ const StatItem = ({ value, label }) => (
     viewport={{ once: true }}
     className="flex flex-col items-center md:items-start"
   >
-    <div className="text-5xl font-bold tracking-tighter mb-4 text-black dark:text-white">{value}</div>
-    <div className="text-[10px] text-black/70 dark:text-white/80 font-bold uppercase tracking-[4px]">{label}</div>
+    <div className="text-5xl font-bold tracking-tighter mb-4 text-foreground dark:text-white">{value}</div>
+    <div className="text-[10px] text-muted-foreground dark:text-white/80 font-bold uppercase tracking-[4px]">{label}</div>
   </motion.div>
 );
 
@@ -562,9 +562,9 @@ const CheckItem = ({ title, desc }) => (
   <div className="space-y-2 group">
     <div className="flex items-center gap-3">
       <CheckCircle2 className="h-4 w-4 text-[#b83316]" />
-      <h4 className="font-bold text-sm tracking-[2px] uppercase mb-0 text-black dark:text-white">{title}</h4>
+      <h4 className="font-bold text-sm tracking-[2px] uppercase mb-0 text-foreground dark:text-white">{title}</h4>
     </div>
-    <p className="text-xs text-black/70 dark:text-white/85 font-bold uppercase tracking-widest pl-7">{desc}</p>
+    <p className="text-xs text-muted-foreground dark:text-white/85 font-bold uppercase tracking-widest pl-7">{desc}</p>
   </div>
 );
 
@@ -579,8 +579,8 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     <div className="mb-10 text-[#b83316]">
       {React.cloneElement(icon, { size: 32, strokeWidth: 1 })}
     </div>
-    <h3 className="text-xl font-bold tracking-tighter mb-4 uppercase text-black dark:text-white">{title}</h3>
-    <p className="text-black/75 dark:text-white/85 text-sm leading-relaxed pr-10 font-medium technical-tracking">
+    <h3 className="text-xl font-bold tracking-tighter mb-4 uppercase text-foreground dark:text-white">{title}</h3>
+    <p className="text-muted-foreground dark:text-white/85 text-sm leading-relaxed pr-10 font-medium technical-tracking">
       {description}
     </p>
     <div className="mt-8 opacity-0 group-hover:opacity-100 transition-all duration-700">

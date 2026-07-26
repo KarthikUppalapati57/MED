@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ArrowLeft, ArrowRight, Check, X, AlertCircle, ScanBarcode, Camera } from 'lucide-react';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -102,8 +102,8 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             `}</style>
           </div>
         ) : (
-          <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4 bg-slate-50/50">
-            <Badge variant="outline" className="text-xs tracking-wider uppercase text-muted-foreground bg-white">
+          <div className="p-6 flex-1 flex flex-col items-center justify-center text-center space-y-4 bg-muted/40">
+            <Badge variant="outline" className="text-xs tracking-wider uppercase text-muted-foreground bg-card">
               {currentItem.location || 'Unassigned Zone'}
             </Badge>
             
@@ -142,7 +142,7 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
               <Button 
                 key={num} 
                 variant="outline" 
-                className="h-16 text-2xl font-semibold bg-white active:bg-secondary touch-manipulation"
+                className="h-16 text-2xl font-semibold bg-card active:bg-secondary touch-manipulation"
                 onClick={() => handleNumpad(num.toString())}
               >
                 {num}
@@ -150,21 +150,21 @@ export default function ActiveCountSession({ sheet, inventory, onComplete, onCan
             ))}
             <Button 
               variant="outline" 
-              className="h-16 text-2xl font-semibold bg-white active:bg-secondary touch-manipulation"
+              className="h-16 text-2xl font-semibold bg-card active:bg-secondary touch-manipulation"
               onClick={() => handleNumpad('.')}
             >
               .
             </Button>
             <Button 
               variant="outline" 
-              className="h-16 text-2xl font-semibold bg-white active:bg-secondary touch-manipulation"
+              className="h-16 text-2xl font-semibold bg-card active:bg-secondary touch-manipulation"
               onClick={() => handleNumpad('0')}
             >
               0
             </Button>
             <Button 
               variant="outline" 
-              className="h-16 text-lg font-medium text-destructive hover:text-destructive bg-white active:bg-secondary touch-manipulation"
+              className="h-16 text-lg font-medium text-destructive hover:text-destructive bg-card active:bg-secondary touch-manipulation"
               onClick={handleClear}
             >
               CLR

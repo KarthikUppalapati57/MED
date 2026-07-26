@@ -1,28 +1,37 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripe, createPaymentIntent } from '@/lib/paymentService';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, AlertCircle, Lock } from 'lucide-react';
-
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      fontSize: '15px',
-      color: '#1e293b',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      '::placeholder': { color: '#94a3b8' },
-      padding: '12px',
-    },
-    invalid: { color: '#dc2626' },
-  },
-  hidePostalCode: true,
-};
 
 function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, metadata = {}, buttonLabel = null, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const updateTheme = () => setIsDark(document.documentElement.classList.contains('dark'));
+    updateTheme();
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const cardElementOptions = useMemo(() => ({
+    style: {
+      base: {
+        fontSize: '15px',
+        color: isDark ? '#f8fafc' : '#0f172a',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        '::placeholder': { color: isDark ? '#a1a1aa' : '#64748b' },
+        padding: '12px',
+      },
+      invalid: { color: isDark ? '#f87171' : '#dc2626' },
+    },
+    hidePostalCode: true,
+  }), [isDark]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,8 +75,8 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, meta
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="border rounded-lg p-3 bg-white">
-        <CardElement options={CARD_ELEMENT_OPTIONS} />
+      <div className="border rounded-lg p-3 bg-card">
+        <CardElement options={cardElementOptions} />
       </div>
 
       {error && (
@@ -77,7 +86,7 @@ function StripeCheckoutForm({ amount, invoiceId, vendorName, invoiceNumber, meta
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/70">
         <Lock className="h-3 w-3" />
         Secured by Stripe. Card data never touches our servers.
       </div>
@@ -104,9 +113,9 @@ export default function StripePaymentForm({ amount, invoiceId, vendorName, invoi
     return (
       <div className="text-center py-6">
         <AlertCircle className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-        <p className="text-sm text-slate-600 font-medium">Stripe Not Configured</p>
-        <p className="text-xs text-slate-400 mt-1">
-          Set <code className="bg-slate-100 px-1 rounded">VITE_STRIPE_PUBLISHABLE_KEY</code> in your environment.
+        <p className="text-sm text-muted-foreground font-medium">Stripe Not Configured</p>
+        <p className="text-xs text-muted-foreground/70 mt-1">
+          Set <code className="bg-muted px-1 rounded">VITE_STRIPE_PUBLISHABLE_KEY</code> in your environment.
         </p>
       </div>
     );

@@ -55,10 +55,10 @@ export default function ReconciliationVarianceTable({ invoiceId, isEditable = fa
 
   if (!variances || variances.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 border rounded-lg bg-slate-50 border-dashed">
+      <div className="flex flex-col items-center justify-center p-8 border rounded-lg bg-muted/40 border-dashed">
         <CheckCircle2 className="h-10 w-10 text-emerald-500 mb-2" />
-        <p className="text-sm font-medium text-slate-700">All items matched within tolerance.</p>
-        <p className="text-xs text-slate-500">No reconciliation variances detected.</p>
+        <p className="text-sm font-medium text-muted-foreground">All items matched within tolerance.</p>
+        <p className="text-xs text-muted-foreground">No reconciliation variances detected.</p>
       </div>
     );
   }
@@ -121,7 +121,7 @@ export default function ReconciliationVarianceTable({ invoiceId, isEditable = fa
                       <Button size="sm" variant="outline" onClick={() => setResolvingId(variance.id)}>Resolve</Button>
                     )
                   ) : (
-                    <span className="text-xs text-slate-500">{variance.resolution_notes || 'N/A'}</span>
+                    <span className="text-xs text-muted-foreground">{variance.resolution_notes || 'N/A'}</span>
                   )}
                 </TableCell>
               </TableRow>

@@ -84,12 +84,12 @@ export default function ApprovalPolicySettings() {
         
         <div className="space-y-4">
           {policies.map(policy => (
-            <div key={policy.id} className="flex items-center justify-between p-4 bg-slate-50 border rounded-lg">
+            <div key={policy.id} className="flex items-center justify-between p-4 bg-muted/40 border rounded-lg">
               <div>
-                <p className="font-semibold text-slate-900 capitalize text-sm">
+                <p className="font-semibold text-foreground capitalize text-sm">
                   Requires {policy.required_role.replace('_', ' ')}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   When invoice total is &ge; ${parseFloat(policy.min_amount || 0).toFixed(2)}
                   {policy.max_amount ? ` and \u2264 $${parseFloat(policy.max_amount).toFixed(2)}` : ' (No maximum)'}
                 </p>
@@ -106,7 +106,7 @@ export default function ApprovalPolicySettings() {
             </div>
           ))}
           {policies.length === 0 && !isAdding && (
-            <div className="text-center p-6 border border-dashed rounded-lg text-slate-500 text-sm">
+            <div className="text-center p-6 border border-dashed rounded-lg text-muted-foreground text-sm">
               No approval policies configured. All invoices will be auto-approved!
             </div>
           )}
@@ -137,7 +137,7 @@ export default function ApprovalPolicySettings() {
               <div className="space-y-1">
                 <Label className="text-xs">Required Role</Label>
                 <Select value={newPolicy.required_role} onValueChange={v => setNewPolicy({...newPolicy, required_role: v})}>
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-card">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

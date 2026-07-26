@@ -1397,7 +1397,7 @@ export default function Invoices() {
             <Badge className="invoice-hero-badge">Invoice Control</Badge>
             <div>
               <h1 className="text-3xl font-bold text-white sm:text-4xl">Invoices</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/78 sm:text-base">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
                 Capture vendor bills, review exceptions, approve payables, and keep AP moving.
               </p>
             </div>
@@ -1729,13 +1729,13 @@ export default function Invoices() {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={aging.overdue ? 'border-red-200 text-resend-red bg-red-50' : 'border-slate-200 text-slate-600 bg-slate-50'}
+                            className={aging.overdue ? 'border-red-200 text-resend-red bg-red-50' : 'border-border text-muted-foreground bg-muted/40'}
                           >
                             {aging.bucket}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={invoice.ap_routing_destination === 'payments' || (!invoice.ap_routing_destination && invoice.file_destination === 'payments') ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-slate-200 text-slate-600 bg-slate-50'}>
+                          <Badge variant="outline" className={invoice.ap_routing_destination === 'payments' || (!invoice.ap_routing_destination && invoice.file_destination === 'payments') ? 'border-purple-200 text-purple-600 bg-purple-50' : 'border-border text-muted-foreground bg-muted/40'}>
                             {invoice.ap_routing_destination ? getApRoutingLabel(invoice.ap_routing_destination) : (invoice.file_destination === 'payments' ? 'Payments' : 'Storage')}
                           </Badge>
                         </TableCell>
@@ -2058,7 +2058,7 @@ export default function Invoices() {
                 className="flex-1 min-h-0 p-6"
               >
                 <ResizablePanel defaultSize={50} minSize={25}>
-                  <div className="h-full mr-3 rounded-xl overflow-hidden border bg-slate-50">
+                  <div className="h-full mr-3 rounded-xl overflow-hidden border bg-muted/40">
                     <React.Suspense fallback={<InlineLoader label="Loading document..." />}>
                       <DocumentViewer fileUrl={editingInvoice.file_url} fileType={editingInvoice.file_type} />
                     </React.Suspense>

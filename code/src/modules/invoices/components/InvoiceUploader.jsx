@@ -447,7 +447,7 @@ export default function InvoiceUploader({
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-teal-400 transition-colors"
+              className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-teal-400 transition-colors"
             >
               {uploading ? (
                 <div className="flex flex-col items-center gap-3">
@@ -456,14 +456,14 @@ export default function InvoiceUploader({
                   ) : (
                     <Loader2 className="h-10 w-10 text-teal-500 animate-spin" />
                   )}
-                  <p className="text-slate-700 font-medium">{progress}</p>
+                  <p className="text-muted-foreground font-medium">{progress}</p>
                   {file && (
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-muted-foreground/70 mt-1">
                       {file.name} ({(file.size / 1024).toFixed(0)} KB)
                     </p>
                   )}
                   {/* Progress bar */}
-                  <div className="w-full max-w-xs h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+                  <div className="w-full max-w-xs h-1.5 bg-muted rounded-full overflow-hidden mt-2">
                     <div 
                       className={`h-full rounded-full transition-all duration-700 ${
                         extractionDone ? 'bg-green-500 w-full' : 'bg-teal-500 w-2/3 animate-pulse'
@@ -476,10 +476,10 @@ export default function InvoiceUploader({
                   <div className="h-14 w-14 rounded-xl bg-teal-50 flex items-center justify-center mx-auto">
                     <FileText className="h-7 w-7 text-teal-600" />
                   </div>
-                  <p className="mt-4 text-slate-700 font-medium">
+                  <p className="mt-4 text-muted-foreground font-medium">
                     Drop your invoice here or click to browse
                   </p>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Supports PDF, JPG, PNG, or WebP up to 50 MB
                   </p>
                   <div className="flex items-center justify-center gap-2 mt-2">
@@ -506,7 +506,7 @@ export default function InvoiceUploader({
           </TabsContent>
 
           <TabsContent value="camera" className="mt-4">
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center">
+            <div className="border-2 border-dashed border-border rounded-xl p-4 text-center">
               {uploading ? (
                 <div className="flex flex-col items-center gap-3 py-8">
                   {extractionDone ? (
@@ -514,7 +514,7 @@ export default function InvoiceUploader({
                   ) : (
                     <Loader2 className="h-10 w-10 text-teal-500 animate-spin" />
                   )}
-                  <p className="text-slate-700 font-medium">{progress}</p>
+                  <p className="text-muted-foreground font-medium">{progress}</p>
                 </div>
               ) : cameraActive ? (
                 <div className="relative rounded-lg overflow-hidden bg-black flex items-center justify-center min-h-[300px]">
@@ -538,8 +538,8 @@ export default function InvoiceUploader({
                 </div>
               ) : (
                 <div className="py-8">
-                  <div className="h-14 w-14 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                    <Camera className="h-7 w-7 text-slate-400" />
+                  <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Camera className="h-7 w-7 text-muted-foreground/70" />
                   </div>
                   <Button onClick={startCamera} className="bg-teal-600 hover:bg-teal-700">
                     Enable Camera
@@ -551,15 +551,15 @@ export default function InvoiceUploader({
 
           <TabsContent value="email" className="mt-4">
             <div className="space-y-4">
-              <div className="bg-slate-50 rounded-lg p-4">
-                <p className="text-sm text-slate-600">
+              <div className="bg-muted/40 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
                   Forward invoices to your dedicated email address:
                 </p>
-                <p className="font-mono text-sm bg-white px-3 py-2 rounded mt-2 border">
+                <p className="font-mono text-sm bg-card px-3 py-2 rounded mt-2 border">
                   invoices@your-company.restops.io
                 </p>
               </div>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 Invoices sent to this address will be automatically extracted and added to your pending list.
               </p>
             </div>
@@ -572,7 +572,7 @@ export default function InvoiceUploader({
               <Button className="w-full bg-teal-600 hover:bg-teal-700">
                 Connect Portal
               </Button>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 Connect to your vendor's portal to automatically import invoices.
               </p>
             </div>

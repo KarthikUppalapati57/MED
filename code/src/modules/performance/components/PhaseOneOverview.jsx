@@ -465,7 +465,7 @@ export default function PhaseOneOverview({
               </div>
               <div className="flex flex-wrap gap-2">
                 {queryErrors.map((error) => (
-                  <Badge key={error.key} variant="outline" className="bg-white/70 border-amber-300 text-amber-900">
+                  <Badge key={error.key} variant="outline" className="bg-card/80 border-amber-300 text-amber-900">
                     {error.key}
                   </Badge>
                 ))}

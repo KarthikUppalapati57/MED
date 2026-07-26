@@ -94,8 +94,8 @@ export default function VendorBidding() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Procurement & Logistics</h1>
-          <p className="text-slate-500">Automated vendor bidding and commissary routing</p>
+          <h1 className="text-3xl font-bold text-foreground">Procurement & Logistics</h1>
+          <p className="text-muted-foreground">Automated vendor bidding and commissary routing</p>
         </div>
       </div>
 
@@ -108,22 +108,22 @@ export default function VendorBidding() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Vendors with pending bids on the same item are shown below. Evaluating selects the lowest-cost bid.
             </p>
 
             {isLoading ? (
-              <p className="text-sm text-slate-500 text-center py-6">Loading pending bids...</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Loading pending bids...</p>
             ) : pendingGroups.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-6">No pending bids to evaluate.</p>
+              <p className="text-sm text-muted-foreground text-center py-6">No pending bids to evaluate.</p>
             ) : (
               pendingGroups.map(group => {
                 const winner = winners[group.global_item_id];
                 return (
-                  <div key={group.global_item_id} className="bg-slate-50 p-4 rounded-md border border-slate-200">
+                  <div key={group.global_item_id} className="bg-muted/40 p-4 rounded-md border border-border">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium text-slate-800">{group.item_name}</span>
-                      <span className="text-sm text-slate-500">{group.bids.length} Pending Bid{group.bids.length === 1 ? '' : 's'}</span>
+                      <span className="font-medium text-foreground">{group.item_name}</span>
+                      <span className="text-sm text-muted-foreground">{group.bids.length} Pending Bid{group.bids.length === 1 ? '' : 's'}</span>
                     </div>
                     {!winner ? (
                       <Button
@@ -154,8 +154,8 @@ export default function VendorBidding() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-slate-500">
-              <Truck className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+            <div className="text-center py-8 text-muted-foreground">
+              <Truck className="w-12 h-12 mx-auto text-muted-foreground/60 mb-4" />
               <p>No active delivery routes today.</p>
             </div>
           </CardContent>

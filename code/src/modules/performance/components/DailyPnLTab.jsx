@@ -104,7 +104,7 @@ export default function DailyPnLTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm bg-slate-50">
+        <Card className="border-0 shadow-sm bg-muted/40">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-muted-foreground">Gross Sales</h3>
@@ -116,7 +116,7 @@ export default function DailyPnLTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-slate-50">
+        <Card className="border-0 shadow-sm bg-muted/40">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-muted-foreground">Estimated COGS</h3>
@@ -129,7 +129,7 @@ export default function DailyPnLTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-slate-50">
+        <Card className="border-0 shadow-sm bg-muted/40">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-muted-foreground">Labor Cost</h3>
@@ -200,7 +200,7 @@ export default function DailyPnLTab() {
                   {pnlData.laborPct > 25 ? <Badge variant="destructive" className="bg-rose-100 text-rose-800 hover:bg-rose-100 border-none">High</Badge> : <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-none hover:bg-emerald-50">Good</Badge>}
                 </TableCell>
               </TableRow>
-              <TableRow className="bg-slate-50 border-y-2 border-slate-200">
+              <TableRow className="bg-muted/40 border-y-2 border-border">
                 <TableCell className="font-bold">Prime Cost</TableCell>
                 <TableCell className="text-right font-bold">{money(pnlData.primeCost)}</TableCell>
                 <TableCell className="text-right font-bold">{pct(pnlData.primeCostPct)}</TableCell>

@@ -94,7 +94,7 @@ export default function PeriodBudgetsTab() {
                         {isEditing ? (
                           <Input 
                             type="number" 
-                            className="w-32 bg-white" 
+                            className="w-32 bg-card" 
                             value={budgetLimit} 
                             onChange={(e) => setBudgetLimit(e.target.value)} 
                             placeholder="e.g. 5000"
@@ -108,7 +108,7 @@ export default function PeriodBudgetsTab() {
                         {budget ? (
                           <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">Active</Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-slate-50 text-slate-500">Unset</Badge>
+                          <Badge variant="outline" className="bg-muted/40 text-muted-foreground">Unset</Badge>
                         )}
                       </TableCell>
                       <TableCell>

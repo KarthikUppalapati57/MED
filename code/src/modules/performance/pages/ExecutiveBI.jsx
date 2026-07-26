@@ -122,8 +122,8 @@ export default function ExecutiveBI() {
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Executive Command Center</h1>
-          <p className="text-slate-500">High-level Business Intelligence and Analytics</p>
+          <h1 className="text-3xl font-bold text-foreground">Executive Command Center</h1>
+          <p className="text-muted-foreground">High-level Business Intelligence and Analytics</p>
         </div>
       </div>
 

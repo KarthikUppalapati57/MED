@@ -67,12 +67,12 @@ function TableBlock({ rows }) {
   const body = rows.slice(2);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="bg-slate-50 text-slate-800">
+        <thead className="bg-muted/40 text-foreground">
           <tr>
             {header.map((cell) => (
-              <th key={cell} className="border-b border-slate-200 px-4 py-3 font-bold">
+              <th key={cell} className="border-b border-border px-4 py-3 font-bold">
                 <InlineContent text={cell} />
               </th>
             ))}
@@ -82,7 +82,7 @@ function TableBlock({ rows }) {
           {body.map((row, rowIndex) => (
             <tr key={`${row.join('|')}-${rowIndex}`}>
               {row.map((cell, cellIndex) => (
-                <td key={`${cell}-${cellIndex}`} className="px-4 py-3 align-top text-slate-600">
+                <td key={`${cell}-${cellIndex}`} className="px-4 py-3 align-top text-muted-foreground">
                   <InlineContent text={cell} />
                 </td>
               ))}
@@ -122,10 +122,10 @@ function MarkdownBlocks({ markdown }) {
       const Component = level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3';
       const className =
         level === 1
-          ? 'text-2xl font-black tracking-tight text-slate-900'
+          ? 'text-2xl font-black tracking-tight text-foreground'
           : level === 2
-            ? 'text-lg font-bold uppercase tracking-wide text-slate-800'
-            : 'text-base font-bold text-slate-800';
+            ? 'text-lg font-bold uppercase tracking-wide text-foreground'
+            : 'text-base font-bold text-foreground';
       blocks.push(
         <Component key={blocks.length} className={className}>
           <InlineContent text={text} />
@@ -220,27 +220,27 @@ export default function LegalMarkdownPage({ markdown, icon: Icon = FileText }) {
   const { title, effectiveDate, lastUpdated, body } = getDocumentMeta(markdown);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <nav className="sticky top-0 z-10 flex h-16 shrink-0 items-center border-b bg-white px-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-2 mr-4 text-slate-500">
+    <div className="flex min-h-screen flex-col bg-muted/40">
+      <nav className="sticky top-0 z-10 flex h-16 shrink-0 items-center border-b bg-card px-6">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-2 mr-4 text-muted-foreground">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
         <div className="flex items-center gap-2">
           <Icon className="h-5 w-5 text-indigo-600" />
-          <span className="font-bold text-slate-900">RestOps-360</span>
+          <span className="font-bold text-foreground">RestOps-360</span>
         </div>
       </nav>
 
       <div className="mx-auto w-full max-w-4xl flex-1 p-6 md:p-12">
-        <article className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm md:p-12">
-          <h1 className="mb-2 text-3xl font-black tracking-tight text-slate-900">{title}</h1>
-          <div className="mb-8 border-b border-slate-100 pb-8 text-sm text-slate-500">
+        <article className="rounded-2xl border border-border bg-card p-8 shadow-sm md:p-12">
+          <h1 className="mb-2 text-3xl font-black tracking-tight text-foreground">{title}</h1>
+          <div className="mb-8 border-b border-border pb-8 text-sm text-muted-foreground">
             {effectiveDate && <p>Effective date: {effectiveDate}</p>}
             {lastUpdated && <p>Last updated: {lastUpdated}</p>}
           </div>
 
           <ScrollArea className="h-[60vh] pr-6">
-            <div className="prose prose-slate prose-sm max-w-none space-y-5 text-slate-600">
+            <div className="prose prose-slate prose-sm max-w-none space-y-5 text-muted-foreground">
               <MarkdownBlocks markdown={body} />
             </div>
           </ScrollArea>

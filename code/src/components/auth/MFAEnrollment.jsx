@@ -114,16 +114,16 @@ export function MFAEnrollment({ onComplete, onCancel, cancelLabel = 'Cancel' }) 
       {step === 2 && (
         <div className="space-y-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-slate-900 flex items-center justify-center gap-2">
+            <h3 className="text-lg font-semibold text-foreground flex items-center justify-center gap-2">
               <QrCode className="w-5 h-5 text-teal-600" />
               Scan QR Code
             </h3>
-            <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
               Scan this code with your Microsoft Authenticator, Google Authenticator, or 1Password app.
             </p>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border-2 border-slate-100 inline-block">
+          <div className="bg-card p-4 rounded-xl border-2 border-border inline-block">
              <img 
                src={qrCodeSvg} 
                alt="MFA QR Code" 
@@ -132,8 +132,8 @@ export function MFAEnrollment({ onComplete, onCancel, cancelLabel = 'Cancel' }) 
           </div>
 
           <div className="space-y-3">
-             <p className="text-xs text-slate-400">Can't scan? Use this code manually:</p>
-             <code className="bg-slate-50 px-3 py-2 rounded border text-xs font-mono font-bold text-teal-700 uppercase tracking-widest break-all">
+             <p className="text-xs text-muted-foreground/70">Can't scan? Use this code manually:</p>
+             <code className="bg-muted/40 px-3 py-2 rounded border text-xs font-mono font-bold text-teal-700 uppercase tracking-widest break-all">
                {secret}
              </code>
           </div>
@@ -150,11 +150,11 @@ export function MFAEnrollment({ onComplete, onCancel, cancelLabel = 'Cancel' }) 
       {step === 3 && (
         <div className="space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-slate-900 flex items-center justify-center gap-2">
+            <h3 className="text-lg font-semibold text-foreground flex items-center justify-center gap-2">
               <Smartphone className="w-5 h-5 text-teal-600" />
               Verify Connection
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Enter the 6-digit code shown in your app to confirm.
             </p>
           </div>
@@ -210,7 +210,7 @@ export function MFAEnrollment({ onComplete, onCancel, cancelLabel = 'Cancel' }) 
       {isLoading && step === 1 && (
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <RefreshCw className="w-8 h-8 text-teal-600 animate-spin" />
-          <p className="text-sm text-slate-500 font-medium">Initializing secure enrollment...</p>
+          <p className="text-sm text-muted-foreground font-medium">Initializing secure enrollment...</p>
           {onCancel && (
             <Button variant="ghost" onClick={handleCancel}>
               {cancelLabel}

@@ -109,19 +109,19 @@ export function SplitCodingDialog({ open, onOpenChange, allocation, onSave, glMa
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="flex justify-between items-center bg-slate-50 p-4 rounded-lg border">
+          <div className="flex justify-between items-center bg-muted/40 p-4 rounded-lg border">
             <div>
-              <p className="text-sm font-medium text-slate-500">Original Allocation</p>
+              <p className="text-sm font-medium text-muted-foreground">Original Allocation</p>
               <p className="font-semibold text-lg">{allocation.category_name || 'Uncategorized'}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-medium text-slate-500">Total Amount</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
               <p className="font-semibold text-lg">${totalAmount?.toFixed(2)}</p>
             </div>
             <div>
               <Label>Split Method</Label>
               <Select value={splitMethod} onValueChange={setSplitMethod}>
-                <SelectTrigger className="w-[140px] bg-white">
+                <SelectTrigger className="w-[140px] bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,7 +171,7 @@ export function SplitCodingDialog({ open, onOpenChange, allocation, onSave, glMa
                   </div>
                 )}
                 
-                <Button variant="ghost" size="icon" onClick={() => handleRemoveSplit(i)} className="text-slate-400 hover:text-red-500 mb-0.5">
+                <Button variant="ghost" size="icon" onClick={() => handleRemoveSplit(i)} className="text-muted-foreground/70 hover:text-red-500 mb-0.5">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

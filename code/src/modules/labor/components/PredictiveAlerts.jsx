@@ -45,7 +45,7 @@ export default function PredictiveAlerts({ laborCost, sales, weatherData }) {
               Real-time AI recommendations based on live sales and labor pacing.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="bg-white">
+          <Badge variant="outline" className="bg-card">
             {activeAlerts.length} Active Alert(s)
           </Badge>
         </div>
@@ -60,7 +60,7 @@ export default function PredictiveAlerts({ laborCost, sales, weatherData }) {
         ) : (
           <div className="space-y-4">
             {activeAlerts.map(alert => (
-              <div key={alert.id} className="bg-white p-4 rounded-xl border border-resend-orange/20 shadow-sm relative overflow-hidden">
+              <div key={alert.id} className="bg-card p-4 rounded-xl border border-resend-orange/20 shadow-sm relative overflow-hidden">
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${alert.type === 'critical' ? 'bg-resend-red' : 'bg-resend-yellow'}`}></div>
                 <div className="flex gap-3">
                   <div className="mt-1">

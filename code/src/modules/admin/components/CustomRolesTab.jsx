@@ -163,7 +163,7 @@ export default function CustomRolesTab() {
                   <div className="flex items-center gap-2">
                     <h4 className="font-semibold text-foreground capitalize">{role.name.replace('_', ' ')}</h4>
                     {role.is_system ? (
-                      <Badge variant="secondary" className="bg-slate-500/10 text-slate-500">System Default</Badge>
+                      <Badge variant="secondary" className="bg-muted text-muted-foreground border border-border">System Default</Badge>
                     ) : (
                       <Badge className="bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20">Custom Role</Badge>
                     )}

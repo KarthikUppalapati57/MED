@@ -80,7 +80,7 @@ export default function CRM() {
                       <div>
                         <Badge variant="outline" className={
                           c.tier === 'Gold' ? 'border-amber-400 text-amber-600' : 
-                          c.tier === 'Silver' ? 'border-slate-400 text-slate-600' : 'border-amber-700 text-amber-800'
+                          c.tier === 'Silver' ? 'border-slate-400 text-muted-foreground' : 'border-amber-700 text-amber-800'
                         }>
                           {c.tier}
                         </Badge>
@@ -112,7 +112,7 @@ export default function CRM() {
             </Card>
             <Card className="border-slate-400/30">
               <CardHeader>
-                <CardTitle className="text-slate-600">Silver Tier</CardTitle>
+                <CardTitle className="text-muted-foreground">Silver Tier</CardTitle>
                 <CardDescription>101 - 300 Points</CardDescription>
               </CardHeader>
               <CardContent>

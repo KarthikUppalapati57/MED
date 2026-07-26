@@ -166,7 +166,7 @@ export default function Documentation() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fdf8f1] dark:bg-[#05070c] text-black dark:text-white selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
+    <div className="min-h-screen bg-[#fdf8f1] dark:bg-[#05070c] text-foreground dark:text-white selection:bg-[#ff5c35]/30 font-sans antialiased overflow-x-hidden selection:text-white">
       {/* 3D BACKBONE (Sticky Backdrop) */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <motion.div 
@@ -182,21 +182,21 @@ export default function Documentation() {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 border-b border-black/5 dark:border-white/10 bg-[#fdf8f1]/80 dark:bg-[#05070c]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 w-full z-50 border-b border-border dark:border-white/10 bg-[#fdf8f1]/80 dark:bg-[#05070c]/80 backdrop-blur-xl">
         <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <Link to="/" className="flex items-center gap-2 group">
               <div className="h-6 w-6 rounded-sm bg-black group-hover:bg-[#ff5c35] transition-colors flex items-center justify-center">
                 <ChevronLeft className="h-4 w-4 text-white" />
               </div>
-              <span className="text-xs font-bold tracking-widest uppercase text-black/60 dark:text-white/70 group-hover:text-black dark:group-hover:text-white transition-colors hidden md:block">
+              <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground dark:text-white/70 group-hover:text-black dark:group-hover:text-white transition-colors hidden md:block">
                 Back to Platform
               </span>
             </Link>
             
             <div className="flex items-center">
               <RestopsLogo className="h-6" showText={false} />
-              <span className="text-sm font-bold tracking-widest uppercase ml-3 text-black dark:text-white">
+              <span className="text-sm font-bold tracking-widest uppercase ml-3 text-foreground dark:text-white">
                 Architecture Docs
               </span>
             </div>
@@ -216,11 +216,11 @@ export default function Documentation() {
               Platform Overview
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold technical-tracking text-black dark:text-white mb-8 leading-tight">
+            <h1 className="text-5xl md:text-7xl font-bold technical-tracking text-foreground dark:text-white mb-8 leading-tight">
               Sovereign infrastructure for <br className="hidden md:block"/> high-performance logistics.
             </h1>
             
-            <p className="max-w-2xl mx-auto text-lg md:text-xl text-black/60 dark:text-white/70 leading-relaxed font-medium technical-tracking">
+            <p className="max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground dark:text-white/70 leading-relaxed font-medium technical-tracking">
               Restops is an end-to-end enterprise platform designed to automate physical supply chains, digitize financial audits, and orchestrate complex multi-unit operations through localized intelligence.
             </p>
           </motion.div>
@@ -228,12 +228,12 @@ export default function Documentation() {
       </section>
 
       {/* Modules Section */}
-      <section className="relative py-24 border-t border-black/5 dark:border-white/10 z-10 bg-[#fdf8f1]/80 dark:bg-[#05070c]/75 backdrop-blur-md">
+      <section className="relative py-24 border-t border-border dark:border-white/10 z-10 bg-[#fdf8f1]/80 dark:bg-[#05070c]/75 backdrop-blur-md">
         <div className="w-full max-w-[2400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-20 text-center">
-            <h2 className="text-3xl font-bold tracking-tighter mb-4 text-black dark:text-white uppercase">Core Modules</h2>
+            <h2 className="text-3xl font-bold tracking-tighter mb-4 text-foreground dark:text-white uppercase">Core Modules</h2>
             <div className="h-0.5 w-16 bg-[#ff5c35] mx-auto" />
-            <p className="mt-6 text-black/50 dark:text-white/60 text-sm font-bold tracking-widest uppercase max-w-xl mx-auto">
+            <p className="mt-6 text-muted-foreground dark:text-white/60 text-sm font-bold tracking-widest uppercase max-w-xl mx-auto">
               A comprehensive suite of interconnected systems designed to scale with your operation.
             </p>
           </div>
@@ -248,11 +248,11 @@ export default function Documentation() {
                 transition={{ delay: (i % 3) * 0.1, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="group relative"
               >
-                <div className="mb-8 text-black dark:text-white group-hover:text-[#ff5c35] transition-colors duration-500">
+                <div className="mb-8 text-foreground dark:text-white group-hover:text-[#ff5c35] transition-colors duration-500">
                   {React.cloneElement(mod.icon, { size: 36, strokeWidth: 1.5 })}
                 </div>
-                <h3 className="text-lg font-bold tracking-tighter mb-3 uppercase text-black dark:text-white">{mod.title}</h3>
-                <p className="text-black/50 dark:text-white/70 text-sm leading-relaxed font-medium technical-tracking">
+                <h3 className="text-lg font-bold tracking-tighter mb-3 uppercase text-foreground dark:text-white">{mod.title}</h3>
+                <p className="text-muted-foreground dark:text-white/70 text-sm leading-relaxed font-medium technical-tracking">
                   {mod.description}
                 </p>
                 <div className="mt-8 opacity-0 group-hover:opacity-100 transition-all duration-700">
@@ -265,10 +265,10 @@ export default function Documentation() {
       </section>
 
       {/* CTA Section & Footer */}
-      <footer className="relative py-32 border-t border-black/5 dark:border-white/10 bg-[#fdf8f1] dark:bg-[#05070c] z-10">
+      <footer className="relative py-32 border-t border-border dark:border-white/10 bg-[#fdf8f1] dark:bg-[#05070c] z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold tracking-tighter mb-8 text-black dark:text-white">Ready to deploy?</h2>
-          <p className="text-black/50 dark:text-white/70 text-lg mb-12 font-medium technical-tracking max-w-xl mx-auto">
+          <h2 className="text-4xl font-bold tracking-tighter mb-8 text-foreground dark:text-white">Ready to deploy?</h2>
+          <p className="text-muted-foreground dark:text-white/70 text-lg mb-12 font-medium technical-tracking max-w-xl mx-auto">
             Schedule a technical walkthrough with our engineering team to map out your infrastructure integration.
           </p>
           
@@ -281,17 +281,17 @@ export default function Documentation() {
               size="lg"
               variant="outline"
               onClick={() => setIsDemoModalOpen(true)}
-              className="h-14 px-12 border-2 border-black dark:border-white text-black dark:text-white hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black font-bold text-xs tracking-[4px] rounded-sm transition-all uppercase bg-transparent"
+              className="h-14 px-12 border-2 border-black dark:border-white text-foreground dark:text-white hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black font-bold text-xs tracking-[4px] rounded-sm transition-all uppercase bg-transparent"
             >
                 <MessageSquare className="mr-3 h-4 w-4" /> CONTACT SUPPORT
             </Button>
           </div>
 
-          <div className="pt-12 border-t border-black/5 dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <Link to="/" className="text-[10px] font-bold uppercase tracking-[4px] text-black/40 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors flex items-center">
+          <div className="pt-12 border-t border-border dark:border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
+            <Link to="/" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground dark:text-white/50 hover:text-black dark:hover:text-white transition-colors flex items-center">
               <ChevronLeft className="h-3 w-3 mr-1" /> RETURN TO HOME
             </Link>
-            <p className="text-[9px] text-black/30 dark:text-white/40 font-bold tracking-[5px] uppercase">
+            <p className="text-[9px] text-muted-foreground dark:text-white/40 font-bold tracking-[5px] uppercase">
               © 2026 MINDFUL TECH SOLUTIONS INC. ARCHITECTURE DOCS.
             </p>
           </div>
@@ -300,29 +300,29 @@ export default function Documentation() {
 
       {/* Demo Request Modal (Shared Logic) */}
       <Dialog open={isDemoModalOpen} onOpenChange={setIsDemoModalOpen}>
-        <DialogContent className="sm:max-w-[450px] bg-white border-black/10 text-black p-0 overflow-hidden rounded-sm">
+        <DialogContent className="sm:max-w-[450px] bg-card border-border text-foreground p-0 overflow-hidden rounded-sm">
           <div className="h-1 bg-[#ff5c35] w-full" />
           <div className="p-12">
             <DialogHeader className="mb-10">
-              <DialogTitle className="text-4xl font-bold tracking-tighter text-black">
+              <DialogTitle className="text-4xl font-bold tracking-tighter text-foreground">
                 Request <br /> Deployment
               </DialogTitle>
-              <DialogDescription className="text-black/40 text-sm font-bold tracking-widest uppercase mt-4">
+              <DialogDescription className="text-muted-foreground text-sm font-bold tracking-widest uppercase mt-4">
                 Initialize your workspace.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleDemoSubmit} className="space-y-8">
               <div className="space-y-3">
-                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Full Identity</Label>
-                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="JOHN DOE" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="fullName" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Full Identity</Label>
+                <Input id="fullName" required value={demoForm.fullName} onChange={(e) => setDemoForm({...demoForm, fullName: e.target.value})} placeholder="JOHN DOE" className="bg-muted/40 border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Technical Email</Label>
-                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="JOHN@OPS.COM" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Technical Email</Label>
+                <Input id="email" type="email" required value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} placeholder="JOHN@OPS.COM" className="bg-muted/40 border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <div className="space-y-3">
-                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-black/20">Enterprise Name</Label>
-                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="ACME LOGISTICS" className="bg-slate-50 border-black/5 h-12 text-black placeholder:text-black/10 focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
+                <Label htmlFor="companyName" className="text-[10px] font-bold uppercase tracking-[4px] text-muted-foreground">Enterprise Name</Label>
+                <Input id="companyName" required value={demoForm.companyName} onChange={(e) => setDemoForm({...demoForm, companyName: e.target.value})} placeholder="ACME LOGISTICS" className="bg-muted/40 border-border h-12 text-foreground placeholder:text-muted-foreground focus:ring-[#ff5c35] rounded-none uppercase text-xs font-bold" />
               </div>
               <DialogFooter className="pt-8">
                 <Button type="submit" disabled={isSubmitting} className="w-full bg-[#ff5c35] text-white hover:bg-black font-bold py-8 text-xs tracking-[5px] rounded-none uppercase shadow-2xl">

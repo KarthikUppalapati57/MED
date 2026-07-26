@@ -312,9 +312,9 @@ export function BillPayWidget({ invoice }) {
       
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-50 p-3 rounded-lg border">
-            <div className="text-xs text-slate-500 mb-1">Total Amount</div>
-            <div className="font-semibold text-slate-900">${invoice.total_amount?.toFixed(2)}</div>
+          <div className="bg-muted/40 p-3 rounded-lg border">
+            <div className="text-xs text-muted-foreground mb-1">Total Amount</div>
+            <div className="font-semibold text-foreground">${invoice.total_amount?.toFixed(2)}</div>
           </div>
           <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
             <div className="text-xs text-emerald-700 mb-1">Paid Amount</div>
@@ -324,9 +324,9 @@ export function BillPayWidget({ invoice }) {
             <div className="text-xs text-rose-700 mb-1">Balance Due</div>
             <div className="font-semibold text-rose-900">${remainingBalance.toFixed(2)}</div>
           </div>
-          <div className="bg-slate-50 p-3 rounded-lg border">
-            <div className="text-xs text-slate-500 mb-1">Status</div>
-            <div className="font-semibold text-slate-900 capitalize">
+          <div className="bg-muted/40 p-3 rounded-lg border">
+            <div className="text-xs text-muted-foreground mb-1">Status</div>
+            <div className="font-semibold text-foreground capitalize">
               {isFullyPaid ? 'Paid in Full' : invoice.status.replace('_', ' ')}
             </div>
           </div>
@@ -373,18 +373,18 @@ export function BillPayWidget({ invoice }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-1 gap-3 rounded-lg border bg-slate-50 p-3 text-sm md:grid-cols-[1.4fr_0.6fr]">
+            <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/40 p-3 text-sm md:grid-cols-[1.4fr_0.6fr]">
               <div>
-                <p className="text-slate-500">Vendor destination</p>
-                <p className="font-semibold text-slate-900">{invoice.vendor_name || '-'}</p>
-                <div className="mt-1 space-y-0.5 text-xs text-slate-500">
+                <p className="text-muted-foreground">Vendor destination</p>
+                <p className="font-semibold text-foreground">{invoice.vendor_name || '-'}</p>
+                <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                   {formatVendorAddress(vendorDetails) ? <p>{formatVendorAddress(vendorDetails)}</p> : <p>No vendor address on file.</p>}
                   {(vendorDetails?.email || vendorDetails?.phone) && <p>{[vendorDetails.email, vendorDetails.phone].filter(Boolean).join(' • ')}</p>}
                 </div>
               </div>
               <div>
-                <p className="text-slate-500">Amount</p>
-                <p className="font-semibold text-slate-900">${remainingBalance.toFixed(2)}</p>
+                <p className="text-muted-foreground">Amount</p>
+                <p className="font-semibold text-foreground">${remainingBalance.toFixed(2)}</p>
               </div>
             </div>
             {releaseData.payout_method !== 'stripe_card' && (
@@ -531,7 +531,7 @@ export function BillPayWidget({ invoice }) {
                 value={recordData.amount} 
                 onChange={e => setRecordData({...recordData, amount: e.target.value})} 
               />
-              <p className="text-xs text-slate-500">Maximum: ${remainingBalance.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">Maximum: ${remainingBalance.toFixed(2)}</p>
             </div>
             <div className="space-y-2">
               <Label>Payment Method</Label>

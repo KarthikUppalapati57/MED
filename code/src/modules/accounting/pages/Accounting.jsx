@@ -549,7 +549,7 @@ export default function Accounting() {
                     <TableBody>
                       {closedPeriods.map(period => (
                         <TableRow key={period.id}>
-                          <TableCell className="font-medium text-slate-900">{period.period_name}</TableCell>
+                          <TableCell className="font-medium text-foreground">{period.period_name}</TableCell>
                           <TableCell>{period.start_date}</TableCell>
                           <TableCell>{period.end_date}</TableCell>
                           <TableCell>{format(new Date(period.closed_at), 'MMM dd, yyyy HH:mm')}</TableCell>

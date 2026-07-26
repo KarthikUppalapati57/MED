@@ -144,7 +144,7 @@ export default function StripePayPalPayouts() {
             {/* Left: Invoice Selection */}
             <div className="xl:col-span-2 space-y-4">
               <h3 className="font-semibold text-lg">Approved Invoices Awaiting Payment</h3>
-              <div className="bg-white border rounded-lg overflow-hidden">
+              <div className="bg-card border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader className="bg-secondary/50">
                     <TableRow>
@@ -197,12 +197,12 @@ export default function StripePayPalPayouts() {
 
             {/* Right: Payment Execution */}
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+              <div className="bg-card p-6 rounded-xl border shadow-sm space-y-6">
                 <div>
                   <h3 className="font-semibold mb-4">Select Payout Method</h3>
                   <RadioGroup value={payoutMethod} onValueChange={setPayoutMethod} className="space-y-3">
                     {PAYOUT_METHODS.map(method => (
-                      <div key={method.value} className="flex items-center space-x-3 border p-4 rounded-lg cursor-pointer hover:bg-slate-50">
+                      <div key={method.value} className="flex items-center space-x-3 border p-4 rounded-lg cursor-pointer hover:bg-muted/60">
                         <RadioGroupItem value={method.value} id={method.value} />
                         <Label htmlFor={method.value} className="flex-1 cursor-pointer font-medium flex items-center justify-between">
                           {method.label}
@@ -223,10 +223,10 @@ export default function StripePayPalPayouts() {
                     <span className="font-medium">${selectedTotal.toFixed(2)}</span>
                   </div>
 
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4 space-y-3">
-                    <Label className="text-sm font-medium flex items-center justify-between text-slate-700">
+                  <div className="bg-muted/40 p-3 rounded-lg border border-border mb-4 space-y-3">
+                    <Label className="text-sm font-medium flex items-center justify-between text-muted-foreground">
                       Apply Vendor Credit
-                      <span className="text-xs font-normal text-slate-500">(Optional Short Pay)</span>
+                      <span className="text-xs font-normal text-muted-foreground">(Optional Short Pay)</span>
                     </Label>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
@@ -234,7 +234,7 @@ export default function StripePayPalPayouts() {
                         <Input
                           type="number"
                           placeholder="0.00"
-                          className="pl-8 bg-white h-9"
+                          className="pl-8 bg-card h-9"
                           value={creditAmount}
                           onChange={(e) => setCreditAmount(e.target.value)}
                         />
@@ -242,7 +242,7 @@ export default function StripePayPalPayouts() {
                       <Input
                         type="text"
                         placeholder="Reason (e.g. Bad tomatoes)"
-                        className="flex-[2] bg-white h-9"
+                        className="flex-[2] bg-card h-9"
                         value={creditReason}
                         onChange={(e) => setCreditReason(e.target.value)}
                       />

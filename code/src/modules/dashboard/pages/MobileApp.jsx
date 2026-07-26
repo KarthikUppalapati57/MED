@@ -94,7 +94,7 @@ export default function MobileApp() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Card className="border-0 shadow-sm hover:bg-slate-50 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('snap')}>
+        <Card className="border-0 shadow-sm hover:bg-muted/60 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('snap')}>
           <CardContent className="p-4 flex flex-col items-center text-center gap-2">
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
               <Camera className="w-6 h-6" />
@@ -103,7 +103,7 @@ export default function MobileApp() {
           </CardContent>
         </Card>
         
-        <Card className="border-0 shadow-sm hover:bg-slate-50 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('approve')}>
+        <Card className="border-0 shadow-sm hover:bg-muted/60 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('approve')}>
           <CardContent className="p-4 flex flex-col items-center text-center gap-2">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 relative">
               <ListTodo className="w-6 h-6" />
@@ -113,7 +113,7 @@ export default function MobileApp() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm hover:bg-slate-50 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('count')}>
+        <Card className="border-0 shadow-sm hover:bg-muted/60 cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('count')}>
           <CardContent className="p-4 flex flex-col items-center text-center gap-2">
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
               <ClipboardList className="w-6 h-6" />
@@ -127,8 +127,8 @@ export default function MobileApp() {
         <h3 className="font-bold mb-3">Recent Approval Work</h3>
         <div className="space-y-3">
           {pendingInvoices.slice(0, 2).map((invoice) => (
-            <button key={invoice.id} type="button" onClick={() => openPage('Invoices')} className="w-full flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-left">
-              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+            <button key={invoice.id} type="button" onClick={() => openPage('Invoices')} className="w-full flex items-center gap-3 p-3 bg-card rounded-xl shadow-sm border border-border text-left">
+              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
               <div className="flex-1 min-w-0">
@@ -139,7 +139,7 @@ export default function MobileApp() {
             </button>
           ))}
           {pendingInvoices.length === 0 && (
-            <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 text-sm text-muted-foreground">
+            <div className="p-3 bg-card rounded-xl shadow-sm border border-border text-sm text-muted-foreground">
               No recent approval activity.
             </div>
           )}
@@ -232,7 +232,7 @@ export default function MobileApp() {
   );
 
   return (
-    <div className="max-w-md mx-auto h-[800px] border-[8px] border-slate-900 rounded-[3rem] overflow-hidden relative shadow-2xl bg-slate-50 flex flex-col">
+    <div className="max-w-md mx-auto h-[800px] border-[8px] border-slate-900 rounded-[3rem] overflow-hidden relative shadow-2xl bg-muted/40 flex flex-col">
       <div className="h-7 w-full bg-brand flex justify-center items-center shrink-0">
         <div className="w-32 h-5 bg-slate-900 rounded-b-2xl absolute top-0"></div>
       </div>
@@ -244,7 +244,7 @@ export default function MobileApp() {
         {activeTab === 'count' && renderCount()}
       </div>
 
-      <div className="h-20 bg-white border-t flex justify-around items-center px-6 pb-2 shrink-0">
+      <div className="h-20 bg-card border-t flex justify-around items-center px-6 pb-2 shrink-0">
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-brand font-bold' : 'text-muted-foreground'}`}>
           <Home className="w-6 h-6" />
           <span className="text-[10px]">Home</span>

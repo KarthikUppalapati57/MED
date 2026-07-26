@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 function statusBadgeClass(status) {
   if (status === 'active') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (status === 'archived') return 'bg-slate-50 text-slate-700 border-slate-200';
+  if (status === 'archived') return 'bg-muted/40 text-muted-foreground border-border';
   if (status === 'failed') return 'bg-rose-50 text-rose-700 border-rose-200';
   return 'bg-sky-50 text-sky-700 border-sky-200';
 }

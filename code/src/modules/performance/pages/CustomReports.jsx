@@ -241,7 +241,7 @@ export default function CustomReports() {
   };
 
   return (
-    <div className="p-6 space-y-8 min-h-screen bg-slate-50 dark:bg-slate-900/20">
+    <div className="p-6 space-y-8 min-h-screen bg-muted/40 dark:bg-slate-900/20">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">

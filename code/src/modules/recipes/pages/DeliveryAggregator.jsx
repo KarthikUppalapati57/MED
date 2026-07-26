@@ -101,7 +101,7 @@ export default function DeliveryAggregator() {
                 <p className="text-sm text-orange-700">Store ID: {channels.find(c => c.provider === 'doordash')?.store_id || 'Not Connected'}</p>
               </div>
             </div>
-            <Badge variant="outline" className="bg-white">
+            <Badge variant="outline" className="bg-card">
               {channels.find(c => c.provider === 'doordash')?.is_active ? 'Active' : 'Offline'}
             </Badge>
           </CardContent>
@@ -118,7 +118,7 @@ export default function DeliveryAggregator() {
                 <p className="text-sm text-green-700">Store ID: {channels.find(c => c.provider === 'ubereats')?.store_id || 'Not Connected'}</p>
               </div>
             </div>
-            <Badge variant="outline" className="bg-white">
+            <Badge variant="outline" className="bg-card">
               {channels.find(c => c.provider === 'ubereats')?.is_active ? 'Active' : 'Offline'}
             </Badge>
           </CardContent>
@@ -135,7 +135,7 @@ export default function DeliveryAggregator() {
                 <p className="text-sm text-red-700">Store ID: {channels.find(c => c.provider === 'grubhub')?.store_id || 'Not Connected'}</p>
               </div>
             </div>
-            <Badge variant="outline" className="bg-white">
+            <Badge variant="outline" className="bg-card">
               {channels.find(c => c.provider === 'grubhub')?.is_active ? 'Active' : 'Offline'}
             </Badge>
           </CardContent>

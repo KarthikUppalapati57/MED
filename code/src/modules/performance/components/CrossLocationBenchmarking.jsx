@@ -207,11 +207,11 @@ export default function CrossLocationBenchmarking() {
                 processedData.map((loc, index) => {
                   let badge = null;
                   if (index === 0 && loc.score > 0) badge = <Medal className="w-5 h-5 text-amber-400 drop-shadow-sm" />;
-                  else if (index === 1 && loc.score > 0) badge = <Medal className="w-5 h-5 text-slate-400 drop-shadow-sm" />;
+                  else if (index === 1 && loc.score > 0) badge = <Medal className="w-5 h-5 text-muted-foreground/70 drop-shadow-sm" />;
                   else if (index === 2 && loc.score > 0) badge = <Medal className="w-5 h-5 text-amber-700 drop-shadow-sm" />;
                   
                   return (
-                    <TableRow key={loc.location_id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableRow key={loc.location_id} className="hover:bg-muted/60 transition-colors">
                       <TableCell className="text-center font-medium">
                         {badge || <span className="text-muted-foreground">{index + 1}</span>}
                       </TableCell>
@@ -230,7 +230,7 @@ export default function CrossLocationBenchmarking() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        <span className={loc.primePct > 60 ? 'text-rose-600' : 'text-slate-900'}>
+                        <span className={loc.primePct > 60 ? 'text-rose-600' : 'text-foreground'}>
                           {loc.primePct.toFixed(1)}%
                         </span>
                       </TableCell>

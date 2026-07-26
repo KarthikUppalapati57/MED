@@ -24,7 +24,7 @@ const ValidationCheck = ({ label, result }) => {
     pass: <CheckCircle2 className="h-5 w-5 text-green-500" />,
     fail: <XCircle className="h-5 w-5 text-red-500" />,
     warning: <AlertTriangle className="h-5 w-5 text-yellow-500" />,
-    checking: <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />,
+    checking: <Loader2 className="h-5 w-5 text-muted-foreground/70 animate-spin" />,
   };
 
   const statusText = {
@@ -38,7 +38,7 @@ const ValidationCheck = ({ label, result }) => {
     pass: 'bg-green-50 border-green-200',
     fail: 'bg-red-50 border-red-200',
     warning: 'bg-yellow-50 border-yellow-200',
-    checking: 'bg-slate-50 border-slate-200',
+    checking: 'bg-muted/40 border-border',
   };
 
   return (
@@ -49,9 +49,9 @@ const ValidationCheck = ({ label, result }) => {
       <div className="flex items-center gap-3 min-w-0">
         {icons[status] || icons.checking}
         <div className="min-w-0">
-          <span className="font-medium text-slate-900 block">{label}</span>
+          <span className="font-medium text-foreground block">{label}</span>
           {result?.message && (
-            <span className="text-xs text-slate-500 block mt-0.5">{result.message}</span>
+            <span className="text-xs text-muted-foreground block mt-0.5">{result.message}</span>
           )}
         </div>
       </div>
@@ -60,7 +60,7 @@ const ValidationCheck = ({ label, result }) => {
         status === 'pass' && 'text-green-600',
         status === 'fail' && 'text-red-600',
         status === 'warning' && 'text-yellow-600',
-        status === 'checking' && 'text-slate-500'
+        status === 'checking' && 'text-muted-foreground'
       )}>
         {statusText[status] || statusText.checking}
       </span>
@@ -202,18 +202,18 @@ export default function ValidationDialog({
           </div>
         ) : (
           <div className="space-y-6 py-4">
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
+            <div className="bg-muted/40 rounded-xl p-4 border border-border space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Vendor</span>
-                <span className="font-medium text-slate-900">{invoice?.vendor_name}</span>
+                <span className="text-muted-foreground">Vendor</span>
+                <span className="font-medium text-foreground">{invoice?.vendor_name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Invoice Number</span>
-                <span className="font-medium text-slate-900">{invoice?.invoice_number}</span>
+                <span className="text-muted-foreground">Invoice Number</span>
+                <span className="font-medium text-foreground">{invoice?.invoice_number}</span>
               </div>
-              <div className="flex justify-between text-sm pt-2 border-t border-slate-200">
-                <span className="text-slate-500">Total Amount</span>
-                <span className="font-bold text-slate-900">${invoice?.total_amount?.toLocaleString()}</span>
+              <div className="flex justify-between text-sm pt-2 border-t border-border">
+                <span className="text-muted-foreground">Total Amount</span>
+                <span className="font-bold text-foreground">${invoice?.total_amount?.toLocaleString()}</span>
               </div>
               {paidDetection?.detected && (
                 <div className={`rounded-lg border p-3 text-sm ${
