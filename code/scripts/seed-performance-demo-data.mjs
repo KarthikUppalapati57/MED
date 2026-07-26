@@ -29,6 +29,7 @@ const MODULES = [
   'recipe_management',
   'performance',
   'custom_reports',
+  'feedback',
   'vendor_management',
   'audit_logs',
   'organization_management',
@@ -811,3 +812,4 @@ console.log('\nPerformance professional demo seed complete.\n');
 console.table(credentials);
 console.log('Shared password: configured from PERFORMANCE_DEMO_PASSWORD.');
 console.log('Organizations:', contexts.map(({ context }) => context.org.name).join(' | '));
+

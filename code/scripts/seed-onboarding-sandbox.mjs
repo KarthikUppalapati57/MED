@@ -38,6 +38,7 @@ const ALL_MODULES = [
   'admin',
   'integrations',
   'performance',
+  'feedback',
   'accounting',
   'setup',
 ];
@@ -569,3 +570,4 @@ for (const account of [...sandboxAccounts, ...fullAccessAccounts]) {
 console.log('\nOnboarding sandbox seed complete.\n');
 console.table(credentialRows.map(({ password: _password, ...row }) => row));
 console.log('Shared password: configured from ONBOARDING_SANDBOX_PASSWORD or ROLE_QA_PASSWORD.');
+

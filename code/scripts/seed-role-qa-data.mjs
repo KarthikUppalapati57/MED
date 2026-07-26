@@ -37,6 +37,7 @@ const MODULES = [
   'admin',
   'integrations',
   'performance',
+  'feedback',
   'accounting',
   'setup',
 ];
@@ -350,3 +351,4 @@ for (const [index, tenantContext] of tenantContexts.entries()) {
 console.log('\nRole QA seed complete.\n');
 console.table(credentialRows.map(({ password: _password, ...row }) => row));
 console.log('Shared password: configured from ROLE_QA_PASSWORD.');
+
