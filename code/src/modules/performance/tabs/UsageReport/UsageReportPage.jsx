@@ -32,6 +32,10 @@ import { ExportMenu, DataFreshnessLabel } from '@/modules/performance/components
 import { usePerformanceFilters } from '@/modules/performance/hooks/usePerformanceFilters';
 import { useInventoryUsage, useInventoryUsageDrilldown } from '@/modules/performance/hooks/useInventoryUsage';
 import { formatMoney, exportRowsToCsv } from '@/modules/performance/services/performanceAnalytics';
+import {
+  prepareInventoryUsageRows,
+  summarizeInventoryCoverage,
+} from '@/modules/performance/services/inventoryRecipeCalculations';
 
 const COLORS = ['#0f766e', '#b45309', '#1d4ed8', '#be123c', '#7c3aed', '#047857'];
 
@@ -140,6 +144,36 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
         cell: (row) => formatMoney(row.unitCost, currency),
       },
       {
+        accessor: 'currentOnHandQuantity',
+        header: 'On hand',
+        cell: (row) => qty(row.currentOnHandQuantity),
+      },
+      {
+        accessor: 'reorderPoint',
+        header: 'Reorder point',
+        cell: (row) => qty(row.reorderPoint),
+      },
+      {
+        accessor: 'reorderStatus',
+        header: 'Reorder status',
+        cell: (row) => (
+          <Badge variant={['below', 'at'].includes(row.reorderStatus) ? 'destructive' : 'outline'}>
+            {row.reorderStatus === 'below'
+              ? 'Below'
+              : row.reorderStatus === 'at'
+                ? 'At'
+                : row.reorderStatus === 'above'
+                  ? 'Above'
+                  : 'Not evaluable'}
+          </Badge>
+        ),
+      },
+      {
+        accessor: 'currentInventoryValue',
+        header: 'Current value',
+        cell: (row) => formatMoney(row.currentInventoryValue, currency),
+      },
+      {
         accessor: 'usageValue',
         header: 'Usage value',
         cell: (row) => (row.usageValue == null ? '—' : formatMoney(row.usageValue, currency)),
@@ -171,6 +205,21 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
 
   const showEmpty = isEmpty && !isLoading;
   const showError = isError && !isLoading;
+  const preparedTableRows = useMemo(
+    () => prepareInventoryUsageRows(tableRows),
+    [tableRows]
+  );
+  const inventoryCoverage = useMemo(
+    () => summarizeInventoryCoverage(tableRows),
+    [tableRows]
+  );
+  const reorderRiskCount = preparedTableRows.filter(
+    (row) => row.reorderStatus === 'below' || row.reorderStatus === 'at'
+  ).length;
+  const currentInventoryValue = preparedTableRows.reduce(
+    (sum, row) => sum + (row.currentInventoryValue ?? 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -217,6 +266,8 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
         onAutoComparisonChange={filterState.setAutoComparison}
         onClear={filterState.clearFilters}
         onDateRangeCommit={filterState.updateDateRange}
+        showComparison={false}
+        showVendor={false}
       />
 
       {showError ? (
@@ -224,6 +275,36 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
       ) : null}
 
       <KpiRibbon>
+        <EnterpriseKpiCard
+          label="Current Inventory Value"
+          loading={isLoading}
+          empty={showEmpty || inventoryCoverage.valuedOnHand === 0}
+          error={showError}
+          value={formatMoney(currentInventoryValue, currency)}
+          sublabel={`${inventoryCoverage.valuedOnHand} valued products`}
+        />
+        <EnterpriseKpiCard
+          label="Count Coverage"
+          tooltip="Products with both opening and closing count evidence for the selected period."
+          loading={isLoading}
+          empty={showEmpty || inventoryCoverage.countCoverage === null}
+          error={showError}
+          value={
+            inventoryCoverage.countCoverage === null
+              ? '—'
+              : `${inventoryCoverage.countCoverage.toFixed(1)}%`
+          }
+          sublabel={`${inventoryCoverage.completeCountPairs} of ${inventoryCoverage.totalProducts}`}
+        />
+        <EnterpriseKpiCard
+          label="At / Below Reorder"
+          tooltip="Uses current on-hand quantity and a positive reorder point. Missing evidence is not treated as healthy."
+          loading={isLoading}
+          empty={showEmpty}
+          error={showError}
+          value={String(reorderRiskCount)}
+          status={reorderRiskCount ? 'negative' : 'neutral'}
+        />
         <EnterpriseKpiCard
           label="Opening Inventory Value"
           tooltip={USAGE_TOOLTIP}
@@ -522,7 +603,7 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
 
           <ChartCard title="Inventory Usage Detail" description="Click a row for product drill-down">
             <AnalyticsDataGrid
-              rows={tableRows}
+              rows={preparedTableRows}
               columns={tableColumns}
               searchKeys={['product', 'category', 'location']}
               searchPlaceholder="Search products, categories, locations…"
@@ -713,4 +794,3 @@ function SimpleTable({ columns, rows }) {
     </div>
   );
 }
-

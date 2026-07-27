@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/lib/AuthContext';
 
 const BudgetSetupPage = React.lazy(() => import('@/modules/performance/tabs/BudgetSetup/BudgetSetupPage'));
 const PhaseOneOverview = React.lazy(() => import('@/modules/performance/components/PhaseOneOverview'));
@@ -70,6 +71,14 @@ function ComingSoonPanel({ title, description, available }) {
 }
 
 const ACTIVE_ANALYTICS = ['Overview', 'Budgets', 'Spend & Products', 'Inventory & Recipes'];
+const PERFORMANCE_ROLES = new Set([
+  'location_manager',
+  'branch_manager',
+  'brand_manager',
+  'org_manager',
+  'tenant_super_admin',
+  'platform_admin',
+]);
 const ACTIVE_TAB_VALUES = ['overview', 'budget', 'spend_products', 'inventory_recipes'];
 const TAB_CLASS = 'performance-tab-button data-[state=active]:is-active';
 const TAB_ITEMS = [
@@ -181,9 +190,37 @@ function PerformanceHero({ periodStart, periodEnd, setPeriodStart, setPeriodEnd,
 
 export default function Performance() {
   const now = new Date();
+  const { location, role } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [periodStart, setPeriodStart] = useState(startOfMonthIso(now));
   const [periodEnd, setPeriodEnd] = useState(endOfMonthIso(now));
+
+  if (role && !PERFORMANCE_ROLES.has(role)) {
+    return (
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Performance access restricted</CardTitle>
+          <CardDescription>
+            Performance reporting is available to location managers and higher roles.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (!location?.id) {
+    return (
+      <Card className="m-6">
+        <CardHeader>
+          <CardTitle>Select a location</CardTitle>
+          <CardDescription>
+            Performance reporting always requires one active location. Choose a location from the
+            global organization and location selector to continue.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <div className="performance-visual-page space-y-6 animate-fade-in-scale flex flex-col h-full w-full" string="progress">

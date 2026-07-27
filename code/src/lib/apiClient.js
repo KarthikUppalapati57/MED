@@ -1271,9 +1271,11 @@ export const api = {
       selectedCategory = null,
       trendCategories = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_category_performance_report', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_category_performance_report', {
         p_organization_id: organizationId,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_comparison_date_from: comparisonDateFrom,
@@ -1298,10 +1300,12 @@ export const api = {
       vendorIds = null,
       timezone = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_category_performance_drilldown', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_category_performance_drilldown', {
         p_organization_id: organizationId,
         p_category: category,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_comparison_date_from: comparisonDateFrom,
@@ -1324,9 +1328,11 @@ export const api = {
       timezone = null,
       productId = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_price_movers_report', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_price_movers_report', {
         p_organization_id: organizationId,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_comparison_date_from: comparisonDateFrom,
@@ -1351,11 +1357,13 @@ export const api = {
       vendorIds = null,
       timezone = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_price_movers_drilldown', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_price_movers_drilldown', {
         p_organization_id: organizationId,
         p_product_id: productId,
         p_product_name: productName,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_comparison_date_from: comparisonDateFrom,
@@ -1374,9 +1382,11 @@ export const api = {
       categoryNames = null,
       timezone = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_inventory_usage_report', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_inventory_usage_report', {
         p_organization_id: organizationId,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_category_names: categoryNames,
@@ -1394,11 +1404,13 @@ export const api = {
       dateTo,
       timezone = null,
     }) => {
-      const { data, error } = await supabase.rpc('get_inventory_usage_drilldown', {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_inventory_usage_drilldown', {
         p_organization_id: organizationId,
         p_inventory_id: inventoryId,
         p_product_id: productId,
-        p_location_ids: locationIds,
+        p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_timezone: timezone,

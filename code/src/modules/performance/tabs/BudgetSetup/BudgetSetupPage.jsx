@@ -47,7 +47,7 @@ function normalizeCategory(value) {
  */
 export default function BudgetSetupPage({ periodStart: initialPeriodStart, periodEnd: initialPeriodEnd } = {}) {
   const demo = import.meta.env.VITE_PERFORMANCE_DEMO === 'true';
-  const { organization, brand, location, userProfile } = useAuth();
+  const { organization, brand, location } = useAuth();
   const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
 
@@ -223,21 +223,19 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
         };
       }
 
-      const existing = targetByCategory[category];
-      const payload = {
-        organization_id: organization?.id,
-        brand_id: (brand?.brand_id || brand?.id) || null,
-        location_id: scopeLocationId,
-        period_start: periodStart,
-        period_end: periodEnd,
-        category,
-        target_amount: amount,
-        target_percent: null,
-        created_by: userProfile?.id || null,
-        updated_by: userProfile?.id || null,
-      };
-      if (existing) return api.entities.BudgetTarget.update(existing.id, payload);
-      return api.entities.BudgetTarget.create(payload);
+      if (!organization?.id || !scopeLocationId) {
+        throw new Error('Performance budgets require one active location');
+      }
+      const { data, error } = await supabase.rpc('upsert_location_performance_budget', {
+        p_organization_id: organization.id,
+        p_location_id: scopeLocationId,
+        p_period_start: periodStart,
+        p_period_end: periodEnd,
+        p_category: category,
+        p_target_amount: amount,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: (row, vars) => {
       if (demo) {
@@ -263,7 +261,18 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
       }
       const existing = targetByCategory[category];
       if (!existing) return null;
-      return api.entities.BudgetTarget.delete(existing.id);
+      if (!organization?.id || !scopeLocationId) {
+        throw new Error('Performance budgets require one active location');
+      }
+      const { data, error } = await supabase.rpc('delete_location_performance_budget', {
+        p_organization_id: organization.id,
+        p_location_id: scopeLocationId,
+        p_period_start: periodStart,
+        p_period_end: periodEnd,
+        p_category: category,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: (_data, category) => {
       if (demo) {

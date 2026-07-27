@@ -3,6 +3,7 @@
  */
 
 export function formatMoney(value, currency = 'USD') {
+  if (value === null || value === undefined || value === '') return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return new Intl.NumberFormat(undefined, {
@@ -15,6 +16,13 @@ export function formatMoney(value, currency = 'USD') {
 export function formatPct(value, digits = 1) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return `${Number(value).toFixed(digits)}%`;
+}
+
+export function formatCount(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(n);
 }
 
 export function exportRowsToCsv(rows, columns, filename = 'category-report.csv') {

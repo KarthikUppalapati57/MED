@@ -13,27 +13,18 @@ import {
 } from 'recharts';
 import { ChefHat, PackageCheck, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
-import { api } from '@/lib/apiClient';
-import { filterByContext } from '@/lib/contextUtils';
-import { useAuthQueries } from '@/hooks/useAuthQuery';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import UsageReportPage from '@/modules/performance/tabs/UsageReport/UsageReportPage';
 import { formatMoney, formatPct } from '@/modules/performance/services/performanceAnalytics';
+import {
+  prepareRecipeRows,
+  summarizeRecipeCoverage,
+} from '@/modules/performance/services/inventoryRecipeCalculations';
+import { fetchLocationRecipeAnalytics } from '@/modules/performance/services/performanceRecipeCatalog';
 
 const COLORS = ['#0f766e', '#b45309', '#be123c', '#1d4ed8', '#7c3aed'];
-
-function recipeName(recipe) {
-  return recipe.name || recipe.recipe_name || recipe.menu_item_name || recipe.title || 'Recipe';
-}
-
-function numberFrom(...values) {
-  for (const value of values) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  return 0;
-}
 
 function StatPill({ icon: Icon, label, value, tone = 'default' }) {
   const toneClass = {
@@ -56,63 +47,54 @@ function StatPill({ icon: Icon, label, value, tone = 'default' }) {
 
 function RecipeMarginPanel() {
   const { organization, brand, location } = useAuth();
-  const scopedFilter = React.useCallback(
-    (data) => filterByContext(data || [], { organization, brand, location }),
-    [organization, brand, location]
-  );
-
-  const results = useAuthQueries({
-    queries: [
-      {
-        queryKey: ['inventory_recipes_recipe_margin', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Recipe.list('-updated_at', { limit: 5000 }),
-        select: scopedFilter,
-        enabled: !!organization?.id,
-      },
+  const query = useAuthQuery({
+    queryKey: [
+      'inventory_recipes_recipe_margin',
+      organization?.id,
+      brand?.brand_id || brand?.id,
+      location?.id,
     ],
+    queryFn: () => fetchLocationRecipeAnalytics({ organization, brand, location }),
+    enabled: Boolean(organization?.id && location?.id),
+    throwOnError: false,
   });
-
-  const query = results[0] || {};
   const recipes = query.data || [];
 
   const analytics = useMemo(() => {
-    const rows = recipes.map((recipe) => {
-      const cost = numberFrom(recipe.cost_per_serving, recipe.total_cost, recipe.recipe_cost, recipe.food_cost);
-      const price = numberFrom(recipe.selling_price, recipe.suggested_price, recipe.menu_price, recipe.price);
-      const targetMargin = Number(recipe.target_margin_percent || recipe.target_margin || 0);
-      const margin = price > 0 ? ((price - cost) / price) * 100 : null;
-      const pressure = margin == null ? 0 : Math.max(0, targetMargin > 0 ? targetMargin - margin : 30 - margin);
-      return {
-        id: recipe.id,
-        name: recipeName(recipe),
-        cost,
-        price,
-        margin,
-        targetMargin,
-        pressure,
-      };
-    });
-
-    const calculable = rows.filter((row) => row.margin != null);
-    const riskRows = calculable
-      .filter((row) => (row.targetMargin > 0 && row.margin < row.targetMargin) || row.margin < 30)
+    const coverage = summarizeRecipeCoverage(recipes);
+    const rows = prepareRecipeRows(recipes);
+    const pressureRows = rows
+      .filter((row) => row.calculable)
+      .map((row) => ({
+        ...row,
+        pressure: Math.max(
+          0,
+          row.targetMargin !== null
+            ? row.targetMargin - row.grossMargin
+            : 30 - row.grossMargin
+        ),
+      }))
+      .filter((row) => row.pressure > 0);
+    const chartRows = pressureRows
       .sort((a, b) => b.pressure - a.pressure)
       .slice(0, 7);
-    const averageMargin = calculable.length
-      ? calculable.reduce((sum, row) => sum + row.margin, 0) / calculable.length
-      : 0;
-    const averageCost = calculable.length
-      ? calculable.reduce((sum, row) => sum + row.cost, 0) / calculable.length
-      : 0;
-    const healthyPct = calculable.length
-      ? ((calculable.length - riskRows.length) / calculable.length) * 100
-      : 0;
+    const averageCost = coverage.calculableRows.length
+      ? coverage.calculableRows.reduce((sum, row) => sum + row.ingredientCost, 0)
+        / coverage.calculableRows.length
+      : null;
+    const healthyPct = coverage.calculableCount
+      ? ((coverage.calculableCount - pressureRows.length) / coverage.calculableCount) * 100
+      : null;
 
-    return { rows, calculable, riskRows, averageMargin, averageCost, healthyPct };
+    return { ...coverage, rows, pressureRows, chartRows, averageCost, healthyPct };
   }, [recipes]);
 
-  const isEmpty = !query.isLoading && analytics.rows.length === 0;
-  const radialData = [{ name: 'Healthy margin', value: Math.max(0, Math.min(100, analytics.healthyPct)), fill: '#0f766e' }];
+  const isEmpty = !query.isLoading && !query.isError && analytics.rows.length === 0;
+  const radialData = [{
+    name: 'Healthy margin',
+    value: Math.max(0, Math.min(100, analytics.healthyPct ?? 0)),
+    fill: '#0f766e',
+  }];
 
   return (
     <div className="space-y-4">
@@ -129,15 +111,23 @@ function RecipeMarginPanel() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatPill
           icon={ChefHat}
-          label="Average recipe margin"
-          value={query.isLoading ? '...' : formatPct(analytics.averageMargin)}
-          tone={analytics.averageMargin >= 35 ? 'good' : analytics.averageMargin >= 25 ? 'warn' : 'risk'}
+          label="Median recipe margin"
+          value={query.isLoading ? '...' : formatPct(analytics.medianMargin)}
+          tone={
+            analytics.medianMargin === null
+              ? 'default'
+              : analytics.medianMargin >= 35
+                ? 'good'
+                : analytics.medianMargin >= 25
+                  ? 'warn'
+                  : 'risk'
+          }
         />
         <StatPill
           icon={ShieldAlert}
           label="Margin pressure recipes"
-          value={query.isLoading ? '...' : String(analytics.riskRows.length)}
-          tone={analytics.riskRows.length ? 'risk' : 'good'}
+          value={query.isLoading ? '...' : String(analytics.pressureRows.length)}
+          tone={analytics.pressureRows.length ? 'risk' : 'good'}
         />
         <StatPill
           icon={PackageCheck}
@@ -146,6 +136,31 @@ function RecipeMarginPanel() {
           tone="default"
         />
       </div>
+
+      {query.isError ? (
+        <Card className="border-destructive/40">
+          <CardContent className="p-4 text-sm text-destructive">
+            Recipe analytics could not be loaded: {query.error?.message || 'Unknown error'}
+          </CardContent>
+        </Card>
+      ) : null}
+      {!query.isLoading && analytics.partial ? (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardContent className="p-4 text-sm text-amber-900">
+            Recipe margin coverage is partial: {analytics.calculableCount} of {analytics.totalCount}
+            {' '}recipes have a stored recipe cost and a positive effective location price.
+          </CardContent>
+        </Card>
+      ) : null}
+      {!query.isLoading && analytics.storedCostOnlyCount > 0 ? (
+        <Card className="border-amber-300 bg-amber-50/50">
+          <CardContent className="p-4 text-sm text-amber-900">
+            {analytics.storedCostOnlyCount} recipes use the Recipe module’s stored cost because
+            normalized ingredient cost snapshots are incomplete. Margins remain calculable, but
+            ingredient-level cost provenance is partial.
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <Card className="xl:col-span-2 glass-card border-border/50 shadow-sm hover-lift">
@@ -161,20 +176,20 @@ function RecipeMarginPanel() {
                 <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center">
                   No recipe price and cost data is available yet.
                 </div>
-              ) : analytics.riskRows.length === 0 ? (
+              ) : analytics.pressureRows.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-sm text-muted-foreground text-center">
                   No recipe margin pressure detected from current recipe pricing.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.riskRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                  <BarChart data={analytics.chartRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-16} textAnchor="end" height={72} />
+                    <XAxis dataKey="recipeName" tick={{ fontSize: 11 }} interval={0} angle={-16} textAnchor="end" height={72} />
                     <YAxis tickFormatter={(value) => `${value}%`} />
                     <Tooltip formatter={(value, name) => [name === 'cost' || name === 'price' ? formatMoney(value, 'USD') : formatPct(value), name]} />
-                    <Bar dataKey="margin" name="Margin" radius={[4, 4, 0, 0]}>
-                      {analytics.riskRows.map((entry, index) => (
-                        <Cell key={entry.id || entry.name} fill={entry.margin < 20 ? '#be123c' : COLORS[index % COLORS.length]} />
+                    <Bar dataKey="grossMargin" name="Margin" radius={[4, 4, 0, 0]}>
+                      {analytics.chartRows.map((entry, index) => (
+                        <Cell key={entry.id || entry.recipeName} fill={entry.grossMargin < 20 ? '#be123c' : COLORS[index % COLORS.length]} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -205,8 +220,15 @@ function RecipeMarginPanel() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{analytics.calculable.length} priced recipes</Badge>
-              <Badge variant={analytics.riskRows.length ? 'destructive' : 'secondary'}>{analytics.riskRows.length} pressure items</Badge>
+              <Badge variant="outline">{analytics.calculableCount} calculable recipes</Badge>
+              {analytics.storedCostOnlyCount ? (
+                <Badge variant="outline">
+                  {analytics.storedCostOnlyCount} using stored recipe cost
+                </Badge>
+              ) : null}
+              <Badge variant={analytics.pressureRows.length ? 'destructive' : 'secondary'}>
+                {analytics.pressureRows.length} pressure items
+              </Badge>
             </div>
           </CardContent>
         </Card>

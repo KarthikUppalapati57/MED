@@ -38,6 +38,8 @@ export function PerformanceFilterBar({
   onAutoComparisonChange,
   onClear,
   onDateRangeCommit,
+  showComparison = true,
+  showVendor = true,
 }) {
   const handleFrom = (value) => {
     onDateFromChange?.(value);
@@ -59,7 +61,7 @@ export function PerformanceFilterBar({
           <Label className="text-xs text-muted-foreground">Date to</Label>
           <Input type="date" value={dateTo || ''} onChange={(e) => handleTo(e.target.value)} className="h-9 w-[150px]" />
         </div>
-        <div className="space-y-1">
+        {showComparison ? <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Compare from</Label>
           <Input
             type="date"
@@ -68,8 +70,8 @@ export function PerformanceFilterBar({
             onChange={(e) => onComparisonDateFromChange?.(e.target.value)}
             className="h-9 w-[150px]"
           />
-        </div>
-        <div className="space-y-1">
+        </div> : null}
+        {showComparison ? <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Compare to</Label>
           <Input
             type="date"
@@ -78,7 +80,7 @@ export function PerformanceFilterBar({
             onChange={(e) => onComparisonDateToChange?.(e.target.value)}
             className="h-9 w-[150px]"
           />
-        </div>
+        </div> : null}
 
         <div className="space-y-1 min-w-[160px]">
           <Label className="text-xs text-muted-foreground">Location</Label>
@@ -128,7 +130,7 @@ export function PerformanceFilterBar({
           </Select>
         </div>
 
-        <div className="space-y-1 min-w-[160px]">
+        {showVendor ? <div className="space-y-1 min-w-[160px]">
           <Label className="text-xs text-muted-foreground">Vendor</Label>
           <Select
             value={vendorIds[0] || 'all'}
@@ -146,9 +148,9 @@ export function PerformanceFilterBar({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div> : null}
 
-        <Button
+        {showComparison ? <Button
           type="button"
           variant={autoComparison ? 'secondary' : 'outline'}
           size="sm"
@@ -156,7 +158,7 @@ export function PerformanceFilterBar({
           onClick={() => onAutoComparisonChange?.(!autoComparison)}
         >
           {autoComparison ? 'Auto comparison' : 'Custom comparison'}
-        </Button>
+        </Button> : null}
 
         <Button type="button" variant="ghost" size="sm" className="h-9" onClick={onClear}>
           <X className="w-4 h-4 mr-1" />
