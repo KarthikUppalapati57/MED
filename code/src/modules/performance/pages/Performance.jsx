@@ -294,7 +294,7 @@ export default function Performance() {
             <ComingSoonPanel
               title="Sales Report"
               description="Sales reporting needs POS or sales imports, which are planned after the current module set."
-              available={['Invoice spend trend', 'Payment status exposure', 'Product price movers']}
+              available={['Invoice allocation spend trend', 'Separate payment status exposure', 'Product price movers']}
             />
           </TabsContent>
 

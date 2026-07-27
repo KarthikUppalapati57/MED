@@ -57,6 +57,46 @@ function pct(curr, prev) {
   return round(((curr - prev) / Math.abs(prev)) * 100, 2);
 }
 
+function impactEvidence({ qty = null, unit = null, currentPrice = null, previousPrice = null, priceChange = null, estimatedImpact = null, mappingStatus = null, comparable = true }) {
+  const mappingConfidence =
+    mappingStatus === 'verified'
+      ? 'verified'
+      : mappingStatus === 'mapped'
+        ? 'mapped_unverified'
+        : mappingStatus;
+  const evidenceComplete = Boolean(
+    comparable &&
+      mappingConfidence === 'verified' &&
+      qty != null &&
+      qty !== 0 &&
+      unit &&
+      priceChange != null &&
+      estimatedImpact != null
+  );
+  return {
+    normalizedPurchasedQuantity: comparable ? qty : null,
+    normalizedQuantityUnit: unit,
+    currentWeightedUnitPrice: currentPrice,
+    comparisonWeightedUnitPrice: comparable ? previousPrice : null,
+    unitPriceDifference: comparable ? priceChange : null,
+    mappingConfidence,
+    impactEvidenceComplete: evidenceComplete,
+    impactFormula: 'unitPriceDifference * normalizedPurchasedQuantity',
+  };
+}
+
+function pickImpactEvidence(r) {
+  return {
+    normalizedPurchasedQuantity: r.normalizedPurchasedQuantity,
+    normalizedQuantityUnit: r.normalizedQuantityUnit,
+    currentWeightedUnitPrice: r.currentWeightedUnitPrice,
+    comparisonWeightedUnitPrice: r.comparisonWeightedUnitPrice,
+    unitPriceDifference: r.unitPriceDifference,
+    mappingConfidence: r.mappingConfidence,
+    impactEvidenceComplete: r.impactEvidenceComplete,
+    impactFormula: r.impactFormula,
+  };
+}
 function buildDemoRows() {
   const rng = createRng(91);
   const rows = [];
@@ -80,6 +120,7 @@ function buildDemoRows() {
         invoiceCount: 3,
         lastPurchase: '2026-07-18',
         mappingStatus: 'unmapped',
+        ...impactEvidence({ unit: p.unit, currentPrice: p.base, mappingStatus: 'unmapped', comparable: false }),
         comparabilityStatus: 'not_comparable',
         outlierStatus: 'n/a',
       });
@@ -104,6 +145,7 @@ function buildDemoRows() {
         invoiceCount: 5,
         lastPurchase: '2026-07-15',
         mappingStatus: 'mapped',
+        ...impactEvidence({ unit: 'Each', currentPrice: p.base, mappingStatus: 'mapped', comparable: false }),
         comparabilityStatus: 'not_comparable',
         outlierStatus: 'n/a',
       });
@@ -124,6 +166,7 @@ function buildDemoRows() {
     const qty = 80 + Math.floor(rng() * 220);
     const estimatedImpact = round(priceChange * qty, 2);
     const vendor = VENDORS[idx % VENDORS.length];
+    const mappingStatus = rng() > 0.2 ? 'verified' : 'mapped';
 
     rows.push({
       productId: `demo-prod-${idx}`,
@@ -139,9 +182,10 @@ function buildDemoRows() {
       percentageChange,
       currentSpend: round(currentPrice * qty, 2),
       estimatedImpact,
+      ...impactEvidence({ qty, unit: p.unit, currentPrice, previousPrice, priceChange, estimatedImpact, mappingStatus }),
       invoiceCount: 4 + Math.floor(rng() * 12),
       lastPurchase: `2026-07-${String(10 + (idx % 10)).padStart(2, '0')}`,
-      mappingStatus: rng() > 0.2 ? 'verified' : 'mapped',
+      mappingStatus,
       comparabilityStatus: 'comparable',
       outlierStatus: Math.abs(percentageChange || 0) >= 50 ? 'outlier' : 'normal',
     });
@@ -170,6 +214,7 @@ function buildDemoRows() {
       percentageChange,
       currentSpend: round(curr * qty, 2),
       estimatedImpact: round(change * qty, 2),
+      ...impactEvidence({ qty, unit: i % 3 === 0 ? 'Case' : 'Pound', currentPrice: curr, previousPrice: prev, priceChange: change, estimatedImpact: round(change * qty, 2), mappingStatus: 'mapped' }),
       invoiceCount: 2 + (i % 8),
       lastPurchase: `2026-07-${String(1 + (i % 20)).padStart(2, '0')}`,
       mappingStatus: 'mapped',
@@ -216,6 +261,7 @@ export function getPriceMoversDemoData(params = {}) {
     priceChange: r.priceChange,
     estimatedImpact: r.estimatedImpact,
     currentPrice: r.currentPrice,
+    ...pickImpactEvidence(r),
   }));
 
   const trendProducts = comparable.slice(0, 5);
@@ -249,6 +295,7 @@ export function getPriceMoversDemoData(params = {}) {
     estimatedImpact: r.estimatedImpact,
     currentSpend: r.currentSpend,
     category: r.category,
+    ...pickImpactEvidence(r),
   }));
 
   const catMap = new Map();
@@ -335,6 +382,7 @@ export function getPriceMoversDemoData(params = {}) {
             priceChange: largestIncrease.priceChange,
             percentageChange: largestIncrease.percentageChange,
             estimatedImpact: largestIncrease.estimatedImpact,
+            ...pickImpactEvidence(largestIncrease),
           }
         : null,
       largestPriceDecrease: largestDecrease
@@ -345,6 +393,7 @@ export function getPriceMoversDemoData(params = {}) {
             priceChange: largestDecrease.priceChange,
             percentageChange: largestDecrease.percentageChange,
             estimatedImpact: largestDecrease.estimatedImpact,
+            ...pickImpactEvidence(largestDecrease),
           }
         : null,
       mostVolatileProduct: mostVolatile
@@ -354,6 +403,7 @@ export function getPriceMoversDemoData(params = {}) {
             category: mostVolatile.category,
             percentageChange: mostVolatile.percentageChange,
             estimatedImpact: mostVolatile.estimatedImpact,
+            ...pickImpactEvidence(mostVolatile),
           }
         : null,
       vendorsDrivingIncreases: new Set(increases.map((r) => r.vendorId)).size,
@@ -455,6 +505,7 @@ export function getPriceMoversDrilldownDemoData({ productId, productName, ...par
       currentSpend: row.currentSpend,
       invoiceCount: row.invoiceCount,
       vendorCount: vendorComparison.length,
+      ...pickImpactEvidence(row),
     },
     priceHistory,
     vendorComparison,

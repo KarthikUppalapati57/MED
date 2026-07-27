@@ -103,7 +103,7 @@ function RecipeMarginPanel() {
           <p className="text-xs font-medium uppercase text-muted-foreground">Inventory + Recipes</p>
           <h2 className="text-2xl font-semibold tracking-tight mt-1">Inventory & Recipes</h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-            Actual inventory usage, stock risk, recipe cost, and recipe margin pressure using the five active modules.
+            Actual inventory usage, current-state stock risk, current-state recipe cost, and current-state recipe margin pressure using the five active modules.
           </p>
         </div>
       </div>
@@ -111,7 +111,7 @@ function RecipeMarginPanel() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatPill
           icon={ChefHat}
-          label="Median recipe margin"
+          label="Median current recipe margin"
           value={query.isLoading ? '...' : formatPct(analytics.medianMargin)}
           tone={
             analytics.medianMargin === null
@@ -131,7 +131,7 @@ function RecipeMarginPanel() {
         />
         <StatPill
           icon={PackageCheck}
-          label="Average recipe cost"
+          label="Average current recipe cost"
           value={query.isLoading ? '...' : formatMoney(analytics.averageCost, 'USD')}
           tone="default"
         />
@@ -147,7 +147,7 @@ function RecipeMarginPanel() {
       {!query.isLoading && analytics.partial ? (
         <Card className="border-amber-300 bg-amber-50/50">
           <CardContent className="p-4 text-sm text-amber-900">
-            Recipe margin coverage is partial: {analytics.calculableCount} of {analytics.totalCount}
+            Source partially complete: recipe margin coverage is partial: {analytics.calculableCount} of {analytics.totalCount}
             {' '}recipes have a stored recipe cost and a positive effective location price.
           </CardContent>
         </Card>
@@ -157,7 +157,7 @@ function RecipeMarginPanel() {
           <CardContent className="p-4 text-sm text-amber-900">
             {analytics.storedCostOnlyCount} recipes use the Recipe module’s stored cost because
             normalized ingredient cost snapshots are incomplete. Margins remain calculable, but
-            ingredient-level cost provenance is partial.
+            ingredient-level cost provenance is partial, not failed or complete.
           </CardContent>
         </Card>
       ) : null}

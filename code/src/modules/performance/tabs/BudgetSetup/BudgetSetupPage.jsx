@@ -146,23 +146,36 @@ export default function BudgetSetupPage({ periodStart: initialPeriodStart, perio
           periodEnd,
         ],
         queryFn: async () => {
-          const { data, error } = await supabase
+          let query = supabase
             .from('budget_targets')
             .select('*')
-            .eq('organization_id', organization?.id);
+            .eq('organization_id', organization?.id)
+            .eq('period_start', periodStart)
+            .eq('period_end', periodEnd);
+
+          if (scopeLocationId) {
+            query = query.eq('location_id', scopeLocationId);
+          } else {
+            query = query.is('location_id', null);
+          }
+
+          const activeBrandId = brand?.brand_id || brand?.id || null;
+          if (activeBrandId) {
+            query = query.eq('brand_id', activeBrandId);
+          } else {
+            query = query.is('brand_id', null);
+          }
+
+          const { data, error } = await query;
           if (error) throw error;
           return data || [];
         },
         select: React.useCallback(
           (data) => {
             const scoped = filterByContext(data || [], { organization, brand, location: null });
-            return scoped.filter((row) => {
-              if (row.period_start !== periodStart || row.period_end !== periodEnd) return false;
-              if (scopeLocationId == null) return row.location_id == null;
-              return row.location_id === scopeLocationId;
-            });
+            return scoped.filter((row) => row.location_id === scopeLocationId);
           },
-          [organization, brand, periodStart, periodEnd, scopeLocationId]
+          [organization, brand, scopeLocationId]
         ),
         enabled: !demo && !!organization?.id && !!periodStart && !!periodEnd,
       },

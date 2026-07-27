@@ -8,7 +8,6 @@ import {
 export function usePriceMovers({
   organizationId,
   filters,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   const demo = isPriceMoversDemoEnabled();
@@ -25,7 +24,6 @@ export function usePriceMovers({
       filters?.locationIds,
       filters?.categoryIds,
       filters?.vendorIds,
-      timezone,
     ],
     queryFn: () =>
       fetchPriceMoversReport({
@@ -37,7 +35,6 @@ export function usePriceMovers({
         comparisonDateTo: filters.comparisonDateTo,
         categoryNames: filters?.categoryIds?.length ? filters.categoryIds : null,
         vendorIds: filters?.vendorIds?.length ? filters.vendorIds : null,
-        timezone,
       }),
     enabled: Boolean(enabled && filters?.dateFrom && filters?.dateTo && (demo || organizationId)),
     staleTime: 30_000,
@@ -71,7 +68,6 @@ export function usePriceMoversDrilldown({
   filters,
   productId,
   productName,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   const demo = isPriceMoversDemoEnabled();
@@ -89,7 +85,6 @@ export function usePriceMoversDrilldown({
       filters?.comparisonDateTo,
       filters?.locationIds,
       filters?.vendorIds,
-      timezone,
     ],
     queryFn: () =>
       fetchPriceMoversDrilldown({
@@ -102,7 +97,6 @@ export function usePriceMoversDrilldown({
         comparisonDateFrom: filters.comparisonDateFrom,
         comparisonDateTo: filters.comparisonDateTo,
         vendorIds: filters?.vendorIds?.length ? filters.vendorIds : null,
-        timezone,
       }),
     enabled: Boolean(
       enabled &&

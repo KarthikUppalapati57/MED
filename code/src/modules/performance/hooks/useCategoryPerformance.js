@@ -10,7 +10,6 @@ export function useCategoryPerformance({
   filters,
   selectedCategory = null,
   trendCategories = null,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   const query = useQuery({
@@ -26,7 +25,6 @@ export function useCategoryPerformance({
       filters?.vendorIds,
       selectedCategory,
       trendCategories,
-      timezone,
     ],
     queryFn: () =>
       api.reports.getCategoryPerformanceReport({
@@ -38,7 +36,6 @@ export function useCategoryPerformance({
         comparisonDateTo: filters.comparisonDateTo,
         categoryNames: filters?.categoryIds?.length ? filters.categoryIds : null,
         vendorIds: filters?.vendorIds?.length ? filters.vendorIds : null,
-        timezone,
         selectedCategory,
         trendCategories,
       }),
@@ -81,7 +78,6 @@ export function useCategoryPerformanceDrilldown({
   organizationId,
   filters,
   category,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   return useQuery({
@@ -95,7 +91,6 @@ export function useCategoryPerformanceDrilldown({
       filters?.comparisonDateTo,
       filters?.locationIds,
       filters?.vendorIds,
-      timezone,
     ],
     queryFn: () =>
       api.reports.getCategoryPerformanceDrilldown({
@@ -107,7 +102,6 @@ export function useCategoryPerformanceDrilldown({
         comparisonDateFrom: filters.comparisonDateFrom,
         comparisonDateTo: filters.comparisonDateTo,
         vendorIds: filters?.vendorIds?.length ? filters.vendorIds : null,
-        timezone,
       }),
     enabled: Boolean(enabled && organizationId && category && filters?.dateFrom && filters?.dateTo),
     staleTime: 30_000,

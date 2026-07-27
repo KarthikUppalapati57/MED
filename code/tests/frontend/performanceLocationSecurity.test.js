@@ -18,6 +18,9 @@ const performancePage = source('src/modules/performance/pages/Performance.jsx');
 const budgetPage = source(
   'src/modules/performance/tabs/BudgetSetup/BudgetSetupPage.jsx'
 );
+const performanceSecurityMatrix = source(
+  'supabase/tests/performance_active_hierarchy_security_acceptance.sql'
+);
 
 describe('strict location Performance security', () => {
   it('requires an authenticated manager and the exact active hierarchy location', () => {
@@ -92,5 +95,30 @@ describe('strict location Performance security', () => {
     expect(migration).toContain(
       'REVOKE INSERT, UPDATE, DELETE ON public.budget_targets FROM authenticated'
     );
+  });
+  it('documents the executable Phase 6 role matrix', () => {
+    for (const scenario of [
+      'anonymous_request_denied',
+      'ground_staff_denied',
+      'location_manager_active_location_allowed',
+      'location_manager_different_location_denied',
+      'branch_manager_active_location_allowed',
+      'branch_manager_inactive_location_denied',
+      'brand_manager_active_brand_location_allowed',
+      'brand_manager_other_brand_denied',
+      'org_manager_active_location_allowed',
+      'org_manager_inactive_location_denied',
+      'tenant_super_admin_active_hierarchy_allowed',
+      'cross_organization_request_denied',
+      'deleted_location_denied',
+      'service_role_valid_location_allowed',
+      'service_role_missing_location_denied',
+      'location_manager_budget_write_allowed',
+      'ground_staff_budget_write_denied',
+    ]) {
+      expect(performanceSecurityMatrix).toContain(scenario);
+    }
+    expect(performanceSecurityMatrix).toContain('public.assert_performance_location_access');
+    expect(performanceSecurityMatrix).toContain('ROLLBACK;');
   });
 });

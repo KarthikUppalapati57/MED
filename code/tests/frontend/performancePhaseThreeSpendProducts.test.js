@@ -141,7 +141,7 @@ describe('Phase 3 Price Movers semantics', () => {
   it('sorts trustworthy impact first and falls back to absolute unit change', () => {
     const rows = preparePriceMoverRows([
       { product: 'Price only small', currentPrice: 12, previousPrice: 10, comparabilityStatus: 'comparable' },
-      { product: 'Impact', currentPrice: 11, previousPrice: 10, comparabilityStatus: 'comparable', estimatedImpact: 20 },
+      comparable('Impact', 11, 10, 20),
       { product: 'Price only large', currentPrice: 20, previousPrice: 10, comparabilityStatus: 'comparable' },
     ]);
     expect(rows.map((row) => row.product)).toEqual(['Impact', 'Price only large', 'Price only small']);
@@ -175,11 +175,19 @@ describe('Phase 3 Price Movers semantics', () => {
 });
 
 function comparable(product, currentPrice, previousPrice, estimatedImpact) {
+  const priceChange = currentPrice - previousPrice;
+  const quantity = priceChange === 0 ? 10 : Math.abs(estimatedImpact / priceChange);
   return {
     product,
     currentPrice,
     previousPrice,
     estimatedImpact,
+    normalizedPurchasedQuantity: quantity,
+    normalizedQuantityUnit: 'Pound',
+    unitPriceDifference: priceChange,
+    mappingStatus: 'verified',
+    mappingConfidence: 'verified',
+    impactEvidenceComplete: true,
     comparabilityStatus: 'comparable',
   };
 }

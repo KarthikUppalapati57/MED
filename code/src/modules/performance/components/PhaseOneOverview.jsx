@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+﻿import React, { useMemo } from 'react';
 import {
   Bar,
   BarChart,
@@ -339,7 +339,7 @@ export default function PhaseOneOverview({
         ? [{
             tone: 'warn',
             title: `${compactMoney(invoiceUnpaid)} unpaid invoice exposure`,
-            body: 'Review Payments and invoice statuses before cash-out planning.',
+            body: 'Review unpaid invoice obligations separately from scheduled, processing, failed, cancelled, or refunded payment attempts.',
             tab: null,
           }]
         : []),
@@ -392,7 +392,7 @@ export default function PhaseOneOverview({
           label: 'Invoices',
           icon: FileText,
           value: compactMoney(totalSpend),
-          detail: `${summary.invoiceCount || 0} categorized invoices`,
+          detail: `${summary.invoiceCount || 0} invoices contributing allocated spend`,
           progress: Math.min(100, Number(summary.activeCategoryCount || 0) * 12),
           tone: Number(summary.categoriesOverBudget || 0) > 0 ? 'warn' : 'good',
         },
@@ -400,7 +400,7 @@ export default function PhaseOneOverview({
           label: 'Payments',
           icon: CreditCard,
           value: compactMoney(paymentExposure),
-          detail: 'open payment exposure',
+          detail: 'separate invoice and payment status exposure',
           progress: paymentExposure ? 68 : 100,
           tone: paymentExposure ? 'warn' : 'good',
         },
@@ -416,7 +416,7 @@ export default function PhaseOneOverview({
           label: 'Inventory',
           icon: Boxes,
           value: String(lowStock),
-          detail: `${compactMoney(inventoryValue)} current value`,
+          detail: `${compactMoney(inventoryValue)} current-state value`,
           progress: 100 - inventoryRisk,
           tone: lowStock ? 'warn' : 'good',
         },
@@ -424,7 +424,7 @@ export default function PhaseOneOverview({
           label: 'Recipes',
           icon: ChefHat,
           value: String(recipeMarginRisks.length),
-          detail: `${formatPct(averageRecipeMargin)} avg margin`,
+          detail: `${formatPct(averageRecipeMargin)} current avg margin`,
           progress: recipes.length ? 100 - pctOf(recipeMarginRisks.length, recipes.length) : 0,
           tone: recipeMarginRisks.length ? 'risk' : 'good',
         },
@@ -494,7 +494,7 @@ export default function PhaseOneOverview({
           icon={CreditCard}
           label="Payment exposure"
           value={isLoading ? '...' : compactMoney(analytics.paymentExposure)}
-          detail="Unpaid, scheduled, failed, or partial"
+          detail="Invoice obligations and payment attempts kept separate"
           tone={analytics.paymentExposure > 0 ? 'warn' : 'good'}
         />
         <StatCard
@@ -561,7 +561,7 @@ export default function PhaseOneOverview({
         <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Action Signals</CardTitle>
-            <CardDescription>Alerts from the five active modules.</CardDescription>
+            <CardDescription>Source loaded successfully; empty and failed sources are shown separately.</CardDescription>
           </CardHeader>
           <CardContent>
             {analytics.actionItems.length === 0 ? (
@@ -629,7 +629,7 @@ export default function PhaseOneOverview({
         <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Category distribution</CardTitle>
-            <CardDescription>Where invoice spend is concentrated.</CardDescription>
+            <CardDescription>Where invoice allocation spend is concentrated.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
@@ -654,8 +654,8 @@ export default function PhaseOneOverview({
 
         <Card className="performance-chart-card overflow-hidden" string="progress">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Payment status exposure</CardTitle>
-            <CardDescription>Paid, scheduled, unpaid, and failed cash-out signals.</CardDescription>
+            <CardTitle className="text-base">Separate payment status exposure</CardTitle>
+            <CardDescription>Invoice obligations and payment attempts are displayed separately for review.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">

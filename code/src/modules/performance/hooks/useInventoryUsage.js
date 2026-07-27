@@ -8,7 +8,6 @@ import {
 export function useInventoryUsage({
   organizationId,
   filters,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   const demo = isInventoryUsageDemoEnabled();
@@ -22,7 +21,6 @@ export function useInventoryUsage({
       filters?.dateTo,
       filters?.locationIds,
       filters?.categoryIds,
-      timezone,
     ],
     queryFn: () =>
       fetchInventoryUsageReport({
@@ -31,7 +29,6 @@ export function useInventoryUsage({
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
         categoryNames: filters?.categoryIds?.length ? filters.categoryIds : null,
-        timezone,
       }),
     enabled: Boolean(enabled && filters?.dateFrom && filters?.dateTo && (demo || organizationId)),
     staleTime: 30_000,
@@ -67,7 +64,6 @@ export function useInventoryUsageDrilldown({
   filters,
   inventoryId,
   productId,
-  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   enabled = true,
 }) {
   const demo = isInventoryUsageDemoEnabled();
@@ -82,7 +78,6 @@ export function useInventoryUsageDrilldown({
       filters?.dateFrom,
       filters?.dateTo,
       filters?.locationIds,
-      timezone,
     ],
     queryFn: () =>
       fetchInventoryUsageDrilldown({
@@ -92,7 +87,6 @@ export function useInventoryUsageDrilldown({
         locationIds: filters?.locationIds?.length ? filters.locationIds : null,
         dateFrom: filters.dateFrom,
         dateTo: filters.dateTo,
-        timezone,
       }),
     enabled: Boolean(
       enabled &&

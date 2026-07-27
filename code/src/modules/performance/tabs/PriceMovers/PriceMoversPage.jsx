@@ -51,6 +51,11 @@ const EXPORT_COLUMNS = [
   { header: 'Previous Price', accessor: 'previousPrice' },
   { header: 'Price Change', accessor: 'priceChange' },
   { header: '% Change', accessor: 'percentageChange' },
+  { header: 'Normalized Quantity', accessor: 'normalizedPurchasedQuantity' },
+  { header: 'Normalized Unit', accessor: 'normalizedQuantityUnit' },
+  { header: 'Unit Price Difference', accessor: 'unitPriceDifference' },
+  { header: 'Impact Evidence', accessor: rawImpactBasis },
+  { header: 'Mapping Confidence', accessor: 'mappingConfidence' },
   { header: 'Current Spend', accessor: 'currentSpend' },
   { header: 'Estimated Impact', accessor: 'estimatedImpact' },
   { header: 'Invoice Count', accessor: 'invoiceCount' },
@@ -61,7 +66,30 @@ const EXPORT_COLUMNS = [
 ];
 
 const PRICE_TOOLTIP =
-  'Normalized weighted-average unit cost = line total / (qty × conversion multiplier). Comparisons require the same mapped product and normalized UOM. Not Comparable returns null % change.';
+  'Normalized weighted-average unit cost = line total / (qty x conversion multiplier). Comparisons require the same mapped product and normalized UOM. Not Comparable returns null percent change.';
+
+function qtyLabel(value) {
+  if (value === null || value === undefined || value === '') return 'n/a';
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(n)
+    : 'n/a';
+}
+
+function rawImpactBasis(row) {
+  if (row?.unitPriceDifference == null || row?.normalizedPurchasedQuantity == null) return '';
+  const unit = row.normalizedQuantityUnit || row.unit || '';
+  return `${row.unitPriceDifference} x ${row.normalizedPurchasedQuantity} ${unit} = ${row.estimatedImpact ?? ''}`.trim();
+}
+
+function impactBasisLabel(row, currency) {
+  if (row?.unitPriceDifference == null || row?.normalizedPurchasedQuantity == null) {
+    return row?.confidence === 'unit_mapping_unverified' ? 'Unverified mapping' : 'Basis unavailable';
+  }
+  const unit = row.normalizedQuantityUnit || row.unit || '';
+  const result = row.estimatedImpact == null ? '-' : formatMoney(row.estimatedImpact, currency);
+  return `${formatMoney(row.unitPriceDifference, currency)} x ${qtyLabel(row.normalizedPurchasedQuantity)} ${unit} = ${result}`;
+}
 
 export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
   const navigate = useNavigate();
@@ -174,9 +202,21 @@ export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
         cell: (row) => formatMoney(row.currentSpend, currency),
       },
       {
+        accessor: 'impactBasis',
+        header: 'Impact basis',
+        cell: (row) => (
+          <div className="min-w-[220px] text-xs leading-5">
+            <div className="font-medium">{impactBasisLabel(row, currency)}</div>
+            <div className="text-muted-foreground">
+              {row.impactEvidenceComplete ? 'Verified evidence' : row.confidence || 'Evidence incomplete'}
+            </div>
+          </div>
+        ),
+      },
+      {
         accessor: 'estimatedImpact',
         header: 'Est. impact',
-        cell: (row) => (row.estimatedImpact == null ? '—' : formatMoney(row.estimatedImpact, currency)),
+        cell: (row) => (row.estimatedImpact == null ? '-' : formatMoney(row.estimatedImpact, currency)),
       },
       { accessor: 'invoiceCount', header: 'Invoices' },
       { accessor: 'lastPurchase', header: 'Last purchase' },
@@ -287,7 +327,7 @@ export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
         />
         <EnterpriseKpiCard
           label="Estimated Unfavorable Impact"
-          tooltip="Sum of positive estimated impacts: (current − previous unit cost) × current normalized qty."
+          tooltip="Sum of positive estimated impacts. Each row exposes unit price difference x normalized purchased quantity = estimated impact."
           loading={isLoading}
           empty={showEmpty}
           error={showError}
@@ -364,7 +404,7 @@ export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
       ) : (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <ChartCard title="Price Movers Ranking" description="Top impact products (est. $)">
+            <ChartCard title="Price Movers Ranking" description="Top estimated impact products with normalized quantity basis">
               {isLoading ? (
                 <ChartLoadingState />
               ) : (
@@ -441,7 +481,7 @@ export default function PriceMoversPage({ periodStart, periodEnd } = {}) {
               )}
             </ChartCard>
 
-            <ChartCard title="Price Impact Scatter" description="% change vs estimated impact" className="xl:col-span-2">
+            <ChartCard title="Price Impact Scatter" description="Percent change vs estimated impact; row detail shows normalized quantity basis" className="xl:col-span-2">
               {isLoading ? (
                 <ChartLoadingState height={260} />
               ) : (
@@ -580,6 +620,11 @@ function PriceMoversDrilldownBody({ data, currency, onOpenInvoice }) {
           sub={s.percentageChange == null ? undefined : formatPct(s.percentageChange)}
         />
         <MiniStat label="Current spend" value={formatMoney(s.currentSpend, currency)} />
+        <MiniStat
+          label="Impact basis"
+          value={impactBasisLabel(s, currency)}
+          sub={s.impactEvidenceComplete ? 'Verified evidence' : s.mappingConfidence || undefined}
+        />
         <MiniStat label="Invoices" value={String(s.invoiceCount || 0)} />
         <MiniStat label="Vendors" value={String(s.vendorCount || 0)} />
       </div>

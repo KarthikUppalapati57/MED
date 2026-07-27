@@ -82,19 +82,49 @@ export function preparePriceMoverRows(rows = []) {
       row.comparabilityStatus === 'comparable' &&
       currentPrice !== null &&
       previousPrice !== null;
-    const priceChange = comparable ? currentPrice - previousPrice : null;
+    const backendPriceChange = finiteOrNull(row.unitPriceDifference ?? row.priceChange);
+    const priceChange = comparable
+      ? backendPriceChange ?? currentPrice - previousPrice
+      : null;
     const percentageChange =
       comparable && previousPrice !== 0
         ? (priceChange / Math.abs(previousPrice)) * 100
         : null;
     const estimatedImpact = finiteOrNull(row.estimatedImpact);
-    const impactReliable = comparable && estimatedImpact !== null;
+    const normalizedPurchasedQuantity = finiteOrNull(
+      row.normalizedPurchasedQuantity ?? row.normalizedQuantity ?? row.impactQuantity ?? row.quantity
+    );
+    const normalizedQuantityUnit = row.normalizedQuantityUnit || row.unit || null;
+    const currentWeightedUnitPrice = finiteOrNull(row.currentWeightedUnitPrice ?? row.currentPrice);
+    const comparisonWeightedUnitPrice = finiteOrNull(row.comparisonWeightedUnitPrice ?? row.previousPrice);
+    const unitPriceDifference = comparable
+      ? finiteOrNull(row.unitPriceDifference ?? priceChange)
+      : null;
+    const mappingConfidence =
+      row.mappingConfidence ||
+      (row.mappingStatus === 'verified'
+        ? 'verified'
+        : row.mappingStatus === 'mapped'
+          ? 'mapped_unverified'
+          : row.mappingStatus || null);
+    const evidenceComplete =
+      row.impactEvidenceComplete === true ||
+      (
+        comparable &&
+        mappingConfidence === 'verified' &&
+        estimatedImpact !== null &&
+        normalizedPurchasedQuantity !== null &&
+        normalizedPurchasedQuantity !== 0 &&
+        unitPriceDifference !== null &&
+        normalizedQuantityUnit
+      );
+    const impactReliable = comparable && estimatedImpact !== null && Boolean(evidenceComplete);
     const direction =
-      impactReliable && estimatedImpact > 0
+      comparable && estimatedImpact !== null && estimatedImpact > 0
         ? 'adverse'
-        : impactReliable && estimatedImpact < 0
+        : comparable && estimatedImpact !== null && estimatedImpact < 0
           ? 'favorable'
-          : impactReliable
+          : comparable && estimatedImpact !== null
             ? 'no_material_impact'
           : comparable && priceChange > 0
             ? 'price_up_impact_unavailable'
@@ -103,10 +133,16 @@ export function preparePriceMoverRows(rows = []) {
               : comparable
                 ? 'no_change'
                 : 'not_comparable';
-    const confidence = impactReliable
+    const confidence = evidenceComplete
       ? 'complete'
       : comparable
-        ? 'price_only'
+        ? mappingConfidence && mappingConfidence !== 'verified'
+          ? 'unit_mapping_unverified'
+          : estimatedImpact === null
+            ? 'price_only'
+            : normalizedPurchasedQuantity === null || normalizedPurchasedQuantity === 0
+              ? 'quantity_missing'
+              : 'price_only'
         : currentPrice !== null
           ? 'comparison_missing'
           : 'current_price_missing';
@@ -116,9 +152,17 @@ export function preparePriceMoverRows(rows = []) {
       previousPrice,
       priceChange,
       percentageChange,
-      estimatedImpact: impactReliable ? estimatedImpact : null,
-      quantity: null,
+      estimatedImpact,
+      normalizedPurchasedQuantity,
+      normalizedQuantityUnit,
+      currentWeightedUnitPrice,
+      comparisonWeightedUnitPrice,
+      unitPriceDifference,
+      quantity: normalizedPurchasedQuantity,
       impactReliable,
+      impactEvidenceComplete: Boolean(evidenceComplete),
+      mappingConfidence,
+      impactFormula: row.impactFormula || 'unitPriceDifference * normalizedPurchasedQuantity',
       direction,
       confidence,
     };

@@ -1267,7 +1267,6 @@ export const api = {
       comparisonDateTo = null,
       categoryNames = null,
       vendorIds = null,
-      timezone = null,
       selectedCategory = null,
       trendCategories = null,
     }) => {
@@ -1282,7 +1281,6 @@ export const api = {
         p_comparison_date_to: comparisonDateTo,
         p_category_names: categoryNames,
         p_vendor_ids: vendorIds,
-        p_timezone: timezone,
         p_selected_category: selectedCategory,
         p_trend_categories: trendCategories,
       });
@@ -1298,7 +1296,6 @@ export const api = {
       comparisonDateFrom = null,
       comparisonDateTo = null,
       vendorIds = null,
-      timezone = null,
     }) => {
       const locationId = locationIds?.length === 1 ? locationIds[0] : null;
       if (!locationId) throw new Error('Performance requires one selected location.');
@@ -1311,7 +1308,6 @@ export const api = {
         p_comparison_date_from: comparisonDateFrom,
         p_comparison_date_to: comparisonDateTo,
         p_vendor_ids: vendorIds,
-        p_timezone: timezone,
       });
       if (error) throw error;
       return data;
@@ -1325,7 +1321,6 @@ export const api = {
       comparisonDateTo = null,
       categoryNames = null,
       vendorIds = null,
-      timezone = null,
       productId = null,
     }) => {
       const locationId = locationIds?.length === 1 ? locationIds[0] : null;
@@ -1339,7 +1334,6 @@ export const api = {
         p_comparison_date_to: comparisonDateTo,
         p_category_names: categoryNames,
         p_vendor_ids: vendorIds,
-        p_timezone: timezone,
         p_product_id: productId,
       });
       if (error) throw error;
@@ -1355,7 +1349,6 @@ export const api = {
       comparisonDateFrom = null,
       comparisonDateTo = null,
       vendorIds = null,
-      timezone = null,
     }) => {
       const locationId = locationIds?.length === 1 ? locationIds[0] : null;
       if (!locationId) throw new Error('Performance requires one selected location.');
@@ -1369,7 +1362,6 @@ export const api = {
         p_comparison_date_from: comparisonDateFrom,
         p_comparison_date_to: comparisonDateTo,
         p_vendor_ids: vendorIds,
-        p_timezone: timezone,
       });
       if (error) throw error;
       return data;
@@ -1380,7 +1372,6 @@ export const api = {
       dateFrom,
       dateTo,
       categoryNames = null,
-      timezone = null,
     }) => {
       const locationId = locationIds?.length === 1 ? locationIds[0] : null;
       if (!locationId) throw new Error('Performance requires one selected location.');
@@ -1390,7 +1381,6 @@ export const api = {
         p_date_from: dateFrom,
         p_date_to: dateTo,
         p_category_names: categoryNames,
-        p_timezone: timezone,
       });
       if (error) throw error;
       return data;
@@ -1402,7 +1392,6 @@ export const api = {
       locationIds = null,
       dateFrom,
       dateTo,
-      timezone = null,
     }) => {
       const locationId = locationIds?.length === 1 ? locationIds[0] : null;
       if (!locationId) throw new Error('Performance requires one selected location.');
@@ -1413,7 +1402,6 @@ export const api = {
         p_location_id: locationId,
         p_date_from: dateFrom,
         p_date_to: dateTo,
-        p_timezone: timezone,
       });
       if (error) throw error;
       return data;

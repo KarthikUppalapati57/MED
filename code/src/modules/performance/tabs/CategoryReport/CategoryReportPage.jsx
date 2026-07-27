@@ -358,12 +358,12 @@ export default function CategoryReportPage({ periodStart, periodEnd } = {}) {
         />
         <EnterpriseKpiCard
           label="Average Invoice Value"
-          tooltip="Total eligible purchasing spend divided by unique invoice count."
+          tooltip="Total eligible purchasing spend divided by invoices contributing allocated spend."
           loading={isLoading}
           empty={showEmpty}
           error={showError}
           value={formatMoney(summary?.averageInvoiceValue, currency)}
-          sublabel={`${summary?.invoiceCount || 0} invoices`}
+          sublabel={`${summary?.invoiceCount || 0} invoices contributing allocated spend`}
         />
         <EnterpriseKpiCard
           label="Categories Over Budget"

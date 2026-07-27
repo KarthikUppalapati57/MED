@@ -276,16 +276,16 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
 
       <KpiRibbon>
         <EnterpriseKpiCard
-          label="Current Inventory Value"
+          label="Current Inventory Value (Current State)"
           loading={isLoading}
           empty={showEmpty || inventoryCoverage.valuedOnHand === 0}
           error={showError}
           value={formatMoney(currentInventoryValue, currency)}
-          sublabel={`${inventoryCoverage.valuedOnHand} valued products`}
+          sublabel={`${inventoryCoverage.valuedOnHand} valued products now`}
         />
         <EnterpriseKpiCard
           label="Count Coverage"
-          tooltip="Products with both opening and closing count evidence for the selected period."
+          tooltip="Source partially complete: products with both opening and closing count evidence for the selected period."
           loading={isLoading}
           empty={showEmpty || inventoryCoverage.countCoverage === null}
           error={showError}
@@ -298,7 +298,7 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
         />
         <EnterpriseKpiCard
           label="At / Below Reorder"
-          tooltip="Uses current on-hand quantity and a positive reorder point. Missing evidence is not treated as healthy."
+          tooltip="Current-state reorder risk: uses current on-hand quantity and a positive reorder point. Missing evidence is not treated as healthy."
           loading={isLoading}
           empty={showEmpty}
           error={showError}
@@ -412,7 +412,7 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
       </KpiRibbon>
 
       {showEmpty ? (
-        <ChartEmptyState message="No inventory rows for the selected filters. Add stock, counts, and movements — or enable Performance Demo Mode." />
+        <ChartEmptyState message="Source empty: no inventory rows for the selected filters. Add stock, counts, and movements, or enable Performance Demo Mode." />
       ) : (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -461,7 +461,7 @@ export default function UsageReportPage({ periodStart, periodEnd } = {}) {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <ChartCard title="Inventory Value Trend" description="Weekly received / movement proxy / waste">
+            <ChartCard title="Inventory Value Trend" description="Historical movement value by location business date; current inventory value remains current-state.">
               {isLoading ? (
                 <ChartLoadingState />
               ) : (
