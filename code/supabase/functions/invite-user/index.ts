@@ -8,7 +8,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, role, org_id, organization_id, onboarding_type, metadata, permissions, modules } = await req.json()
+    const { email, role, org_id, organization_id, brand_id, location_id, onboarding_type, metadata, permissions, modules } = await req.json()
     const targetOrganizationId = organization_id || org_id
 
     if (!email || !targetOrganizationId) {
@@ -21,6 +21,8 @@ serve(async (req) => {
       ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {}),
       ...(permissions && typeof permissions === 'object' && !Array.isArray(permissions) ? { permissions } : {}),
       ...(Array.isArray(modules) ? { modules } : {}),
+      ...(brand_id ? { brand_id } : {}),
+      ...(location_id ? { location_id } : {}),
     }
 
     // Insert invitation
@@ -30,6 +32,8 @@ serve(async (req) => {
         email,
         role: role || 'ground_staff',
         organization_id: targetOrganizationId,
+        brand_id: brand_id || null,
+        location_id: location_id || null,
         onboarding_type: onboarding_type || 'invited',
         status: 'pending',
         metadata: inviteMetadata

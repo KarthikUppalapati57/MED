@@ -219,7 +219,6 @@ function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
 function UserDetailDrawer({ member, orgId, onClose }) {
   const queryClient = useQueryClient();
   const { confirm } = useConfirmation();
-  const { role: currentUserRole, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState("role");
   const [form, setForm] = useState({
     role: member.role || member.capabilities?.role || 'ground_staff',
@@ -560,6 +559,9 @@ function InviteDialog({ open, onClose, orgId }) {
   const [permissions, setPermissions] = useState(() => defaultPermissionMatrix('ground_staff'));
   const [sending, setSending] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
+  const [assignmentScope, setAssignmentScope] = useState(() => userProfile?.location_id ? 'location' : 'location');
+  const [selectedBrandId, setSelectedBrandId] = useState(userProfile?.brand_id || '');
+  const [selectedLocationId, setSelectedLocationId] = useState(userProfile?.location_id || '');
 
   const { data: dbRoles } = useQuery({
     queryKey: ['dbRoles', orgId],
@@ -570,11 +572,79 @@ function InviteDialog({ open, onClose, orgId }) {
     enabled: !!orgId
   });
 
+  const { data: assignableBrands = [] } = useAuthQuery({
+    queryKey: ['invite-assignable-brands', orgId || userProfile?.organization_id],
+    queryFn: async () => {
+      const targetOrg = orgId || userProfile?.organization_id;
+      if (!targetOrg) return [];
+      const { data, error } = await supabase
+        .from('brands')
+        .select('brand_id, name')
+        .eq('organization_id', targetOrg)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!(orgId || userProfile?.organization_id),
+  });
+
+  const { data: assignableLocations = [] } = useAuthQuery({
+    queryKey: ['invite-assignable-locations', orgId || userProfile?.organization_id],
+    queryFn: async () => {
+      const targetOrg = orgId || userProfile?.organization_id;
+      if (!targetOrg) return [];
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name, brand_id')
+        .eq('organization_id', targetOrg)
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!(orgId || userProfile?.organization_id),
+  });
+
+  const canAssignOrganization = ['tenant_super_admin', 'org_manager', 'platform_admin'].includes(currentUserRole);
+  const canAssignBrand = canAssignOrganization || currentUserRole === 'branch_manager';
+  const canAssignLocation = canAssignBrand || currentUserRole === 'location_manager';
+  const visibleBrands = currentUserRole === 'branch_manager' && userProfile?.brand_id
+    ? assignableBrands.filter((brand) => brand.brand_id === userProfile.brand_id)
+    : assignableBrands;
+  const visibleLocations = currentUserRole === 'location_manager' && userProfile?.location_id
+    ? assignableLocations.filter((location) => location.id === userProfile.location_id)
+    : currentUserRole === 'branch_manager' && userProfile?.brand_id
+      ? assignableLocations.filter((location) => location.brand_id === userProfile.brand_id)
+      : assignmentScope === 'location' && selectedBrandId
+        ? assignableLocations.filter((location) => location.brand_id === selectedBrandId)
+        : assignableLocations;
+
+  const resolvedAssignment = useMemo(() => {
+    if (assignmentScope === 'location') {
+      const location = assignableLocations.find((entry) => entry.id === selectedLocationId);
+      return {
+        brandId: location?.brand_id || selectedBrandId || null,
+        locationId: selectedLocationId || null,
+        label: location ? 'Location: ' + location.name : 'Location',
+      };
+    }
+    if (assignmentScope === 'brand') {
+      const brand = assignableBrands.find((entry) => entry.brand_id === selectedBrandId);
+      return { brandId: selectedBrandId || null, locationId: null, label: brand ? 'Brand: ' + brand.name : 'Brand' };
+    }
+    return { brandId: null, locationId: null, label: 'Organization-wide' };
+  }, [assignmentScope, assignableBrands, assignableLocations, selectedBrandId, selectedLocationId]);
+
   const handleSubmit = async () => {
     if (!email) { toast.error('Email is required'); return; }
+    const targetOrganizationId = orgId || userProfile?.organization_id;
+    if (!targetOrganizationId) { toast.error('Organization is required'); return; }
+    if (assignmentScope === 'brand' && !resolvedAssignment.brandId) { toast.error('Select a brand for this invite'); return; }
+    if (assignmentScope === 'location' && !resolvedAssignment.locationId) { toast.error('Select a location for this invite'); return; }
+    if (role === 'branch_manager' && assignmentScope === 'organization') { toast.error('Branch Managers must be assigned to a brand'); return; }
+    if (['location_manager', 'ground_staff'].includes(role) && assignmentScope !== 'location') { toast.error(`${Restops_ROLES[role]?.label || role} must be assigned to a location`); return; }
     const proceed = await confirm({
       title: `Invite ${email}?`,
-      description: `This will send a real invitation email to ${email} with the ${Restops_ROLES[role]?.label || role} role.`,
+      description: `This will send a real invitation email to ${email} with the ${Restops_ROLES[role]?.label || role} role for ${resolvedAssignment.label}.`,
       confirmText: 'Generate Link',
       cancelText: 'Cancel',
       variant: 'warning',
@@ -587,10 +657,13 @@ function InviteDialog({ open, onClose, orgId }) {
         body: {
           email,
           role,
-          organization_id: orgId || userProfile?.organization_id,
+          organization_id: targetOrganizationId,
+          brand_id: resolvedAssignment.brandId,
+          location_id: resolvedAssignment.locationId,
           onboarding_type: 'invited',
           permissions,
           modules: enabledModulesFromPermissions(permissions),
+          metadata: { assignment_scope: assignmentScope, assignment_label: resolvedAssignment.label },
         }
       });
 
@@ -604,9 +677,11 @@ function InviteDialog({ open, onClose, orgId }) {
             email,
             role,
             invited_by: currentUser?.id,
-            organization_id: orgId || userProfile?.organization_id,
+            organization_id: targetOrganizationId,
+            brand_id: resolvedAssignment.brandId,
+            location_id: resolvedAssignment.locationId,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            metadata: { permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)) },
+            metadata: { permissions, modules: enabledModulesFromPermissions(permissions), assignment_scope: assignmentScope, assignment_label: resolvedAssignment.label },
           }])
           .select('token')
           .single();
@@ -623,8 +698,10 @@ function InviteDialog({ open, onClose, orgId }) {
           action: 'invite_user',
           entityType: 'User',
           entityId: email,
-          organization_id: orgId || userProfile?.organization_id,
-          details: { role, org_id: orgId, permissions, modules: enabledModulesFromPermissions(permissions) },
+          organization_id: targetOrganizationId,
+          brand_id: resolvedAssignment.brandId,
+          location_id: resolvedAssignment.locationId,
+          details: { role, org_id: targetOrganizationId, brand_id: resolvedAssignment.brandId, location_id: resolvedAssignment.locationId, assignment_scope: assignmentScope, permissions, modules: enabledModulesFromPermissions(permissions) },
         });
       } catch { /* audit non-critical */ }
 
@@ -632,7 +709,7 @@ function InviteDialog({ open, onClose, orgId }) {
       queryClient.invalidateQueries({ queryKey: ['users'] });
 
       // Optimistic update so it shows immediately
-      queryClient.setQueryData(['team-members', orgId || userProfile?.organization_id, userProfile?.brand_id, userProfile?.location_id, false], (old) => {
+      queryClient.setQueryData(['team-members', targetOrganizationId, userProfile?.brand_id, userProfile?.location_id, false], (old) => {
         if (!old) return old;
         return [...old, {
           id: 'inv_temp_' + Date.now(),
@@ -640,6 +717,8 @@ function InviteDialog({ open, onClose, orgId }) {
           user_id: 'inv_temp_' + Date.now(),
           email,
           role,
+          brand_id: resolvedAssignment.brandId,
+          location_id: resolvedAssignment.locationId,
           status: 'invited',
           profiles: { email, full_name: 'Pending Invite' },
           created_at: new Date().toISOString()
@@ -737,7 +816,13 @@ function InviteDialog({ open, onClose, orgId }) {
           {/* Step 1: Role */}
           <div className="space-y-2">
             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Role</Label>
-            <Select value={role} onValueChange={(nextRole) => { setRole(nextRole); setPermissions(defaultPermissionMatrix(nextRole)); }}>
+            <Select value={role} onValueChange={(nextRole) => {
+                setRole(nextRole);
+                setPermissions(defaultPermissionMatrix(nextRole));
+                if (['tenant_super_admin', 'org_manager'].includes(nextRole) && canAssignOrganization) setAssignmentScope('organization');
+                if (nextRole === 'branch_manager' && canAssignBrand) setAssignmentScope('brand');
+                if (['location_manager', 'ground_staff'].includes(nextRole) && canAssignLocation) setAssignmentScope('location');
+              }}>
               <SelectTrigger className="h-12 rounded-2xl border-border">
                 <SelectValue />
               </SelectTrigger>
@@ -757,6 +842,65 @@ function InviteDialog({ open, onClose, orgId }) {
             </Select>
           </div>
 
+          <div className="space-y-3">
+            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Member Scope</Label>
+            <Select value={assignmentScope} onValueChange={(scope) => {
+              setAssignmentScope(scope);
+              if (scope === 'organization') {
+                setSelectedBrandId('');
+                setSelectedLocationId('');
+              }
+              if (scope === 'brand') setSelectedLocationId('');
+            }}>
+              <SelectTrigger className="h-12 rounded-2xl border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-border">
+                {canAssignOrganization && <SelectItem value="organization">Organization-wide</SelectItem>}
+                {canAssignBrand && <SelectItem value="brand">Brand-wide</SelectItem>}
+                {canAssignLocation && <SelectItem value="location">Specific location</SelectItem>}
+              </SelectContent>
+            </Select>
+
+            {(assignmentScope === 'brand' || assignmentScope === 'location') && (
+              <Select value={selectedBrandId || undefined} onValueChange={(brandId) => {
+                setSelectedBrandId(brandId);
+                setSelectedLocationId('');
+              }}>
+                <SelectTrigger className="h-12 rounded-2xl border-border">
+                  <div className="flex items-center gap-2">
+                    <Store className="w-4 h-4 text-muted-foreground" />
+                    <SelectValue placeholder="Select brand" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border">
+                  {visibleBrands.map((brand) => (
+                    <SelectItem key={brand.brand_id} value={brand.brand_id}>{brand.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {assignmentScope === 'location' && (
+              <Select value={selectedLocationId || undefined} onValueChange={(locationId) => {
+                const location = assignableLocations.find((entry) => entry.id === locationId);
+                setSelectedLocationId(locationId);
+                if (location?.brand_id) setSelectedBrandId(location.brand_id);
+              }}>
+                <SelectTrigger className="h-12 rounded-2xl border-border">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <SelectValue placeholder="Select location" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-border">
+                  {visibleLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
           <div className="space-y-2">
             <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Read, Write, Update Access</Label>
             <PermissionMatrixEditor value={permissions} onChange={setPermissions} compact />
@@ -836,7 +980,7 @@ function CSVUploadDialog({ open, onClose, orgId }) {
           await supabase.from("invitations").insert([{
             email, role, organization_id: orgId,
             expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            metadata: { permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)) },
+            metadata: { permissions: defaultPermissionMatrix(role), modules: enabledModulesFromPermissions(defaultPermissionMatrix(role)), assignment_scope: 'organization', assignment_label: 'Organization-wide' },
           }]);
         }
         posthog.capture('team_member_invited', { role, method: 'csv' });
@@ -1026,7 +1170,7 @@ export default function UserManagement() {
       // Merge pending invitations
       try {
         const { data: invs } = await supabase.from('invitations')
-          .select('id, email, role, token, created_at, metadata')
+          .select('id, email, role, token, created_at, brand_id, location_id, metadata')
           .eq('organization_id', activeOrgId)
           .is('accepted_at', null);
           
@@ -1040,6 +1184,8 @@ export default function UserManagement() {
                 user_id: 'inv_' + inv.id,
                 email: inv.email,
                 role: inv.role,
+                brand_id: inv.brand_id || null,
+                location_id: inv.location_id || null,
                 status: 'invited',
                 token: inv.token,
                 profiles: { email: inv.email, full_name: 'Pending Invite', access_permissions: inv.metadata?.permissions || inv.metadata?.access || {} },
@@ -1400,3 +1546,7 @@ export default function UserManagement() {
     </div>
   );
 }
+
+
+
+

@@ -13,6 +13,7 @@ describe('module entitlement aliases', () => {
   it('does not enable Recipes from unrelated operational modules', () => {
     expect(isPageInEnabledModules('Recipes', ['invoices', 'payments'], 'tenant_super_admin')).toBe(false);
   });
+
   it('normalizes singular recipe module keys from admin metadata', () => {
     expect(normalizeEnabledModules(['recipe'])).toEqual(['recipes']);
     expect(isPageInEnabledModules('Recipes', ['recipe'], 'tenant_super_admin')).toBe(true);
@@ -25,5 +26,16 @@ describe('module entitlement aliases', () => {
 
   it('includes Recipes in enabled pages after module key normalization', () => {
     expect(getEnabledPages('["recipe"]').has('Recipes')).toBe(true);
+  });
+
+  it('exposes Team Members as a dedicated tenant entitlement', () => {
+    expect(normalizeEnabledModules(['user_management'])).toEqual(['team_members']);
+    expect(isPageInEnabledModules('UserManagement', ['team_members'], 'tenant_super_admin')).toBe(true);
+    expect(getEnabledPages(['team_members']).has('UserManagement')).toBe(true);
+  });
+
+  it('includes Team Members when Organization Management is enabled', () => {
+    expect(isPageInEnabledModules('UserManagement', ['organization_management'], 'tenant_super_admin')).toBe(true);
+    expect(getEnabledPages(['organization_management']).has('UserManagement')).toBe(true);
   });
 });

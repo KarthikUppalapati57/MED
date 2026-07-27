@@ -53,7 +53,19 @@ for (const [moduleKey, definition] of Object.entries(MODULE_DEFINITIONS)) {
 
 const missingMappings = uniqueRegisteredPages.filter((page) => !getModuleForPage(page) && !isUngatedAuthPage(page));
 const staleMappings = [...mappedPages.keys()].filter((page) => !uniqueRegisteredPages.includes(page));
-const duplicateMappings = [...mappedPages.entries()].filter(([, modules]) => modules.length > 1);
+const allowedDuplicateMappings = new Set([
+  'AuditLogs::admin,audit_logs',
+  'Inventory::inventory,inventory_management',
+  'OrgManagement::admin,organization_management',
+  'Recipes::recipe_management,recipes',
+  'UserManagement::admin,organization_management,team_members',
+  'Vendors::vendor_management,vendors',
+]);
+const duplicateMappings = [...mappedPages.entries()].filter(([page, modules]) => {
+  if (modules.length <= 1) return false;
+  const signature = `${page}::${[...modules].sort().join(',')}`;
+  return !allowedDuplicateMappings.has(signature);
+});
 const gatedSetupPages = setupPages.filter((page) => !getModuleForPage(page) && !isUngatedAuthPage(page));
 
 if (

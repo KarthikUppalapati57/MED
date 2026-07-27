@@ -148,9 +148,15 @@ export const MODULE_DEFINITIONS = {
   },
   organization_management: {
     label: "Organization Management",
-    pages: ["OrgManagement"],
+    pages: ["OrgManagement", "UserManagement"],
     minRole: "org_manager",
     icon: "Building2",
+  },
+  team_members: {
+    label: "Team Members",
+    pages: ["UserManagement"],
+    minRole: "org_manager",
+    icon: "Users",
   },
   audit_logs: {
     label: "Audit Logs",
@@ -240,6 +246,8 @@ const MODULE_KEY_ALIASES = {
   food_safety_haccp: "food_safety",
   inventory_module: "inventory",
   invoice: "invoices",
+  invitation_management: "team_members",
+  invites: "team_members",
   kitchen_display: "kitchen_displays",
   kitchen_displays_module: "kitchen_displays",
   order: "orders",
@@ -247,6 +255,11 @@ const MODULE_KEY_ALIASES = {
   product: "products",
   recipe: "recipes",
   recipe_module: "recipes",
+  team: "team_members",
+  team_member: "team_members",
+  team_members: "team_members",
+  user_management: "team_members",
+  users: "team_members",
   vendor: "vendors",
 };
 
