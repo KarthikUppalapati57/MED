@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 export const NOTIFICATION_CONSENT_TEXT = {
   title: 'SMS and email notification consent',
   summary: 'Enable these channels only if you want RestOps to send service-related notifications to the contact information on your account.',
-  collected: 'We use your account email address and verified phone number for selected notification channels.',
-  examples: 'Notifications can include verification codes, account and onboarding updates, invoice and payment alerts, inventory or vendor alerts, reports, approvals, and important service notices.',
+  collected: 'We use your account email address and saved phone number only for the notification channels you turn on.',
+  examples: 'Notifications can include invoice and payment alerts, inventory or vendor alerts, reports, approvals, reminders, and important service notices.',
   sms: 'SMS messages may use automated delivery. Message and data rates may apply. Message frequency depends on your account activity.',
   optOut: 'You can turn these settings off at any time. SMS recipients can also reply STOP to unsubscribe or HELP for help.',
 };

@@ -12,8 +12,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import NotificationConsentNotice from '@/components/NotificationConsentNotice';
 
 const BUSINESS_TYPES = [
   { value: 'llc', label: 'LLC' },
@@ -24,8 +22,6 @@ const BUSINESS_TYPES = [
   { value: 'independent_contractor', label: 'Independent Contractor' },
 ];
 
-const createNotificationDeliveryPreferences = () => ({ email_enabled: false, phone_enabled: false });
-const BUSINESS_VERIFICATION_NOTIFICATION_MODULE_KEYS = ['dashboard', 'invoices', 'payments', 'inventory', 'vendors', 'labor'];
 const INDIVIDUAL_OWNER_TYPES = new Set(['sole_proprietor', 'independent_contractor']);
 
 function identifierTypeForBusinessType(businessType) {
@@ -95,7 +91,6 @@ export default function BusinessVerification() {
   const [revealingTaxId, setRevealingTaxId] = useState(false);
   const [nameAvailable, setNameAvailable] = useState(true);
   const [verificationSettings, setVerificationSettings] = useState({ ein_verification_enabled: false, ssn_verification_enabled: false });
-  const [notificationDelivery, setNotificationDelivery] = useState(createNotificationDeliveryPreferences());
   const [contactOtp, setContactOtp] = useState({
     email: {
       otpId: null,
@@ -159,13 +154,6 @@ export default function BusinessVerification() {
         if (draft.form) {
           setForm((prev) => ({ ...prev, ...draft.form }));
         }
-        if (draft.notificationDelivery) {
-          setNotificationDelivery({
-            ...createNotificationDeliveryPreferences(),
-            email_enabled: draft.notificationDelivery.email_enabled === true,
-            phone_enabled: draft.notificationDelivery.phone_enabled === true,
-          });
-        }
         if (draftState?.current_step && BUSINESS_STEPS.some((step) => step.key === draftState.current_step)) {
           setStepKey(draftState.current_step);
         }
@@ -200,24 +188,7 @@ export default function BusinessVerification() {
 
   const buildDraftPayload = () => {
     const { taxIdentifier, ...formWithoutTaxId } = form;
-    return { form: { ...formWithoutTaxId, identifierType: requiredIdentifierType }, notificationDelivery };
-  };
-  const saveNotificationDeliveryPreferences = async () => {
-    if (!user?.id) return;
-    const rows = BUSINESS_VERIFICATION_NOTIFICATION_MODULE_KEYS.map((moduleKey) => ({
-      user_id: user.id,
-      organization_id: userProfile?.organization_id || null,
-      module_key: moduleKey,
-      in_app_enabled: true,
-      email_enabled: notificationDelivery.email_enabled,
-      phone_enabled: notificationDelivery.phone_enabled,
-      critical_only: false,
-    }));
-
-    const { error } = await api.client
-      .from('notification_delivery_preferences')
-      .upsert(rows, { onConflict: 'user_id,module_key' });
-    if (error) throw error;
+    return { form: { ...formWithoutTaxId, identifierType: requiredIdentifierType } };
   };
   const saveDraft = async (targetStep = stepKey, options = {}) => {
     if (!user?.id) return false;
@@ -669,28 +640,9 @@ export default function BusinessVerification() {
                       )}
                       {phoneVerified && <p className="text-xs font-medium text-resend-green">Phone verified.</p>}
                     </div>
-                    <div className="space-y-3 rounded-lg border bg-secondary/30 p-4 md:col-span-2">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Notification Delivery</p>
-                        <p className="text-xs text-muted-foreground">Email and SMS notifications are off by default. Turn on only the channels this user wants to receive.</p>
-                      </div>
-                      <NotificationConsentNotice compact />
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="flex items-center justify-between gap-3 rounded-md border bg-card/70 px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">Email notifications</span>
-                          </div>
-                          <Switch checked={notificationDelivery.email_enabled} onCheckedChange={(checked) => setNotificationDelivery((prev) => ({ ...prev, email_enabled: checked === true }))} aria-label="Enable email notifications" />
-                        </div>
-                        <div className="flex items-center justify-between gap-3 rounded-md border bg-card/70 px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">SMS notifications</span>
-                          </div>
-                          <Switch checked={notificationDelivery.phone_enabled} onCheckedChange={(checked) => setNotificationDelivery((prev) => ({ ...prev, phone_enabled: checked === true }))} aria-label="Enable SMS notifications" />
-                        </div>
-                      </div>
+                    <div className="space-y-1.5 rounded-md bg-secondary/20 p-3 text-xs leading-5 text-muted-foreground md:col-span-2">
+                      <p className="font-medium text-foreground">Security Consent</p>
+                      <p>By clicking Send OTP, you agree that RestOps may send a one-time code to the email address or phone number entered here to verify your identity for onboarding security. These codes are used only for account security and business verification; they do not turn on email or SMS notifications.</p>
                     </div>
                   </div>
                 )}
