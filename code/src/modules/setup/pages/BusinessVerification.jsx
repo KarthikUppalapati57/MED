@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import NotificationConsentNotice from '@/components/NotificationConsentNotice';
 
 const BUSINESS_TYPES = [
   { value: 'llc', label: 'LLC' },
@@ -673,6 +674,7 @@ export default function BusinessVerification() {
                         <p className="text-sm font-semibold text-foreground">Notification Delivery</p>
                         <p className="text-xs text-muted-foreground">Email and SMS notifications are off by default. Turn on only the channels this user wants to receive.</p>
                       </div>
+                      <NotificationConsentNotice compact />
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="flex items-center justify-between gap-3 rounded-md border bg-card/70 px-3 py-2">
                           <div className="flex items-center gap-2">

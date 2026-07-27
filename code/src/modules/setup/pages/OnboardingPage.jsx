@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Landmark, Loader2, Mail, MapPin, MessageSquare, Plus, Save, Sparkles, Trash2, Upload } from 'lucide-react';
+import NotificationConsentNotice from '@/components/NotificationConsentNotice';
 
 const DRAFT_KEY = 'restops:onboarding:draft:v2';
 const ownershipModels = ['corporate', 'franchise', 'independent', 'partnership', 'individual'];
@@ -1467,6 +1468,7 @@ export default function OnboardingPage() {
                     <h3 className="text-sm font-semibold text-foreground">Notification Delivery</h3>
                     <p className="text-xs text-muted-foreground">Email and SMS notifications are off by default. Turn on only the channels this user wants to receive.</p>
                   </div>
+                  <NotificationConsentNotice compact />
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="flex items-center justify-between rounded-md border bg-muted/20 px-4 py-3">
                       <div className="flex items-center gap-3">

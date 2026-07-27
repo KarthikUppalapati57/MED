@@ -18,6 +18,7 @@ import { getNotificationAction } from '@/lib/notificationActions';
 import { MODULE_DEFINITIONS, isPageInEnabledModules } from '@/lib/moduleConfig';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import NotificationConsentNotice from '@/components/NotificationConsentNotice';
 
 // Groups the notifications.type check-constraint values (see 106_schema_hardening) into the
 // app's actual modules, so the Notifications page can offer per-module tabs alongside "All".
@@ -513,6 +514,10 @@ export default function Notifications() {
           {preferencesError && !isMissingPreferenceTable(preferencesError) && (
             <Badge variant="destructive">Settings unavailable</Badge>
           )}
+        </div>
+
+        <div className="border-b border-border/50 p-6">
+          <NotificationConsentNotice />
         </div>
 
         {isPreferencesLoading ? (
