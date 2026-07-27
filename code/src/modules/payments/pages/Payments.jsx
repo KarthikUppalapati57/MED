@@ -389,6 +389,7 @@ export default function Payments() {
     isFetchingNextPage: isFetchingNextInvoicesPage
   } = useAuthInfiniteQuery({
     queryKey: ['invoices-payments', organization?.id, (brand?.brand_id || brand?.id), location?.id, activeTab, debouncedSearch, statusFilter, invoiceSortBy],
+    staleTime: 0, // Transactional data (approvals, payment status) -- always re-verified, never trusted from cache alone.
     queryFn: async ({ pageParam = 0 }) => {
       const filters = {};
       if (organization?.id) filters.organization_id = organization.id;
@@ -533,7 +534,7 @@ export default function Payments() {
   useEffect(() => {
     const channel = supabase.channel('payments-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
+        invalidateInvoiceLists();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         queryClient.invalidateQueries({ queryKey: ['invoices-payments'] });
@@ -967,7 +968,7 @@ export default function Payments() {
           });
         }
       }
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      invalidateInvoiceLists();
       toast.success('Bank transfer confirmed!');
     } catch (err) {
       toast.error('Failed to confirm: ' + err.message);

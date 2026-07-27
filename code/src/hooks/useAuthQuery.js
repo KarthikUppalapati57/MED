@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/AuthContext';
  * causing RLS to reject them (auth.uid() returns NULL).
  *
  * Performance optimizations:
- * - staleTime: 5 minutes prevents unnecessary re-fetches on component re-mount
+ * - staleTime: 3 minutes prevents unnecessary re-fetches on component re-mount
  * - placeholderData: keeps previous data visible during background refetch
  * - gcTime: 10 minutes keeps unused data in cache for faster re-navigation
  *
@@ -54,7 +54,7 @@ export function useAuthQuery(options) {
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
  // Keep data in cache for 5 minutes prevents re-fetching on every page
     // navigation or component re-mount. Realtime subscriptions handle live updates.
-    staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
+    staleTime: options.staleTime ?? 3 * 60 * 1000, // 3 minutes
     // Keep unused data in cache for 10 minutes so navigating back is instant
     gcTime: options.gcTime ?? 10 * 60 * 1000, // 10 minutes
     placeholderData: options.placeholderData,
@@ -92,7 +92,7 @@ export function useAuthQueries({ queries }) {
       ...queryOptions,
       queryKey: scopedQueryKey,
       enabled: authReady && (query.enabled !== undefined ? query.enabled : true),
-      staleTime: query.staleTime ?? 5 * 60 * 1000,
+      staleTime: query.staleTime ?? 3 * 60 * 1000,
       gcTime: query.gcTime ?? 10 * 60 * 1000,
       throwOnError: query.throwOnError ?? true,
     };
@@ -130,7 +130,7 @@ export function useAuthInfiniteQuery(options) {
     ...queryOptions,
     queryKey: scopedQueryKey,
     enabled: authReady && (options.enabled !== undefined ? options.enabled : true),
-    staleTime: options.staleTime ?? 5 * 60 * 1000,
+    staleTime: options.staleTime ?? 3 * 60 * 1000,
     gcTime: options.gcTime ?? 10 * 60 * 1000,
     throwOnError: options.throwOnError ?? true,
   });

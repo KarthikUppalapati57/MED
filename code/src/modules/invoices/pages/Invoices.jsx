@@ -352,6 +352,7 @@ export default function Invoices() {
     }),
     select: React.useCallback((data) => filterByContext(data, { organization, brand, location }), [organization, brand, location]),
     enabled: !!(organization?.id),
+    staleTime: 0, // Transactional data (approvals, payment status) -- always re-verified, never trusted from cache alone.
     refetchInterval: (query) => {
       const data = query?.state?.data;
       if (!data) return false;
