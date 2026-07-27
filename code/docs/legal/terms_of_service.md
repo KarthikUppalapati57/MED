@@ -221,5 +221,6 @@ The Agreement, including the Order, these Terms, the DPA, AUP, SLA, SMS Terms wh
 ## 23. Contact
 
 Email: `contact@mindfultechsol.com`  
+Support: `support@restops-360.com`  
 Phone: `+1 (865) 666-7690`  
 Mail: 224 S Peters Road, Knoxville, Tennessee 37923, United States

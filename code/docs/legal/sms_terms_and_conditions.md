@@ -56,6 +56,7 @@ Opting out may prevent you from receiving SMS verification codes. You may need t
 Reply **HELP** for help. You may also contact:
 
 Email: `contact@mindfultechsol.com`  
+Support: `support@restops-360.com`  
 Phone: `+1 (865) 666-7690`
 
 For account security, do not send passwords, complete payment-card numbers, full bank-account details, or full Social Security numbers by text message.
@@ -97,4 +98,5 @@ We may modify or discontinue the SMS program or update these SMS Terms. Material
 **Mindful Tech Solutions Inc., doing business as RestOps-360**  
 224 S Peters Road, Knoxville, Tennessee 37923, United States  
 Email: `contact@mindfultechsol.com`  
+Support: `support@restops-360.com`  
 Phone: `+1 (865) 666-7690`

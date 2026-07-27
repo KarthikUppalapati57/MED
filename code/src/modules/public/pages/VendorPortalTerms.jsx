@@ -80,7 +80,7 @@ export default function VendorPortalTerms() {
               </Section>
 
               <Section title="11. Contact">
-                <p>Questions about the vendor portal can be sent to contact@mindfultechsol.com. Privacy-specific questions can be sent to contact@mindfultechsol.com.</p>
+                <p>Questions about the vendor portal can be sent to support@restops-360.com. Privacy-specific questions can be sent to contact@mindfultechsol.com.</p>
                 <p className="pt-2">
                   <strong>Mindful Tech Solutions Inc., doing business as RestOps-360</strong><br />
                   224 S Peters Road, Knoxville, Tennessee 37923, United States<br />

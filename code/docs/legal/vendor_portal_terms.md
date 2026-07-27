@@ -45,4 +45,4 @@ We may update these Vendor Portal Terms from time to time. Material changes will
 
 ## 11. Contact
 
-Questions about the vendor portal can be sent to [SUPPORT CONTACT EMAIL]. Privacy-specific questions can be sent to [PRIVACY CONTACT EMAIL].
+Questions about the vendor portal can be sent to `support@restops-360.com`. Privacy-specific questions can be sent to `contact@mindfultechsol.com`.
