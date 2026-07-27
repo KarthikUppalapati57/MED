@@ -6,3 +6,4 @@ venv/
 # Ignore temporary/output folders
 outputs/
 scratch/
+extra/
