@@ -8,29 +8,43 @@ BEGIN;
 
 DO $$
 DECLARE
+  v_tenant uuid := gen_random_uuid();
   v_org uuid := gen_random_uuid();
   v_brand uuid := gen_random_uuid();
   v_location uuid := gen_random_uuid();
+  v_user uuid := gen_random_uuid();
   v_invoice_1 uuid;
   v_invoice_2 uuid;
   v_validation jsonb;
   v_failures jsonb;
 BEGIN
-  INSERT INTO public.organizations (id, name, slug)
-  VALUES (v_org, 'Invoice Validation Test Org', 'invoice-validation-test-' || replace(v_org::text, '-', ''));
+  INSERT INTO public.tenants (id, name, slug) VALUES (v_tenant, 'Test Tenant', 'test-tenant-' || replace(v_tenant::text, '-', ''));
+
+  INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_user, 'inv-validation@example.test', crypt('password', gen_salt('bf')), now(), now(), now(), jsonb_build_object('provider','email','providers',ARRAY['email'],'organization_id',v_org,'tenant_id',v_tenant,'role','org_manager'), '{}'::jsonb);
+
+  INSERT INTO public.organizations (id, tenant_id, name, slug)
+  VALUES (v_org, v_tenant, 'Invoice Validation Test Org', 'invoice-validation-test-' || replace(v_org::text, '-', ''));
 
   INSERT INTO public.brands (brand_id, organization_id, name) VALUES (v_brand, v_org, 'Test Brand');
   INSERT INTO public.locations (id, organization_id, brand_id, name) VALUES (v_location, v_org, v_brand, 'Test Location');
 
+  UPDATE public.profiles SET organization_id = v_org, brand_id = v_brand, location_id = v_location, role = 'org_manager', has_unlimited_approval = true, updated_at = now() WHERE id = v_user;
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_user::text, 'role', 'authenticated', 'app_metadata', jsonb_build_object('organization_id', v_org, 'tenant_id', v_tenant, 'role', 'org_manager'))::text, true);
+
   -- First invoice: an existing, non-rejected invoice with a given number/vendor.
-  INSERT INTO public.invoices (organization_id, tenant_id, brand_id, location_id, vendor_name, invoice_number, total_amount, status)
-  VALUES (v_org, v_org, v_brand, v_location, 'Acme Foods', 'INV-DUP-TEST-1', 100.00, 'approved')
+  INSERT INTO public.invoices (organization_id, tenant_id, brand_id, location_id, vendor_name, invoice_number, total_amount, status, created_by)
+  VALUES (v_org, v_tenant, v_brand, v_location, 'Acme Foods', 'INV-DUP-TEST-1', 100.00, 'approved', v_user)
   RETURNING id INTO v_invoice_1;
 
   -- Second invoice: same vendor/number, different id -- starts in a non-approval status so the
   -- later UPDATE is what actually exercises the trigger.
-  INSERT INTO public.invoices (organization_id, tenant_id, brand_id, location_id, vendor_name, invoice_number, total_amount, status)
-  VALUES (v_org, v_org, v_brand, v_location, 'Acme Foods', 'INV-DUP-TEST-1', 100.00, 'extracting')
+  INSERT INTO public.invoices (organization_id, tenant_id, brand_id, location_id, vendor_name, invoice_number, total_amount, status, created_by)
+  VALUES (v_org, v_tenant, v_brand, v_location, 'Acme Foods', 'INV-DUP-TEST-1', 100.00, 'extracting', v_user)
   RETURNING id INTO v_invoice_2;
 
   -- Moving invoice 2 to pending_approval must succeed (not raise) even though it's a duplicate.

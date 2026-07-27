@@ -15,7 +15,7 @@ BEGIN
     (v_org_a, 'Inv Totals Scope Org A', 'inv-totals-scope-org-a-' || replace(v_org_a::text, '-', '')),
     (v_org_b, 'Inv Totals Scope Org B', 'inv-totals-scope-org-b-' || replace(v_org_b::text, '-', ''));
 
-  UPDATE public.profiles SET organization_id = v_org_a, role = 'branch_manager', updated_at = now() WHERE id = v_user_a;
+  UPDATE public.profiles SET organization_id = v_org_a, role = 'org_manager', updated_at = now() WHERE id = v_user_a;
 
   SET LOCAL ROLE authenticated;
   PERFORM set_config('request.jwt.claim.sub', v_user_a::text, true);

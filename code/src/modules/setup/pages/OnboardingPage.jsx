@@ -24,35 +24,16 @@ const emptyAddress = () => ({ line1: '', line2: '', city: '', state: '', postalC
 const DEV_TEST_ADDRESS = { line1: '123 Market Square', line2: 'Suite 100', city: 'Knoxville', state: 'TN', postalCode: '37902', country: 'United States' };
 const ONBOARDING_PLAN_CATALOG = [
   {
-    id: 'starter',
-    name: 'Starter',
-    priceMonthly: 149,
-    description: 'Core location operations for one restaurant, store, or service location.',
-    badge: 'Available now',
+    id: 'custom',
+    name: 'Custom plan',
+    priceMonthly: 0,
+    description: 'A client-specific commercial package discussed with the RestOps team before launch.',
+    badge: 'Discuss with us',
     tone: 'primary',
-    features: ['Core location workspace', 'Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
+    features: ['Client-specific module scope', 'Location and team review', 'Implementation planning', 'Account-managed billing'],
   },
-  {
-    id: 'starter-ai',
-    name: 'Starter + AI',
-    priceMonthly: 249,
-    description: 'Starter modules plus AI-assisted operating intelligence.',
-    badge: 'Coming soon',
-    comingSoon: true,
-    tone: 'amber',
-    features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
-  },
-  {
-    id: 'advanced',
-    name: 'Advanced modules',
-    priceMonthly: 349,
-    description: 'Expanded controls for larger teams and advanced operating workflows.',
-    badge: 'Coming soon',
-    comingSoon: true,
-    tone: 'slate',
-    features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
-  },
-];const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+];
+const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const formatAddress = (a) => [a?.line1, a?.line2, a?.city, a?.state, a?.postalCode, a?.country].filter(Boolean).join(', ');
 const normalizeCouponCodeInput = (value) => String(value || '').trim().replace(/\s+-\s+\d+\s*(month|months|mo).*$/i, '').toUpperCase();
 const addressComplete = (a) => Boolean(a?.line1?.trim() && a?.city?.trim() && a?.state?.trim() && a?.postalCode?.trim() && a?.country?.trim());
@@ -626,7 +607,7 @@ export default function OnboardingPage() {
   }, []);
 
   useEffect(() => {
-    supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('is_active', true).order('price_monthly', { ascending: true }).then(({ data }) => {
+    supabase.from('plans').select('id, name, description, price_monthly, features, stripe_price_id').eq('id', 'custom').eq('is_active', true).order('name', { ascending: true }).then(({ data }) => {
       if (data) setPlans(data);
     });
   }, []);
@@ -1274,7 +1255,7 @@ export default function OnboardingPage() {
     setStep((current) => Math.max(1, current - 1));
   };
 
-  const nextLabel = step === 2 && hierarchyView === 'build' ? 'Continue to review' : step === 2 ? 'Confirm & continue' : step === 3 ? 'Continue to payment' : step === 4 ? 'Complete' : 'Next';
+  const nextLabel = step === 2 && hierarchyView === 'build' ? 'Continue to review' : step === 2 ? 'Confirm & continue' : step === 3 ? 'Continue to plan review' : step === 4 ? 'Complete' : 'Next';
 
   useEffect(() => {
     if (!draftReady || !user || !userProfile?.payment_verified || userProfile?.organization_id || userProfile?.hierarchy_review_status || finalizingOnboarding || autoFinalizeRef.current) return;
@@ -1530,7 +1511,7 @@ export default function OnboardingPage() {
                       <p className="mt-1 text-xs text-muted-foreground">Current setup: {Math.max(1, totals.locationCount || 0)} billable location{Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.</p>
                     </div>
                     <div className="rounded-md border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground">
-                      Starter launches now. More tiers unlock soon.
+                      Your plan is prepared after our team reviews your locations, modules, and rollout needs.
                     </div>
                   </div>
                 </div>
@@ -1556,13 +1537,9 @@ export default function OnboardingPage() {
                             <p className="mt-2 min-h-[42px] text-sm text-muted-foreground">{plan.description}</p>
                           </div>
                           {selected ? <CheckCircle2 className="h-5 w-5 flex-none text-primary" /> : <Sparkles className={`h-5 w-5 flex-none ${comingSoon ? 'text-muted-foreground' : 'text-primary'}`} />}
-                        </div>
-                        <div className="relative z-10 mt-5">
-                          <div className="flex items-end gap-1 text-foreground">
-                            <span className="text-4xl font-black">${Number(plan.price_monthly || 0).toFixed(0)}</span>
-                            <span className="pb-1 text-sm font-semibold text-muted-foreground">/location/mo</span>
-                          </div>
-                          <p className="mt-2 text-xs font-semibold text-foreground">Estimated: ${monthlyTotal.toFixed(0)}/mo for {locationCount} location{locationCount === 1 ? '' : 's'}</p>
+                        </div>`r`n                        <div className="relative z-10 mt-5">
+                          <div className="text-4xl font-black text-foreground">Custom quote</div>
+                          <p className="mt-2 text-xs font-semibold text-foreground">Prepared after review for {locationCount} location{locationCount === 1 ? '' : 's'}.</p>
                         </div>
                         <ul className="relative z-10 mt-5 flex-1 space-y-2 text-sm text-muted-foreground">
                           {plan.features.map((feature) => (
@@ -1573,7 +1550,7 @@ export default function OnboardingPage() {
                           ))}
                         </ul>
                         <div className={`relative z-10 mt-5 rounded-md border px-3 py-2 text-center text-xs font-bold ${selected ? 'border-primary/40 bg-primary/10 text-primary' : comingSoon ? 'border-border bg-card text-muted-foreground' : 'border-border bg-muted/20 text-foreground'}`}>
-                          {selected ? 'Selected' : comingSoon ? plan.unavailableReason : 'Select Starter'}
+                          {selected ? 'Selected' : comingSoon ? plan.unavailableReason : 'Select custom plan'}
                         </div>
                       </button>
                     );
@@ -1585,8 +1562,8 @@ export default function OnboardingPage() {
           {step === 4 && (
             <>
               <CardHeader>
-                <CardTitle>Payment</CardTitle>
-                <CardDescription>{selectedPlan ? `Complete payment for the ${selectedPlan.name} plan across ${Math.max(1, totals.locationCount || 0)} location${Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.` : 'Select a plan to continue.'}</CardDescription>
+                <CardTitle>Plan Review</CardTitle>
+                <CardDescription>{selectedPlan ? `Review the ${selectedPlan.name} across ${Math.max(1, totals.locationCount || 0)} location${Math.max(1, totals.locationCount || 0) === 1 ? '' : 's'}.` : 'Select the custom plan to continue.'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {Number(selectedPlan?.price_monthly || 0) > 0 && (

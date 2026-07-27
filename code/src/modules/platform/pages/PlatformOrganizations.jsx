@@ -906,7 +906,7 @@ export default function PlatformOrganizations() {
                     )}>{tenant.name}</p>
                     <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate flex items-center gap-2">
                       <span>{tenant.organizations.length} org{tenant.organizations.length === 1 ? '' : 's'}</span>
-                      <span>{primaryOrg?.plan_id || 'starter'}</span>
+                      <span>{primaryOrg?.plan_id || 'custom'}</span>
                     </p>
                   </div>
                   <ChevronRight className={cn(

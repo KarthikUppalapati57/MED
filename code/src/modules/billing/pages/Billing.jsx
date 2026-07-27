@@ -1,37 +1,37 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, CreditCard, Loader2 } from "lucide-react";
-import { MODULE_DEFINITIONS } from "@/lib/moduleConfig";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-
-const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
-
+import { CreditCard } from "lucide-react";
 
 export default function Billing() {
   const { organization } = useAuth();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
 
-  const { data: plans = [], isLoading: isLoadingPlans } = useAuthQuery({
-    queryKey: ['active_plans'],
+  const { data: plan = null } = useAuthQuery({
+    queryKey: ['billing-custom-plan', organization?.plan_id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').in('id', CURRENT_PLAN_IDS).eq('is_active', true).order('price_monthly', { ascending: true });
+      if (!organization?.plan_id) return null;
+      const { data, error } = await supabase
+        .from('plans')
+        .select('id, name, description, features, is_active')
+        .eq('id', organization.plan_id)
+        .maybeSingle();
       if (error) throw error;
-      return data || [];
-    }
+      return data || null;
+    },
+    enabled: !!organization?.plan_id,
   });
 
   const { data: locations = [] } = useAuthQuery({
     queryKey: ['billing-locations', organization?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      const { data, error } = await supabase.from('locations').select('id, plan_id, subscription_status').eq('organization_id', organization.id);
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, plan_id, subscription_status')
+        .eq('organization_id', organization.id);
       if (error) throw error;
       return data || [];
     },
@@ -39,39 +39,7 @@ export default function Billing() {
   });
 
   const billingLocationCount = Math.max(1, locations.length || 0);
-  const locationPlanIds = React.useMemo(() => {
-    const ids = new Set((locations || []).map(location => location.plan_id).filter(Boolean));
-    return Array.from(ids);
-  }, [locations]);
-  const currentPlanLabel = locationPlanIds.length === 0
-    ? 'No assigned location plan'
-    : locationPlanIds.length === 1
-      ? `${plans.find(plan => plan.id === locationPlanIds[0])?.name || locationPlanIds[0]} plan`
-      : 'Mixed location plans';
-
-  const handleCheckout = async (plan) => {
-    if (!organization?.id) return toast.error("Organization context missing");
-    setIsProcessing(true);
-    setSelectedPlan(plan.id);
-
-    try {
-      const response = await supabase.functions.invoke('create-checkout-session', {
-        body: { plan_id: plan.id, organization_id: organization.id, location_count: billingLocationCount }
-      });
-
-      if (response.error) throw response.error;
-
-      const { url } = response.data;
-      if (url) {
-        window.location.href = url;
-      }
-    } catch (err) {
-      toast.error("Checkout failed: " + err.message);
-    } finally {
-      setIsProcessing(false);
-      setSelectedPlan(null);
-    }
-  };
+  const planName = plan?.name || 'Custom plan';
 
   return (
     <div className="p-6 space-y-8 min-h-screen bg-secondary/30">
@@ -80,8 +48,8 @@ export default function Billing() {
           <CreditCard className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Plans</h1>
-          <p className="text-muted-foreground mt-1">Manage your Restops SaaS subscription by location.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Plan</h1>
+          <p className="text-muted-foreground mt-1">Your RestOps subscription is managed as a client-specific commercial plan.</p>
         </div>
       </div>
 
@@ -89,68 +57,37 @@ export default function Billing() {
         <CardHeader>
           <CardTitle className="text-lg text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
             Current Status
-            <Badge className="bg-resend-green text-white">Active</Badge>
+            <Badge className="bg-resend-green text-white">{organization?.subscription_status || 'Custom'}</Badge>
           </CardTitle>
           <CardDescription className="text-indigo-700/80 dark:text-indigo-300/80">
-            You are currently on {currentPlanLabel} across {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}.
+            {planName} is assigned across {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}.
           </CardDescription>
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {isLoadingPlans ? (
-          <div className="col-span-3 py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
-        ) : plans.map(plan => {
-          const isCurrentPlan = locationPlanIds.length === 1 && locationPlanIds[0] === plan.id;
-
-          return (
-            <Card key={plan.id} className={cn(
-              "border-0 shadow-sm relative group overflow-hidden transition-all hover:shadow-md",
-              isCurrentPlan ? "ring-2 ring-indigo-500 bg-indigo-50/30" : ""
-            )}>
-              {isCurrentPlan && (
-                <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">
-                  CURRENT PLAN
-                </div>
-              )}
-              <CardHeader className="pb-2 relative z-10">
-                <CardTitle className="text-xl font-black text-foreground">{plan.name}</CardTitle>
-                <p className="text-4xl font-black text-foreground mt-2">${plan.price_monthly}<span className="text-sm text-muted-foreground font-normal">/location/mo</span></p>
-                <p className="text-xs text-muted-foreground mt-2">{plan.description}</p>
-                <p className="text-xs font-semibold text-foreground mt-2">Estimated monthly: ${(Number(plan.price_monthly || 0) * billingLocationCount).toLocaleString()} for {billingLocationCount} location{billingLocationCount === 1 ? '' : 's'}</p>
-              </CardHeader>
-              <CardContent className="relative z-10 flex flex-col h-full">
-                <div className="space-y-3 mb-8 mt-4 flex-grow">
-                  {(Array.isArray(plan.features) ? plan.features : []).map(f => (
-                    <div key={f} className="flex items-start gap-2">
-                      <div className="w-4 h-4 rounded-full bg-resend-green/10 flex items-center justify-center shrink-0 mt-0.5">
-                        <CheckCircle2 className="w-2.5 h-2.5 text-resend-green" />
-                      </div>
-                      <span className="text-xs font-medium text-muted-foreground">{MODULE_DEFINITIONS[f]?.label || f}</span>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  className={cn(
-                    "w-full rounded-xl mt-auto",
-                    isCurrentPlan ? "bg-secondary text-foreground hover:bg-secondary" : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                  )}
-                  onClick={() => handleCheckout(plan)}
-                  disabled={isCurrentPlan || isProcessing}
-                >
-                  {isProcessing && selectedPlan === plan.id ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : isCurrentPlan ? (
-                    "Current Plan"
-                  ) : (
-                    "Upgrade to " + plan.name
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-xl font-black text-foreground">Custom commercial plan</CardTitle>
+          <CardDescription>
+            Fixed self-service upgrades are disabled. Plan scope, modules, billing, implementation, and support are discussed with each client before changes are applied.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assigned plan</p>
+              <p className="mt-2 text-lg font-black text-foreground">{planName}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-secondary/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Billable locations</p>
+              <p className="mt-2 text-lg font-black text-foreground">{billingLocationCount}</p>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Contact your RestOps account team to review pricing, add locations, enable modules, or update payment terms.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -43,6 +43,9 @@ for (const file of files) {
       upper.startsWith('DROP POLICY') ||
       (upper.startsWith('ALTER TABLE') && upper.includes('ENABLE ROW LEVEL SECURITY')) ||
       (upper.startsWith('ALTER TABLE') && upper.includes('FORCE ROW LEVEL SECURITY')) ||
+      (upper.startsWith('ALTER FUNCTION') && (upper.includes('SECURITY DEFINER') || upper.includes('SECURITY INVOKER'))) ||
+      (upper.startsWith('ALTER ROUTINE') && (upper.includes('SECURITY DEFINER') || upper.includes('SECURITY INVOKER'))) ||
+      upper.startsWith('ALTER DEFAULT PRIVILEGES') ||
       upper.startsWith('GRANT ') || 
       upper.startsWith('REVOKE ') ||
       upper.startsWith('CREATE ROLE') ||

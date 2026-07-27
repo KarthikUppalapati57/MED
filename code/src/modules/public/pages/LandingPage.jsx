@@ -33,31 +33,11 @@ import { toast } from "sonner";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lenis from '@studio-freight/lenis';
 
-const LANDING_PLANS = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    badge: 'Available now',
-    price: 149,
-    description: 'Core tools for one restaurant, store, or service location.',
-    features: ['Invoices', 'Products', 'Vendors', 'Payments', 'Inventory', 'Recipes', 'Analytics'],
-  },
-  {
-    id: 'starter-ai',
-    name: 'Starter + AI',
-    badge: 'Coming soon',
-    price: 249,
-    description: 'Starter tools plus AI-assisted review features as they become available.',
-    features: ['Everything in Starter', 'AI insights', 'AI invoice assistance', 'AI inventory recommendations'],
-  },
-  {
-    id: 'advanced',
-    name: 'Advanced modules',
-    badge: 'Coming soon',
-    price: 349,
-    description: 'Expanded controls for larger teams and multi-location workflows.',
-    features: ['Everything in Starter + AI', 'Advanced accounting', 'Multi-unit controls', 'Deeper performance analytics'],
-  },
+const CUSTOM_PLAN_FEATURES = [
+  'Client-specific rollout plan',
+  'Modules selected around your workflows',
+  'Location and team needs reviewed together',
+  'Implementation and support discussed before launch',
 ];
 const REVEAL_STEPS = [
   {
@@ -179,7 +159,7 @@ export default function LandingPage() {
             <div className="hidden lg:flex items-center gap-8 text-[11px] font-bold tracking-[2px] text-muted-foreground dark:text-white/80 uppercase">
               <a href="#features" className="hover:text-[#b83316] transition-colors">Features</a>
               <a href="#showcase" className="hover:text-[#b83316] transition-colors">How it works</a>
-              <a href="#pricing" className="hover:text-[#b83316] transition-colors">Pricing</a>
+              <a href="#pricing" className="hover:text-[#b83316] transition-colors">Custom pricing</a>
             </div>
 
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
@@ -217,7 +197,7 @@ export default function LandingPage() {
             <div className="grid gap-2 text-[11px] font-bold uppercase tracking-[2px] text-muted-foreground dark:text-white/85">
               <a href="#features" className="py-3" onClick={() => setIsMenuOpen(false)}>Features</a>
               <a href="#showcase" className="py-3" onClick={() => setIsMenuOpen(false)}>How it works</a>
-              <a href="#pricing" className="py-3" onClick={() => setIsMenuOpen(false)}>Pricing</a>
+              <a href="#pricing" className="py-3" onClick={() => setIsMenuOpen(false)}>Custom pricing</a>
               <Button
                 className="mt-2 h-11 w-full bg-black text-[10px] font-bold uppercase tracking-[2px] text-white hover:bg-[#b83316] dark:bg-white dark:text-black dark:hover:bg-[#b83316] dark:hover:text-white"
                 onClick={() => {
@@ -405,49 +385,43 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Pricing */}
+                {/* Custom Pricing */}
         <section id="pricing">
           <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
-            <div className="text-center mb-32">
-              <h2 className="text-5xl font-bold tracking-tighter mb-6 text-foreground dark:text-white">Simple pricing by location</h2>
-              <p className="text-muted-foreground dark:text-white/85 text-lg font-bold tracking-widest uppercase">Start with the tools your restaurant needs</p>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-3">
-              {LANDING_PLANS.map((plan, index) => (
-                <motion.div
-                  key={plan.id}
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.08 }}
-                  viewport={{ once: true }}
-                  className="h-full"
-                >
-                  <div className="flex h-full flex-col p-10 bg-[#F2EEE8] dark:bg-white/5 dark:border dark:border-white/10 mistral-border relative group hover:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.1)] transition-all duration-700">
-                    <div className="mb-10 flex items-center justify-between gap-4">
-                      <h3 className="text-2xl font-bold tracking-tight text-foreground dark:text-white">{plan.name}</h3>
-                      <span className="shrink-0 text-[9px] font-bold px-3 py-1 bg-black text-white uppercase tracking-[3px]">{plan.badge}</span>
-                    </div>
-                    <p className="min-h-[60px] text-sm font-semibold leading-relaxed text-muted-foreground dark:text-white/80">{plan.description}</p>
-                    <div className="my-10 flex items-baseline gap-2">
-                      <span className="text-7xl font-bold tracking-tighter text-foreground dark:text-white">${plan.price}</span>
-                      <span className="text-muted-foreground dark:text-white/80 font-bold text-xs uppercase tracking-[3px]">USD / Location / Mo</span>
-                    </div>
-                    <ul className="mb-12 flex-1 space-y-5">
-                      {plan.features.map((item) => (
-                        <li key={item} className="flex items-center gap-4 text-muted-foreground dark:text-white/85 text-xs font-bold uppercase tracking-widest">
-                          <div className="h-1 w-1 bg-[#b83316]" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                    <Button className="w-full h-14 bg-black text-white hover:bg-[#b83316] font-bold text-[10px] tracking-[5px] rounded-sm uppercase transition-all shadow-2xl" onClick={() => setIsDemoModalOpen(true)}>
-                      {plan.id === 'starter' ? 'BOOK DEMO' : 'REQUEST INFO'}
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="mx-auto max-w-5xl bg-[#F2EEE8] p-10 dark:border dark:border-white/10 dark:bg-white/5 md:p-16"
+            >
+              <div className="mb-8 inline-flex items-center gap-2 border border-[#b83316]/20 bg-[#b83316]/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[3px] text-[#b83316]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Custom commercial plan
+              </div>
+              <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+                <div>
+                  <h2 className="text-5xl font-bold leading-[0.98] tracking-tighter text-foreground dark:text-white md:text-7xl">
+                    Pricing is built around your operation.
+                  </h2>
+                  <p className="mt-8 max-w-2xl text-lg font-medium leading-relaxed text-muted-foreground dark:text-white/85 technical-tracking">
+                    RestOps no longer publishes fixed plan tiers. We review your locations, modules, onboarding needs, and support scope with your team, then prepare a custom plan for approval.
+                  </p>
+                </div>
+                <div className="space-y-6">
+                  <ul className="space-y-5">
+                    {CUSTOM_PLAN_FEATURES.map((item) => (
+                      <li key={item} className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest text-muted-foreground dark:text-white/85">
+                        <div className="h-1 w-1 bg-[#b83316]" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="h-14 w-full rounded-sm bg-black text-[10px] font-bold uppercase tracking-[5px] text-white shadow-2xl transition-all hover:bg-[#b83316]" onClick={() => setIsDemoModalOpen(true)}>
+                    Discuss Your Plan
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </section>
       </div>

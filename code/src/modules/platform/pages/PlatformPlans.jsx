@@ -16,14 +16,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useConfirmation } from '@/hooks/useConfirmation';
-
-const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
-
-function normalizeCurrentPlanId(name) {
-  const slug = String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  if (slug === 'advanced-modules') return 'advanced';
-  return slug;
+function normalizePlanId(name) {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'custom';
 }
+
 
 export default function PlatformPlans() {
   const { user, role: userRole } = useAuth();
@@ -46,7 +46,7 @@ export default function PlatformPlans() {
   const { data: plans = [], isLoading: isLoadingPlans } = useAuthQuery({
     queryKey: ['plans'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('plans').select('*').in('id', CURRENT_PLAN_IDS).order('price_monthly', { ascending: true });
+      const { data, error } = await supabase.from('plans').select('*').order('name', { ascending: true });
       if (error) throw error;
       return data || [];
     },
@@ -67,7 +67,7 @@ export default function PlatformPlans() {
     if (!planForm.name) { toast.error("Plan name is required"); return; }
     const proceed = await confirm({
       title: editingPlan ? `Save changes to "${planForm.name}"?` : `Create plan "${planForm.name}"?`,
-      description: `This ${editingPlan ? 'updates the live' : 'creates a new live'} SaaS pricing plan at $${planForm.price_monthly}/location/month, affecting every organization subscribed to it.`,
+      description: `This ${editingPlan ? 'updates the live' : 'creates a new live'} client-specific commercial plan, affecting every organization assigned to it.`,
       confirmText: 'Save Plan',
       cancelText: 'Cancel',
       variant: 'destructive',
@@ -90,10 +90,7 @@ export default function PlatformPlans() {
         if (error) throw error;
         toast.success("Plan updated successfully", { id: toastId });
       } else {
-        const planId = normalizeCurrentPlanId(planForm.name);
-        if (!CURRENT_PLAN_IDS.includes(planId)) {
-          throw new Error('Only Starter, Starter + AI, and Advanced modules plans are supported.');
-        }
+        const planId = normalizePlanId(planForm.name);
         const { error } = await supabase.from('plans').insert([{ id: planId, ...payload }]);
         if (error) throw error;
         toast.success("Plan created successfully", { id: toastId });
@@ -141,12 +138,12 @@ export default function PlatformPlans() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Platform Plans</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage global per-location SaaS subscriptions and service tiers</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage client-specific commercial plans and assigned modules</p>
           </div>
         </div>
         <Button onClick={openNewPlan} className="bg-brand hover:bg-brand/90 text-primary-foreground font-bold rounded-xl h-10 px-6">
           <Plus className="w-4 h-4 mr-2" />
-          Restore Plan
+          Add Custom Plan
         </Button>
       </div>
 
@@ -192,7 +189,7 @@ export default function PlatformPlans() {
              <Building2 className="w-5 h-5 text-muted-foreground" />
              Organization Plan Assignments
            </CardTitle>
-           <p className="text-xs text-muted-foreground">Review which plan each organization is currently subscribed to.</p>
+           <p className="text-xs text-muted-foreground">Review which custom plan each organization is assigned to.</p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -245,12 +242,12 @@ export default function PlatformPlans() {
         </CardContent>
       </Card>
 
-      {/* Edit/Restore Plan Dialog */}
+      {/* Edit/Add Custom Plan Dialog */}
       <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
         <DialogContent className="max-w-2xl rounded-3xl border-none shadow-2xl p-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">{editingPlan ? 'Edit Plan' : 'Restore Plan'}</DialogTitle>
-            <DialogDescription>Configure one of the three current SaaS subscription tiers.</DialogDescription>
+            <DialogTitle className="text-2xl font-black">{editingPlan ? 'Edit Plan' : 'Add Custom Plan'}</DialogTitle>
+            <DialogDescription>Configure a client-specific commercial plan.</DialogDescription>
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
@@ -272,13 +269,13 @@ export default function PlatformPlans() {
                     <Input 
                       value={planForm.description} 
                       onChange={e => setPlanForm({...planForm, description: e.target.value})} 
-                      placeholder="Brief summary of the tier"
+                      placeholder="Brief summary of the client package"
                       className="mt-1 bg-card border-border"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label className="text-xs font-semibold">Monthly Price per Location ($)</Label>
+                      <Label className="text-xs font-semibold">Internal Monthly Amount ($)</Label>
                       <div className="relative mt-1">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input 
@@ -312,7 +309,7 @@ export default function PlatformPlans() {
                       placeholder="price_1ABC123..."
                       className="mt-1 bg-card border-border font-mono text-xs"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-1">Link to a Stripe product for automated billing.</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Optional internal Stripe price for account-managed billing.</p>
                   </div>
                 </div>
               </div>
