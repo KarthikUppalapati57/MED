@@ -58,10 +58,19 @@ function clearPendingInviteToken() {
   try { localStorage.removeItem(PENDING_INVITE_TOKEN_KEY); } catch {}
 }
 
+const PROFILE_CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 min -- bounds the instant-hydration snapshot only.
+// The authoritative profile fetch below still runs fresh on every load regardless; this just
+// stops an old cached snapshot from being the thing painted on screen before that fetch resolves.
+
 function getCachedProfile() {
   try {
     const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?._cachedAt && Date.now() - parsed._cachedAt > PROFILE_CACHE_MAX_AGE_MS) {
+      return null;
+    }
+    return parsed;
   } catch { /* ignore parse errors */ }
   return null;
 }
@@ -97,6 +106,7 @@ function setCachedProfile(profile) {
         organization: profile.organization,
         brand: profile.brand,
         location: profile.location,
+        _cachedAt: Date.now(),
       }));
     } else {
       sessionStorage.removeItem(PROFILE_CACHE_KEY);
@@ -120,7 +130,8 @@ function withTimeout(promise, timeoutMs, message) {
 // so the React Query cache is pre-warmed by the time Dashboard mounts.
 async function prefetchDashboardData(role) {
   try {
-    const staleTime = 5 * 60 * 1000;
+    const dashboardStaleTime = 3 * 60 * 1000; // live roster data -- dashboard tier
+    const configStaleTime = 15 * 60 * 60 * 1000; // feature flags / plan limits -- global-config tier, changes rarely
     if (role === 'platform_admin') {
       queryClientInstance.prefetchQuery({
         queryKey: ['dash-orgs'],
@@ -129,7 +140,7 @@ async function prefetchDashboardData(role) {
             .select('id, name, subscription_plan, subscription_status, plan_id, enabled_modules');
           return data || [];
         },
-        staleTime,
+        staleTime: configStaleTime,
       });
       queryClientInstance.prefetchQuery({
         queryKey: ['dash-profiles'],
@@ -137,7 +148,7 @@ async function prefetchDashboardData(role) {
           const { data } = await supabase.from('profiles').select('id, role, organization_id');
           return data || [];
         },
-        staleTime,
+        staleTime: dashboardStaleTime,
       });
       queryClientInstance.prefetchQuery({
         queryKey: ['dash-plans'],
@@ -145,7 +156,7 @@ async function prefetchDashboardData(role) {
           const { data } = await supabase.from('plans').select('*');
           return data || [];
         },
-        staleTime,
+        staleTime: configStaleTime,
       });
     }
   } catch (err) {

@@ -7,7 +7,7 @@ export const queryClientInstance = new QueryClient({
 			refetchOnWindowFocus: false,
 			retry: 2,
 			retryDelay: (attemptIndex) => Math.min(500 * 2 ** attemptIndex, 3000),
-			staleTime: 5 * 60 * 1000,  // 5 min — realtime channels handle live updates
+			staleTime: 3 * 60 * 1000,  // 3 min — realtime channels + event-driven invalidation handle live updates; this is the dashboard/report-tier default. Transactional queries (invoices/payments lists) override this to 0 individually.
 			gcTime: 10 * 60 * 1000,    // 10 min — keep cache warm for back-navigation
 		},
 	},

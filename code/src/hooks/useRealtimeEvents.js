@@ -37,7 +37,7 @@ export function useRealtimeEvents() {
           } else if (eventName.startsWith('inventory.')) {
             keysToInvalidate.push(['inventory'], ['products']);
           } else if (eventName.startsWith('order.') || eventName.startsWith('payment.') || eventName.startsWith('invoice.')) {
-            keysToInvalidate.push(['invoices'], ['payments']);
+            keysToInvalidate.push(['invoices'], ['invoices-dashboard'], ['invoices-payments']);
           } else if (eventName.startsWith('subscription.')) {
             keysToInvalidate.push(['dash-plans'], ['dash-orgs']);
           }
