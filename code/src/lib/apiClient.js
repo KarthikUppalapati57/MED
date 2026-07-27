@@ -1258,6 +1258,23 @@ export const api = {
       if (error) throw error;
       return data;
     },
+    getPerformanceOverviewRollup: async ({
+      organizationId,
+      locationIds = null,
+      dateFrom,
+      dateTo,
+    }) => {
+      const locationId = locationIds?.length === 1 ? locationIds[0] : null;
+      if (!locationId) throw new Error('Performance requires one selected location.');
+      const { data, error } = await supabase.rpc('get_location_performance_overview_rollup', {
+        p_organization_id: organizationId,
+        p_location_id: locationId,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+      });
+      if (error) throw error;
+      return data;
+    },
     getCategoryPerformanceReport: async ({
       organizationId,
       locationIds = null,

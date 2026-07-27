@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 
 /**
- * Shared Performance filter bar — not coupled to Category Report.
+ * Shared Performance filter bar, not coupled to Category Report.
  */
 export function PerformanceFilterBar({
   dateFrom,
@@ -41,6 +41,15 @@ export function PerformanceFilterBar({
   showComparison = true,
   showVendor = true,
 }) {
+  const idPrefix = useId();
+  const dateFromId = `${idPrefix}-date-from`;
+  const dateToId = `${idPrefix}-date-to`;
+  const comparisonFromId = `${idPrefix}-comparison-from`;
+  const comparisonToId = `${idPrefix}-comparison-to`;
+  const locationId = `${idPrefix}-location`;
+  const categoryId = `${idPrefix}-category`;
+  const vendorId = `${idPrefix}-vendor`;
+
   const handleFrom = (value) => {
     onDateFromChange?.(value);
     if (autoComparison && dateTo) onDateRangeCommit?.(value, dateTo);
@@ -51,39 +60,41 @@ export function PerformanceFilterBar({
   };
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-4 space-y-3">
-      <div className="flex flex-wrap items-end gap-3">
+    <div className="rounded-xl border border-border/60 bg-card/40 p-4 space-y-3" role="search" aria-label="Performance report filters">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-8 xl:items-end">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Date from</Label>
-          <Input type="date" value={dateFrom || ''} onChange={(e) => handleFrom(e.target.value)} className="h-9 w-[150px]" />
+          <Label htmlFor={dateFromId} className="text-xs text-muted-foreground">Date from</Label>
+          <Input id={dateFromId} type="date" value={dateFrom || ''} onChange={(e) => handleFrom(e.target.value)} className="h-9 w-full" />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Date to</Label>
-          <Input type="date" value={dateTo || ''} onChange={(e) => handleTo(e.target.value)} className="h-9 w-[150px]" />
+          <Label htmlFor={dateToId} className="text-xs text-muted-foreground">Date to</Label>
+          <Input id={dateToId} type="date" value={dateTo || ''} onChange={(e) => handleTo(e.target.value)} className="h-9 w-full" />
         </div>
         {showComparison ? <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Compare from</Label>
+          <Label htmlFor={comparisonFromId} className="text-xs text-muted-foreground">Compare from</Label>
           <Input
+            id={comparisonFromId}
             type="date"
             value={comparisonDateFrom || ''}
             disabled={autoComparison}
             onChange={(e) => onComparisonDateFromChange?.(e.target.value)}
-            className="h-9 w-[150px]"
+            className="h-9 w-full"
           />
         </div> : null}
         {showComparison ? <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Compare to</Label>
+          <Label htmlFor={comparisonToId} className="text-xs text-muted-foreground">Compare to</Label>
           <Input
+            id={comparisonToId}
             type="date"
             value={comparisonDateTo || ''}
             disabled={autoComparison}
             onChange={(e) => onComparisonDateToChange?.(e.target.value)}
-            className="h-9 w-[150px]"
+            className="h-9 w-full"
           />
         </div> : null}
 
-        <div className="space-y-1 min-w-[160px]">
-          <Label className="text-xs text-muted-foreground">Location</Label>
+        <div className="space-y-1 min-w-0">
+          <Label id={locationId} className="text-xs text-muted-foreground">Location</Label>
           <Select
             value={locationIds[0] || (locationLocked ? 'none' : 'all')}
             disabled={locationLocked}
@@ -92,7 +103,7 @@ export function PerformanceFilterBar({
               onLocationChange?.(v === 'all' ? [] : [v]);
             }}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full" aria-labelledby={locationId}>
               <SelectValue placeholder={locationLocked ? 'Active location required' : 'All locations'} />
             </SelectTrigger>
             <SelectContent>
@@ -110,13 +121,13 @@ export function PerformanceFilterBar({
           </Select>
         </div>
 
-        <div className="space-y-1 min-w-[160px]">
-          <Label className="text-xs text-muted-foreground">Category</Label>
+        <div className="space-y-1 min-w-0">
+          <Label id={categoryId} className="text-xs text-muted-foreground">Category</Label>
           <Select
             value={categoryIds[0] || 'all'}
             onValueChange={(v) => onCategoryChange?.(v === 'all' ? [] : [v])}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full" aria-labelledby={categoryId}>
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
@@ -130,13 +141,13 @@ export function PerformanceFilterBar({
           </Select>
         </div>
 
-        {showVendor ? <div className="space-y-1 min-w-[160px]">
-          <Label className="text-xs text-muted-foreground">Vendor</Label>
+        {showVendor ? <div className="space-y-1 min-w-0">
+          <Label id={vendorId} className="text-xs text-muted-foreground">Vendor</Label>
           <Select
             value={vendorIds[0] || 'all'}
             onValueChange={(v) => onVendorChange?.(v === 'all' ? [] : [v])}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 w-full" aria-labelledby={vendorId}>
               <SelectValue placeholder="All vendors" />
             </SelectTrigger>
             <SelectContent>
@@ -150,24 +161,28 @@ export function PerformanceFilterBar({
           </Select>
         </div> : null}
 
-        {showComparison ? <Button
-          type="button"
-          variant={autoComparison ? 'secondary' : 'outline'}
-          size="sm"
-          className="h-9"
-          onClick={() => onAutoComparisonChange?.(!autoComparison)}
-        >
-          {autoComparison ? 'Auto comparison' : 'Custom comparison'}
-        </Button> : null}
+        <div className="flex flex-col gap-2 sm:flex-row xl:col-span-1 xl:flex-col">
+          {showComparison ? <Button
+            type="button"
+            variant={autoComparison ? 'secondary' : 'outline'}
+            size="sm"
+            className="h-9 w-full"
+            aria-pressed={autoComparison}
+            aria-label={autoComparison ? 'Auto comparison enabled' : 'Custom comparison enabled'}
+            onClick={() => onAutoComparisonChange?.(!autoComparison)}
+          >
+            {autoComparison ? 'Auto comparison' : 'Custom comparison'}
+          </Button> : null}
 
-        <Button type="button" variant="ghost" size="sm" className="h-9" onClick={onClear}>
-          <X className="w-4 h-4 mr-1" />
-          Clear filters
-        </Button>
+          <Button type="button" variant="ghost" size="sm" className="h-9 w-full" onClick={onClear} aria-label="Clear Performance filters">
+            <X className="w-4 h-4 mr-1" aria-hidden="true" />
+            Clear filters
+          </Button>
+        </div>
       </div>
 
       {(locationIds.length > 0 || categoryIds.length > 0 || vendorIds.length > 0) && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" aria-label="Active Performance filters">
           {locationIds.map((id) => (
             <Badge key={`loc-${id}`} variant="secondary">
               Loc: {locations.find((l) => l.id === id)?.name || id}

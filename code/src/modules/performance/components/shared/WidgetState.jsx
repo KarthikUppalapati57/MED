@@ -54,14 +54,20 @@ export function WidgetStatePanel({
   if (state === WIDGET_STATES.READY) return children;
   if (state === WIDGET_STATES.LOADING) {
     return (
-      <div className={cn('min-h-[220px] flex items-center justify-center text-sm text-muted-foreground animate-pulse', className)}>
-        Loading…
+      <div
+        className={cn('min-h-[220px] flex items-center justify-center text-sm text-muted-foreground animate-pulse', className)}
+        role="status"
+        aria-live="polite"
+      >
+        Loading...
       </div>
     );
   }
   return (
     <div
       data-widget-state={state}
+      role={state === WIDGET_STATES.ERROR ? 'alert' : 'status'}
+      aria-live={state === WIDGET_STATES.ERROR ? 'assertive' : 'polite'}
       className={cn(
         'min-h-[220px] flex flex-col items-center justify-center text-center gap-3 px-4 text-sm',
         state === WIDGET_STATES.ERROR ? 'text-destructive' : 'text-muted-foreground',
@@ -70,7 +76,9 @@ export function WidgetStatePanel({
     >
       <p className="max-w-md">{message || DEFAULT_MESSAGES[state]}</p>
       {state === WIDGET_STATES.ERROR && onRetry ? (
-        <Button type="button" size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onRetry} aria-label="Retry loading this Performance panel">
+          Retry
+        </Button>
       ) : null}
     </div>
   );

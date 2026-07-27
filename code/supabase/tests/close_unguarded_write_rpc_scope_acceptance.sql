@@ -1,0 +1,88 @@
+-- Acceptance test for 20260727020000_close_unguarded_write_rpc_scope.sql.
+-- Same role-impersonation pattern as close_unguarded_report_rpc_scope_acceptance.sql.
+BEGIN;
+
+DO $$
+DECLARE
+  v_org_a uuid := gen_random_uuid();
+  v_org_b uuid := gen_random_uuid();
+  v_user_a uuid := gen_random_uuid();
+  v_victim uuid := gen_random_uuid();
+  v_raised boolean;
+  v_result jsonb;
+BEGIN
+  INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES
+    (v_user_a, 'write-scope-a@example.test', crypt('password', gen_salt('bf')), now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb),
+    (v_victim, 'write-scope-victim@example.test', crypt('password', gen_salt('bf')), now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+
+  INSERT INTO public.organizations (id, name, slug) VALUES
+    (v_org_a, 'Write Scope Org A', 'write-scope-org-a-' || replace(v_org_a::text, '-', '')),
+    (v_org_b, 'Write Scope Org B', 'write-scope-org-b-' || replace(v_org_b::text, '-', ''));
+
+  UPDATE public.profiles SET organization_id = v_org_a, role = 'branch_manager', updated_at = now() WHERE id = v_user_a;
+  UPDATE public.profiles SET organization_id = v_org_a, role = 'ground_staff', updated_at = now() WHERE id = v_victim;
+  INSERT INTO public.organization_members (organization_id, user_id, role) VALUES (v_org_a, v_user_a, 'org_manager'), (v_org_a, v_victim, 'ground_staff');
+
+  INSERT INTO public.operational_settings (organization_id, category, settings)
+  VALUES (v_org_a, 'payments', jsonb_build_object('marker', 'org-a-real-settings'));
+  INSERT INTO public.operational_settings (organization_id, category, scope, settings)
+  VALUES (v_org_a, 'product_approval', 'organization', jsonb_build_object('require_location_manager_approval', true));
+
+  INSERT INTO public.payment_provider_configs (organization_id, collection_provider, payout_provider, settings)
+  VALUES (v_org_a, 'stripe', 'stripe', jsonb_build_object('marker', 'org-a-real-provider-config'));
+
+  SET LOCAL ROLE authenticated;
+  PERFORM set_config('request.jwt.claim.sub', v_user_a::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+
+  -- record_payment_ledger: foreign org must be rejected.
+  v_raised := false;
+  BEGIN
+    PERFORM public.record_payment_ledger(v_org_b, NULL, gen_random_uuid(), 'ach', 100.00, now(), v_user_a);
+  EXCEPTION WHEN OTHERS THEN
+    v_raised := true;
+  END;
+  ASSERT v_raised, 'record_payment_ledger must reject a foreign organization id';
+  PERFORM public.record_payment_ledger(v_org_a, NULL, gen_random_uuid(), 'ach', 100.00, now(), v_user_a);
+
+  -- resolve_payment_provider_config: foreign org must come back with the safe default, not org A's real config.
+  v_result := public.resolve_payment_provider_config(NULL, v_org_b, NULL, NULL);
+  ASSERT v_result->>'collection_provider' = 'not_configured' AND (v_result->'settings'->>'marker') IS NULL,
+    'resolve_payment_provider_config must not leak org A''s config when queried with org B''s id';
+  v_result := public.resolve_payment_provider_config(NULL, v_org_a, NULL, NULL);
+  ASSERT v_result->'settings'->>'marker' = 'org-a-real-provider-config',
+    'resolve_payment_provider_config must return the real config for the caller''s own org';
+
+  -- get_payment_approval_settings: same shape.
+  v_result := public.get_payment_approval_settings(v_org_b, NULL, NULL);
+  ASSERT v_result = '{}'::jsonb, 'get_payment_approval_settings must not leak org A''s settings when queried with org B''s id';
+  v_result := public.get_payment_approval_settings(v_org_a, NULL, NULL);
+  ASSERT v_result->>'marker' = 'org-a-real-settings', 'get_payment_approval_settings must return real settings for the caller''s own org';
+
+  -- get_product_approval_setting: same shape, boolean instead of jsonb.
+  ASSERT public.get_product_approval_setting(v_org_b) = false,
+    'get_product_approval_setting must not leak org A''s true setting when queried with org B''s id';
+  ASSERT public.get_product_approval_setting(v_org_a) = true,
+    'get_product_approval_setting must return the real setting for the caller''s own org';
+
+  -- org_remove_member: passing org B's id explicitly must be rejected; own org (default or explicit) must succeed.
+  v_raised := false;
+  BEGIN
+    PERFORM public.org_remove_member(v_victim, v_org_b);
+  EXCEPTION WHEN OTHERS THEN
+    v_raised := true;
+  END;
+  ASSERT v_raised, 'org_remove_member must reject an explicitly-passed foreign organization id';
+
+  PERFORM public.org_remove_member(v_victim, v_org_a);
+  ASSERT (SELECT role FROM public.profiles WHERE id = v_victim) = 'ground_staff'
+     AND (SELECT organization_id FROM public.profiles WHERE id = v_victim) IS NULL,
+    'org_remove_member must still succeed and reset the profile for the caller''s own org';
+
+  RESET ROLE;
+
+  RAISE NOTICE 'close_unguarded_write_rpc_scope_acceptance: PASSED';
+END $$;
+
+ROLLBACK;

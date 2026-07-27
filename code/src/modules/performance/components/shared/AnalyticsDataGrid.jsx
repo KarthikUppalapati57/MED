@@ -12,7 +12,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 export function AnalyticsDataGrid({
   rows = [],
   columns = [],
-  searchPlaceholder = 'Search…',
+  searchPlaceholder = 'Search...',
   searchKeys = [],
   pageSize = 25,
   onRowClick,
@@ -54,6 +54,7 @@ export function AnalyticsDataGrid({
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageRows = filtered.slice(page * pageSize, page * pageSize + pageSize);
+  const hasClickableRows = typeof onRowClick === 'function';
 
   const getSortState = (col) => {
     const key = col.sortAccessor || col.accessor;
@@ -72,8 +73,8 @@ export function AnalyticsDataGrid({
   };
 
   return (
-    <div className={cn('space-y-3', className)}>
-      <div className="flex items-center justify-between gap-3">
+    <div className={cn('space-y-3', className)} role="region" aria-label="Analytics data grid">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <label className="sr-only" htmlFor={searchInputId}>{searchPlaceholder}</label>
         <Input
           id={searchInputId}
@@ -84,15 +85,16 @@ export function AnalyticsDataGrid({
             setPage(0);
           }}
           placeholder={searchPlaceholder}
-          className="h-9 max-w-xs"
+          className="h-9 w-full sm:max-w-xs"
+          aria-describedby={`${searchInputId}-count`}
         />
-        <p className="text-xs text-muted-foreground">
+        <p id={`${searchInputId}-count`} className="text-xs text-muted-foreground" aria-live="polite">
           {filtered.length} row{filtered.length === 1 ? '' : 's'}
         </p>
       </div>
 
       <div className="rounded-lg border border-border/60 overflow-auto max-h-[480px]">
-        <Table>
+        <Table aria-rowcount={filtered.length}>
           <TableHeader className={cn(stickyHeader && 'sticky top-0 z-10 bg-background')}>
             <TableRow>
               {columns.map((col) => (
@@ -107,7 +109,7 @@ export function AnalyticsDataGrid({
                   ) : (
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       onClick={() => toggleSort(col.sortAccessor || col.accessor)}
                       aria-label={`Sort by ${col.header}, currently ${getSortState(col)}`}
                     >
@@ -134,8 +136,18 @@ export function AnalyticsDataGrid({
               pageRows.map((row, idx) => (
                 <TableRow
                   key={row.id || row.category || idx}
-                  className={cn(onRowClick && 'cursor-pointer hover:bg-muted/40')}
+                  tabIndex={hasClickableRows ? 0 : undefined}
+                  role={hasClickableRows ? 'button' : undefined}
+                  aria-label={hasClickableRows ? `Open details for row ${page * pageSize + idx + 1}` : undefined}
+                  className={cn(hasClickableRows && 'cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2')}
                   onClick={() => onRowClick?.(row)}
+                  onKeyDown={(event) => {
+                    if (!hasClickableRows) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onRowClick(row);
+                    }
+                  }}
                 >
                   {columns.map((col) => (
                     <TableCell key={col.id || col.accessor} className={cn('whitespace-nowrap', col.cellClassName)}>
@@ -149,11 +161,18 @@ export function AnalyticsDataGrid({
         </Table>
       </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={page <= 0} onClick={() => setPage((p) => p - 1)}>
+      <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={page <= 0}
+          onClick={() => setPage((p) => p - 1)}
+          aria-label="Go to previous table page"
+        >
           Previous
         </Button>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-center text-xs text-muted-foreground" aria-live="polite">
           Page {page + 1} of {pageCount}
         </span>
         <Button
@@ -162,6 +181,7 @@ export function AnalyticsDataGrid({
           variant="outline"
           disabled={page >= pageCount - 1}
           onClick={() => setPage((p) => p + 1)}
+          aria-label="Go to next table page"
         >
           Next
         </Button>
@@ -171,8 +191,3 @@ export function AnalyticsDataGrid({
 }
 
 export default AnalyticsDataGrid;
-
-
-
-
-

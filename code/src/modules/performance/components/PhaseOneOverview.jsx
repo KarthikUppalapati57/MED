@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Bar,
   BarChart,
@@ -25,8 +25,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
-import { supabase } from '@/lib/supabaseClient';
-import { filterByContext } from '@/lib/contextUtils';
 import { useAuthQueries } from '@/hooks/useAuthQuery';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,14 +47,6 @@ function toDateKey(value) {
   return String(value).slice(0, 10);
 }
 
-function inRange(value, start, end) {
-  const key = toDateKey(value);
-  return key && key >= start && key <= end;
-}
-
-function sum(rows, selector) {
-  return (rows || []).reduce((total, row) => total + Number(selector(row) || 0), 0);
-}
 
 function pctOf(part, total) {
   const t = Number(total) || 0;
@@ -142,11 +132,7 @@ export default function PhaseOneOverview({
   periodEnd,
   onOpenTab,
 }) {
-  const { organization, brand, location } = useAuth();
-  const scopedFilter = React.useCallback(
-    (data) => filterByContext(data || [], { organization, brand, location }),
-    [organization, brand, location]
-  );
+  const { organization, location } = useAuth();
 
   const results = useAuthQueries({
     queries: [
@@ -158,63 +144,17 @@ export default function PhaseOneOverview({
           dateFrom: periodStart,
           dateTo: periodEnd,
         }),
-        enabled: !!organization?.id && !!periodStart && !!periodEnd,
+        enabled: !!organization?.id && !!location?.id && !!periodStart && !!periodEnd,
       },
       {
-        queryKey: ['phase1_overview_invoices', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: async () => {
-          const startTs = `${periodStart}T00:00:00.000Z`;
-          const endTs = `${periodEnd}T23:59:59.999Z`;
-          const { data, error } = await supabase
-            .from('invoices')
-            .select('*')
-            .eq('organization_id', organization?.id)
-            .is('deleted_at', null)
-            .or(`and(invoice_date.gte.${periodStart},invoice_date.lte.${periodEnd}),and(invoice_date.is.null,created_at.gte.${startTs},created_at.lte.${endTs})`)
-            .order('invoice_date', { ascending: false, nullsFirst: false })
-            .limit(5000);
-          if (error) throw error;
-          return data || [];
-        },
-        select: scopedFilter,
-        enabled: !!organization?.id && !!periodStart && !!periodEnd,
-      },
-      {
-        queryKey: ['phase1_overview_payments', organization?.id, brand?.brand_id || brand?.id, location?.id, periodStart, periodEnd],
-        queryFn: async () => {
-          const startTs = `${periodStart}T00:00:00.000Z`;
-          const endTs = `${periodEnd}T23:59:59.999Z`;
-          const { data, error } = await supabase
-            .from('payments')
-            .select('*')
-            .eq('organization_id', organization?.id)
-            .is('deleted_at', null)
-            .or(`and(payment_date.gte.${periodStart},payment_date.lte.${periodEnd}),and(payment_date.is.null,created_at.gte.${startTs},created_at.lte.${endTs})`)
-            .order('payment_date', { ascending: false, nullsFirst: false })
-            .limit(5000);
-          if (error) throw error;
-          return data || [];
-        },
-        select: scopedFilter,
-        enabled: !!organization?.id && !!periodStart && !!periodEnd,
-      },
-      {
-        queryKey: ['phase1_overview_products', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Product.list('-updated_at', { limit: 5000 }),
-        select: scopedFilter,
-        enabled: !!organization?.id,
-      },
-      {
-        queryKey: ['phase1_overview_inventory', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Inventory.list('-updated_at', { limit: 5000 }),
-        select: scopedFilter,
-        enabled: !!organization?.id,
-      },
-      {
-        queryKey: ['phase1_overview_recipes', organization?.id, brand?.brand_id || brand?.id, location?.id],
-        queryFn: () => api.entities.Recipe.list('-updated_at', { limit: 5000 }),
-        select: scopedFilter,
-        enabled: !!organization?.id,
+        queryKey: ['phase1_overview_rollup', organization?.id, location?.id, periodStart, periodEnd],
+        queryFn: () => api.reports.getPerformanceOverviewRollup({
+          organizationId: organization?.id,
+          locationIds: location?.id ? [location.id] : null,
+          dateFrom: periodStart,
+          dateTo: periodEnd,
+        }),
+        enabled: !!organization?.id && !!location?.id && !!periodStart && !!periodEnd,
       },
       {
         queryKey: ['phase1_overview_price_movers', organization?.id, location?.id, periodStart, periodEnd],
@@ -224,26 +164,17 @@ export default function PhaseOneOverview({
           dateFrom: periodStart,
           dateTo: periodEnd,
         }),
-        enabled: !!organization?.id && !!periodStart && !!periodEnd,
+        enabled: !!organization?.id && !!location?.id && !!periodStart && !!periodEnd,
       },
     ],
   });
-
   const categoryReport = results[0]?.data || {};
-  const invoices = (results[1]?.data || []).filter((row) =>
-    inRange(row.invoice_date || row.created_at, periodStart, periodEnd)
-  );
-  const payments = (results[2]?.data || []).filter((row) =>
-    inRange(row.payment_date || row.created_at, periodStart, periodEnd)
-  );
-  const products = results[3]?.data || [];
-  const inventory = results[4]?.data || [];
-  const recipes = results[5]?.data || [];
-  const priceMoversReport = results[6]?.data || {};
+  const overviewRollup = results[1]?.data || {};
+  const priceMoversReport = results[2]?.data || {};
   const isLoading = results.some((query) => query.isLoading);
   const queryErrors = results
     .map((query, index) => (query?.isError ? {
-      key: ['Category report', 'Invoices', 'Payments', 'Products', 'Inventory', 'Recipes', 'Price movers'][index],
+      key: ['Category report', 'Overview rollup', 'Price movers'][index],
     } : null))
     .filter(Boolean);
 
@@ -275,18 +206,15 @@ export default function PhaseOneOverview({
       .sort((a, b) => String(a.bucketStart).localeCompare(String(b.bucketStart)))
       .slice(-12);
 
-    const paymentCompleted = sum(payments, (p) =>
-      ['completed', 'paid'].includes(String(p.status || '').toLowerCase()) ? p.amount : 0
-    );
-    const paymentScheduled = sum(payments, (p) =>
-      ['pending', 'processing', 'scheduled'].includes(String(p.status || '').toLowerCase()) ? p.amount : 0
-    );
-    const paymentFailed = sum(payments, (p) =>
-      ['failed', 'cancelled', 'refunded'].includes(String(p.status || '').toLowerCase()) ? p.amount : 0
-    );
-    const invoiceUnpaid = sum(invoices, (i) =>
-      ['unpaid', 'partial', 'processing'].includes(String(i.payment_status || '').toLowerCase()) ? i.total_amount : 0
-    );
+    const paymentRollup = overviewRollup.payments || {};
+    const productRollup = overviewRollup.products || {};
+    const inventoryRollup = overviewRollup.inventory || {};
+    const recipeRollup = overviewRollup.recipes || {};
+
+    const paymentCompleted = Number(paymentRollup.completedAmount || 0);
+    const paymentScheduled = Number(paymentRollup.scheduledAmount || 0);
+    const paymentFailed = Number(paymentRollup.failedAmount || 0);
+    const invoiceUnpaid = Number(paymentRollup.invoiceUnpaidBalance || 0);
     const paymentExposure = paymentScheduled + paymentFailed + invoiceUnpaid;
     const paymentData = [
       { name: 'Paid', value: paymentCompleted },
@@ -295,31 +223,19 @@ export default function PhaseOneOverview({
       { name: 'Failed', value: paymentFailed },
     ].filter((row) => row.value > 0);
 
-    const categorizedProducts = products.filter((p) => String(p.category || p.accounting_category || '').trim()).length;
-    const productCoverage = products.length ? pctOf(categorizedProducts, products.length) : 0;
+    const categorizedProducts = Number(productRollup.categorizedProducts || 0);
+    const totalProducts = Number(productRollup.totalProducts || 0);
+    const productCoverage = totalProducts ? pctOf(categorizedProducts, totalProducts) : 0;
     const priceMovers = priceMoversReport.ranking || priceMoversReport.tableRows || [];
 
-    const inventoryValue = sum(inventory, (row) => row.current_value);
-    const lowStock = inventory.filter((row) => {
-      const qty = Number(row.current_quantity || 0);
-      const reorder = Number(row.reorder_point ?? row.par_level ?? 0);
-      return reorder > 0 && qty <= reorder;
-    }).length;
-    const inventoryRisk = inventory.length ? pctOf(lowStock, inventory.length) : 0;
+    const inventoryValue = Number(inventoryRollup.currentInventoryValue || 0);
+    const lowStock = Number(inventoryRollup.lowStockCount || 0);
+    const inventoryCount = Number(inventoryRollup.inventoryCount || 0);
+    const inventoryRisk = inventoryCount ? pctOf(lowStock, inventoryCount) : 0;
 
-    const recipeRows = recipes.map((recipe) => {
-      const cost = Number(recipe.cost_per_serving || recipe.total_cost || 0);
-      const price = Number(recipe.selling_price || recipe.suggested_price || 0);
-      const targetMargin = Number(recipe.target_margin_percent || 0);
-      const margin = price > 0 ? ((price - cost) / price) * 100 : null;
-      return { ...recipe, cost, price, margin, targetMargin };
-    });
-    const recipeMarginRisks = recipeRows.filter((recipe) =>
-      recipe.margin != null && recipe.targetMargin > 0 && recipe.margin < recipe.targetMargin
-    );
-    const averageRecipeMargin = recipeRows.filter((r) => r.margin != null).length
-      ? recipeRows.filter((r) => r.margin != null).reduce((acc, r) => acc + r.margin, 0) / recipeRows.filter((r) => r.margin != null).length
-      : 0;
+    const recipeCount = Number(recipeRollup.recipeCount || 0);
+    const recipeMarginRiskCount = Number(recipeRollup.recipeMarginRiskCount || 0);
+    const averageRecipeMargin = Number(recipeRollup.averageRecipeMargin || 0);
 
     const categoryDistribution = (categoryReport.distribution || []).slice(0, 6).map((row) => ({
       name: row.category,
@@ -351,10 +267,10 @@ export default function PhaseOneOverview({
             tab: 'inventory_recipes',
           }]
         : []),
-      ...(recipeMarginRisks.length > 0
+      ...(recipeMarginRiskCount > 0
         ? [{
             tone: 'risk',
-            title: `${recipeMarginRisks.length} recipes below target margin`,
+            title: `${recipeMarginRiskCount} recipes below target margin`,
             body: 'Review recipe costs and products with recent price movement.',
             tab: null,
           }]
@@ -383,7 +299,8 @@ export default function PhaseOneOverview({
       inventoryValue,
       lowStock,
       inventoryRisk,
-      recipeMarginRisks,
+      recipeMarginRiskCount,
+      recipeCount,
       averageRecipeMargin,
       categoryDistribution,
       actionItems,
@@ -408,7 +325,7 @@ export default function PhaseOneOverview({
           label: 'Products',
           icon: Package,
           value: `${Math.round(productCoverage)}%`,
-          detail: `${categorizedProducts}/${products.length || 0} categorized`,
+          detail: `${categorizedProducts}/${totalProducts || 0} categorized`,
           progress: productCoverage,
           tone: productCoverage >= 80 ? 'good' : 'warn',
         },
@@ -423,14 +340,14 @@ export default function PhaseOneOverview({
         {
           label: 'Recipes',
           icon: ChefHat,
-          value: String(recipeMarginRisks.length),
+          value: String(recipeMarginRiskCount),
           detail: `${formatPct(averageRecipeMargin)} current avg margin`,
-          progress: recipes.length ? 100 - pctOf(recipeMarginRisks.length, recipes.length) : 0,
-          tone: recipeMarginRisks.length ? 'risk' : 'good',
+          progress: recipeCount ? 100 - pctOf(recipeMarginRiskCount, recipeCount) : 0,
+          tone: recipeMarginRiskCount ? 'risk' : 'good',
         },
       ],
     };
-  }, [categoryReport, invoices, payments, products, inventory, recipes, priceMoversReport]);
+  }, [categoryReport, overviewRollup, priceMoversReport]);
 
   const budgetEmpty = !isLoading && analytics.budgetRows.length === 0;
   const trendEmpty = !isLoading && analytics.spendTrend.length === 0;
@@ -500,9 +417,9 @@ export default function PhaseOneOverview({
         <StatCard
           icon={ChefHat}
           label="Recipe margin risks"
-          value={isLoading ? '...' : String(analytics.recipeMarginRisks.length)}
-          detail={`${recipes.length || 0} recipes in scope`}
-          tone={analytics.recipeMarginRisks.length ? 'risk' : 'good'}
+          value={isLoading ? '...' : String(analytics.recipeMarginRiskCount)}
+          detail={`${analytics.recipeCount || 0} recipes in scope`}
+          tone={analytics.recipeMarginRiskCount ? 'risk' : 'good'}
         />
       </div>
 
