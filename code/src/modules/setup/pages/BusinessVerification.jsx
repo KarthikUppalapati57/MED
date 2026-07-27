@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Building2, CheckCircle2, FileCheck2, Loader2, Mail, Phone, ShieldCheck, Clock3, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -593,11 +593,11 @@ export default function BusinessVerification() {
                             setForm({ ...form, email: e.target.value });
                             setContactOtp((prev) => ({ ...prev, email: { ...prev.email, verifiedTarget: '', verifiedAt: null } }));
                           }}
-                          placeholder={isIndividualOwner ? "owner@gmail.com" : "owner@restaurant.com"}
+                          placeholder={isIndividualOwner ? "owner@example.com" : "ops@example.com"}
                         />
                         <Button type="button" variant={emailVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('email')} disabled={contactOtp.email.sending} className="min-w-[112px] shrink-0 gap-2">
                           {contactOtp.email.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : emailVerified ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-                          {contactOtp.email.sending ? 'Sending' : emailVerified ? 'Reverify' : contactOtp.email.otpId ? 'Resend' : 'Send OTP'}
+                          {contactOtp.email.sending ? 'Sending' : emailVerified ? 'Reverify' : contactOtp.email.otpId ? 'Resend Email OTP' : 'Send Email OTP'}
                         </Button>
                       </div>
                       {!emailVerified && contactOtp.email.otpId && (
@@ -625,7 +625,7 @@ export default function BusinessVerification() {
                         />
                         <Button type="button" variant={phoneVerified ? 'secondary' : 'outline'} onClick={() => requestOtp('phone')} disabled={contactOtp.phone.sending} className="min-w-[112px] shrink-0 gap-2">
                           {contactOtp.phone.sending ? <Loader2 className="h-4 w-4 animate-spin" /> : phoneVerified ? <CheckCircle2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-                          {contactOtp.phone.sending ? 'Sending' : phoneVerified ? 'Reverify' : contactOtp.phone.otpId ? 'Resend' : 'Send OTP'}
+                          {contactOtp.phone.sending ? 'Sending' : phoneVerified ? 'Reverify' : contactOtp.phone.otpId ? 'Resend SMS OTP' : 'Send SMS OTP'}
                         </Button>
                       </div>
                       {!phoneVerified && contactOtp.phone.otpId && (
@@ -642,7 +642,8 @@ export default function BusinessVerification() {
                     </div>
                     <div className="space-y-1.5 rounded-md bg-secondary/20 p-3 text-xs leading-5 text-muted-foreground md:col-span-2">
                       <p className="font-medium text-foreground">Security Consent</p>
-                      <p>By clicking Send OTP, you agree that RestOps may send a one-time code to the email address or phone number entered here to verify your identity for onboarding security. These codes are used only for account security and business verification; they do not turn on email or SMS notifications.</p>
+                      <p>By clicking <span className="font-medium text-foreground">Send Email OTP</span>, you agree to receive a one-time security code at the email address entered here for onboarding security and business verification.</p>
+                      <p>By clicking <span className="font-medium text-foreground">Send SMS OTP</span>, you agree to receive an automated SMS from RestOps-360, operated by Mindful Tech Solutions, containing a one-time security code. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. <Link to="/privacy" className="font-medium text-primary underline underline-offset-2">Privacy Policy</Link> | <Link to="/sms-terms" className="font-medium text-primary underline underline-offset-2">Terms and Conditions</Link>.</p>
                     </div>
                   </div>
                 )}
