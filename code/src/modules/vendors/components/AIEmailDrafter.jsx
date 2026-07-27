@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Bot, Send, X, Loader2 } from 'lucide-react';
 import { generateVendorCreditRequestEmail } from '@/lib/aiService';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { toast } from 'sonner';
 
 export default function AIEmailDrafter({ open, onOpenChange, invoice, po, varianceDetails, onSend }) {
+  const { confirm } = useConfirmation();
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [isDrafting, setIsDrafting] = useState(false);
@@ -46,6 +48,14 @@ export default function AIEmailDrafter({ open, onOpenChange, invoice, po, varian
 
   const handleSend = async () => {
     if (!subject || !body) return;
+    const ok = await confirm({
+      title: 'Send email to vendor?',
+      description: `This sends this AI-drafted email to ${invoice?.vendor_name || 'the vendor'}'s real email address. Review the content before sending.`,
+      confirmText: 'Send Email',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setIsSending(true);
     try {
       await onSend({ subject, body });

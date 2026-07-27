@@ -795,14 +795,24 @@ export default function Products() {
   });
 
   const categorizeProductsMutation = useMutation({
-    mutationFn: () => api.products.categorizeProducts({
-      organizationId,
-      brandId,
-      locationId,
-      limit: 25,
-      autoApply: true,
-    }),
+    mutationFn: async () => {
+      const proceed = await confirm({
+        title: 'Generate AI categories?',
+        description: 'This applies AI-suggested categories directly to up to 25 products with no per-item review.',
+        confirmLabel: 'Generate AI Categories',
+        destructive: false,
+      });
+      if (!proceed) return null;
+      return api.products.categorizeProducts({
+        organizationId,
+        brandId,
+        locationId,
+        limit: 25,
+        autoApply: true,
+      });
+    },
     onSuccess: (result) => {
+      if (!result) return;
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });
       queryClient.invalidateQueries({ queryKey: ['product_purchase_report'] });
@@ -864,10 +874,19 @@ export default function Products() {
       if (invalidRows > 0) {
         return { staged, committed: null };
       }
+      const validRows = Number(staged?.summary?.valid_rows ?? rows.length);
+      const proceed = await confirm({
+        title: 'Import products?',
+        description: `This will import ${validRows} product(s) into your catalog.`,
+        confirmLabel: 'Import',
+        destructive: false,
+      });
+      if (!proceed) return { staged, committed: null, cancelled: true };
       const committed = await api.products.commitImport(staged.job_id);
       return { staged, committed };
     },
-    onSuccess: ({ staged, committed }) => {
+    onSuccess: ({ staged, committed, cancelled }) => {
+      if (cancelled) return;
       setImportSummary({ ...(staged?.summary || {}), ...(committed || {}) });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product_dashboard_summary'] });

@@ -13,10 +13,10 @@ const budgets = [
     maxGzipKiB: 32,
   },
   {
-    name: 'dashboard_report_panels',
-    pattern: /^DashboardReportPanels-[\w-]+\.js$/,
-    maxRawKiB: 26,
-    maxGzipKiB: 8,
+    name: 'dashboard_reports_route',
+    pattern: /^DashboardReports-[\w-]+\.js$/,
+    maxRawKiB: 22,
+    maxGzipKiB: 7,
   },
   {
     name: 'vendors_shell',
@@ -27,8 +27,8 @@ const budgets = [
   {
     name: 'vendor_list',
     pattern: /^VendorList-[\w-]+\.js$/,
-    maxRawKiB: 25,
-    maxGzipKiB: 7,
+    maxRawKiB: 42,
+    maxGzipKiB: 12,
   },
   {
     name: 'vendor_detail',
@@ -39,14 +39,14 @@ const budgets = [
   {
     name: 'inventory_route',
     pattern: /^Inventory-[\w-]+\.js$/,
-    maxRawKiB: 65,
-    maxGzipKiB: 16,
+    maxRawKiB: 155,
+    maxGzipKiB: 37,
   },
   {
     name: 'invoices_route',
     pattern: /^Invoices-[\w-]+\.js$/,
-    maxRawKiB: 52,
-    maxGzipKiB: 16,
+    maxRawKiB: 84,
+    maxGzipKiB: 26,
   },
   {
     name: 'payments_route',

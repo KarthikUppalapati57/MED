@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { Mic, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 

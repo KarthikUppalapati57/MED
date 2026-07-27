@@ -533,6 +533,35 @@ function backfillLineItemsFromTables(data = {}, tableLineItems = []) {
   return { ...data, line_items: enrichedLineItems };
 }
 
+async function notifyInvoiceUploader(supabaseClient, invoice, outcome) {
+  if (!invoice?.created_by || !invoice?.organization_id || !invoice?.id) return;
+
+  const isSuccess = outcome === 'success';
+  const vendorName = invoice.vendor_name || 'Invoice';
+  const invoiceNumber = invoice.invoice_number ? ` #${invoice.invoice_number}` : '';
+  const notification = {
+    user_id: invoice.created_by,
+    organization_id: invoice.organization_id,
+    type: 'invoice',
+    title: isSuccess ? 'Invoice extraction complete' : 'Invoice extraction needs attention',
+    message: isSuccess
+      ? `${vendorName}${invoiceNumber} is ready for review.`
+      : `${vendorName}${invoiceNumber} could not be extracted. Open it to review the issue.`,
+    is_read: false,
+    metadata: {
+      module_key: 'invoices',
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number || null,
+      vendor_name: invoice.vendor_name || null,
+      extraction_status: outcome,
+    },
+  };
+
+  const { error } = await supabaseClient.from('notifications').insert(notification);
+  if (error) {
+    console.warn(`Failed to notify uploader for invoice ${invoice.id}:`, error.message);
+  }
+}
 function mapLineItemsForRpc(lineItems = []) {
   return lineItems.map((item) => ({
     item_name: item.description || item.item_name || '',
@@ -822,6 +851,8 @@ async function processInvoiceBackground(record, supabaseClient) {
 
     }
 
+    await notifyInvoiceUploader(supabaseClient, { ...record, ...updatePayload }, 'success');
+
     console.log(`Successfully processed invoice ${record.id}`);
     await supabaseClient.from('debug_logs').insert({
       log_data: { point: 'success', invoice_id: record.id, line_items_count: lineItemsForRpc.length }
@@ -840,6 +871,8 @@ async function processInvoiceBackground(record, supabaseClient) {
       .update(failPayload)
       .eq('id', record.id)
       .eq('organization_id', record.organization_id);
+      
+    await notifyInvoiceUploader(supabaseClient, record, 'failed');
       
     // Log the failure to event log
     await supabaseClient.from('debug_logs').insert({

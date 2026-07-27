@@ -15,6 +15,7 @@ import { MODULE_DEFINITIONS, ALL_MODULE_KEYS } from "@/lib/moduleConfig";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 const CURRENT_PLAN_IDS = ['starter', 'starter-ai', 'advanced'];
 
@@ -26,6 +27,7 @@ function normalizeCurrentPlanId(name) {
 
 export default function PlatformPlans() {
   const { user, role: userRole } = useAuth();
+  const { confirm } = useConfirmation();
   const authChecked = !!user;
   const queryClient = useQueryClient();
 
@@ -63,6 +65,14 @@ export default function PlatformPlans() {
 
   const handleSavePlan = async () => {
     if (!planForm.name) { toast.error("Plan name is required"); return; }
+    const proceed = await confirm({
+      title: editingPlan ? `Save changes to "${planForm.name}"?` : `Create plan "${planForm.name}"?`,
+      description: `This ${editingPlan ? 'updates the live' : 'creates a new live'} SaaS pricing plan at $${planForm.price_monthly}/location/month, affecting every organization subscribed to it.`,
+      confirmText: 'Save Plan',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!proceed) return;
     setIsSaving(true);
     const toastId = toast.loading(editingPlan ? "Updating plan..." : "Creating plan...");
     try {

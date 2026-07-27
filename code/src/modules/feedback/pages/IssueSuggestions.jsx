@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabaseClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { cn } from '@/lib/utils';
 
 const FEEDBACK_COPY = {
@@ -41,6 +42,7 @@ const initialDraft = { subject: '', message: '', priority: 'normal' };
 function FeedbackForm({ type }) {
   const config = FEEDBACK_COPY[type];
   const Icon = config.icon;
+  const { confirm } = useConfirmation();
   const [draft, setDraft] = React.useState(initialDraft);
   const [showSuccess, setShowSuccess] = React.useState(false);
 
@@ -66,6 +68,18 @@ function FeedbackForm({ type }) {
   });
 
   const canSubmit = draft.subject.trim().length >= 4 && draft.message.trim().length >= 10 && !mutation.isPending;
+
+  const handleSubmit = async () => {
+    const ok = await confirm({
+      title: `Send this ${config.label.toLowerCase()}?`,
+      description: 'This is emailed directly to the configured Restops team recipients.',
+      confirmText: `Send ${config.label}`,
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
+    mutation.mutate();
+  };
 
   return (
     <>
@@ -134,7 +148,7 @@ function FeedbackForm({ type }) {
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             A record is saved for follow-up after submission.
           </div>
-          <Button disabled={!canSubmit} onClick={() => mutation.mutate()} className="h-10 w-full sm:w-auto">
+          <Button disabled={!canSubmit} onClick={handleSubmit} className="h-10 w-full sm:w-auto">
             {mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Send {config.label}
           </Button>

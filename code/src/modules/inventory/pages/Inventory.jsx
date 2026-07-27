@@ -2421,6 +2421,15 @@ export default function Inventory() {
       toast.error('Enter a waste quantity');
       return;
     }
+    const proceed = await confirm({
+      title: 'Log this wastage?',
+      description: `This will deduct ${wastageForm.quantity} ${wastageForm.unit || ''} of ${selectedItem.product_name} from live inventory immediately.`,
+      confirmText: 'Log Wastage',
+      cancelText: 'Cancel',
+      variant: 'warning',
+      severity: 'medium',
+    });
+    if (!proceed) return;
     try {
       await api.metrics.logInventoryWaste({
         orgId: organization?.id,
@@ -2585,6 +2594,15 @@ export default function Inventory() {
 
   const handleBulkOrder = async () => {
     if (selectedIds.size === 0) return;
+    const proceed = await confirm({
+      title: `Create order for ${selectedIds.size} item(s)?`,
+      description: 'This will create a new purchase order from the selected low-stock items and route you to Auto Ordering.',
+      confirmText: 'Create Order',
+      cancelText: 'Cancel',
+      variant: 'info',
+      severity: 'medium',
+    });
+    if (!proceed) return;
     const selected = inventory.filter(i => selectedIds.has(i.id));
     const orderItems = selected.map(item => ({
       product_id: item.product_id,

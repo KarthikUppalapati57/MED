@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, Clock, RefreshCcw, UserCircle2, CheckCircle2 } from 'lucide-react';
-import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

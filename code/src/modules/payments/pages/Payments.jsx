@@ -8,6 +8,7 @@ import { useRequireLocation } from '@/hooks/useRequireLocation';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { filterByContext } from '@/lib/contextUtils';
+import { invalidateInvoiceLists } from '@/lib/query-client';
 import { format, subDays, subMonths } from 'date-fns';
 import {
   Search,
@@ -89,7 +90,7 @@ function formatVendorAddress(vendor) {
   const zip = vendor.remittance_zip_code || vendor.mailing_zip_code || vendor.zip_code;
   return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' � ');
 }
-function CreateCheckDialog({ open, onClose, organization, brand, location }) {
+function CreateCheckDialog({ open, onClose, organization, brand, location, confirm }) {
   const queryClient = useQueryClient();
   const { hasLocation, warnIfMissing } = useRequireLocation();
   const [vendorId, setVendorId] = useState('');
@@ -151,7 +152,7 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
     onSuccess: () => {
       toast.success('Check issued');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       reset();
       onClose();
     },
@@ -205,7 +206,18 @@ function CreateCheckDialog({ open, onClose, organization, brand, location }) {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { reset(); onClose(); }}>Cancel</Button>
-          <Button onClick={() => { if (!warnIfMissing()) return; createCheckMutation.mutate(); }} disabled={createCheckMutation.isPending} className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}>
+          <Button onClick={async () => {
+            if (!warnIfMissing()) return;
+            const vendor = vendors.find(v => v.id === vendorId);
+            const ok = await confirm({
+              title: 'Issue check?',
+              description: `This creates a new invoice record and immediately issues a real ${payoutMethod === 'checkbook_physical' ? 'mailed check' : 'digital check'} payout of $${amount || '0.00'} to ${vendor?.name || 'this vendor'}, outside the normal approval queue. This cannot be undone.`,
+              confirmLabel: 'Issue Check',
+              destructive: true,
+            });
+            if (!ok) return;
+            createCheckMutation.mutate();
+          }} disabled={createCheckMutation.isPending} className={cn(!hasLocation && "opacity-50 cursor-not-allowed")}>
             {createCheckMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
             Issue Check
           </Button>
@@ -779,6 +791,16 @@ export default function Payments() {
   };
 
   const submitSchedulePayment = async () => {
+    const scheduleTarget = scheduleDialogInvoice
+      ? `${scheduleDialogInvoice.vendor_name || 'this vendor'} invoice #${scheduleDialogInvoice.invoice_number}`
+      : `${selectedInvoiceIds.length} selected invoices`;
+    const ok = await confirm({
+      title: 'Confirm schedule?',
+      description: `This schedules a future automatic payment for ${scheduleTarget} on ${scheduleForm.scheduled_payment_date}.`,
+      confirmLabel: 'Confirm Schedule',
+      destructive: false,
+    });
+    if (!ok) return;
     setIsSubmittingSchedule(true);
     try {
       if (scheduleDialogInvoice) {
@@ -879,6 +901,14 @@ export default function Payments() {
       return;
     }
 
+    const releaseOk = await confirm({
+      title: 'Release funds?',
+      description: `This releases $${Math.max(0, Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0)).toLocaleString()} to ${invoice.vendor_name || 'this vendor'} via ${selectedMethod.label}. This sends a real payout and cannot be undone.`,
+      confirmLabel: 'Release Funds',
+      destructive: true,
+    });
+    if (!releaseOk) return;
+
     setReleasingInvoiceId(invoice.id);
     try {
       const { data, error } = await supabase.functions.invoke('process-payout', {
@@ -904,6 +934,13 @@ export default function Payments() {
   };
 
   const handleConfirmBankTransfer = async (payment) => {
+    const ok = await confirm({
+      title: 'Confirm bank transfer?',
+      description: `This marks the $${Number(payment.amount || 0).toLocaleString()} bank transfer from ${payment.vendor_name || 'this vendor'} as completed, marks the invoice paid, and writes the ledger entry.`,
+      confirmLabel: 'Confirm',
+      destructive: false,
+    });
+    if (!ok) return;
     try {
       const confirmedPayment = await confirmBankTransfer(payment.id, payment.organization_id || organization?.id);
       // Also update invoice to paid
@@ -941,6 +978,13 @@ export default function Payments() {
 
   const handleRetryPayment = async (payment) => {
     if (!payment.invoice_id) return toast.error('No invoice linked to this payment.');
+    const ok = await confirm({
+      title: 'Retry payment?',
+      description: `This re-attempts a real payout of $${Number(payment.amount || 0).toLocaleString()} to ${payment.vendor_name || 'this vendor'}.`,
+      confirmLabel: 'Retry',
+      destructive: true,
+    });
+    if (!ok) return;
     setRetryingPaymentId(payment.id);
     try {
       const payoutMethod = ['stripe_connect_custom', 'checkbook_digital', 'checkbook_physical'].includes(payment.payment_method)
@@ -955,7 +999,7 @@ export default function Payments() {
       if (data?.error) throw new Error(data.error);
       toast.success('Payment retried successfully');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
     } catch (err) {
       toast.error('Retry failed: ' + err.message);
     } finally {
@@ -1056,6 +1100,7 @@ export default function Payments() {
         onClose={() => setShowCreateCheck(false)}
         organization={organization}
         brand={brand}
+        confirm={confirm}
         location={location}
       />
 
@@ -1836,7 +1881,19 @@ export default function Payments() {
                     onCheckedChange={(checked) => setPaymentSettings({ ...paymentSettings, enforceApprovalLimits: checked })}
                   />
                 </div>
-                <Button onClick={() => savePaymentSettings.mutate()} disabled={savePaymentSettings.isPending} className="w-full bg-primary hover:bg-primary text-primary-foreground">
+                <Button onClick={async () => {
+                  const newlyEnablingAutoPay = paymentSettings.autoPayApprovedInvoices && !paymentSettingsRow?.settings?.autoPayApprovedInvoices;
+                  const ok = await confirm({
+                    title: 'Save payment settings?',
+                    description: newlyEnablingAutoPay
+                      ? 'This saves the org-wide payment settings and turns on Auto-Pay -- every approved invoice going forward will be paid automatically with no further review.'
+                      : 'This saves the org-wide payment settings for this scope.',
+                    confirmLabel: 'Save Payment Settings',
+                    destructive: false,
+                  });
+                  if (!ok) return;
+                  savePaymentSettings.mutate();
+                }} disabled={savePaymentSettings.isPending} className="w-full bg-primary hover:bg-primary text-primary-foreground">
                   {savePaymentSettings.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   Save Payment Settings
                 </Button>
@@ -2222,12 +2279,21 @@ export default function Payments() {
             <Button
               className="bg-resend-green hover:bg-green-700"
               disabled={!recordForm.amount || !recordForm.reference.trim() || recordInvoicePayment.isPending}
-              onClick={() => recordInvoicePayment.mutate({
-                invoice: recordDialogInvoice,
-                amount: recordForm.amount,
-                reference: recordForm.reference,
-                method: recordForm.method,
-              })}
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Record payment?',
+                  description: `This records a manual payment of $${recordForm.amount} against ${recordDialogInvoice?.vendor_name || 'this'} invoice #${recordDialogInvoice?.invoice_number || ''}. Make sure the payment was actually made outside RestOps before confirming.`,
+                  confirmLabel: 'Record Payment',
+                  destructive: false,
+                });
+                if (!ok) return;
+                recordInvoicePayment.mutate({
+                  invoice: recordDialogInvoice,
+                  amount: recordForm.amount,
+                  reference: recordForm.reference,
+                  method: recordForm.method,
+                });
+              }}
             >
               {recordInvoicePayment.isPending ? 'Recording...' : 'Record Payment'}
             </Button>

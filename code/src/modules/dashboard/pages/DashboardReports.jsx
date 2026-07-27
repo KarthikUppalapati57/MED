@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/lib/supabaseClient';
 import { AUDIT_MODULES, logAudit } from '@/lib/audit';
 import { createNotification } from '@/lib/notificationService';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -153,6 +154,7 @@ function VisualReportShell({ title, description, children, action, className }) 
 }
 
 export default function DashboardReports() {
+  const { confirm } = useConfirmation();
   const { organization, brand, location, userProfile } = useAuth();
   const { isTenantSuperAdmin, isOrgManager, isBranchManager, isLocationManager, isPlatformAdmin } = usePermissions();
   const scope = isBranchManager ? 'brand' : isLocationManager ? 'location' : 'org';
@@ -315,6 +317,14 @@ export default function DashboardReports() {
 
   const resendDelivery = async (delivery) => {
     if (!canManage || !scopeContext.orgId) return;
+    const ok = await confirm({
+      title: 'Resend this report?',
+      description: 'This resends the full report content as real in-app notifications to every matching manager in scope.',
+      confirmText: 'Resend',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setResendingId(delivery.id);
     try {
       const normalized = normalizeReportPreferences({
@@ -381,6 +391,14 @@ export default function DashboardReports() {
 
   const generateReportsNow = async () => {
     if (!canManage || !scopeContext.orgId) return;
+    const ok = await confirm({
+      title: 'Generate reports now?',
+      description: 'This immediately generates and delivers both daily and weekly reports for the whole organization, bypassing the normal schedule.',
+      confirmText: 'Generate reports now',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setGeneratingReports(true);
     try {
       const { data, error } = await supabase.functions.invoke('schedule-reports', {

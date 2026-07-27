@@ -486,11 +486,19 @@ export default function Invoices() {
         const current = invoices.find(i => i.id === prev.id);
         if (current && !IN_FLIGHT_INVOICE_STATUSES.has(current.status)) {
           if (['pending_approval', 'pending_review', 'validated', 'processed'].includes(current.status)) {
-            toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`);
-            openEditorWithFullData(current);
+            toast.success(`Extraction complete for ${current.vendor_name || 'Invoice'}`, {
+              action: {
+                label: 'Open',
+                onClick: () => openEditorWithFullData(current),
+              },
+            });
           } else if (['failed', 'extract_failed', 'rejected'].includes(current.status)) {
-            toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`);
-            openEditorWithFullData(current);
+            toast.error(`Extraction failed for ${current.vendor_name || 'Invoice'}`, {
+              action: {
+                label: 'Open',
+                onClick: () => openEditorWithFullData(current),
+              },
+            });
           }
         }
       }
@@ -661,8 +669,6 @@ export default function Invoices() {
 
     upsertInvoiceInDashboardCache(updatedInvoice);
     queryClient.invalidateQueries({ queryKey: ['invoices-dashboard', organization?.id] });
-    setEditingInvoice(updatedInvoice);
-    setEditorOpen(true);
     if (updatedInvoice.status === 'extracting') {
       api.financial.startInvoiceExtraction(updatedInvoice.id).catch((error) => {
         console.error('Failed to queue invoice extraction:', error);
@@ -1122,6 +1128,13 @@ export default function Invoices() {
       const invoiceData = { ...editingInvoice };
       if (!validateManualInvoice(invoiceData)) return;
 
+      if (!(await confirm({
+        title: 'Save this invoice?',
+        description: 'This saves the invoice and notifies managers to review it.',
+        confirmLabel: 'Save',
+        destructive: false,
+      }))) return;
+
       if (role === 'ground_staff') {
         invoiceData.status = 'pending_review';
       }
@@ -1236,6 +1249,12 @@ export default function Invoices() {
   };
 
   const handleEditorReject = async () => {
+    if (!(await confirm({
+      title: 'Reject invoice?',
+      description: 'This will mark the invoice as rejected and notify the uploader. This cannot be undone.',
+      confirmLabel: 'Reject',
+      destructive: false,
+    }))) return;
     try {
       const data = { ...editingInvoice, status: 'rejected', ap_status: 'rejected' };
       let savedInvoice;

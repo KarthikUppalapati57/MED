@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { Camera, Upload, AlertCircle, X, DollarSign, Send, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -17,10 +17,12 @@ import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { invalidateInvoiceLists } from '@/lib/query-client';
 
 export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
   const { organization } = useAuth();
-  const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
@@ -57,7 +59,7 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       toast.success("Digital Credit Requested! Invoice automatically short-paid.");
       onOpenChange(false);
       // Reset form
@@ -172,7 +174,17 @@ export default function CreditRequestDialog({ invoice, open, onOpenChange }) {
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             className="bg-resend-orange hover:bg-resend-orange/90 text-white px-8"
-            onClick={() => requestCreditMutation.mutate()}
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Submit credit claim?',
+                description: `This creates a formal credit request for $${parseFloat(amount || 0).toFixed(2)} against ${invoice?.vendor_name || 'the vendor'} on invoice ${invoice?.invoice_number || 'Unknown'}, and will automatically short-pay/adjust the AP ledger once approved.`,
+                confirmText: 'Submit',
+                cancelText: 'Cancel',
+                variant: 'warning',
+              });
+              if (!ok) return;
+              requestCreditMutation.mutate();
+            }}
             disabled={requestCreditMutation.isPending}
           >
             {requestCreditMutation.isPending ? (

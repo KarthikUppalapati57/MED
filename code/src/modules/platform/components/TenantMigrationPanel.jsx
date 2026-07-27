@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Database, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';

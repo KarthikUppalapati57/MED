@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { api } from '@/lib/apiClient';
 
 export default function VendorBulkTools({ vendorId }) {
   const { organization } = useAuth();
+  const { confirm } = useConfirmation();
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -74,6 +76,15 @@ export default function VendorBulkTools({ vendorId }) {
             on_order_guide: row.on_order_guide === 'true' || row.on_order_guide === 'TRUE' || row.on_order_guide === '1',
             preferred_quantity: row.preferred_quantity ? parseFloat(row.preferred_quantity) : 1
           }));
+
+          const ok = await confirm({
+            title: 'Bulk import vendor catalog?',
+            description: `This will create/update ${itemsToInsert.length} vendor catalog item${itemsToInsert.length === 1 ? '' : 's'} immediately. There is no preview step.`,
+            confirmText: 'Bulk Import Catalog',
+            cancelText: 'Cancel',
+            variant: 'warning',
+          });
+          if (!ok) return;
 
           for (const item of itemsToInsert) {
             const matches = await api.entities.VendorItem.filter({

@@ -227,6 +227,15 @@ export default function Integrations() {
   };
 
   const handleConnect = async () => {
+    const ok = await confirm({
+      title: `Establish connection to ${selectedIntegration.name}?`,
+      description: 'The credentials entered will be stored and this integration will be activated immediately.',
+      confirmText: 'Establish Connection',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     setConnecting(true);
     const toastId = toast.loading(`Connecting to ${selectedIntegration.name}...`);
 

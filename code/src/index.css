@@ -1294,6 +1294,30 @@
   color: #ffffff;
 }
 
+.dashboard-visual-hero :is(.dashboard-metric-orbit, .dashboard-metric-ring > div, .dashboard-hero-stat, .dashboard-hero-badge),
+.invoice-command-hero :is(.invoice-hero-panel, .invoice-hero-mini, .invoice-focus-panel, .invoice-focus-list div, .invoice-intake-chip),
+.performance-command-hero :is(.performance-hero-stat, .performance-focus-panel, .performance-date-card, .performance-source-list div, .performance-hero-badge) {
+  color: #ffffff;
+}
+
+.dashboard-visual-hero :is(.text-foreground, .text-card-foreground, .text-popover-foreground, .text-muted-foreground, p, span, small, strong),
+.invoice-command-hero :is(.text-foreground, .text-card-foreground, .text-popover-foreground, .text-muted-foreground, p, span, small, strong),
+.performance-command-hero :is(.text-foreground, .text-card-foreground, .text-popover-foreground, .text-muted-foreground, p, span, small, strong) {
+  color: rgba(255, 255, 255, 0.86) !important;
+}
+
+.dashboard-visual-hero :is(h1, h2, h3, h4, .dashboard-hero-title, .dashboard-hero-stat strong),
+.invoice-command-hero :is(h1, h2, h3, h4, .invoice-hero-panel strong, .invoice-hero-mini span, .invoice-focus-topline strong, .invoice-focus-list span),
+.performance-command-hero :is(h1, h2, h3, h4, .performance-hero-stat strong, .performance-focus-topline strong) {
+  color: #ffffff !important;
+}
+
+.dashboard-visual-hero :is(.bg-card, .bg-background, .bg-muted, .bg-secondary),
+.invoice-command-hero :is(.bg-card, .bg-background, .bg-muted, .bg-secondary),
+.performance-command-hero :is(.bg-card, .bg-background, .bg-muted, .bg-secondary) {
+  background-color: rgba(15, 23, 42, 0.42) !important;
+}
+
 .performance-command-hero::before {
   content: '';
   position: absolute;

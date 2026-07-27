@@ -328,7 +328,16 @@ export default function PlatformAdmin() {
       toast.error(`An invitation for ${inviteEmail} already exists. Revoke it first to send a new one.`);
       return;
     }
-    
+
+    const proceed = await confirm({
+      title: `Invite ${inviteEmail}?`,
+      description: `This creates a tenant_super_admin invitation${inviteIncludesCoupon ? ' with a trial coupon' : ''} and emails a real onboarding link to ${inviteEmail}.`,
+      confirmText: 'Generate Onboarding Link',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
+
     const toastId = toast.loading("Generating secure onboarding link & sending email...");
     setInviting(true);
     try {
@@ -658,7 +667,11 @@ The Restops Platform Team
       updateContactRequestStatus(request, 'accepted');
       return;
     }
-    handleAcceptDemo(request);
+    // Route through the same review-then-confirm flow as the labeled "Accept & Invite"
+    // button (openDemoInviteDialog -> demoInviteDraft dialog -> confirmDemoInvite dialog ->
+    // handleAcceptDemo). Previously called handleAcceptDemo(request) directly here, which
+    // sent a real tenant_super_admin invite with zero gate.
+    openDemoInviteDialog(request);
   };
 
   const handleRequestReject = async (request, type) => {

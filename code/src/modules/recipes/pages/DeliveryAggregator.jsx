@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
@@ -191,10 +191,20 @@ export default function DeliveryAggregator() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
-                          onClick={() => syncMenuMutation.mutate({ recipe_id: recipe.id, action: 'price_update' })}
+                          onClick={async () => {
+                            const proceed = await confirm({
+                              title: 'Push this price update to every platform?',
+                              description: 'This immediately pushes the updated price to every connected delivery platform (DoorDash, UberEats, Grubhub). The change goes live on customer-facing menus right away.',
+                              confirmText: 'Push Price Update',
+                              cancelText: 'Cancel',
+                              variant: 'warning',
+                            });
+                            if (!proceed) return;
+                            syncMenuMutation.mutate({ recipe_id: recipe.id, action: 'price_update' });
+                          }}
                           disabled={syncMenuMutation.isPending}
                         >
                           <ExternalLink className="w-4 h-4 mr-1" /> Push Price Update

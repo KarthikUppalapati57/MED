@@ -356,7 +356,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
               <Textarea value={taxNotes} onChange={(e) => setTaxNotes(e.target.value)} placeholder="Review notes" />
               <Input value={taxFailureReason} onChange={(e) => setTaxFailureReason(e.target.value)} placeholder="Failure reason, if rejecting" />
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => reviewTaxMutation.mutate({ status: 'verified' })} disabled={reviewTaxMutation.isPending}>
+                <Button onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Verify business/tax information?',
+                    description: "This marks this vendor's tax/W-9 verification as verified, unlocking their ability to be paid.",
+                    confirmText: 'Verify Business',
+                    cancelText: 'Cancel',
+                    variant: 'warning',
+                  });
+                  if (!ok) return;
+                  reviewTaxMutation.mutate({ status: 'verified' });
+                }} disabled={reviewTaxMutation.isPending}>
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Verify Business
                 </Button>
                 <Button variant="destructive" onClick={async () => {
@@ -468,7 +478,17 @@ export default function VendorOnboardingPanel({ vendorId }) {
                   <div className="grid gap-2 md:grid-cols-2">
                     <Textarea value={callbackNotes[request.id] || ''} onChange={(e) => setCallbackNotes({ ...callbackNotes, [request.id]: e.target.value })} placeholder="Callback notes" />
                     <Textarea value={overrideReasons[request.id] || ''} onChange={(e) => setOverrideReasons({ ...overrideReasons, [request.id]: e.target.value })} placeholder="Override reason" />
-                    <Button onClick={() => confirmCallbackMutation.mutate(request.id)} disabled={confirmCallbackMutation.isPending}>Confirm Callback</Button>
+                    <Button onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Confirm callback verification?',
+                        description: 'This records that phone-callback verification for this vendor banking change has been completed. Only confirm if the callback was actually completed.',
+                        confirmText: 'Confirm Callback',
+                        cancelText: 'Cancel',
+                        variant: 'warning',
+                      });
+                      if (!ok) return;
+                      confirmCallbackMutation.mutate(request.id);
+                    }} disabled={confirmCallbackMutation.isPending}>Confirm Callback</Button>
                     <Button variant="destructive" onClick={async () => {
                       const ok = await confirm({
                         title: 'Override callback verification?',
@@ -536,8 +556,28 @@ export default function VendorOnboardingPanel({ vendorId }) {
               <div className="rounded-md border p-3"><p className="text-muted-foreground">Banking</p><StatusBadge value={payableBank ? 'confirmed' : 'pending'} /></div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => approvalMutation.mutate('pending_approval')} disabled={approvalMutation.isPending || data.vendor.approval_status !== 'draft'}>Submit for Approval</Button>
-              <Button onClick={() => approvalMutation.mutate('approved')} disabled={approvalMutation.isPending || !canApprove || data.vendor.approval_status === 'approved'}>Approve Vendor</Button>
+              <Button variant="outline" onClick={async () => {
+                const ok = await confirm({
+                  title: 'Submit for approval?',
+                  description: 'This submits the vendor for internal approval.',
+                  confirmText: 'Submit for Approval',
+                  cancelText: 'Cancel',
+                  variant: 'info',
+                });
+                if (!ok) return;
+                approvalMutation.mutate('pending_approval');
+              }} disabled={approvalMutation.isPending || data.vendor.approval_status !== 'draft'}>Submit for Approval</Button>
+              <Button onClick={async () => {
+                const ok = await confirm({
+                  title: 'Approve vendor?',
+                  description: 'This moves the vendor to fully-approved/payable status across the organization.',
+                  confirmText: 'Approve Vendor',
+                  cancelText: 'Cancel',
+                  variant: 'warning',
+                });
+                if (!ok) return;
+                approvalMutation.mutate('approved');
+              }} disabled={approvalMutation.isPending || !canApprove || data.vendor.approval_status === 'approved'}>Approve Vendor</Button>
               <Button variant="destructive" onClick={async () => {
                 const ok = await confirm({
                   title: 'Reject vendor?',

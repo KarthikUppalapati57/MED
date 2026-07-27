@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import {
   Camera,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function MobileApp() {
+  const { confirm } = useConfirmation();
   const { organization, brand, location, userProfile } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -60,6 +62,15 @@ export default function MobileApp() {
       toast.error('Organization context is required before creating an invoice draft.');
       return;
     }
+
+    const ok = await confirm({
+      title: 'Create invoice draft?',
+      description: `This immediately creates a pending-review invoice draft from "${file.name}". You'll review and complete it in Invoices afterward.`,
+      confirmText: 'Create Invoice Draft',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
 
     setIsCreatingInvoice(true);
     try {

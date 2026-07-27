@@ -36,9 +36,9 @@ const ValidationCheck = ({ label, result }) => {
   };
 
   const statusColors = {
-    pass: 'bg-green-50 border-green-200',
-    fail: 'bg-red-50 border-red-200',
-    warning: 'bg-yellow-50 border-yellow-200',
+    pass: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/12 dark:border-emerald-500/35',
+    fail: 'bg-red-50 border-red-200 dark:bg-red-500/12 dark:border-red-500/35',
+    warning: 'bg-amber-50 border-amber-200 dark:bg-amber-500/12 dark:border-amber-500/35',
     checking: 'bg-muted/40 border-border',
   };
 
@@ -58,9 +58,9 @@ const ValidationCheck = ({ label, result }) => {
       </div>
       <span className={cn(
         "text-sm font-medium whitespace-nowrap",
-        status === 'pass' && 'text-green-600',
-        status === 'fail' && 'text-red-600',
-        status === 'warning' && 'text-yellow-600',
+        status === 'pass' && 'text-emerald-700 dark:text-emerald-300',
+        status === 'fail' && 'text-red-700 dark:text-red-300',
+        status === 'warning' && 'text-amber-700 dark:text-amber-300',
         status === 'checking' && 'text-muted-foreground'
       )}>
         {statusText[status] || statusText.checking}
@@ -128,7 +128,17 @@ export default function ValidationDialog({
   const allPassed = !hasFailures && !hasWarnings && !validating;
   const paidDetection = invoice?.validation_results?.paid_status_detection;
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
+    const ok = await confirm({
+      title: hasWarnings ? 'Approve with warnings?' : 'Approve invoice?',
+      description: hasWarnings
+        ? 'This invoice has validation warnings. Approving will move it to pending approval for the next reviewer.'
+        : 'This will move the invoice to pending approval for the next reviewer.',
+      confirmText: 'Approve',
+      cancelText: 'Cancel',
+      variant: hasWarnings ? 'warning' : 'info',
+    });
+    if (!ok) return;
     onSave({
       ...invoice,
       validation_results: results,
@@ -161,7 +171,7 @@ export default function ValidationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg bg-popover text-popover-foreground">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-teal-600" />
@@ -191,8 +201,8 @@ export default function ValidationDialog({
             {!validating && (
               <div className={cn(
                 "p-4 rounded-lg text-sm border",
-                allPassed ? "bg-green-50 border-green-100 text-green-800" :
-                hasFailures ? "bg-red-50 border-red-100 text-red-800" : "bg-yellow-50 border-yellow-100 text-yellow-800"
+                allPassed ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/35 dark:bg-emerald-500/12 dark:text-emerald-100" :
+                hasFailures ? "border-red-200 bg-red-50 text-red-900 dark:border-red-500/35 dark:bg-red-500/12 dark:text-red-100" : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-500/12 dark:text-amber-100"
               )}>
                 {allPassed ? "All validation checks passed successfully." :
                  hasFailures ? "Critical issues were found during validation." : "Validation completed with some warnings."}
@@ -228,8 +238,8 @@ export default function ValidationDialog({
               {paidDetection?.detected && (
                 <div className={`rounded-lg border p-3 text-sm ${
                   paidDetection.should_mark_paid
-                    ? 'bg-green-50 border-green-100 text-green-800'
-                    : 'bg-yellow-50 border-yellow-100 text-yellow-800'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-500/35 dark:bg-emerald-500/12 dark:text-emerald-100'
+                    : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-500/12 dark:text-amber-100'
                 }`}>
                   {paidDetection.should_mark_paid
                     ? 'Paid stamp detected. This invoice will be treated as paid after approval.'
@@ -241,7 +251,7 @@ export default function ValidationDialog({
             {issues.length > 0 && (
               <div className={cn(
                 "rounded-lg border p-3 text-sm space-y-1",
-                hasFailures ? "bg-red-50 border-red-100 text-red-800" : "bg-yellow-50 border-yellow-100 text-yellow-800"
+                hasFailures ? "border-red-200 bg-red-50 text-red-900 dark:border-red-500/35 dark:bg-red-500/12 dark:text-red-100" : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/35 dark:bg-amber-500/12 dark:text-amber-100"
               )}>
                 <p className="font-medium">
                   {hasFailures ? 'This invoice is flagged — validation failed:' : 'Validation warnings:'}
@@ -269,7 +279,7 @@ export default function ValidationDialog({
               <Button 
                 variant="outline" 
                 onClick={handleReject}
-                className="text-red-600 border-red-200 hover:bg-red-50"
+                className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-500/35 dark:text-red-300 dark:hover:bg-red-500/12"
               >
                 Reject
               </Button>

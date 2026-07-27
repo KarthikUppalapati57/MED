@@ -5,7 +5,6 @@ import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 export default function TipPooling() {
   const { location } = useAuth();

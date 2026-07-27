@@ -4,6 +4,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { toast } from 'sonner';
 import {
   FileText,
@@ -27,6 +28,7 @@ import { AP_ROUTING_OPTIONS, normalizeApRouting } from '@/lib/apRouting';
 export default function VendorStatementsTab({ vendors }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [selectedVendorId, setSelectedVendorId] = useState('all');
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [disputeDialogOpen, setDisputeDialogOpen] = useState(false);
@@ -132,7 +134,27 @@ export default function VendorStatementsTab({ vendors }) {
     }
   });
 
+  const handleUploadStatement = async () => {
+    const ok = await confirm({
+      title: 'Upload statement and reconcile?',
+      description: "This uploads the vendor statement and automatically runs invoice-matching reconciliation against this vendor's open invoices.",
+      confirmText: 'Upload & Reconcile',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    uploadStatementMutation.mutate();
+  };
+
   const handleDispute = async () => {
+    const ok = await confirm({
+      title: 'Log dispute?',
+      description: 'This will formally log a dispute against this vendor statement.',
+      confirmText: 'Log Dispute',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       await api.entities.VendorStatement.update(selectedStatement.id, {
         organization_id: organization.id,
@@ -375,7 +397,7 @@ export default function VendorStatementsTab({ vendors }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => uploadStatementMutation.mutate()}
+              onClick={handleUploadStatement}
               disabled={isUploading || !uploadVendorId || !uploadDate || !uploadAmount}
               className="bg-primary hover:bg-primary"
             >

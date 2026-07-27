@@ -9,6 +9,8 @@ export default [
     files: [
       "src/components/**/*.{js,mjs,cjs,jsx}",
       "src/modules/**/*.{js,mjs,cjs,jsx}",
+      "src/hooks/**/*.{js,mjs,cjs,jsx}",
+      "mobile/**/*.{js,mjs,cjs,jsx}",
       "src/Layout.jsx",
     ],
     ignores: ["src/lib/**/*", "src/components/ui/**/*"],
@@ -52,9 +54,25 @@ export default [
       "react/react-in-jsx-scope": "off",
       "react/no-unknown-property": [
         "error",
-        { ignore: ["cmdk-input-wrapper", "toast-close"] },
+        {
+          ignore: [
+            "cmdk-input-wrapper",
+            "toast-close",
+            "args",
+            "attach",
+            "emissive",
+            "emissiveIntensity",
+            "wireframe",
+            "transparent",
+            "intensity",
+            "position",
+            "penumbra",
+            "castShadow",
+          ],
+        },
       ],
       "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
 ];

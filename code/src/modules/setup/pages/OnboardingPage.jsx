@@ -438,7 +438,7 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
     setLine1Focused(false);
   };
 
-  const useEnteredAddress = () => {
+  const acceptEnteredAddress = () => {
     const line1 = String(value.line1 || '').trim();
     selectedLineRef.current = line1;
     onChange({ ...value, line1 });
@@ -482,7 +482,7 @@ function AddressFields({ idPrefix, value, onChange, required = false, compact = 
                     className="mt-2 flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none"
                     onMouseDown={(event) => {
                       event.preventDefault();
-                      useEnteredAddress();
+                      acceptEnteredAddress();
                     }}
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-muted-foreground" />

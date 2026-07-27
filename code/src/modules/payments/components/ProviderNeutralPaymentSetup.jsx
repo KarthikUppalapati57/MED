@@ -129,6 +129,14 @@ export default function ProviderNeutralPaymentSetup({
       toast.error('Choose an organization before adding a bank account.');
       return;
     }
+    const ok = await confirm({
+      title: 'Save bank account?',
+      description: `This creates a new shared bank account (...${bankForm.account_number.slice(-4)}) for ${organization?.name || 'this organization'}. It is vaulted and available org-wide for vendor bill-pay once linked to a provider.`,
+      confirmText: 'Save Bank Account',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       const sharedScope = {

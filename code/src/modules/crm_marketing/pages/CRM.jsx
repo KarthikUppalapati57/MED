@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Users, Mail, Award, Search, Send, Plus } from 'lucide-react';
+import { Users, Mail, Award, Search, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function CRM() {
+  const { confirm } = useConfirmation();
   const [activeTab, setActiveTab] = useState('database');
   const [campaignDraft, setCampaignDraft] = useState('');
 
@@ -18,11 +20,19 @@ export default function CRM() {
     { id: 3, name: 'Charlie Davis', email: 'charlie@example.com', ltv: 85.00, tier: 'Bronze', points: 30, lastVisit: '2026-06-22' },
   ];
 
-  const handleSendCampaign = () => {
+  const handleSendCampaign = async () => {
     if (!campaignDraft.trim()) {
       toast.error('Campaign message cannot be empty');
       return;
     }
+    const ok = await confirm({
+      title: 'Send this campaign?',
+      description: 'This dispatches the promotional SMS/email campaign to the targeted customer segment.',
+      confirmText: 'Send Campaign',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     toast.success('Campaign dispatched to 3 targeted customers via Resend & Twilio!');
     setCampaignDraft('');
   };

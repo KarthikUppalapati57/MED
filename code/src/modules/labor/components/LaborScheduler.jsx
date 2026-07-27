@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Plus, Bot, Loader2 } from 'lucide-react';
 import { generateLaborSchedule } from '@/lib/aiService';
 import { api } from '@/lib/apiClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { toast } from 'sonner';
 export default function LaborScheduler({ employees, shifts, forecastData, onCreateShift, onEditShift }) {
+  const { confirm } = useConfirmation();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isGenerating, setIsGenerating] = useState(false);
   
@@ -24,7 +26,16 @@ export default function LaborScheduler({ employees, shifts, forecastData, onCrea
       toast.error('No employees available to schedule.');
       return;
     }
-    
+
+    const proceed = await confirm({
+      title: 'Auto-schedule the full week with AI?',
+      description: 'This will generate and create a full week of shifts for the team directly, with no preview or review step before they are saved.',
+      confirmText: 'Auto-Schedule (AI)',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
+
     setIsGenerating(true);
     try {
       const weekStartDateStr = format(weekStart, 'yyyy-MM-dd');

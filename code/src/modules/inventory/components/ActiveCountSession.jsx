@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, ArrowRight, Check, X, AlertCircle, ScanBarcode, Camera } from 'lucide-react';
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useConfirmation } from '@/hooks/useConfirmation';

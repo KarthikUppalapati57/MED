@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
+import { invalidateInvoiceLists } from '@/lib/query-client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +37,7 @@ function formatVendorAddress(vendor) {
   const city = vendor.remittance_city || vendor.mailing_city || vendor.city;
   const state = vendor.remittance_state || vendor.mailing_state || vendor.state;
   const zip = vendor.remittance_zip_code || vendor.mailing_zip_code || vendor.zip_code;
-  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' • ');
+  return [line1, line2, [city, state, zip].filter(Boolean).join(', ')].filter(Boolean).join(' ï¿½ ');
 }
 // Labels only -- process-payout dispatches to the right rail off this same string, see
 // _shared/payoutProviders/index.ts.
@@ -51,6 +53,7 @@ const PAYOUT_METHOD_LABELS = Object.fromEntries(PAYOUT_METHODS.map((method) => [
 export function BillPayWidget({ invoice }) {
   const { organization, profile } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const [isScheduling, setIsScheduling] = useState(false);
   const [scheduleData, setScheduleData] = useState({
@@ -123,7 +126,7 @@ export function BillPayWidget({ invoice }) {
     onSuccess: () => {
       toast.success("Payment scheduled");
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       setIsScheduling(false);
     },
     onError: (err) => toast.error(err.message)
@@ -142,7 +145,7 @@ export function BillPayWidget({ invoice }) {
     onSuccess: () => {
       toast.success("Payment recorded");
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       setIsRecording(false);
       setRecordData({ ...recordData, reference: '' }); // Reset reference, amount recalculates on next open
     },
@@ -167,13 +170,13 @@ export function BillPayWidget({ invoice }) {
       toast.success(`Funds released via ${PAYOUT_METHOD_LABELS[variables.payoutMethod] || variables.payoutMethod}`);
       setIsReleasing(false);
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
     },
     onError: (err) => {
       toast.error(err.message || "Failed to release funds");
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
       queryClient.invalidateQueries({ queryKey: ['invoice-latest-payment', invoice.id] });
     }
   });
@@ -190,7 +193,16 @@ export function BillPayWidget({ invoice }) {
     setIsReleasing(true);
   };
 
-  const handleRelease = () => {
+  const handleRelease = async () => {
+    const methodLabel = PAYOUT_METHOD_LABELS[releaseData.payout_method] || releaseData.payout_method;
+    const ok = await confirm({
+      title: 'Release funds?',
+      description: `This releases $${remainingBalance.toFixed(2)} to ${invoice.vendor_name || 'this vendor'} via ${methodLabel}. This sends a real payout and cannot be undone.`,
+      confirmText: 'Release Funds',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     releaseFundsMutation.mutate({
       payoutMethod: releaseData.payout_method,
       paymentAccountId: releaseData.payment_account_id
@@ -209,16 +221,32 @@ export function BillPayWidget({ invoice }) {
       toast.error(err.message || 'Card payment succeeded, but recording failed.');
     }
   };
-  const handleSchedule = () => {
+  const handleSchedule = async () => {
     if (!scheduleData.payment_account_id) return toast.error("Select a payment account");
     if (!scheduleData.date) return toast.error("Select a payment date");
+    const ok = await confirm({
+      title: 'Confirm schedule?',
+      description: `This schedules an automatic payment of $${remainingBalance.toFixed(2)} to ${invoice.vendor_name || 'this vendor'} on ${scheduleData.date}.`,
+      confirmText: 'Confirm Schedule',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     scheduleMutation.mutate(scheduleData);
   };
 
-  const handleRecord = () => {
+  const handleRecord = async () => {
     const amt = parseFloat(recordData.amount);
     if (isNaN(amt) || amt <= 0) return toast.error("Enter a valid amount");
     if (!recordData.reference.trim()) return toast.error("Reference is required");
+    const ok = await confirm({
+      title: 'Record payment?',
+      description: `This records a manual payment of $${amt.toFixed(2)} against this invoice. Make sure the payment was actually made outside RestOps before confirming.`,
+      confirmText: 'Record Payment',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     recordMutation.mutate(recordData);
   };
 
@@ -379,7 +407,7 @@ export function BillPayWidget({ invoice }) {
                 <p className="font-semibold text-foreground">{invoice.vendor_name || '-'}</p>
                 <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                   {formatVendorAddress(vendorDetails) ? <p>{formatVendorAddress(vendorDetails)}</p> : <p>No vendor address on file.</p>}
-                  {(vendorDetails?.email || vendorDetails?.phone) && <p>{[vendorDetails.email, vendorDetails.phone].filter(Boolean).join(' • ')}</p>}
+                  {(vendorDetails?.email || vendorDetails?.phone) && <p>{[vendorDetails.email, vendorDetails.phone].filter(Boolean).join(' ï¿½ ')}</p>}
                 </div>
               </div>
               <div>

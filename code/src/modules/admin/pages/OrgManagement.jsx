@@ -172,6 +172,14 @@ export default function OrgManagement() {
 
   const handleAddBrand = async () => {
     if (!newBrandName.trim() || !addBrandDialog) return;
+    const proceed = await confirm({
+      title: `Add brand "${newBrandName.trim()}"?`,
+      description: 'This will create a new brand under this organization.',
+      confirmText: 'Add Brand',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!proceed) return;
     setSavingBrand(true);
     try {
       const { error } = await supabase.from('brands').insert({
@@ -193,6 +201,14 @@ export default function OrgManagement() {
 
   const handleAddLocation = async () => {
     if (!newLocationName.trim() || !addLocationDialog) return;
+    const proceed = await confirm({
+      title: `Add location "${newLocationName.trim()}"?`,
+      description: 'This will create a new location under this brand.',
+      confirmText: 'Add Location',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!proceed) return;
     setSavingLocation(true);
     try {
       const { error } = await supabase.from('locations').insert({
@@ -222,6 +238,15 @@ export default function OrgManagement() {
       toast.error('No organization found for this group.');
       return;
     }
+
+    const proceed = await confirm({
+      title: `Create group "${newGroupName.trim()}"?`,
+      description: 'This will create a new location group for reporting and grouping.',
+      confirmText: 'Create Group',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!proceed) return;
 
     setSavingGroup(true);
     try {

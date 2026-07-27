@@ -1,11 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Bell, Check, Trash2, ShieldAlert, Sparkles, AlertCircle, Info, Clock, CheckCircle2, Mail, MessageSquare, MonitorCheck, SlidersHorizontal } from "lucide-react";
 import { useAuth } from '@/lib/AuthContext';
+import { api } from '@/lib/apiClient';
+import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { supabase } from '@/lib/supabaseClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
@@ -47,6 +50,42 @@ const DELIVERY_CHANNELS = [
 
 const MODULE_SETTING_ALIAS_KEYS = new Set(['inventory_management', 'recipe_management', 'vendor_management']);
 
+const MODULE_NOTIFICATION_RULES = [
+  {
+    key: 'lowStock',
+    moduleKey: 'inventory',
+    label: 'Low Stock Alerts',
+    description: 'Receive alerts when inventory falls below minimums.',
+    defaultEnabled: true,
+  },
+  {
+    key: 'largeOrders',
+    moduleKey: 'orders',
+    label: 'Large Order Approvals',
+    description: 'Notify managers for POs exceeding $500.',
+    defaultEnabled: true,
+  },
+  {
+    key: 'eodSummary',
+    moduleKey: 'dashboard',
+    label: 'End of Day Summary',
+    description: 'Daily sales and labor cost digest at 11:00 PM.',
+    defaultEnabled: false,
+  },
+  {
+    key: 'systemAlerts',
+    moduleKey: 'integrations',
+    label: 'System Health Alerts',
+    description: 'Notices for POS sync failures or integration errors.',
+    defaultEnabled: true,
+  },
+];
+
+const DEFAULT_MODULE_NOTIFICATION_RULES = MODULE_NOTIFICATION_RULES.reduce((rules, rule) => ({
+  ...rules,
+  [rule.key]: rule.defaultEnabled,
+}), {});
+
 const isMissingPreferenceTable = (error) => {
   const message = String(error?.message || '');
   return error?.code === '42P01' || error?.code === 'PGRST205' || message.includes('notification_delivery_preferences');
@@ -63,11 +102,15 @@ const defaultPreferenceFor = (moduleKey, user, organization, userProfile) => ({
 });
 
 export default function Notifications() {
-  const { user, userProfile, organization } = useAuth();
+  const { user, userProfile, organization, brand, location } = useAuth();
   const { hasMinRole, isPlatformAdmin } = usePermissions();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [activeView, setActiveView] = React.useState('notifications');
+  const activeOrgId = organization?.id || userProfile?.organization_id || null;
+  const activeBrandId = (brand?.brand_id || brand?.id) || null;
+  const activeLocationId = location?.id || userProfile?.location_id || null;
+  const canManageOperationalNotificationRules = hasMinRole('location_manager');
   const [activeModule, setActiveModule] = React.useState('all');
   const invalidateNotifications = React.useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['notifications_page', user?.id] });
@@ -92,6 +135,12 @@ export default function Notifications() {
     enabled: !!user?.id,
   });
 
+  const { data: operationalSettings = [] } = useAuthQuery({
+    queryKey: ['operational_settings', activeOrgId, activeBrandId, activeLocationId, 'notification_rules'],
+    queryFn: () => api.entities.OperationalSetting.filter({ organization_id: activeOrgId }),
+    enabled: !!activeOrgId && canManageOperationalNotificationRules,
+  });
+
   const { data: notificationPreferences = [], isLoading: isPreferencesLoading, error: preferencesError } = useQuery({
     queryKey: ['notification_delivery_preferences', user?.id],
     queryFn: async () => {
@@ -112,6 +161,20 @@ export default function Notifications() {
   const preferenceByModule = React.useMemo(() => {
     return new Map(notificationPreferences.map((preference) => [preference.module_key, preference]));
   }, [notificationPreferences]);
+
+  const notificationRulesRow = React.useMemo(() => {
+    return operationalSettings.find((row) => row.category === 'notification_rules');
+  }, [operationalSettings]);
+
+  const legacyRestaurantSetupRow = React.useMemo(() => {
+    return operationalSettings.find((row) => row.category === 'restaurant_setup');
+  }, [operationalSettings]);
+
+  const moduleNotificationRules = React.useMemo(() => ({
+    ...DEFAULT_MODULE_NOTIFICATION_RULES,
+    ...(legacyRestaurantSetupRow?.settings?.notifications || {}),
+    ...(notificationRulesRow?.settings?.rules || notificationRulesRow?.settings || {}),
+  }), [legacyRestaurantSetupRow, notificationRulesRow]);
 
   const accessibleModules = React.useMemo(() => {
     const enabledModules = organization?.enabled_modules;
@@ -144,6 +207,37 @@ export default function Notifications() {
     ...defaultPreferenceFor(moduleKey, user, organization, userProfile),
     ...(preferenceByModule.get(moduleKey) || {}),
   }), [organization, preferenceByModule, user, userProfile]);
+
+  const updateModuleRuleMutation = useMutation({
+    mutationFn: async ({ ruleKey, enabled }) => {
+      if (!activeOrgId) throw new Error('No active organization selected');
+      if (!canManageOperationalNotificationRules) throw new Error('You do not have permission to manage notification rules.');
+      const settings = {
+        rules: {
+          ...moduleNotificationRules,
+          [ruleKey]: enabled,
+        },
+      };
+      const payload = {
+        organization_id: activeOrgId,
+        brand_id: activeBrandId,
+        location_id: activeLocationId,
+        scope: activeLocationId ? 'location' : activeBrandId ? 'brand' : 'organization',
+        category: 'notification_rules',
+        settings,
+        created_by: userProfile?.id || null,
+        updated_by: userProfile?.id || null,
+      };
+
+      if (notificationRulesRow) return api.entities.OperationalSetting.update(notificationRulesRow.id, payload);
+      return api.entities.OperationalSetting.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational_settings', activeOrgId, activeBrandId, activeLocationId, 'notification_rules'] });
+      toast.success('Notification rule updated');
+    },
+    onError: (error) => toast.error(error?.message || 'Unable to save notification rule.'),
+  });
 
   const updatePreferenceMutation = useMutation({
     mutationFn: async ({ moduleKey, changes }) => {
@@ -285,6 +379,10 @@ export default function Notifications() {
 
   const handlePreferenceToggle = (moduleKey, field, checked) => {
     updatePreferenceMutation.mutate({ moduleKey, changes: { [field]: checked } });
+  };
+
+  const handleModuleRuleToggle = (ruleKey, checked) => {
+    updateModuleRuleMutation.mutate({ ruleKey, enabled: checked });
   };
 
   const renderNotificationList = () => (
@@ -431,45 +529,66 @@ export default function Notifications() {
               const isSaving = updatePreferenceMutation.isPending;
 
               return (
-                <div key={module.key} className="grid gap-4 p-5 md:grid-cols-[minmax(180px,1fr)_auto] md:items-center">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-foreground">{module.label}</p>
-                      {preference.critical_only && (
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Priority</Badge>
-                      )}
+                <div key={module.key} className="space-y-4 p-5">
+                  <div className="grid gap-4 md:grid-cols-[minmax(180px,1fr)_auto] md:items-center">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-foreground">{module.label}</p>
+                        {preference.critical_only && (
+                          <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Priority</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground capitalize">Minimum role: {module.minRole.replace('_', ' ')}</p>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground capitalize">Minimum role: {module.minRole.replace('_', ' ')}</p>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      {DELIVERY_CHANNELS.map((channel) => {
+                        const Icon = channel.icon;
+                        return (
+                          <label key={`${module.key}-${channel.key}`} className="flex h-10 items-center gap-2 rounded-md border border-border/70 bg-background/60 px-3">
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            <span className="min-w-10 text-sm font-medium text-foreground">{channel.label}</span>
+                            <Switch
+                              checked={Boolean(preference[channel.key])}
+                              disabled={isSaving}
+                              onCheckedChange={(checked) => handlePreferenceToggle(module.key, channel.key, checked)}
+                              aria-label={`${module.label} ${channel.label} notifications`}
+                            />
+                          </label>
+                        );
+                      })}
+
+                      <label className="flex h-10 items-center gap-2 rounded-md border border-border/70 bg-background/60 px-3">
+                        <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">Priority only</span>
+                        <Switch
+                          checked={Boolean(preference.critical_only)}
+                          disabled={isSaving}
+                          onCheckedChange={(checked) => handlePreferenceToggle(module.key, 'critical_only', checked)}
+                          aria-label={`${module.label} priority-only notifications`}
+                        />
+                      </label>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    {DELIVERY_CHANNELS.map((channel) => {
-                      const Icon = channel.icon;
-                      return (
-                        <label key={`${module.key}-${channel.key}`} className="flex h-10 items-center gap-2 rounded-md border border-border/70 bg-background/60 px-3">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="min-w-10 text-sm font-medium text-foreground">{channel.label}</span>
+                  {canManageOperationalNotificationRules && MODULE_NOTIFICATION_RULES.filter((rule) => rule.moduleKey === module.key).length > 0 && (
+                    <div className="grid gap-3 rounded-md border border-border/60 bg-secondary/20 p-4 md:grid-cols-2">
+                      {MODULE_NOTIFICATION_RULES.filter((rule) => rule.moduleKey === module.key).map((rule) => (
+                        <div key={rule.key} className="flex items-center justify-between gap-4 rounded-md border border-border/50 bg-background/60 p-3">
+                          <div className="min-w-0">
+                            <Label className="text-sm font-semibold text-foreground">{rule.label}</Label>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">{rule.description}</p>
+                          </div>
                           <Switch
-                            checked={Boolean(preference[channel.key])}
-                            disabled={isSaving}
-                            onCheckedChange={(checked) => handlePreferenceToggle(module.key, channel.key, checked)}
-                            aria-label={`${module.label} ${channel.label} notifications`}
+                            checked={Boolean(moduleNotificationRules[rule.key])}
+                            disabled={updateModuleRuleMutation.isPending}
+                            onCheckedChange={(checked) => handleModuleRuleToggle(rule.key, checked)}
+                            aria-label={rule.label}
                           />
-                        </label>
-                      );
-                    })}
-
-                    <label className="flex h-10 items-center gap-2 rounded-md border border-border/70 bg-background/60 px-3">
-                      <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-foreground">Priority only</span>
-                      <Switch
-                        checked={Boolean(preference.critical_only)}
-                        disabled={isSaving}
-                        onCheckedChange={(checked) => handlePreferenceToggle(module.key, 'critical_only', checked)}
-                        aria-label={`${module.label} priority-only notifications`}
-                      />
-                    </label>
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -522,4 +641,3 @@ export default function Notifications() {
     </div>
   );
 }
-

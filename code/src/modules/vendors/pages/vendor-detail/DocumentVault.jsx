@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +27,7 @@ const statusLabels = {
 
 export default function DocumentVault({ vendorId }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [documentType, setDocumentType] = useState('w9');
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -95,6 +97,18 @@ export default function DocumentVault({ vendorId }) {
     onError: (err) => toast.error(err.message || 'Review update failed'),
   });
 
+  const handleUpload = async () => {
+    const ok = await confirm({
+      title: 'Upload document?',
+      description: `This uploads "${selectedFile?.name}" as a ${documentLabels[documentType] || documentType} document for this vendor.`,
+      confirmText: 'Upload',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
+    uploadMutation.mutate();
+  };
+
   const handleDownload = async (doc) => {
     const { data, error } = await supabase.storage
       .from('vendor_documents')
@@ -141,7 +155,7 @@ export default function DocumentVault({ vendorId }) {
               onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
             />
           </div>
-          <Button onClick={() => uploadMutation.mutate()} disabled={uploadMutation.isPending || !selectedFile}>
+          <Button onClick={handleUpload} disabled={uploadMutation.isPending || !selectedFile}>
             {uploadMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
             Upload
           </Button>

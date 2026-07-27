@@ -287,6 +287,17 @@ export default function AutoOrdering() {
 
   const saveOrderingSettings = useMutation({
     mutationFn: async () => {
+      const autoApproveNote = orderSettings.autoApproveBelowThreshold
+        ? ` This will auto-approve orders under $${Number(orderSettings.approvalThreshold || 0).toFixed(2)} with no human review.`
+        : '';
+      const ok = await confirm({
+        title: 'Save ordering settings?',
+        description: `This updates ordering rules org-wide.${autoApproveNote}`,
+        confirmText: 'Save Ordering Settings',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return null;
       const payload = {
         organization_id: organization?.id,
         brand_id: (brand?.brand_id || brand?.id) || null,
@@ -300,7 +311,8 @@ export default function AutoOrdering() {
       if (orderingSettingsRow) return api.entities.OperationalSetting.update(orderingSettingsRow.id, payload);
       return api.entities.OperationalSetting.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result) return;
       queryClient.invalidateQueries({ queryKey: ['operational_settings', organization?.id, (brand?.brand_id || brand?.id), location?.id, 'ordering'] });
       toast.success('Ordering settings saved');
     },
@@ -349,6 +361,14 @@ export default function AutoOrdering() {
       const order = orders.find((item) => item.id === receivingOrderId);
       if (!order) throw new Error('Select an order to receive');
       if (!hasLocation) throw new Error('Please select a location to continue');
+      const ok = await confirm({
+        title: 'Log receiving?',
+        description: `This assumes the full ordered quantity for ${order.order_number || 'this order'}${order.vendor_name ? ` (${order.vendor_name})` : ''} arrived and immediately updates live inventory. This cannot be undone.`,
+        confirmText: 'Log Receiving',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return null;
       const receivedQuantities = Object.fromEntries((order.items || []).map((item) => [
         item.product_id || item.inventory_id || item.product_name,
         item.approved_quantity ?? item.suggested_quantity ?? item.quantity ?? 0,
@@ -361,7 +381,8 @@ export default function AutoOrdering() {
         userId: userProfile?.id || null,
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (!result) return;
       queryClient.invalidateQueries({ queryKey: ['receivings', organization?.id] });
       queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       queryClient.invalidateQueries({ queryKey: ['inventory', organization?.id] });
@@ -475,6 +496,14 @@ export default function AutoOrdering() {
   };
 
   const handleApprove = async (order) => {
+    const ok = await confirm({
+      title: 'Approve order?',
+      description: `This approves the auto-generated purchase order ${order.order_number || ''}${order.vendor_name ? ` from ${order.vendor_name}` : ''}.`,
+      confirmText: 'Approve',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     await updateMutation.mutateAsync({
       id: order.id,
       data: {
@@ -505,6 +534,15 @@ export default function AutoOrdering() {
 
   const handleSendOrder = async () => {
     if (!selectedOrder) return;
+
+    const ok = await confirm({
+      title: 'Send order to vendor?',
+      description: `This sends a real ${sendMethod === 'whatsapp' ? 'WhatsApp' : 'email'} message to ${selectedOrder.vendor_name || 'the vendor'} placing this order. This cannot be undone.`,
+      confirmText: 'Send Order',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
 
     await sendOrderWorkflow({
       order: selectedOrder,
@@ -596,12 +634,23 @@ export default function AutoOrdering() {
   };
 
   const approveInvoiceMutation = useMutation({
-    mutationFn: ({ invoice, order }) => approveInvoiceWorkflow({
-      invoice,
-      order,
-      userId: userProfile?.id || null,
-    }),
-    onSuccess: () => {
+    mutationFn: async ({ invoice, order }) => {
+      const ok = await confirm({
+        title: 'Approve invoice?',
+        description: `This approves invoice ${invoice.invoice_number || ''} from ${invoice.vendor_name || order?.vendor_name || 'this vendor'} for $${Number(invoice.total_amount || 0).toFixed(2)} and posts a real ledger bill. This cannot be undone.`,
+        confirmText: 'Approve',
+        cancelText: 'Cancel',
+        variant: 'destructive',
+      });
+      if (!ok) return null;
+      return approveInvoiceWorkflow({
+        invoice,
+        order,
+        userId: userProfile?.id || null,
+      });
+    },
+    onSuccess: (result) => {
+      if (!result) return;
       queryClient.invalidateQueries({ queryKey: ['order-invoice-approval', organization?.id] });
       queryClient.invalidateQueries({ queryKey: ['auto-orders', organization?.id] });
       queryClient.invalidateQueries({ queryKey: ['accounting-invoices'] });

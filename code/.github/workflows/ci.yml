@@ -28,6 +28,14 @@ jobs:
       working-directory: ./code
       run: npm run lint
 
+    - name: Run TypeScript Check
+      working-directory: ./code
+      run: npm run typecheck
+
+    - name: Run Foundation Audit
+      working-directory: ./code
+      run: npm run check:foundations
+
     - name: Run Unit & Integration Tests
       working-directory: ./code
       run: npm run test

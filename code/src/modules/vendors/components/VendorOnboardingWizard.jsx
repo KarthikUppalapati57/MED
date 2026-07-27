@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { api } from '@/lib/apiClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +50,7 @@ async function invokeVendorOnboarding(body) {
 export default function VendorOnboardingWizard({ open, onOpenChange }) {
   const { organization, brand, location } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const [step, setStep] = useState(1);
   const [vendorId, setVendorId] = useState(null);
@@ -86,6 +88,14 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
     if (!formData.name || !formData.email) {
       return toast.error("Name and Email are required");
     }
+    const ok = await confirm({
+      title: 'Save vendor and continue?',
+      description: `This creates a new vendor record for ${formData.name} and sends a verification OTP to ${formData.email}.`,
+      confirmText: 'Save & Continue',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       const newVendor = await api.entities.Vendor.create({
@@ -165,6 +175,16 @@ export default function VendorOnboardingWizard({ open, onOpenChange }) {
   };
 
   const handleFinalize = async () => {
+    const ok = await confirm({
+      title: 'Complete vendor onboarding?',
+      description: paymentSettings.autopay_enabled
+        ? 'This finalizes onboarding for this vendor and enables AutoPay using the selected payment rail.'
+        : 'This finalizes onboarding for this vendor.',
+      confirmText: 'Save & Complete',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       await api.entities.Vendor.update(vendorId, {

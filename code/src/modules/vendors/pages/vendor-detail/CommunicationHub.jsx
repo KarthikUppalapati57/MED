@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,7 @@ import { AlertCircle, CheckCircle2, Send, Plus, Mail } from 'lucide-react';
 export default function CommunicationHub({ vendorId }) {
   const { organization, user } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [newIssue, setNewIssue] = useState({ issue_type: 'late_delivery', description: '' });
   const [messageDraft, setMessageDraft] = useState('');
 
@@ -76,11 +78,19 @@ export default function CommunicationHub({ vendorId }) {
     }
   });
 
-  const handleLogIssue = () => {
+  const handleLogIssue = async () => {
     if (!newIssue.description) {
       toast.error('Description is required');
       return;
     }
+    const ok = await confirm({
+      title: 'Log issue?',
+      description: 'This creates a formal issue/dispute record against this vendor.',
+      confirmText: 'Log Issue',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     createIssueMutation.mutate(newIssue);
   };
 

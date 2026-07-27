@@ -8,12 +8,58 @@ const PASS = { status: 'pass', message: '' };
 // validating an invoice outside their active context silently compares against
 // the wrong location's data (withActiveScope() falls back to ambient context
 // for any key not already present in the filter conditions).
-function invoiceScope(invoice) {
+function invoiceScope(invoice, allowedKeys = ['organization_id', 'brand_id', 'location_id']) {
   const scope = {};
-  if (invoice?.organization_id) scope.organization_id = invoice.organization_id;
-  if (invoice?.brand_id) scope.brand_id = invoice.brand_id;
-  if (invoice?.location_id) scope.location_id = invoice.location_id;
+  if (allowedKeys.includes('organization_id') && invoice?.organization_id) scope.organization_id = invoice.organization_id;
+  if (allowedKeys.includes('brand_id') && invoice?.brand_id) scope.brand_id = invoice.brand_id;
+  if (allowedKeys.includes('location_id') && invoice?.location_id) scope.location_id = invoice.location_id;
   return scope;
+}
+
+function numberFrom(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function jsonInvoiceLines(invoice) {
+  return Array.isArray(invoice?.line_items) ? invoice.line_items : [];
+}
+
+function lineAmount(line) {
+  const expected = numberFrom(line.quantity) * numberFrom(line.unit_price);
+  return numberFrom(line.total_price, line.extended_price, line.line_total, line.amount, expected);
+}
+
+function lineIdentity(line) {
+  return [
+    line.vendor_item_code,
+    line.description || line.item_name || line.product_name,
+    line.quantity,
+    line.unit_price,
+    lineAmount(line),
+  ].map(value => String(value ?? '').trim().toLowerCase()).join('|');
+}
+
+function findDuplicateLineExplainingSubtotalDelta(lines, delta) {
+  if (!Array.isArray(lines) || lines.length < 2 || Math.abs(delta) < 0.01) return null;
+  const seen = new Map();
+  for (const line of lines) {
+    const key = lineIdentity(line);
+    const amount = lineAmount(line);
+    const prior = seen.get(key);
+    if (prior && Math.abs(amount - delta) < 0.02) {
+      return {
+        amount,
+        description: line.description || line.item_name || line.product_name || line.vendor_item_code || 'unknown item',
+      };
+    }
+    seen.set(key, line);
+  }
+  return null;
 }
 
 async function checkDuplicate(invoice) {
@@ -43,14 +89,15 @@ async function checkDuplicate(invoice) {
 async function checkInvoiceMath(invoice) {
   if (!invoice?.id) return PASS;
   try {
-    const lines = await api.entities.InvoiceLineItem.filter(
-      { invoice_id: invoice.id, ...invoiceScope(invoice) }
+    const normalizedLines = await api.entities.InvoiceLineItem.filter(
+      { invoice_id: invoice.id, ...invoiceScope(invoice, ['organization_id']) }
     );
+    const lines = normalizedLines.length > 0 ? normalizedLines : jsonInvoiceLines(invoice);
     const discrepancies = [];
     let lineSum = 0;
     for (const line of lines) {
-      const expected = (Number(line.quantity) || 0) * (Number(line.unit_price) || 0);
-      const got = Number(line.total_price) || 0;
+      const expected = numberFrom(line.quantity) * numberFrom(line.unit_price);
+      const got = lineAmount(line);
       lineSum += got;
       if (Math.abs(expected - got) >= 0.01) {
         discrepancies.push(`line total: expected $${expected.toFixed(2)}, got $${got.toFixed(2)}`);
@@ -59,7 +106,11 @@ async function checkInvoiceMath(invoice) {
 
     const subtotal = Number(invoice.subtotal) || 0;
     if (lines.length > 0 && Math.abs(lineSum - subtotal) >= 0.01) {
-      discrepancies.push(`subtotal: expected $${lineSum.toFixed(2)}, got $${subtotal.toFixed(2)}`);
+      const duplicate = findDuplicateLineExplainingSubtotalDelta(lines, lineSum - subtotal);
+      const duplicateHint = duplicate
+        ? ` Possible duplicate extracted line: ${duplicate.description} ($${duplicate.amount.toFixed(2)}). This may be a non-billable repeat from a summary section such as Hazard Materials Summary; remove/review the duplicate before approval.`
+        : '';
+      discrepancies.push(`subtotal: expected $${lineSum.toFixed(2)}, got $${subtotal.toFixed(2)}.${duplicateHint}`);
     }
 
     const expectedTotal = subtotal
@@ -143,7 +194,7 @@ async function checkDeliveryMatch(invoice) {
     const variances = await api.entities.ReconciliationVariance.filter({
       invoice_id: invoice.id,
       is_resolved: false,
-      ...invoiceScope(invoice),
+      ...invoiceScope(invoice, ['organization_id']),
     });
     if (variances.length > 0) {
       const types = [...new Set(variances.map(v => v.variance_type))].join(', ');
@@ -156,23 +207,54 @@ async function checkDeliveryMatch(invoice) {
   }
 }
 
+// Real payment-provider status (payments.status/payout_status, kept current by
+// the Stripe/Checkbook webhooks via applyPayoutOutcome) -- not the OCR paid-stamp
+// guess in paid_status_detection, which only reads what the document looks like.
+async function checkPaymentStatus(invoice) {
+  if (!invoice?.id) return PASS;
+  try {
+    const payments = await api.entities.Payment.filter(
+      { invoice_id: invoice.id, ...invoiceScope(invoice, ['organization_id']) },
+      { orderBy: '-created_at', limit: 1 }
+    );
+    const latest = payments[0];
+    if (!latest) return PASS;
+
+    if (latest.payout_status === 'failed' || latest.status === 'failed') {
+      return { status: 'fail', message: `A previous payment attempt failed (${latest.failure_reason || 'no reason on file'}). Safe to retry from Bill Pay.` };
+    }
+    if (latest.status === 'paid' || ['cleared', 'completed'].includes(latest.payout_status)) {
+      return { status: 'warning', message: 'A payment for this invoice already cleared. Confirm this isn\'t a duplicate before approving.' };
+    }
+    if (['in_transit', 'processing', 'pending'].includes(latest.payout_status)) {
+      return { status: 'warning', message: 'A payment for this invoice is already in progress.' };
+    }
+    return PASS;
+  } catch (e) {
+    console.error('[Validation] Payment status check error:', e);
+    return { status: 'warning', message: 'Could not check existing payment status.' };
+  }
+}
+
 export const VALIDATION_CHECK_LABELS = {
   duplicate_check: 'Duplicate Check',
   invoice_math: 'Line Item Math',
   vendor_risk: 'Vendor Risk',
   price_deviation: 'Price Deviation',
   delivery_match: 'Delivery / Three-Way Match',
+  payment_status: 'Payment Status',
 };
 
 export async function runInvoiceValidationChecks(invoice) {
-  const [duplicate_check, invoice_math, vendor_risk, price_deviation, delivery_match] = await Promise.all([
+  const [duplicate_check, invoice_math, vendor_risk, price_deviation, delivery_match, payment_status] = await Promise.all([
     checkDuplicate(invoice),
     checkInvoiceMath(invoice),
     checkVendorRisk(invoice),
     checkPriceDeviation(invoice),
     checkDeliveryMatch(invoice),
+    checkPaymentStatus(invoice),
   ]);
-  return { duplicate_check, invoice_math, vendor_risk, price_deviation, delivery_match };
+  return { duplicate_check, invoice_math, vendor_risk, price_deviation, delivery_match, payment_status };
 }
 
 export function summarizeValidationIssues(results) {

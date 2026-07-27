@@ -95,6 +95,10 @@ const edgeRewire = await runCommand('edge_rewire_self_check', 'npm', ['run', 'ch
 steps.push(compactStep(edgeRewire));
 if (!edgeRewire.ok) exitCode = 1;
 
+const foundations = await runCommand('foundation_readiness', 'npm', ['run', 'check:foundations']);
+steps.push(compactStep(foundations));
+if (!foundations.ok) exitCode = 1;
+
 const build = await runCommand('production_build', 'npm', ['run', 'build']);
 steps.push(compactStep(build));
 if (!build.ok) exitCode = 1;

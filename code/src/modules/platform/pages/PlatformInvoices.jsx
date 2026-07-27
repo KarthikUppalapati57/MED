@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Receipt, Building2, Send, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function PlatformInvoices() {
   const { user, role: userRole } = useAuth();
+  const { confirm } = useConfirmation();
   const authChecked = !!user;
   const [generating, setGenerating] = useState(new Set());
 
@@ -40,6 +42,15 @@ export default function PlatformInvoices() {
       toast.error("Organization has no plan assigned.");
       return;
     }
+
+    const proceed = await confirm({
+      title: `Issue invoice for ${org.name}?`,
+      description: `This creates and sends a real Stripe invoice billing ${org.name} for the ${plan.name} plan.`,
+      confirmText: 'Issue Invoice',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!proceed) return;
 
     setGenerating(prev => { const n = new Set(prev); n.add(org.id); return n; });
     const toastId = toast.loading(`Generating Stripe invoice for ${org.name}...`);

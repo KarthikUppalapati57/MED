@@ -63,8 +63,19 @@ export default function ApprovalPolicySettings() {
     onError: (err) => toast.error(err.message)
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newPolicy.required_role) return toast.error("Role is required");
+    const range = newPolicy.max_amount
+      ? `between $${parseFloat(newPolicy.min_amount || 0).toFixed(2)} and $${parseFloat(newPolicy.max_amount).toFixed(2)}`
+      : `of $${parseFloat(newPolicy.min_amount || 0).toFixed(2)} and above`;
+    const ok = await confirm({
+      title: 'Save approval rule?',
+      description: `This creates a new approval policy requiring ${newPolicy.required_role.replace('_', ' ')} sign-off for invoices ${range}. This changes which invoices need manager sign-off going forward.`,
+      confirmText: 'Save Rule',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     createPolicyMutation.mutate(newPolicy);
   };
 

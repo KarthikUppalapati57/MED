@@ -41,6 +41,15 @@ export default function ApiKeysTab() {
   async function handleGenerateKey() {
     if (!newKeyName.trim()) return toast.error("Please enter a key name");
 
+    const ok = await confirm({
+      title: 'Generate a new API key?',
+      description: "This creates a live key granting external REST API access to your organization's data. The secret is shown once and cannot be retrieved again.",
+      confirmText: 'Generate Key',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     const { data, error } = await supabase.functions.invoke('create-api-key', {
       body: {
         name: newKeyName,

@@ -9,10 +9,12 @@ import { toast } from "sonner";
 import { Loader2, Zap } from 'lucide-react';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function JustPayVendorDialog({ open, onOpenChange }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -33,6 +35,16 @@ export default function JustPayVendorDialog({ open, onOpenChange }) {
       toast.error("Please select a vendor and enter a valid amount.");
       return;
     }
+
+    const vendor = vendors.find(v => v.id === formData.vendor_id);
+    const ok = await confirm({
+      title: 'Record payment?',
+      description: `This creates a standalone payment record of $${formData.amount} to ${vendor?.name || 'this vendor'} with no invoice or PO backing it -- there is no other paper trail besides this record.`,
+      confirmText: 'Record Payment',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
 
     setIsProcessing(true);
     try {

@@ -24,6 +24,10 @@ jobs:
       ROLE_QA_EMAIL: ${{ secrets.ROLE_QA_EMAIL }}
       ROLE_QA_PASSWORD: ${{ secrets.ROLE_QA_PASSWORD }}
       ROLE_QA_BASE_URL: ${{ secrets.ROLE_QA_BASE_URL }}
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
       SUPABASE_LATENCY_TIMEOUT_MS: 8000
       SUPABASE_LATENCY_WARN_MS: 1500
       SUPABASE_LATENCY_SIGNIN_WARN_MS: 2500
@@ -40,14 +44,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: code/package-lock.json
 
       - name: Install dependencies
+        working-directory: ./code
         run: npm ci
 
       - name: Validate release-gate environment
+        working-directory: ./code
         run: npm run check:release-env
 
       - name: Run release gate
+        working-directory: ./code
         run: npm run check:release-gate:ui:report
 
       - name: Upload release-gate report
@@ -55,5 +63,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-gate-report
-          path: reports/release-gate-latest.json
+          path: code/reports/release-gate-latest.json
           if-no-files-found: warn

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { ShieldCheck, Thermometer, ThermometerSnowflake, AlertTriangle, CheckCircle, Clock, Server } from 'lucide-react';
+import { ThermometerSnowflake, AlertTriangle, CheckCircle, Clock, Server } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,7 @@ export default function FoodSafety() {
             <div>
               <h3 className="font-bold text-rose-800">Critical Temperature Alerts</h3>
               <p className="text-sm text-rose-700 mt-1">
-                {activeAlerts.length} temperature logs have exceeded the safety threshold (41°F) in the last 24 hours. Please inspect the equipment immediately to prevent spoilage.
+                {activeAlerts.length} temperature logs have exceeded the safety threshold (41ï¿½F) in the last 24 hours. Please inspect the equipment immediately to prevent spoilage.
               </p>
             </div>
           </CardContent>
@@ -151,7 +151,7 @@ export default function FoodSafety() {
                   
                   <div className="flex items-end gap-2 mb-2">
                     <span className={`text-4xl font-black tracking-tighter ${isLatestAlert ? 'text-rose-600' : 'text-foreground'}`}>
-                      {latestLog ? latestLog.temperature_f : '--'}°
+                      {latestLog ? latestLog.temperature_f : '--'}ï¿½
                     </span>
                     <span className="text-muted-foreground mb-1 text-sm font-medium">F</span>
                   </div>
@@ -198,13 +198,13 @@ export default function FoodSafety() {
                     </TableCell>
                     <TableCell>{log.iot_sensors?.name}</TableCell>
                     <TableCell className="font-mono">
-                      {log.temperature_f}°F
+                      {log.temperature_f}ï¿½F
                     </TableCell>
                     <TableCell>
                       {log.is_alert ? (
                         <Badge variant="outline" className="text-rose-600 border-rose-200 bg-rose-50">
                           <AlertTriangle className="h-3 w-3 mr-1" />
-                          WARNING ( &gt; 41°F )
+                          WARNING ( &gt; 41ï¿½F )
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-teal-600 border-teal-200 bg-teal-50">

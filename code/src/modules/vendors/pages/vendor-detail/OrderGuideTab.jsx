@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 export default function OrderGuideTab({ vendorId, vendorName }) {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [generating, setGenerating] = useState(false);
 
   const { data: items = [], isLoading } = useQuery({
@@ -75,14 +77,23 @@ export default function OrderGuideTab({ vendorId, vendorName }) {
   };
 
   const handleGenerateOrder = async () => {
+    const orderItems = items.filter(i => i.on_order_guide);
+    if (orderItems.length === 0) {
+      toast.error("No items on the order guide. Please add some first.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: 'Generate draft order?',
+      description: `This creates a new draft purchase order with ${orderItems.length} item${orderItems.length === 1 ? '' : 's'} from the order guide.`,
+      confirmText: 'Generate Order',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
+
     setGenerating(true);
     try {
-      const orderItems = items.filter(i => i.on_order_guide);
-      if (orderItems.length === 0) {
-        toast.error("No items on the order guide. Please add some first.");
-        return;
-      }
-      
       const payload = {
         vendor_id: vendorId,
         organization_id: organization?.id,

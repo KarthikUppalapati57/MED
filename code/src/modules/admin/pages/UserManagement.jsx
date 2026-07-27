@@ -554,6 +554,7 @@ function PermissionMatrixEditor({ value, onChange, compact = false }) {
 function InviteDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
   const { user: currentUser, role: currentUserRole, userProfile } = useAuth();
+  const { confirm } = useConfirmation();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('ground_staff');
   const [permissions, setPermissions] = useState(() => defaultPermissionMatrix('ground_staff'));
@@ -571,6 +572,14 @@ function InviteDialog({ open, onClose, orgId }) {
 
   const handleSubmit = async () => {
     if (!email) { toast.error('Email is required'); return; }
+    const proceed = await confirm({
+      title: `Invite ${email}?`,
+      description: `This will send a real invitation email to ${email} with the ${Restops_ROLES[role]?.label || role} role.`,
+      confirmText: 'Generate Link',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     setSending(true);
     try {
       // Try Edge Function first
@@ -775,6 +784,7 @@ function InviteDialog({ open, onClose, orgId }) {
 // CSVUploadDialog 
 function CSVUploadDialog({ open, onClose, orgId }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [file, setFile] = useState(null);
   const [parsed, setParsed] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -802,6 +812,14 @@ function CSVUploadDialog({ open, onClose, orgId }) {
 
   const handleUpload = async () => {
     if (parsed.length === 0) return;
+    const proceed = await confirm({
+      title: `Invite ${parsed.length} Users?`,
+      description: `This will send real invitation emails and create invitation rows for all ${parsed.length} rows parsed from the CSV.`,
+      confirmText: `Invite ${parsed.length} Users`,
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     setUploading(true);
     let successCount = 0;
     for (const row of parsed) {

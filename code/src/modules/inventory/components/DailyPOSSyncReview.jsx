@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuthQuery } from '@/hooks/useAuthQuery';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
 
 export function DailyPOSSyncReview() {
   const { organization, location } = useAuth();
+  const { confirm } = useConfirmation();
   const [open, setOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   
@@ -31,6 +32,16 @@ export function DailyPOSSyncReview() {
   });
 
   const handleApprove = async () => {
+    const proceed = await confirm({
+      title: 'Approve and deplete inventory?',
+      description: "This will permanently deduct today's theoretical usage from your physical inventory levels based on POS sales. This action cannot be undone.",
+      confirmText: 'Approve & Deplete Inventory',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+      severity: 'high',
+    });
+    if (!proceed) return;
+
     setIsApproving(true);
     try {
       const { data, error } = await supabase.rpc('approve_daily_pos_usage', {

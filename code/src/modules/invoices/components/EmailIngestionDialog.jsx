@@ -3,6 +3,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,8 @@ import { supabase } from '@/lib/supabaseClient';
 export default function EmailIngestionDialog({ open, onClose }) {
   const queryClient = useQueryClient();
   const { userProfile, organization, brand, location } = useAuth();
-  
+  const { confirm } = useConfirmation();
+
   const [form, setForm] = useState({
     host: 'imap.gmail.com',
     port: '993',
@@ -73,11 +75,19 @@ export default function EmailIngestionDialog({ open, onClose }) {
     }
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.host || !form.port || !form.username || !form.password) {
       toast.error("Please fill in all fields.");
       return;
     }
+    const ok = await confirm({
+      title: 'Save email configuration?',
+      description: `The platform will start automatically checking ${form.username} for invoice attachments and creating invoices from them going forward.`,
+      confirmText: 'Save Config',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     saveMutation.mutate(form);
   };
 

@@ -21,7 +21,6 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
-  ChevronDown,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -59,12 +58,12 @@ import { notifyManagers } from '@/lib/notificationService';
 import { createPageUrl } from '@/utils';
 import { filterByContext } from '@/lib/contextUtils';
 import { getModuleForPage, isPageInEnabledModules } from '@/lib/moduleConfig';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import BudgetProgressWidget from '@/modules/dashboard/components/BudgetProgressWidget';
 
 const SpendPieChart = React.lazy(() => import('@/modules/dashboard/components/DashboardCharts').then((module) => ({ default: module.SpendPieChart })));
 const BenchmarkBarChart = React.lazy(() => import('@/modules/dashboard/components/DashboardCharts').then((module) => ({ default: module.BenchmarkBarChart })));
@@ -539,6 +538,7 @@ function useDashboardReportDeliveries({ brand, location, organization, scope }) 
 
 function useDashboardPersistence({ actions, brand, dataHealthScore, location, metrics, organization, scope, userProfile }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const scopeContext = React.useMemo(
     () => getDashboardScopeContext(scope, { organization, brand, location }),
     [brand, location, organization, scope]
@@ -747,6 +747,15 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
   }, [actionDate, basePayload, isMissingDashboardTable, markLocal, markSynced, note, orgReady]);
 
   const saveReview = React.useCallback(async () => {
+    const ok = await confirm({
+      title: 'Save this manager review?',
+      description: 'This creates a permanent, timestamped review snapshot. It cannot be edited once saved.',
+      confirmText: 'Save Review',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     const completed = actions.filter((item) => statusMap[actionId(item.title)] === 'done');
     const open = actions.filter((item) => statusMap[actionId(item.title)] !== 'done');
     const snapshot = {
@@ -802,7 +811,7 @@ function useDashboardPersistence({ actions, brand, dataHealthScore, location, me
       }
     }
     toast.success('Manager review saved');
-  }, [actionDate, actions, basePayload, dataHealthScore, isMissingDashboardTable, markLocal, markSynced, metrics.lowStock.length, metrics.pendingInvoices.length, metrics.primeCostPercent, metrics.unpaid, metrics.weekSales, note, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, statusMap, userProfile?.id]);
+  }, [actionDate, actions, basePayload, confirm, dataHealthScore, isMissingDashboardTable, markLocal, markSynced, metrics.lowStock.length, metrics.pendingInvoices.length, metrics.primeCostPercent, metrics.unpaid, metrics.weekSales, note, orgReady, scope, scopeContext.orgId, scopeContext.scopeKey, setReviews, statusMap, userProfile?.id]);
 
   const clearReviews = React.useCallback(async () => {
     setReviews([]);
@@ -2597,12 +2606,22 @@ function RoleActionPlanPanel({ actions: providedActions, metrics, scope, canAcce
 
 function EscalationPanel({ escalations, organization, brand, location, scope, userProfile }) {
   const [notifyingKey, setNotifyingKey] = React.useState(null);
+  const { confirm } = useConfirmation();
 
   const notifyEscalation = async (item) => {
     if (!organization?.id) {
       toast.error('No organization found for escalation');
       return;
     }
+
+    const ok = await confirm({
+      title: `Notify managers about "${item.title}"?`,
+      description: 'This sends a real notification to every manager in the organization about this escalation. You can re-send it again later if needed.',
+      confirmText: 'Notify',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!ok) return;
 
     const key = actionId(item.title);
     setNotifyingKey(key);

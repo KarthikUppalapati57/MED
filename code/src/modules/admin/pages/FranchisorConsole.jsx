@@ -1,8 +1,8 @@
-﻿import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import React from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Building2, DollarSign, Users, Briefcase, TrendingUp, CheckCircle, Clock } from 'lucide-react';
+import { DollarSign, Users, Briefcase, TrendingUp, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 export default function FranchisorConsole() {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
 
   const { data: agreements = [], isLoading: loadingAgreements } = useQuery({
     queryKey: ['franchise_agreements', organization?.id],
@@ -53,6 +55,14 @@ export default function FranchisorConsole() {
   });
 
   const runRoyaltyCalculation = async () => {
+    const proceed = await confirm({
+      title: 'Run weekly royalty calculations?',
+      description: 'This generates real royalty invoices billed to every franchisee organization under this agreement network.',
+      confirmText: 'Run Weekly Royalties',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!proceed) return;
     const toastId = toast.loading('Running weekly royalty calculations...');
     try {
       const { data: { session } } = await supabase.auth.getSession();

@@ -127,6 +127,14 @@ export default function PlatformUserManagement() {
  // Invite Platform Admin 
   const handleInvitePlatformAdmin = async () => {
     if (!platformInviteEmail) return;
+    const proceed = await confirm({
+      title: `Invite ${platformInviteEmail} as Platform Admin?`,
+      description: `This grants unrestricted access to all organizations, users, and platform settings — the highest-privilege role in the system. A real invitation email will be sent to ${platformInviteEmail}.`,
+      confirmText: 'Invite Admin',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!proceed) return;
     setPlatformInviting(true);
     try {
       const token = createSecureToken(48);

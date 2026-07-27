@@ -228,6 +228,28 @@ export const MODULE_DEFINITIONS = {
 
 export const ALL_MODULE_KEYS = Object.keys(MODULE_DEFINITIONS);
 
+const MODULE_KEY_ALIASES = {
+  auto_orders: "orders",
+  auto_ordering: "orders",
+  bill_pay: "payments",
+  billing_plans: "billing",
+  crm: "crm_marketing",
+  custom_report: "custom_reports",
+  dashboard_report: "dashboard_reports",
+  executive: "executive_bi",
+  food_safety_haccp: "food_safety",
+  inventory_module: "inventory",
+  invoice: "invoices",
+  kitchen_display: "kitchen_displays",
+  kitchen_displays_module: "kitchen_displays",
+  order: "orders",
+  payment: "payments",
+  product: "products",
+  recipe: "recipes",
+  recipe_module: "recipes",
+  vendor: "vendors",
+};
+
 // These authenticated setup routes are handled by App.jsx state gates before the
 // normal module router. They are not subscription modules.
 const UNGATED_AUTH_PAGES = new Set(["BusinessVerification", "CompleteOnboarding", "OnboardingPage"]);
@@ -240,6 +262,34 @@ function normalizePageName(pageName) {
   return String(pageName).split(/[/?#]/)[0];
 }
 
+function normalizeModuleKey(moduleEntry) {
+  if (moduleEntry == null) return null;
+  const rawKey = typeof moduleEntry === "object"
+    ? moduleEntry.key || moduleEntry.module_key || moduleEntry.moduleKey || moduleEntry.id || moduleEntry.name
+    : moduleEntry;
+  const normalized = String(rawKey || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (!normalized) return null;
+  return MODULE_KEY_ALIASES[normalized] || normalized;
+}
+
+export function normalizeEnabledModules(enabledModules) {
+  let modules = enabledModules;
+  if (typeof modules === "string") {
+    const trimmed = modules.trim();
+    if (!trimmed) return [];
+    try {
+      modules = JSON.parse(trimmed);
+    } catch {
+      modules = trimmed.split(",");
+    }
+  }
+  if (!Array.isArray(modules)) return [];
+  return [...new Set(modules.map(normalizeModuleKey).filter(Boolean))];
+}
+
 export function isUngatedAuthPage(pageName) {
   return UNGATED_AUTH_PAGES.has(normalizePageName(pageName));
 }
@@ -249,12 +299,13 @@ export function isUngatedAuthPage(pageName) {
  * FAIL-CLOSED: If enabledModules is null/empty, only core module pages are returned.
  */
 export function getEnabledPages(enabledModules) {
-  const modulesList = (enabledModules && enabledModules.length > 0)
-    ? enabledModules
+  const normalizedModules = normalizeEnabledModules(enabledModules);
+  const modulesList = normalizedModules.length > 0
+    ? normalizedModules
     : CORE_MODULE_KEYS;
   const pages = new Set();
   modulesList.forEach(moduleKey => {
-    const mod = MODULE_DEFINITIONS[String(moduleKey).toLowerCase()];
+    const mod = MODULE_DEFINITIONS[moduleKey];
     if (mod) mod.pages.forEach(p => pages.add(p));
   });
   CORE_MODULE_KEYS.forEach(key => {
@@ -276,8 +327,7 @@ export function isPageInEnabledModules(pageName, enabledModules, userRole) {
   const moduleInfo = getModuleForPage(pageName);
   if (!moduleInfo) return isUngatedAuthPage(pageName);
   if (CORE_MODULE_KEYS.includes(moduleInfo.key)) return true;
-  const modulesList = enabledModules || [];
-  const normalizedList = modulesList.map(m => String(m).toLowerCase());
+  const normalizedList = normalizeEnabledModules(enabledModules);
   if (normalizedList.includes(moduleInfo.key.toLowerCase())) return true;
 
   // Some historical plans use alias module keys that point at the same page,

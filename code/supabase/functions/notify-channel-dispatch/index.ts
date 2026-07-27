@@ -25,7 +25,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { user_id, title, message, send_email, send_sms } = await req.json()
+    const { user_id, title, message, send_email, send_sms, notification_id } = await req.json()
     if (!user_id || (!send_email && !send_sms)) {
       return new Response(JSON.stringify({ dispatched: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     }
@@ -37,6 +37,7 @@ serve(async (req) => {
       .maybeSingle()
 
     const results = { email: false, sms: false }
+    const errors = {}
 
     if (send_email && profile?.email) {
       try {
@@ -45,6 +46,7 @@ serve(async (req) => {
       } catch (err) {
         // Non-fatal: the in-app notification already landed via the trigger that called us.
         console.error('notify-channel-dispatch email failed:', err)
+        errors.email = err.message || 'send failed'
       }
     }
 
@@ -54,6 +56,37 @@ serve(async (req) => {
         results.sms = true
       } catch (err) {
         console.error('notify-channel-dispatch sms failed:', err)
+        errors.sms = err.message || 'send failed'
+      }
+    }
+
+    // Record the outcome on the notification row itself -- otherwise a failed channel only ever
+    // existed in this function's server-side logs, invisible to anyone without log access.
+    if (notification_id) {
+      try {
+        const { data: existing } = await supabase
+          .from('notifications')
+          .select('metadata')
+          .eq('id', notification_id)
+          .maybeSingle()
+
+        await supabase
+          .from('notifications')
+          .update({
+            metadata: {
+              ...(existing?.metadata || {}),
+              channel_dispatch: {
+                email: send_email ? (results.email ? 'sent' : 'failed') : 'skipped',
+                sms: send_sms ? (results.sms ? 'sent' : 'failed') : 'skipped',
+                checked_at: new Date().toISOString(),
+                ...(errors.email ? { email_error: errors.email } : {}),
+                ...(errors.sms ? { sms_error: errors.sms } : {}),
+              },
+            },
+          })
+          .eq('id', notification_id)
+      } catch (err) {
+        console.error('notify-channel-dispatch: failed to record dispatch result', err)
       }
     }
 

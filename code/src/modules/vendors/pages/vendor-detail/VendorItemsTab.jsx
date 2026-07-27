@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useConfirmation } from '@/hooks/useConfirmation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

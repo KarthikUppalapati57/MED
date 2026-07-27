@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { Gavel, Truck, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 
 export default function VendorBidding() {
   const { currentOrganization } = useAuth();
+  const { confirm } = useConfirmation();
   const [evaluatingItemId, setEvaluatingItemId] = useState(null);
   const [winners, setWinners] = useState({});
 
@@ -65,6 +67,14 @@ export default function VendorBidding() {
 
   const handleEvaluateBids = async (globalItemId) => {
     if (!currentOrganization) return;
+    const ok = await confirm({
+      title: 'Evaluate bids?',
+      description: 'This evaluates all pending bids for this item and commits the lowest-cost vendor as the winner.',
+      confirmText: 'Evaluate Bids',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     setEvaluatingItemId(globalItemId);
     try {
       const { data, error } = await supabase.functions.invoke('evaluate-vendor-bids', {

@@ -56,7 +56,7 @@ export default function AIVendorAnalyst({ vendorId }) {
         setMessages([{ role: 'assistant', content: `I couldn't analyze this vendor: ${err.message}` }]);
       })
       .finally(() => setIsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [dataReady]);
 
   useEffect(() => {

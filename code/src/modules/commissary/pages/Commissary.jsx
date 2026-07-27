@@ -359,7 +359,17 @@ export default function Commissary() {
             )}
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button variant="outline" onClick={() => setIsOrderModalOpen(false)}>Cancel</Button>
-              <Button disabled={orderItems.length === 0 || submitOrderMutation.isPending} onClick={() => submitOrderMutation.mutate()}>
+              <Button disabled={orderItems.length === 0 || submitOrderMutation.isPending} onClick={async () => {
+                const proceed = await confirm({
+                  title: 'Submit this commissary order?',
+                  description: 'This creates a new transfer request from the commissary for the items listed above, with status pending.',
+                  confirmText: 'Submit Order',
+                  cancelText: 'Cancel',
+                  variant: 'info',
+                });
+                if (!proceed) return;
+                submitOrderMutation.mutate();
+              }}>
                 {submitOrderMutation.isPending ? 'Submitting...' : 'Submit Order'}
               </Button>
             </div>

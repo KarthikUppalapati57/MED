@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPageInEnabledModules } from '../../src/lib/moduleConfig';
+import { getEnabledPages, isPageInEnabledModules, normalizeEnabledModules } from '../../src/lib/moduleConfig';
 
 describe('module entitlement aliases', () => {
   it('allows Recipes when the organization is entitled to the recipes module key', () => {
@@ -12,5 +12,18 @@ describe('module entitlement aliases', () => {
 
   it('does not enable Recipes from unrelated operational modules', () => {
     expect(isPageInEnabledModules('Recipes', ['invoices', 'payments'], 'tenant_super_admin')).toBe(false);
+  });
+  it('normalizes singular recipe module keys from admin metadata', () => {
+    expect(normalizeEnabledModules(['recipe'])).toEqual(['recipes']);
+    expect(isPageInEnabledModules('Recipes', ['recipe'], 'tenant_super_admin')).toBe(true);
+  });
+
+  it('accepts JSON-string and object-shaped module entitlement payloads', () => {
+    expect(isPageInEnabledModules('Recipes', '["recipe"]', 'tenant_super_admin')).toBe(true);
+    expect(isPageInEnabledModules('Recipes', [{ key: 'recipes' }], 'tenant_super_admin')).toBe(true);
+  });
+
+  it('includes Recipes in enabled pages after module key normalization', () => {
+    expect(getEnabledPages('["recipe"]').has('Recipes')).toBe(true);
   });
 });

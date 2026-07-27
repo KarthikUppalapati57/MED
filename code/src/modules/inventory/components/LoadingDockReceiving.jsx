@@ -3,6 +3,7 @@ import { useAuthQuery } from '@/hooks/useAuthQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { receiveOrderWorkflow } from '@/lib/workflowService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { Package, Truck, CheckCircle2, AlertTriangle, ChevronLeft } from 'lucide
 export default function LoadingDockReceiving() {
   const queryClient = useQueryClient();
   const { organization, location, userProfile } = useAuth();
+  const { confirm } = useConfirmation();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [receivedQtys, setReceivedQtys] = useState({});
 
@@ -70,7 +72,7 @@ export default function LoadingDockReceiving() {
     }));
   };
 
-  const handleReceive = () => {
+  const handleReceive = async () => {
     let isPartial = false;
     selectedOrder.items?.forEach(i => {
       const expected = i.approved_quantity || i.suggested_quantity || 0;
@@ -79,6 +81,17 @@ export default function LoadingDockReceiving() {
         isPartial = true;
       }
     });
+
+    const proceed = await confirm({
+      title: 'Complete receiving for this order?',
+      description: isPartial
+        ? "This posts real inventory increases for the received quantities, updates this order's status, and will automatically request a credit memo for the short-shipped items."
+        : "This posts real inventory increases for the received quantities and updates this order's status.",
+      confirmText: 'Complete Receiving',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
 
     receiveMutation.mutate({ order: selectedOrder, qtys: receivedQtys, isPartial });
   };

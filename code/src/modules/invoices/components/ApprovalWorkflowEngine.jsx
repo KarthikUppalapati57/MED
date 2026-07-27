@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { invalidateInvoiceLists } from '@/lib/query-client';
 import { useConfirmation } from '@/hooks/useConfirmation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export function ApprovalWorkflowEngine({ invoice }) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['approval-workflow', invoice.id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateInvoiceLists();
     }
   });
 
@@ -128,6 +129,18 @@ export function ApprovalWorkflowEngine({ invoice }) {
         title: 'Reject invoice?',
         description: 'This will reject the invoice at this approval step and notify the uploader. This cannot be undone.',
         confirmText: 'Reject',
+        cancelText: 'Cancel',
+        variant: 'warning',
+      });
+      if (!ok) return;
+    } else if (status === 'approved') {
+      const isFinalStep = pendingSteps.length === 1;
+      const ok = await confirm({
+        title: 'Approve invoice?',
+        description: isFinalStep
+          ? 'This is the final required approval step -- the invoice will be fully approved and become eligible for payment.'
+          : 'This advances the invoice past this approval step. It will still need further approval before it can be paid.',
+        confirmText: 'Approve',
         cancelText: 'Cancel',
         variant: 'warning',
       });

@@ -49,6 +49,15 @@ export default function WebhooksTab() {
   async function handleAddEndpoint() {
     if (!newUrl.trim() || !newUrl.startsWith('http')) return toast.error("Please enter a valid URL starting with http/https");
 
+    const ok = await confirm({
+      title: 'Add this webhook endpoint?',
+      description: `Real customer, employee, and inventory event data will start flowing to ${newUrl} immediately once this endpoint and its signing secret are created.`,
+      confirmText: 'Add Endpoint',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
+
     const { data, error } = await supabase.functions.invoke('create-webhook-endpoint', {
       body: {
         organization_id: organizationId,

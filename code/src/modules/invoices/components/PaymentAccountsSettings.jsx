@@ -88,8 +88,16 @@ export default function PaymentAccountsSettings() {
     onError: (err) => toast.error(err.message)
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newAccount.name.trim()) return toast.error("Account name is required");
+    const ok = await confirm({
+      title: 'Save payment account?',
+      description: `This creates a new shared "${newAccount.name}" ${newAccount.account_type.replace('_', ' ')} account for the entire organization. Anyone releasing vendor payments will be able to select it.`,
+      confirmText: 'Save Account',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!ok) return;
     createAccountMutation.mutate(newAccount);
   };
 
@@ -282,9 +290,21 @@ export default function PaymentAccountsSettings() {
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     <Label className="text-xs text-muted-foreground">Enable</Label>
-                    <Switch 
+                    <Switch
                       checked={!!vendor.autopay_enabled}
-                      onCheckedChange={(checked) => updateVendorMutation.mutate({ id: vendor.id, updates: { autopay_enabled: checked }})}
+                      onCheckedChange={async (checked) => {
+                        if (checked) {
+                          const ok = await confirm({
+                            title: 'Enable AutoPay?',
+                            description: `Future approved invoices from ${vendor.name} will be paid automatically with no further human review.`,
+                            confirmText: 'Enable',
+                            cancelText: 'Cancel',
+                            variant: 'warning',
+                          });
+                          if (!ok) return;
+                        }
+                        updateVendorMutation.mutate({ id: vendor.id, updates: { autopay_enabled: checked }});
+                      }}
                     />
                   </div>
                 </div>

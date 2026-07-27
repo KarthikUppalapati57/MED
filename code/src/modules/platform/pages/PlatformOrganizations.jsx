@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { sendBusinessVerificationDecisionEmail } from '@/lib/emailService';
 import ProviderNeutralPaymentSetup from '@/modules/payments/components/ProviderNeutralPaymentSetup';
+import { useConfirmation } from '@/hooks/useConfirmation';
 
 function verificationStatusTone(status) {
   if (status === 'verified') return 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -40,6 +41,7 @@ function verificationStatusLabel(status) {
 }
 
 export default function PlatformOrganizations() {
+  const { confirm } = useConfirmation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -276,6 +278,14 @@ export default function PlatformOrganizations() {
   }, [verificationSettings]);
 
   const handleSaveVerificationSettings = async () => {
+    const proceed = await confirm({
+      title: 'Save verification settings?',
+      description: 'This changes EIN/SSN/USPS address verification requirements for all future tenant onboarding, platform-wide.',
+      confirmText: 'Save Verification Settings',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     setIsSavingVerificationSettings(true);
     try {
       await api.onboarding.updateVerificationSettings({
@@ -371,6 +381,14 @@ export default function PlatformOrganizations() {
 
   const handleUpdateBilling = async () => {
     if (!selectedOrgId) return;
+    const proceed = await confirm({
+      title: `Save billing configuration for ${selectedOrg?.name || 'this organization'}?`,
+      description: 'This directly updates the plan, subscription status, Stripe IDs, and enabled modules for this organization (or the selected location). Changes take effect immediately.',
+      confirmText: 'Save Configuration',
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!proceed) return;
     setIsUpdatingBilling(true);
     try {
       const billingUpdates = {
@@ -516,6 +534,14 @@ export default function PlatformOrganizations() {
 
   const handleCsvSubmit = async () => {
     if (!csvData || csvData.length === 0 || !selectedOrgId) return;
+    const proceed = await confirm({
+      title: 'Import hierarchy?',
+      description: `This will bulk-create brands/locations for this organization from ${csvData.length} parsed row${csvData.length === 1 ? '' : 's'}.`,
+      confirmText: 'Import Hierarchy',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     setIsModifyingHierarchy(true);
     
     try {
@@ -594,6 +620,16 @@ export default function PlatformOrganizations() {
 
   const handleManualSubmit = async () => {
     if (!selectedOrgId) return;
+    const proceed = await confirm({
+      title: manualEntry.type === 'brand' ? 'Create this brand?' : 'Create this location?',
+      description: manualEntry.type === 'brand'
+        ? `This creates a new brand${manualEntry.locationName ? ' with an initial location' : ''} under this organization.`
+        : 'This creates a new location under the selected brand.',
+      confirmText: 'Save Changes',
+      cancelText: 'Cancel',
+      variant: 'info',
+    });
+    if (!proceed) return;
     setIsModifyingHierarchy(true);
     try {
       if (manualEntry.type === 'brand') {

@@ -68,6 +68,7 @@ import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 import AiInsightsAssistant from '@/modules/ai_insights/components/AiInsightsAssistant';
 import i18n from '@/i18n';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import { toast } from 'sonner';
 
 const navigation = [
   { name: 'Dashboard', href: 'Dashboard', icon: LayoutDashboard, minRole: 'ground_staff' },
@@ -302,7 +303,27 @@ export default function Layout({ children, currentPageName }) {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        invalidateNotificationQueries
+        (payload) => {
+          invalidateNotificationQueries();
+          if (payload.eventType !== 'INSERT' || !payload.new) return;
+          const notif = payload.new;
+          const action = getNotificationAction(notif);
+          const isInvoiceExtractionNotice = notif.type === 'invoice' && notif.metadata?.extraction_status;
+          toast(notif.title || 'New notification', {
+            id: notif.id ? `notification-${notif.id}` : undefined,
+            description: notif.message || notif.body,
+            duration: isInvoiceExtractionNotice ? Infinity : 10000,
+            closeButton: true,
+            action: action?.path ? {
+              label: action.label || 'Open',
+              onClick: async () => {
+                await markAsRead(notif.id);
+                if (notif.id) toast.dismiss(`notification-${notif.id}`);
+                navigate(action.path);
+              },
+            } : undefined,
+          });
+        }
       )
       .subscribe();
 

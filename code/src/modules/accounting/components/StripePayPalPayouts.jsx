@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { api } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
+import { useConfirmation } from '@/hooks/useConfirmation';
 import { format } from 'date-fns';
 import JustPayVendorDialog from './JustPayVendorDialog';
 
@@ -26,6 +27,7 @@ const PAYOUT_METHODS = [
 export default function StripePayPalPayouts() {
   const { organization } = useAuth();
   const queryClient = useQueryClient();
+  const { confirm } = useConfirmation();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [payoutMethod, setPayoutMethod] = useState('stripe_connect_custom');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -59,6 +61,17 @@ export default function StripePayPalPayouts() {
       toast.error("Please select at least one invoice to pay.");
       return;
     }
+
+    const methodLabel = PAYOUT_METHODS.find(m => m.value === payoutMethod)?.label || payoutMethod;
+    const finalAmount = Math.max(0, selectedTotal - (parseFloat(creditAmount) || 0));
+    const ok = await confirm({
+      title: 'Release funds?',
+      description: `This releases $${finalAmount.toFixed(2)} across ${selectedInvoices.length} invoice${selectedInvoices.length === 1 ? '' : 's'} via ${methodLabel}. Funds will be sent for every selected invoice and this cannot be undone.`,
+      confirmText: `Release Funds via ${methodLabel}`,
+      cancelText: 'Cancel',
+      variant: 'destructive',
+    });
+    if (!ok) return;
 
     setIsProcessing(true);
     setResults({});

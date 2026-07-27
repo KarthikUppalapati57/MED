@@ -59,6 +59,19 @@ export function clearAllQueries() {
 }
 
 /**
+ * Invalidate every known invoice-list query key.
+ * Call after any mutation that changes an invoice's status or payment state --
+ * 'invoices-dashboard' (Invoices.jsx) and 'invoices-payments' (Payments.jsx) are
+ * separate top-level keys, not nested under 'invoices', so invalidating just
+ * 'invoices' silently misses both list views.
+ */
+export function invalidateInvoiceLists() {
+	queryClientInstance.invalidateQueries({ queryKey: ['invoices'] });
+	queryClientInstance.invalidateQueries({ queryKey: ['invoices-dashboard'] });
+	queryClientInstance.invalidateQueries({ queryKey: ['invoices-payments'] });
+}
+
+/**
  * Legacy alias invalidate all queries.
  * @deprecated Use invalidateOrgScopedQueries() or clearAllQueries() instead.
  */

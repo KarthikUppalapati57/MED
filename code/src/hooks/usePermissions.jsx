@@ -1,5 +1,5 @@
 import { useAuth } from '@/lib/AuthContext';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 
 /**
  * Custom hook for role-based capability checks.

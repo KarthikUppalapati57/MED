@@ -123,11 +123,19 @@ export default function CustomRolesTab() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!roleName.trim()) {
       toast.error("Role name is required");
       return;
     }
+    const proceed = await confirm({
+      title: selectedRole ? `Save changes to "${roleName.trim()}"?` : `Create custom role "${roleName.trim()}"?`,
+      description: 'This defines a real read/write/update permission matrix that can be assigned to users in your organization.',
+      confirmText: 'Save Role',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!proceed) return;
     saveRoleMutation.mutate({
       id: selectedRole?.id,
       name: roleName.trim(),
