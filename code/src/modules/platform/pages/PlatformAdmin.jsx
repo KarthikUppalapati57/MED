@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ALL_MODULE_KEYS, MODULE_DEFINITIONS } from "@/lib/moduleConfig";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { buildAppUrl, buildSignupUrl } from '@/lib/appUrl';
 import InventoryAudit from '@/modules/accounting/components/InventoryAudit';
 import TenantMigrationPanel from '@/modules/platform/components/TenantMigrationPanel';
 import PlatformFeedbackSettings from '@/modules/platform/components/PlatformFeedbackSettings';
@@ -411,7 +412,7 @@ export default function PlatformAdmin() {
         return [newInvite, ...old];
       });
 
-      const link = `${window.location.origin}/signup/${token}`;
+      const link = buildSignupUrl(token);
 
       // Send invitation email via EmailJS
       const emailResult = await sendInvitationEmail({
@@ -511,7 +512,7 @@ export default function PlatformAdmin() {
         return [newInvite, ...old];
       });
 
-      const signupLink = `${window.location.origin}/signup/${token}`;
+      const signupLink = buildSignupUrl(token);
 
       // 2. Update demo request status and demo_viewed
       const { error: updateErr } = await supabase
@@ -740,8 +741,8 @@ The Restops Platform Team
         }
 
         const signupLink = invite?.token
-          ? `${window.location.origin}/signup/${invite.token}`
-          : `${window.location.origin}`;
+          ? buildSignupUrl(invite.token)
+          : buildAppUrl('/');
 
         const onboardingEmail = invite?.email || request.email;
 
@@ -836,7 +837,7 @@ The Restops Platform Team
     setReissuingInviteId(invitationId);
     try {
       const result = await api.onboarding.reissueOwnerInvitation(invitationId);
-      const signupLink = `${window.location.origin}/signup/${result.token}`;
+      const signupLink = buildSignupUrl(result.token);
       await navigator.clipboard.writeText(signupLink).catch(() => {});
       toast.success('Invitation reissued. New signup link copied to clipboard.');
       queryClient.invalidateQueries({ queryKey: ['client-invites'] });
@@ -1357,7 +1358,7 @@ The Restops Platform Team
                         className="h-8 w-8 text-muted-foreground hover:text-resend-blue hover:bg-resend-blue/5"
                         title="Copy Invite Link"
                         onClick={() => {
-                          const link = `${window.location.origin}/signup/${invite.token}`;
+                          const link = buildSignupUrl(invite.token);
                           navigator.clipboard.writeText(link);
                           toast.success("Invite link copied to clipboard!");
                         }}
@@ -1371,7 +1372,7 @@ The Restops Platform Team
                         title="Resend Invite"
                         onClick={async () => {
                           toast.loading("Resending invite...", { id: 'resend-invite' });
-                          const link = `${window.location.origin}/signup/${invite.token}`;
+                          const link = buildSignupUrl(invite.token);
                           const emailResult = await sendInvitationEmail({
                             to_email: invite.email,
                             to_name: invite.email.split('@')[0],

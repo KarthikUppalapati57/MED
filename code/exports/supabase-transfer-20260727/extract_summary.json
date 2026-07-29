@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-07-27",
+  "migration_count": 574,
+  "results": [
+    {
+      "target": "020_rls_rbac.sql",
+      "count": 2689,
+      "sourceCount": 300
+    },
+    {
+      "target": "030_rpc_functions.sql",
+      "count": 1009,
+      "sourceCount": 328
+    },
+    {
+      "target": "040_storage_realtime_cron_extensions.sql",
+      "count": 126,
+      "sourceCount": 41
+    },
+    {
+      "target": "060_edge_functions.md",
+      "count": 47,
+      "sourceCount": 47
+    }
+  ]
+}

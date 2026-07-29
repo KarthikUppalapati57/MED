@@ -15,6 +15,11 @@
 
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.create_product_details(text, text, text, text, text, boolean, boolean, text, text, numeric, boolean, uuid, uuid, uuid);
+DROP FUNCTION IF EXISTS public.update_product_details(uuid, text, text, text, text, text, boolean, boolean, text, text, numeric, boolean);
+DROP FUNCTION IF EXISTS public.set_product_inventory_tracking(uuid, boolean);
+DROP FUNCTION IF EXISTS public.soft_delete_product_safe(uuid);
+
 CREATE OR REPLACE FUNCTION public.create_product_details(
   p_name text,
   p_restops_product_id text DEFAULT NULL,
@@ -199,3 +204,4 @@ REVOKE ALL ON FUNCTION public.soft_delete_product_safe(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.soft_delete_product_safe(uuid) TO authenticated;
 
 COMMIT;
+

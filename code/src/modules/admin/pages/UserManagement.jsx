@@ -26,6 +26,7 @@ import { Search, Edit2, Trash2, Users, Mail, Shield, MoreVertical,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConfirmation } from '@/hooks/useConfirmation';
+import { buildSignupUrl } from '@/lib/appUrl';
 
 // Restops Roles 
 const Restops_ROLES = {
@@ -142,7 +143,7 @@ function MemberRow({ member, canEditRow, onSelect, activeOrgId }) {
                   <DropdownMenuItem
                     className="rounded-xl px-3 py-2 cursor-pointer font-bold text-xs text-resend-blue hover:bg-resend-blue/5"
                     onClick={() => {
-                      const link = `${window.location.origin}/signup/${member.token}`;
+                      const link = buildSignupUrl(member.token);
                       navigator.clipboard.writeText(link);
                       toast.success("Invite link copied to clipboard!");
                     }}
@@ -726,7 +727,7 @@ function InviteDialog({ open, onClose, orgId }) {
       });
 
       if (token) {
-        const link = `${window.location.origin}/signup/${token}`;
+        const link = buildSignupUrl(token);
         setGeneratedLink(link);
 
         // Send invitation email via EmailJS

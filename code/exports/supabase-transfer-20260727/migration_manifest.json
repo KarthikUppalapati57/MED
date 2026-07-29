@@ -1,0 +1,2876 @@
+{
+  "generated_at": "2026-07-27",
+  "migration_count": 574,
+  "migrations": [
+    {
+      "file": "001_initial_schema.sql",
+      "size": 23446,
+      "modified": "2026-07-26T21:14:32.832Z"
+    },
+    {
+      "file": "002_saas_hierarchy.sql",
+      "size": 5896,
+      "modified": "2026-07-26T21:14:32.832Z"
+    },
+    {
+      "file": "003_seed_first_org.sql",
+      "size": 2385,
+      "modified": "2026-07-26T21:14:32.832Z"
+    },
+    {
+      "file": "004_repair_schemas.sql",
+      "size": 2073,
+      "modified": "2026-07-26T21:14:32.835Z"
+    },
+    {
+      "file": "005_emergency_fix_rls.sql",
+      "size": 2977,
+      "modified": "2026-07-26T21:14:32.835Z"
+    },
+    {
+      "file": "006_saas_billing_and_audit.sql",
+      "size": 6476,
+      "modified": "2026-07-26T21:14:32.838Z"
+    },
+    {
+      "file": "007_public_invitations_fix.sql",
+      "size": 1593,
+      "modified": "2026-07-26T21:14:32.838Z"
+    },
+    {
+      "file": "008_storage_policies.sql",
+      "size": 2302,
+      "modified": "2026-07-26T21:14:32.840Z"
+    },
+    {
+      "file": "009_star_schema.sql",
+      "size": 32590,
+      "modified": "2026-07-26T21:14:32.842Z"
+    },
+    {
+      "file": "010_fix_missing_invoice_columns.sql",
+      "size": 2061,
+      "modified": "2026-07-26T21:14:32.843Z"
+    },
+    {
+      "file": "011_fix_onboarding_rls.sql",
+      "size": 1970,
+      "modified": "2026-07-26T21:14:32.844Z"
+    },
+    {
+      "file": "012_fix_role_constraint_and_utility_functions.sql",
+      "size": 7894,
+      "modified": "2026-07-26T21:14:32.844Z"
+    },
+    {
+      "file": "013_version_control_rpc_functions.sql",
+      "size": 11999,
+      "modified": "2026-07-26T21:14:32.848Z"
+    },
+    {
+      "file": "014_security_hardening_and_rls_optimization.sql",
+      "size": 9363,
+      "modified": "2026-07-26T21:14:32.848Z"
+    },
+    {
+      "file": "015_create_error_logs_and_audit_hardening.sql",
+      "size": 4479,
+      "modified": "2026-07-26T21:14:32.851Z"
+    },
+    {
+      "file": "016_foreign_key_indexes.sql",
+      "size": 5744,
+      "modified": "2026-07-26T21:14:32.852Z"
+    },
+    {
+      "file": "017_policy_consolidation_and_public_forms.sql",
+      "size": 5069,
+      "modified": "2026-07-26T21:14:32.853Z"
+    },
+    {
+      "file": "018_fix_anon_invitation_read.sql",
+      "size": 827,
+      "modified": "2026-07-26T21:14:32.854Z"
+    },
+    {
+      "file": "019_fix_accept_invitation_role_mapping.sql",
+      "size": 2532,
+      "modified": "2026-07-26T21:14:32.855Z"
+    },
+    {
+      "file": "020_restore_public_insert_policies.sql",
+      "size": 1400,
+      "modified": "2026-07-26T21:14:32.856Z"
+    },
+    {
+      "file": "021_add_phone_and_check_email_exists.sql",
+      "size": 1059,
+      "modified": "2026-07-26T21:14:32.857Z"
+    },
+    {
+      "file": "022_allow_auto_pay_status.sql",
+      "size": 780,
+      "modified": "2026-07-26T21:14:32.858Z"
+    },
+    {
+      "file": "026_normalize_invoice_line_items.sql",
+      "size": 3575,
+      "modified": "2026-07-26T21:14:32.859Z"
+    },
+    {
+      "file": "027_labor_management.sql",
+      "size": 4273,
+      "modified": "2026-07-26T21:14:32.860Z"
+    },
+    {
+      "file": "028_accounting_and_onboarding.sql",
+      "size": 4287,
+      "modified": "2026-07-26T21:14:32.862Z"
+    },
+    {
+      "file": "029_standardize_rls.sql",
+      "size": 589,
+      "modified": "2026-07-26T21:14:32.863Z"
+    },
+    {
+      "file": "030_enterprise_rls_upgrade.sql",
+      "size": 960,
+      "modified": "2026-07-26T21:14:32.864Z"
+    },
+    {
+      "file": "031_recipe_normalization.sql",
+      "size": 2389,
+      "modified": "2026-07-26T21:14:32.865Z"
+    },
+    {
+      "file": "032_inventory_movements.sql",
+      "size": 1978,
+      "modified": "2026-07-26T21:14:32.866Z"
+    },
+    {
+      "file": "033_soft_deletes.sql",
+      "size": 2839,
+      "modified": "2026-07-26T21:14:32.867Z"
+    },
+    {
+      "file": "034_purchase_orders.sql",
+      "size": 3681,
+      "modified": "2026-07-26T21:14:32.868Z"
+    },
+    {
+      "file": "035_indexing_strategy.sql",
+      "size": 710,
+      "modified": "2026-07-26T21:14:32.869Z"
+    },
+    {
+      "file": "036_financial_ledger.sql",
+      "size": 3826,
+      "modified": "2026-07-26T21:14:32.871Z"
+    },
+    {
+      "file": "037_notification_system.sql",
+      "size": 1801,
+      "modified": "2026-07-26T21:14:32.871Z"
+    },
+    {
+      "file": "038_ai_and_events.sql",
+      "size": 2761,
+      "modified": "2026-07-26T21:14:32.872Z"
+    },
+    {
+      "file": "039_granular_rbac.sql",
+      "size": 3659,
+      "modified": "2026-07-26T21:14:32.873Z"
+    },
+    {
+      "file": "040_multi_tenant_rbac.sql",
+      "size": 14119,
+      "modified": "2026-07-26T21:14:32.874Z"
+    },
+    {
+      "file": "041_admin_delete_user.sql",
+      "size": 2751,
+      "modified": "2026-07-26T21:14:32.875Z"
+    },
+    {
+      "file": "042_org_member_management_rpcs.sql",
+      "size": 5347,
+      "modified": "2026-07-26T21:14:32.876Z"
+    },
+    {
+      "file": "043_fix_archived_organizations_schema.sql",
+      "size": 1087,
+      "modified": "2026-07-26T21:14:32.876Z"
+    },
+    {
+      "file": "044_recipe_margin_protection.sql",
+      "size": 5757,
+      "modified": "2026-07-26T21:14:32.877Z"
+    },
+    {
+      "file": "045_pos_avt_costing.sql",
+      "size": 6134,
+      "modified": "2026-07-26T21:14:32.878Z"
+    },
+    {
+      "file": "046_storage_security.sql",
+      "size": 3327,
+      "modified": "2026-07-26T21:14:32.879Z"
+    },
+    {
+      "file": "047_fix_user_metadata_vulnerability.sql",
+      "size": 2743,
+      "modified": "2026-07-26T21:14:32.880Z"
+    },
+    {
+      "file": "048_invoice_file_routing.sql",
+      "size": 653,
+      "modified": "2026-07-26T21:14:32.881Z"
+    },
+    {
+      "file": "049_menu_engineering_pmix.sql",
+      "size": 1648,
+      "modified": "2026-07-26T21:14:32.882Z"
+    },
+    {
+      "file": "050_orders_lifecycle.sql",
+      "size": 2292,
+      "modified": "2026-07-26T21:14:32.883Z"
+    },
+    {
+      "file": "051_inventory_count_sheets.sql",
+      "size": 2105,
+      "modified": "2026-07-26T21:14:32.883Z"
+    },
+    {
+      "file": "052_enterprise_readiness.sql",
+      "size": 2059,
+      "modified": "2026-07-26T21:14:32.884Z"
+    },
+    {
+      "file": "053_fix_auth_user_fk_constraints.sql",
+      "size": 2041,
+      "modified": "2026-07-26T21:14:32.886Z"
+    },
+    {
+      "file": "054_custom_rbac_roles.sql",
+      "size": 2091,
+      "modified": "2026-07-26T21:14:32.887Z"
+    },
+    {
+      "file": "055_dynamic_recipe_costing.sql",
+      "size": 1931,
+      "modified": "2026-07-26T21:14:32.887Z"
+    },
+    {
+      "file": "056_sub_recipes.sql",
+      "size": 3243,
+      "modified": "2026-07-26T21:14:32.887Z"
+    },
+    {
+      "file": "057_avt_variance_rpc.sql",
+      "size": 2416,
+      "modified": "2026-07-26T21:14:32.889Z"
+    },
+    {
+      "file": "058_gl_mappings.sql",
+      "size": 1944,
+      "modified": "2026-07-26T21:14:32.889Z"
+    },
+    {
+      "file": "059_vendor_item_prices.sql",
+      "size": 1211,
+      "modified": "2026-07-26T21:14:32.893Z"
+    },
+    {
+      "file": "060_edi_routing.sql",
+      "size": 2158,
+      "modified": "2026-07-26T21:14:32.894Z"
+    },
+    {
+      "file": "061_executive_dashboards_rpc.sql",
+      "size": 4103,
+      "modified": "2026-07-26T21:14:32.894Z"
+    },
+    {
+      "file": "062_copilot_rpc.sql",
+      "size": 3935,
+      "modified": "2026-07-26T21:14:32.894Z"
+    },
+    {
+      "file": "063_fix_cascading_deletes.sql",
+      "size": 1305,
+      "modified": "2026-07-26T21:14:32.894Z"
+    },
+    {
+      "file": "064_fix_archived_rls_vulnerability.sql",
+      "size": 798,
+      "modified": "2026-07-26T21:14:32.898Z"
+    },
+    {
+      "file": "065_webhook_infrastructure.sql",
+      "size": 4352,
+      "modified": "2026-07-26T21:14:32.898Z"
+    },
+    {
+      "file": "066_webhook_triggers.sql",
+      "size": 2251,
+      "modified": "2026-07-26T21:14:32.898Z"
+    },
+    {
+      "file": "067_realtime_events.sql",
+      "size": 5123,
+      "modified": "2026-07-26T21:14:32.902Z"
+    },
+    {
+      "file": "068_workflow_wiring_hardening.sql",
+      "size": 3467,
+      "modified": "2026-07-26T21:14:32.903Z"
+    },
+    {
+      "file": "069_production_workflow_completion.sql",
+      "size": 3430,
+      "modified": "2026-07-26T21:14:32.903Z"
+    },
+    {
+      "file": "070_labor_shift_column_aliases.sql",
+      "size": 484,
+      "modified": "2026-07-26T21:14:32.903Z"
+    },
+    {
+      "file": "071_workflow_depth_completion.sql",
+      "size": 5843,
+      "modified": "2026-07-26T21:14:32.906Z"
+    },
+    {
+      "file": "072_missing_marginedge_workflows.sql",
+      "size": 6328,
+      "modified": "2026-07-26T21:14:32.906Z"
+    },
+    {
+      "file": "073_enterprise_secret_hardening.sql",
+      "size": 582,
+      "modified": "2026-07-26T21:14:32.906Z"
+    },
+    {
+      "file": "074_brand_scope_core_tables.sql",
+      "size": 1491,
+      "modified": "2026-07-26T21:14:32.906Z"
+    },
+    {
+      "file": "075_role_dashboard_summary_rpc.sql",
+      "size": 15060,
+      "modified": "2026-07-26T21:14:32.910Z"
+    },
+    {
+      "file": "076_dashboard_persistence.sql",
+      "size": 17309,
+      "modified": "2026-07-26T21:14:32.910Z"
+    },
+    {
+      "file": "077_dashboard_report_scheduler.sql",
+      "size": 3786,
+      "modified": "2026-07-26T21:14:32.913Z"
+    },
+    {
+      "file": "078_unified_invoice_ap_ledger.sql",
+      "size": 5595,
+      "modified": "2026-07-26T21:14:32.914Z"
+    },
+    {
+      "file": "079_invoice_action_reasons.sql",
+      "size": 2293,
+      "modified": "2026-07-26T21:14:32.915Z"
+    },
+    {
+      "file": "080_invoice_document_intake.sql",
+      "size": 6481,
+      "modified": "2026-07-26T21:14:32.915Z"
+    },
+    {
+      "file": "081_vendor_item_matching.sql",
+      "size": 5459,
+      "modified": "2026-07-26T21:14:32.915Z"
+    },
+    {
+      "file": "082_three_way_reconciliation.sql",
+      "size": 6541,
+      "modified": "2026-07-26T21:14:32.915Z"
+    },
+    {
+      "file": "083_invoice_allocations.sql",
+      "size": 4429,
+      "modified": "2026-07-26T21:14:32.919Z"
+    },
+    {
+      "file": "084_approval_workflows.sql",
+      "size": 7066,
+      "modified": "2026-07-26T21:14:32.919Z"
+    },
+    {
+      "file": "085_payment_accounts.sql",
+      "size": 4350,
+      "modified": "2026-07-26T21:14:32.919Z"
+    },
+    {
+      "file": "086_invoice_audit_events.sql",
+      "size": 2602,
+      "modified": "2026-07-26T21:14:32.919Z"
+    },
+    {
+      "file": "087_general_ledger.sql",
+      "size": 1790,
+      "modified": "2026-07-26T21:14:32.923Z"
+    },
+    {
+      "file": "088_credit_requests.sql",
+      "size": 1744,
+      "modified": "2026-07-26T21:14:32.923Z"
+    },
+    {
+      "file": "089_vendor_autopay.sql",
+      "size": 284,
+      "modified": "2026-07-26T21:14:32.923Z"
+    },
+    {
+      "file": "090_vendor_credits.sql",
+      "size": 314,
+      "modified": "2026-07-26T21:14:32.923Z"
+    },
+    {
+      "file": "091_period_budgets.sql",
+      "size": 1623,
+      "modified": "2026-07-26T21:14:32.923Z"
+    },
+    {
+      "file": "092_recipe_yields.sql",
+      "size": 882,
+      "modified": "2026-07-26T21:14:32.927Z"
+    },
+    {
+      "file": "093_commissary.sql",
+      "size": 2365,
+      "modified": "2026-07-26T21:14:32.927Z"
+    },
+    {
+      "file": "094_global_items.sql",
+      "size": 1662,
+      "modified": "2026-07-26T21:14:32.927Z"
+    },
+    {
+      "file": "095_harden_payment_rbac.sql",
+      "size": 3096,
+      "modified": "2026-07-26T21:14:32.931Z"
+    },
+    {
+      "file": "096_fix_labor_forecast_revenue_column.sql",
+      "size": 1905,
+      "modified": "2026-07-26T21:14:32.931Z"
+    },
+    {
+      "file": "097_finalize_payment_rbac_and_labor_forecast.sql",
+      "size": 4616,
+      "modified": "2026-07-26T21:14:32.931Z"
+    },
+    {
+      "file": "098_vendor_item_price_intelligence.sql",
+      "size": 3458,
+      "modified": "2026-07-26T21:14:32.934Z"
+    },
+    {
+      "file": "099_bill_pay_status_hardening.sql",
+      "size": 2252,
+      "modified": "2026-07-26T21:14:32.935Z"
+    },
+    {
+      "file": "100_scheduled_payments.sql",
+      "size": 4727,
+      "modified": "2026-07-26T21:14:32.936Z"
+    },
+    {
+      "file": "101_vendor_statements.sql",
+      "size": 4579,
+      "modified": "2026-07-26T21:14:32.936Z"
+    },
+    {
+      "file": "102_accounting_sync.sql",
+      "size": 2646,
+      "modified": "2026-07-26T21:14:32.938Z"
+    },
+    {
+      "file": "104_fix_total_spent.sql",
+      "size": 107,
+      "modified": "2026-07-26T21:14:32.938Z"
+    },
+    {
+      "file": "105_performance_optimization.sql",
+      "size": 3025,
+      "modified": "2026-07-26T21:14:32.940Z"
+    },
+    {
+      "file": "106_schema_hardening_and_perfect_tables.sql",
+      "size": 3130,
+      "modified": "2026-07-26T21:14:32.940Z"
+    },
+    {
+      "file": "107_dashboard_materialized_views.sql",
+      "size": 4189,
+      "modified": "2026-07-26T21:14:32.940Z"
+    },
+    {
+      "file": "108_dashboard_rpc_cache_wiring.sql",
+      "size": 15848,
+      "modified": "2026-07-26T21:14:32.940Z"
+    },
+    {
+      "file": "109_database_monitoring.sql",
+      "size": 1331,
+      "modified": "2026-07-26T21:14:32.944Z"
+    },
+    {
+      "file": "110_server_side_metrics_and_sync.sql",
+      "size": 4464,
+      "modified": "2026-07-26T21:14:32.944Z"
+    },
+    {
+      "file": "111_fix_dashboard_performance.sql",
+      "size": 17013,
+      "modified": "2026-07-26T21:14:32.944Z"
+    },
+    {
+      "file": "112_foreign_key_indexes.sql",
+      "size": 25798,
+      "modified": "2026-07-26T21:14:32.944Z"
+    },
+    {
+      "file": "113_security_hardening.sql",
+      "size": 2939,
+      "modified": "2026-07-26T21:14:32.948Z"
+    },
+    {
+      "file": "114_rename_brands_id.sql",
+      "size": 106,
+      "modified": "2026-07-26T21:14:32.948Z"
+    },
+    {
+      "file": "115_resolve_advisor_lints.sql",
+      "size": 3687,
+      "modified": "2026-07-26T21:14:32.950Z"
+    },
+    {
+      "file": "116_table_partitioning.sql",
+      "size": 5004,
+      "modified": "2026-07-26T21:14:32.950Z"
+    },
+    {
+      "file": "117_fix_fetch_user_access_tree.sql",
+      "size": 1473,
+      "modified": "2026-07-26T21:14:32.954Z"
+    },
+    {
+      "file": "118_live_schema_repair_and_security.sql",
+      "size": 20084,
+      "modified": "2026-07-26T21:14:32.956Z"
+    },
+    {
+      "file": "119_fix_labor_forecast_date_ambiguity.sql",
+      "size": 1936,
+      "modified": "2026-07-26T21:14:32.957Z"
+    },
+    {
+      "file": "120_native_workflow_triggers.sql",
+      "size": 5215,
+      "modified": "2026-07-26T21:14:32.959Z"
+    },
+    {
+      "file": "121_safe_updated_at_trigger.sql",
+      "size": 1269,
+      "modified": "2026-07-26T21:14:32.959Z"
+    },
+    {
+      "file": "122_harden_native_workflow_triggers.sql",
+      "size": 3666,
+      "modified": "2026-07-26T21:14:32.961Z"
+    },
+    {
+      "file": "123_security_hardening_app_metadata.sql",
+      "size": 7812,
+      "modified": "2026-07-26T21:14:32.963Z"
+    },
+    {
+      "file": "124_sync_archived_tables.sql",
+      "size": 1094,
+      "modified": "2026-07-26T21:14:32.963Z"
+    },
+    {
+      "file": "125_fix_storage_fk.sql",
+      "size": 1529,
+      "modified": "2026-07-26T21:14:32.965Z"
+    },
+    {
+      "file": "126_fix_admin_delete_rpc.sql",
+      "size": 2185,
+      "modified": "2026-07-26T21:14:32.965Z"
+    },
+    {
+      "file": "127_vendor_command_center.sql",
+      "size": 3787,
+      "modified": "2026-07-26T21:14:32.965Z"
+    },
+    {
+      "file": "128_fix_lint_errors.sql",
+      "size": 13091,
+      "modified": "2026-07-26T21:14:32.969Z"
+    },
+    {
+      "file": "129_server_side_pnl.sql",
+      "size": 2765,
+      "modified": "2026-07-26T21:14:32.969Z"
+    },
+    {
+      "file": "130_labor_schedule_variance.sql",
+      "size": 1916,
+      "modified": "2026-07-26T21:14:32.969Z"
+    },
+    {
+      "file": "131_procurement_receivings.sql",
+      "size": 4744,
+      "modified": "2026-07-26T21:14:32.969Z"
+    },
+    {
+      "file": "132_three_way_match_rpc.sql",
+      "size": 3700,
+      "modified": "2026-07-26T21:14:32.973Z"
+    },
+    {
+      "file": "133_harden_rls_location_access.sql",
+      "size": 3018,
+      "modified": "2026-07-26T21:14:32.973Z"
+    },
+    {
+      "file": "134_cross_location_benchmarks.sql",
+      "size": 1922,
+      "modified": "2026-07-26T21:14:32.973Z"
+    },
+    {
+      "file": "135_prevent_privilege_escalation.sql",
+      "size": 1453,
+      "modified": "2026-07-26T21:14:32.975Z"
+    },
+    {
+      "file": "136_fix_invoice_status_constraint.sql",
+      "size": 1232,
+      "modified": "2026-07-26T21:14:32.977Z"
+    },
+    {
+      "file": "20260520201733_add_stripe_billing_fields.sql",
+      "size": 1585,
+      "modified": "2026-07-26T21:14:32.977Z"
+    },
+    {
+      "file": "20260520202500_add_stripe_price_to_plans.sql",
+      "size": 66,
+      "modified": "2026-07-26T21:14:32.981Z"
+    },
+    {
+      "file": "20260617001000_enable_rls_on_log_partitions.sql",
+      "size": 4634,
+      "modified": "2026-07-26T21:14:32.982Z"
+    },
+    {
+      "file": "20260617003000_secure_webhook_dispatcher_cron.sql",
+      "size": 1872,
+      "modified": "2026-07-26T21:14:32.982Z"
+    },
+    {
+      "file": "20260618043000_grant_auth_helper_execute_to_api_roles.sql",
+      "size": 445,
+      "modified": "2026-07-26T21:14:32.984Z"
+    },
+    {
+      "file": "20260618044000_grant_access_helper_execute_to_api_roles.sql",
+      "size": 449,
+      "modified": "2026-07-26T21:14:32.985Z"
+    },
+    {
+      "file": "20260618051000_resolve_remote_lint_errors.sql",
+      "size": 4201,
+      "modified": "2026-07-26T21:14:32.987Z"
+    },
+    {
+      "file": "20260618120000_remove_ask_tom.sql",
+      "size": 1039,
+      "modified": "2026-07-26T21:14:32.988Z"
+    },
+    {
+      "file": "20260618143000_remove_legacy_access_levels.sql",
+      "size": 3789,
+      "modified": "2026-07-26T21:14:32.989Z"
+    },
+    {
+      "file": "20260618153000_create_tenant_registry.sql",
+      "size": 3891,
+      "modified": "2026-07-26T21:14:32.990Z"
+    },
+    {
+      "file": "20260618154500_create_tenant_template_schema.sql",
+      "size": 7331,
+      "modified": "2026-07-26T21:14:32.991Z"
+    },
+    {
+      "file": "20260618160000_provision_tenant_schema.sql",
+      "size": 8328,
+      "modified": "2026-07-26T21:14:32.993Z"
+    },
+    {
+      "file": "20260618161500_tenant_access_routing.sql",
+      "size": 6780,
+      "modified": "2026-07-26T21:14:32.994Z"
+    },
+    {
+      "file": "20260618163000_dual_write_mirror_infrastructure.sql",
+      "size": 12481,
+      "modified": "2026-07-26T21:14:32.995Z"
+    },
+    {
+      "file": "20260618164500_tenant_backfill_validation.sql",
+      "size": 18664,
+      "modified": "2026-07-26T21:14:32.996Z"
+    },
+    {
+      "file": "20260618170000_tenant_read_cutover_controls.sql",
+      "size": 9040,
+      "modified": "2026-07-26T21:14:32.997Z"
+    },
+    {
+      "file": "20260619101500_tenant_write_cutover_controls.sql",
+      "size": 8283,
+      "modified": "2026-07-26T21:14:32.998Z"
+    },
+    {
+      "file": "20260619103000_tenant_reporting_snapshots.sql",
+      "size": 15571,
+      "modified": "2026-07-26T21:14:32.999Z"
+    },
+    {
+      "file": "20260619104500_fix_tenant_reporting_manifest_columns.sql",
+      "size": 6652,
+      "modified": "2026-07-26T21:14:33.000Z"
+    },
+    {
+      "file": "20260619105000_fix_tenant_reporting_backfill_timestamp.sql",
+      "size": 6623,
+      "modified": "2026-07-26T21:14:33.002Z"
+    },
+    {
+      "file": "20260619110000_tenant_pilot_cutover_controls.sql",
+      "size": 17265,
+      "modified": "2026-07-26T21:14:33.003Z"
+    },
+    {
+      "file": "20260619113000_tenant_entity_read_rpc.sql",
+      "size": 8623,
+      "modified": "2026-07-26T21:14:33.004Z"
+    },
+    {
+      "file": "20260619114500_tenant_entity_write_rpc.sql",
+      "size": 10745,
+      "modified": "2026-07-26T21:14:33.005Z"
+    },
+    {
+      "file": "20260619115500_fix_tenant_update_row_lint.sql",
+      "size": 3733,
+      "modified": "2026-07-26T21:14:33.007Z"
+    },
+    {
+      "file": "20260619120500_add_vendor_statements_to_tenant_manifest.sql",
+      "size": 480,
+      "modified": "2026-07-26T21:14:33.008Z"
+    },
+    {
+      "file": "20260619121500_tenant_vendor_statement_lines_rpc.sql",
+      "size": 2630,
+      "modified": "2026-07-26T21:14:33.009Z"
+    },
+    {
+      "file": "20260619122500_tenant_joined_read_rpcs.sql",
+      "size": 4867,
+      "modified": "2026-07-26T21:14:33.011Z"
+    },
+    {
+      "file": "20260620010000_auto_provision_new_tenants_to_schema.sql",
+      "size": 5150,
+      "modified": "2026-07-26T21:14:33.012Z"
+    },
+    {
+      "file": "20260620011000_verify_new_tenant_auto_provisioning.sql",
+      "size": 2523,
+      "modified": "2026-07-26T21:14:33.013Z"
+    },
+    {
+      "file": "20260620012000_fix_location_manager_brand_scope.sql",
+      "size": 1735,
+      "modified": "2026-07-26T21:14:33.014Z"
+    },
+    {
+      "file": "20260622210000_invoice_performance_optimization.sql",
+      "size": 7231,
+      "modified": "2026-07-26T21:14:33.016Z"
+    },
+    {
+      "file": "20260622210001_enterprise_invoice_hardening.sql",
+      "size": 3911,
+      "modified": "2026-07-26T21:14:33.016Z"
+    },
+    {
+      "file": "20260622210002_price_variance_tracking.sql",
+      "size": 4059,
+      "modified": "2026-07-26T21:14:33.017Z"
+    },
+    {
+      "file": "20260622210003_inventory_count_optimization.sql",
+      "size": 6344,
+      "modified": "2026-07-26T21:14:33.017Z"
+    },
+    {
+      "file": "20260622210004_tighten_locations_rls.sql",
+      "size": 1906,
+      "modified": "2026-07-26T21:14:33.020Z"
+    },
+    {
+      "file": "20260622210005_logistics_hardening.sql",
+      "size": 12011,
+      "modified": "2026-07-26T21:14:33.021Z"
+    },
+    {
+      "file": "20260622210006_accounting_ledger_hardening.sql",
+      "size": 1834,
+      "modified": "2026-07-26T21:14:33.022Z"
+    },
+    {
+      "file": "20260622210007_analytics_hardening.sql",
+      "size": 5765,
+      "modified": "2026-07-26T21:14:33.023Z"
+    },
+    {
+      "file": "20260622210008_rbac_approval_limits.sql",
+      "size": 1257,
+      "modified": "2026-07-26T21:14:33.024Z"
+    },
+    {
+      "file": "20260622210009_saas_subscriptions.sql",
+      "size": 1935,
+      "modified": "2026-07-26T21:14:33.025Z"
+    },
+    {
+      "file": "20260622210010_pos_sync_engine.sql",
+      "size": 5259,
+      "modified": "2026-07-26T21:14:33.026Z"
+    },
+    {
+      "file": "20260622210011_custom_reports.sql",
+      "size": 1033,
+      "modified": "2026-07-26T21:14:33.027Z"
+    },
+    {
+      "file": "20260622210012_commissary_orders.sql",
+      "size": 1253,
+      "modified": "2026-07-26T21:14:33.028Z"
+    },
+    {
+      "file": "20260622210013_iot_sensors.sql",
+      "size": 1708,
+      "modified": "2026-07-26T21:14:33.029Z"
+    },
+    {
+      "file": "20260622210014_franchise_royalties.sql",
+      "size": 2247,
+      "modified": "2026-07-26T21:14:33.030Z"
+    },
+    {
+      "file": "20260622210015_delivery_aggregation.sql",
+      "size": 1847,
+      "modified": "2026-07-26T21:14:33.030Z"
+    },
+    {
+      "file": "20260622210016_labor_shifts_time_clocks.sql",
+      "size": 3984,
+      "modified": "2026-07-26T21:14:33.032Z"
+    },
+    {
+      "file": "20260622210017_crm_loyalty_campaigns.sql",
+      "size": 3100,
+      "modified": "2026-07-26T21:14:33.033Z"
+    },
+    {
+      "file": "20260622210018_vendor_bidding_logistics.sql",
+      "size": 3387,
+      "modified": "2026-07-26T21:14:33.034Z"
+    },
+    {
+      "file": "20260622210019_iot_hardware.sql",
+      "size": 1672,
+      "modified": "2026-07-26T21:14:33.035Z"
+    },
+    {
+      "file": "20260622210020_api_keys.sql",
+      "size": 1645,
+      "modified": "2026-07-26T21:14:33.036Z"
+    },
+    {
+      "file": "20260622210021_franchise_royalties.sql",
+      "size": 2827,
+      "modified": "2026-07-26T21:14:33.037Z"
+    },
+    {
+      "file": "20260622210022_telemetry.sql",
+      "size": 1060,
+      "modified": "2026-07-26T21:14:33.038Z"
+    },
+    {
+      "file": "20260622210023_pos_integration.sql",
+      "size": 1163,
+      "modified": "2026-07-26T21:14:33.039Z"
+    },
+    {
+      "file": "20260623000000_create_invoices_storage_bucket.sql",
+      "size": 1279,
+      "modified": "2026-07-26T21:14:33.040Z"
+    },
+    {
+      "file": "20260624000000_invoice_schema_upgrade.sql",
+      "size": 4648,
+      "modified": "2026-07-26T21:14:33.041Z"
+    },
+    {
+      "file": "20260624000001_secure_invoices_bucket.sql",
+      "size": 1420,
+      "modified": "2026-07-26T21:14:33.042Z"
+    },
+    {
+      "file": "20260624000002_fix_tenant_webhook_triggers.sql",
+      "size": 1107,
+      "modified": "2026-07-26T21:14:33.043Z"
+    },
+    {
+      "file": "20260624000003_strict_storage_rls.sql",
+      "size": 1341,
+      "modified": "2026-07-26T21:14:33.043Z"
+    },
+    {
+      "file": "20260624000004_platform_performance_indexes.sql",
+      "size": 1977,
+      "modified": "2026-07-26T21:14:33.045Z"
+    },
+    {
+      "file": "20260624000005_drop_invoice_webhook_triggers.sql",
+      "size": 626,
+      "modified": "2026-07-26T21:14:33.046Z"
+    },
+    {
+      "file": "20260624000006_restore_invoice_webhook_triggers.sql",
+      "size": 1222,
+      "modified": "2026-07-26T21:14:33.047Z"
+    },
+    {
+      "file": "20260624000007_vendor_ap_routing.sql",
+      "size": 9646,
+      "modified": "2026-07-26T21:14:33.048Z"
+    },
+    {
+      "file": "20260624000008_performance_indexes_rls.sql",
+      "size": 1903,
+      "modified": "2026-07-26T21:14:33.050Z"
+    },
+    {
+      "file": "20260624000009_batch2_supply_chain.sql",
+      "size": 5828,
+      "modified": "2026-07-26T21:14:33.050Z"
+    },
+    {
+      "file": "20260624000010_batch3_kitchen_vendors.sql",
+      "size": 261,
+      "modified": "2026-07-26T21:11:00.063Z"
+    },
+    {
+      "file": "20260624000011_batch4_admin_accounting.sql",
+      "size": 7890,
+      "modified": "2026-07-26T21:14:33.052Z"
+    },
+    {
+      "file": "20260624000012_payment_routing_guardrails.sql",
+      "size": 7868,
+      "modified": "2026-07-26T21:14:33.053Z"
+    },
+    {
+      "file": "20260624000013_programmatic_payouts_dwolla.sql",
+      "size": 3330,
+      "modified": "2026-07-26T21:14:33.053Z"
+    },
+    {
+      "file": "20260624000014_programmatic_payouts_checkbook.sql",
+      "size": 3115,
+      "modified": "2026-07-26T21:14:33.055Z"
+    },
+    {
+      "file": "20260624000015_pay_now_support.sql",
+      "size": 2829,
+      "modified": "2026-07-26T21:14:33.056Z"
+    },
+    {
+      "file": "20260624000016_freeze_schema_per_tenant_default.sql",
+      "size": 3532,
+      "modified": "2026-07-26T21:14:33.056Z"
+    },
+    {
+      "file": "20260624000017_shared_public_access_scope_hardening.sql",
+      "size": 10492,
+      "modified": "2026-07-26T21:14:33.056Z"
+    },
+    {
+      "file": "20260624000018_remote_lint_repair.sql",
+      "size": 42788,
+      "modified": "2026-07-26T21:14:33.056Z"
+    },
+    {
+      "file": "20260624000019_remote_lint_followup.sql",
+      "size": 13190,
+      "modified": "2026-07-26T21:14:33.060Z"
+    },
+    {
+      "file": "20260624000020_drop_stale_release_invoice_funds_overload.sql",
+      "size": 315,
+      "modified": "2026-07-26T21:14:33.061Z"
+    },
+    {
+      "file": "20260624211911_remote_history_placeholder.sql",
+      "size": 393,
+      "modified": "2026-06-25T06:06:55.848Z"
+    },
+    {
+      "file": "20260624211915_remote_history_placeholder.sql",
+      "size": 393,
+      "modified": "2026-06-25T06:06:55.851Z"
+    },
+    {
+      "file": "20260624212100_remote_history_placeholder.sql",
+      "size": 393,
+      "modified": "2026-06-25T06:06:55.852Z"
+    },
+    {
+      "file": "20260625000001_tenant_backmigration_audit_rpc.sql",
+      "size": 6066,
+      "modified": "2026-07-26T21:14:33.061Z"
+    },
+    {
+      "file": "20260625000002_backfill_tenant_schema_missing_rows.sql",
+      "size": 6465,
+      "modified": "2026-07-26T21:14:33.061Z"
+    },
+    {
+      "file": "20260625000003_finalize_tenant_backmigration_reconciliation.sql",
+      "size": 15472,
+      "modified": "2026-07-26T21:14:33.064Z"
+    },
+    {
+      "file": "20260625000004_retire_schema_tenant_rpc_surface.sql",
+      "size": 6228,
+      "modified": "2026-07-26T21:14:33.065Z"
+    },
+    {
+      "file": "20260625000005_archive_and_drop_legacy_tenant_schemas.sql",
+      "size": 2888,
+      "modified": "2026-07-26T21:14:33.065Z"
+    },
+    {
+      "file": "20260625000006_drop_legacy_schema_tenant_bk.sql",
+      "size": 50,
+      "modified": "2026-07-26T21:11:00.082Z"
+    },
+    {
+      "file": "20260625000007_drop_legacy_schema_tenant_bkk.sql",
+      "size": 51,
+      "modified": "2026-07-26T21:11:00.067Z"
+    },
+    {
+      "file": "20260625000008_drop_legacy_schema_tenant_king_llc.sql",
+      "size": 60,
+      "modified": "2026-07-26T21:11:00.072Z"
+    },
+    {
+      "file": "20260625000009_drop_legacy_schema_tenant_origin.sql",
+      "size": 54,
+      "modified": "2026-07-26T21:11:00.074Z"
+    },
+    {
+      "file": "20260625000010_drop_legacy_schema_tenant_qa_bistro.sql",
+      "size": 63,
+      "modified": "2026-07-26T21:11:00.079Z"
+    },
+    {
+      "file": "20260625000011_drop_legacy_schema_tenant_qa_coastal.sql",
+      "size": 70,
+      "modified": "2026-07-26T21:10:59.962Z"
+    },
+    {
+      "file": "20260625000012_drop_legacy_schema_tenant_queen_llc.sql",
+      "size": 61,
+      "modified": "2026-07-26T21:10:59.979Z"
+    },
+    {
+      "file": "20260625000013_drop_legacy_schema_tenant_rswings.sql",
+      "size": 55,
+      "modified": "2026-07-26T21:10:59.989Z"
+    },
+    {
+      "file": "20260625000014_drop_legacy_schema_tenant_tej_kitchen.sql",
+      "size": 61,
+      "modified": "2026-07-26T21:11:00.000Z"
+    },
+    {
+      "file": "20260625000015_cleanup_legacy_schema_tenant_artifacts.sql",
+      "size": 3432,
+      "modified": "2026-07-26T21:14:33.065Z"
+    },
+    {
+      "file": "20260625000016_drop_stale_tenant_backfill_overload.sql",
+      "size": 134,
+      "modified": "2026-07-26T21:11:00.083Z"
+    },
+    {
+      "file": "20260625000017_architecture_inspection_rpc.sql",
+      "size": 6620,
+      "modified": "2026-07-26T21:14:33.069Z"
+    },
+    {
+      "file": "20260625000018_shared_tenancy_rls_financial_hardening.sql",
+      "size": 22573,
+      "modified": "2026-07-26T21:14:33.069Z"
+    },
+    {
+      "file": "20260625000019_fix_schedule_payment_batch_lint.sql",
+      "size": 3868,
+      "modified": "2026-07-26T21:14:33.070Z"
+    },
+    {
+      "file": "20260625000020_financial_rpc_service_scope_returns.sql",
+      "size": 4267,
+      "modified": "2026-07-26T21:14:33.070Z"
+    },
+    {
+      "file": "20260625000021_financial_workflow_rpc_migration.sql",
+      "size": 19589,
+      "modified": "2026-07-26T21:14:33.073Z"
+    },
+    {
+      "file": "20260625000022_ledger_bill_payment_rpc_cleanup.sql",
+      "size": 2701,
+      "modified": "2026-07-26T21:14:33.073Z"
+    },
+    {
+      "file": "20260625000023_scoped_audit_logging_rpc.sql",
+      "size": 4081,
+      "modified": "2026-07-26T21:14:33.073Z"
+    },
+    {
+      "file": "20260625000024_archive_trigger_column_name_safe.sql",
+      "size": 1459,
+      "modified": "2026-07-26T21:14:33.073Z"
+    },
+    {
+      "file": "20260625000025_fix_ad_hoc_vendor_payment_source_fk.sql",
+      "size": 3794,
+      "modified": "2026-07-26T21:14:33.077Z"
+    },
+    {
+      "file": "20260625000026_fix_ad_hoc_vendor_payment_ledger_reference_type.sql",
+      "size": 3808,
+      "modified": "2026-07-26T21:14:33.077Z"
+    },
+    {
+      "file": "20260625000027_create_system_service_user.sql",
+      "size": 1934,
+      "modified": "2026-07-26T21:14:33.077Z"
+    },
+    {
+      "file": "20260625000028_global_vendor_item_trust_hardening.sql",
+      "size": 3409,
+      "modified": "2026-07-26T21:14:33.081Z"
+    },
+    {
+      "file": "20260626000000_allow_invoice_uploading_status.sql",
+      "size": 444,
+      "modified": "2026-07-26T21:14:33.081Z"
+    },
+    {
+      "file": "20260626000001_onboarding_hierarchy_rpc.sql",
+      "size": 7996,
+      "modified": "2026-07-26T21:14:33.081Z"
+    },
+    {
+      "file": "20260626000002_business_verification_onboarding.sql",
+      "size": 6131,
+      "modified": "2026-07-26T21:14:33.085Z"
+    },
+    {
+      "file": "20260626000003_production_onboarding_workflow.sql",
+      "size": 26562,
+      "modified": "2026-07-26T21:14:33.086Z"
+    },
+    {
+      "file": "20260626000004_harden_onboarding_hierarchy_completion.sql",
+      "size": 9711,
+      "modified": "2026-07-26T21:14:33.086Z"
+    },
+    {
+      "file": "20260626000005_onboarding_contact_otp.sql",
+      "size": 12040,
+      "modified": "2026-07-26T21:14:33.086Z"
+    },
+    {
+      "file": "20260626000006_enforce_tax_identifier_by_tenant_type.sql",
+      "size": 1542,
+      "modified": "2026-07-26T21:14:33.089Z"
+    },
+    {
+      "file": "20260626000007_start_invoice_extraction_workflow.sql",
+      "size": 3198,
+      "modified": "2026-07-26T21:14:33.090Z"
+    },
+    {
+      "file": "20260626000008_public_invoice_extraction_started_at.sql",
+      "size": 279,
+      "modified": "2026-07-26T21:14:33.091Z"
+    },
+    {
+      "file": "20260626000009_extend_invoice_processing_pg_net_timeout.sql",
+      "size": 4563,
+      "modified": "2026-07-26T21:14:33.091Z"
+    },
+    {
+      "file": "20260627000001_parent_scoped_child_rls_hardening.sql",
+      "size": 9992,
+      "modified": "2026-07-26T21:14:33.091Z"
+    },
+    {
+      "file": "20260628000000_remove_tenant_mirror_fossils.sql",
+      "size": 3710,
+      "modified": "2026-07-26T21:14:33.094Z"
+    },
+    {
+      "file": "20260628000001_consolidate_org_resolver_and_force_rls.sql",
+      "size": 8865,
+      "modified": "2026-07-26T21:14:33.094Z"
+    },
+    {
+      "file": "20260628000002_consolidate_role_resolver.sql",
+      "size": 256,
+      "modified": "2026-07-26T21:14:33.094Z"
+    },
+    {
+      "file": "20260628000003_harden_context_plumbing.sql",
+      "size": 8014,
+      "modified": "2026-07-26T21:14:33.094Z"
+    },
+    {
+      "file": "20260628000004_fix_role_gate_helpers.sql",
+      "size": 738,
+      "modified": "2026-07-26T21:14:33.098Z"
+    },
+    {
+      "file": "20260628000005_secure_approval_primitives.sql",
+      "size": 13470,
+      "modified": "2026-07-26T21:14:33.100Z"
+    },
+    {
+      "file": "20260628000006_hierarchical_rls_batch1_financial.sql",
+      "size": 14953,
+      "modified": "2026-07-26T21:14:33.101Z"
+    },
+    {
+      "file": "20260628000007_hierarchical_rls_batch2_operational.sql",
+      "size": 23423,
+      "modified": "2026-07-26T21:14:33.102Z"
+    },
+    {
+      "file": "20260628000008_hierarchical_rls_batch3a_safe_tables.sql",
+      "size": 27612,
+      "modified": "2026-07-26T21:14:33.102Z"
+    },
+    {
+      "file": "20260628000009_hierarchical_rls_batch3b_org_config.sql",
+      "size": 13933,
+      "modified": "2026-07-26T21:14:33.102Z"
+    },
+    {
+      "file": "20260628000010_hierarchical_rls_batch3b_cont_org_level.sql",
+      "size": 5590,
+      "modified": "2026-07-26T21:14:33.106Z"
+    },
+    {
+      "file": "20260628000011_phase2c_access_tables_non_recursive_rls.sql",
+      "size": 12958,
+      "modified": "2026-07-26T21:14:33.106Z"
+    },
+    {
+      "file": "20260628000012_secure_integration_secrets.sql",
+      "size": 3501,
+      "modified": "2026-07-26T21:14:33.106Z"
+    },
+    {
+      "file": "20260628000013_append_only_ledger_audit.sql",
+      "size": 2342,
+      "modified": "2026-07-26T21:14:33.111Z"
+    },
+    {
+      "file": "20260628000014_admin_only_api_payout_config.sql",
+      "size": 3438,
+      "modified": "2026-07-26T21:14:33.112Z"
+    },
+    {
+      "file": "20260628000015_admin_only_sensitive_config.sql",
+      "size": 9110,
+      "modified": "2026-07-26T21:14:33.112Z"
+    },
+    {
+      "file": "20260628000016_transfer_endpoint_rls.sql",
+      "size": 7327,
+      "modified": "2026-07-26T21:14:33.115Z"
+    },
+    {
+      "file": "20260628000017_location_email_addresses.sql",
+      "size": 4388,
+      "modified": "2026-07-26T21:14:33.115Z"
+    },
+    {
+      "file": "20260628000018_ingest_email_invoice_rpc.sql",
+      "size": 4359,
+      "modified": "2026-07-26T21:14:33.115Z"
+    },
+    {
+      "file": "20260628000019_fix_invoice_column_drift.sql",
+      "size": 7851,
+      "modified": "2026-07-26T21:14:33.115Z"
+    },
+    {
+      "file": "20260628000020_vendor_data_model_v1a.sql",
+      "size": 16314,
+      "modified": "2026-07-26T21:14:33.115Z"
+    },
+    {
+      "file": "20260628000021_vendor_secret_vault.sql",
+      "size": 6618,
+      "modified": "2026-07-26T21:14:33.119Z"
+    },
+    {
+      "file": "20260628000022_vendor_banking_default.sql",
+      "size": 2182,
+      "modified": "2026-07-26T21:14:33.119Z"
+    },
+    {
+      "file": "20260628000023_vendor_banking_link.sql",
+      "size": 8094,
+      "modified": "2026-07-26T21:14:33.122Z"
+    },
+    {
+      "file": "20260628000024_vendor_banking_change_intent.sql",
+      "size": 6566,
+      "modified": "2026-07-26T21:14:33.123Z"
+    },
+    {
+      "file": "20260628000025_provider_links_consolidation.sql",
+      "size": 3430,
+      "modified": "2026-07-26T21:14:33.125Z"
+    },
+    {
+      "file": "20260628000026_provider_link_ref_lookup_index.sql",
+      "size": 433,
+      "modified": "2026-07-26T21:14:33.125Z"
+    },
+    {
+      "file": "20260628000027_drop_legacy_vendor_dwolla_columns.sql",
+      "size": 235,
+      "modified": "2026-07-26T21:14:33.125Z"
+    },
+    {
+      "file": "20260628000028_vendor_approval_containment.sql",
+      "size": 2100,
+      "modified": "2026-07-26T21:14:33.128Z"
+    },
+    {
+      "file": "20260628000029_vendor_approval_insert_containment.sql",
+      "size": 2441,
+      "modified": "2026-07-26T21:14:33.128Z"
+    },
+    {
+      "file": "20260628000030_vendor_approval_transition_rpc.sql",
+      "size": 2187,
+      "modified": "2026-07-26T21:14:33.128Z"
+    },
+    {
+      "file": "20260628000031_find_duplicate_vendors.sql",
+      "size": 2583,
+      "modified": "2026-07-26T21:14:33.131Z"
+    },
+    {
+      "file": "20260628000032_validate_invoice_reconciliation.sql",
+      "size": 3311,
+      "modified": "2026-07-26T21:14:33.133Z"
+    },
+    {
+      "file": "20260628000033_invoice_identity_unique_index.sql",
+      "size": 532,
+      "modified": "2026-07-26T21:14:33.133Z"
+    },
+    {
+      "file": "20260628000034_invoice_payment_status_processing_constraint.sql",
+      "size": 686,
+      "modified": "2026-07-26T21:14:33.135Z"
+    },
+    {
+      "file": "20260706000001_tenant_onboarding_banking_signature_review.sql",
+      "size": 34662,
+      "modified": "2026-07-26T21:14:33.136Z"
+    },
+    {
+      "file": "20260706000002_fix_sync_invoice_products.sql",
+      "size": 5821,
+      "modified": "2026-07-26T21:14:33.136Z"
+    },
+    {
+      "file": "20260706000003_fix_approval_product_sync.sql",
+      "size": 5022,
+      "modified": "2026-07-26T21:14:33.138Z"
+    },
+    {
+      "file": "20260707000001_fix_invoice_product_catalog_sync.sql",
+      "size": 7771,
+      "modified": "2026-07-26T21:14:33.139Z"
+    },
+    {
+      "file": "20260707000002_onboarding_draft_and_verification_settings.sql",
+      "size": 14135,
+      "modified": "2026-07-26T21:14:33.140Z"
+    },
+    {
+      "file": "20260707000003_onboarding_audit_log_coverage.sql",
+      "size": 10505,
+      "modified": "2026-07-26T21:14:33.140Z"
+    },
+    {
+      "file": "20260708000001_invitation_signup_validation_status.sql",
+      "size": 1623,
+      "modified": "2026-07-26T21:14:33.140Z"
+    },
+    {
+      "file": "20260708000002_tenant_super_admin_org_manager_role_model.sql",
+      "size": 44965,
+      "modified": "2026-07-26T21:14:33.143Z"
+    },
+    {
+      "file": "20260709000001_fix_tenant_id_in_archived_tables_and_rpcs.sql",
+      "size": 1811,
+      "modified": "2026-07-26T21:14:33.144Z"
+    },
+    {
+      "file": "20260709000002_fix_legacy_roles_in_access_functions.sql",
+      "size": 28132,
+      "modified": "2026-07-26T21:14:33.144Z"
+    },
+    {
+      "file": "20260709000003_invite_business_verification_toggle.sql",
+      "size": 5281,
+      "modified": "2026-07-26T21:14:33.144Z"
+    },
+    {
+      "file": "20260709000004_persist_onboarding_hierarchy_addresses.sql",
+      "size": 16851,
+      "modified": "2026-07-26T21:14:33.144Z"
+    },
+    {
+      "file": "20260709000005_pending_onboarding_checkout_fields.sql",
+      "size": 1142,
+      "modified": "2026-07-26T21:14:33.148Z"
+    },
+    {
+      "file": "20260709000006_repair_live_invitations_role_constraint.sql",
+      "size": 915,
+      "modified": "2026-07-26T21:14:33.148Z"
+    },
+    {
+      "file": "20260709000007_normalize_invitation_roles_before_constraint.sql",
+      "size": 2406,
+      "modified": "2026-07-26T21:14:33.148Z"
+    },
+    {
+      "file": "20260709000008_invite_coupon_email_lock.sql",
+      "size": 8950,
+      "modified": "2026-07-26T21:14:33.148Z"
+    },
+    {
+      "file": "20260710000001_extend_onboarding_step_event_types.sql",
+      "size": 852,
+      "modified": "2026-07-26T21:14:33.152Z"
+    },
+    {
+      "file": "20260710000002_fix_onboarding_contact_otp_hashing.sql",
+      "size": 5914,
+      "modified": "2026-07-26T21:14:33.153Z"
+    },
+    {
+      "file": "20260710000003_remove_onboarding_otp_dev_echo.sql",
+      "size": 1533,
+      "modified": "2026-07-26T21:14:33.153Z"
+    },
+    {
+      "file": "20260710000004_supabase_auth_onboarding_contact_verification.sql",
+      "size": 2319,
+      "modified": "2026-07-26T21:14:33.153Z"
+    },
+    {
+      "file": "20260710000005_temporary_dev_onboarding_contact_otp.sql",
+      "size": 4423,
+      "modified": "2026-07-26T21:14:33.156Z"
+    },
+    {
+      "file": "20260710000006_business_verification_tenant_addresses_only.sql",
+      "size": 8043,
+      "modified": "2026-07-26T21:14:33.156Z"
+    },
+    {
+      "file": "20260710000007_hierarchy_required_org_location_addresses.sql",
+      "size": 14591,
+      "modified": "2026-07-26T21:14:33.156Z"
+    },
+    {
+      "file": "20260710000008_business_verification_without_addresses.sql",
+      "size": 6146,
+      "modified": "2026-07-26T21:14:33.156Z"
+    },
+    {
+      "file": "20260710000009_add_business_verification_rejection_reason.sql",
+      "size": 311,
+      "modified": "2026-07-26T21:14:33.160Z"
+    },
+    {
+      "file": "20260710000010_add_onboarding_step_events_event_data_compat.sql",
+      "size": 524,
+      "modified": "2026-07-26T21:14:33.161Z"
+    },
+    {
+      "file": "20260710000011_add_invitations_status_compat.sql",
+      "size": 679,
+      "modified": "2026-07-26T21:14:33.161Z"
+    },
+    {
+      "file": "20260710000012_business_review_notification_metadata.sql",
+      "size": 3328,
+      "modified": "2026-07-26T21:14:33.161Z"
+    },
+    {
+      "file": "20260710000013_platform_business_review_queue_rpc.sql",
+      "size": 917,
+      "modified": "2026-07-26T21:14:33.161Z"
+    },
+    {
+      "file": "20260710000014_dedupe_business_verifications_per_user.sql",
+      "size": 2223,
+      "modified": "2026-07-26T21:14:33.164Z"
+    },
+    {
+      "file": "20260710000015_idempotent_submit_business_verification_rpc.sql",
+      "size": 7022,
+      "modified": "2026-07-26T21:14:33.164Z"
+    },
+    {
+      "file": "20260710000016_fix_approve_business_verification_columns.sql",
+      "size": 2414,
+      "modified": "2026-07-26T21:14:33.164Z"
+    },
+    {
+      "file": "20260710000017_vendor_onboarding_schema.sql",
+      "size": 1561,
+      "modified": "2026-07-26T21:14:33.164Z"
+    },
+    {
+      "file": "20260710000018_optional_org_address_required_location_address.sql",
+      "size": 14732,
+      "modified": "2026-07-26T21:14:33.164Z"
+    },
+    {
+      "file": "20260710000019_ensure_legacy_vendor_columns.sql",
+      "size": 316,
+      "modified": "2026-07-26T21:11:00.073Z"
+    },
+    {
+      "file": "20260711000001_allow_trial_coupon_before_hierarchy_creation.sql",
+      "size": 16226,
+      "modified": "2026-07-26T21:14:33.169Z"
+    },
+    {
+      "file": "20260711000002_treat_optional_hierarchy_address_json_null_as_absent.sql",
+      "size": 15128,
+      "modified": "2026-07-26T21:14:33.169Z"
+    },
+    {
+      "file": "20260711000003_backfill_no_business_verification_invites.sql",
+      "size": 756,
+      "modified": "2026-07-26T21:14:33.169Z"
+    },
+    {
+      "file": "20260711000004_vendor_onboarding_flow.sql",
+      "size": 45151,
+      "modified": "2026-07-26T21:14:33.169Z"
+    },
+    {
+      "file": "20260712000001_restore_vendor_phone_column.sql",
+      "size": 287,
+      "modified": "2026-07-26T21:11:00.107Z"
+    },
+    {
+      "file": "20260713000001_require_stripe_payment_method_for_trial_coupons.sql",
+      "size": 15538,
+      "modified": "2026-07-26T21:14:33.169Z"
+    },
+    {
+      "file": "20260713000002_reset_incomplete_mock_payment_bypasses.sql",
+      "size": 751,
+      "modified": "2026-07-26T21:14:33.173Z"
+    },
+    {
+      "file": "20260714000001_vendor_module_gap_fixes.sql",
+      "size": 3434,
+      "modified": "2026-07-26T21:14:33.173Z"
+    },
+    {
+      "file": "20260714000002_recipe_library_release_1.sql",
+      "size": 6758,
+      "modified": "2026-07-26T21:14:33.175Z"
+    },
+    {
+      "file": "20260715000001_vendor_module_hardening.sql",
+      "size": 2632,
+      "modified": "2026-07-26T21:14:33.175Z"
+    },
+    {
+      "file": "20260715010001_recipe_margin_alert_lifecycle.sql",
+      "size": 1969,
+      "modified": "2026-07-26T21:14:33.175Z"
+    },
+    {
+      "file": "20260715010002_recipe_location_visibility.sql",
+      "size": 1924,
+      "modified": "2026-07-26T21:14:33.177Z"
+    },
+    {
+      "file": "20260715010003_recipe_margin_alert_events.sql",
+      "size": 6123,
+      "modified": "2026-07-26T21:14:33.177Z"
+    },
+    {
+      "file": "20260715010004_menu_item_authoring_phase1.sql",
+      "size": 12226,
+      "modified": "2026-07-26T21:14:33.179Z"
+    },
+    {
+      "file": "20260715010005_prepared_items_release1.sql",
+      "size": 12866,
+      "modified": "2026-07-26T21:14:33.179Z"
+    },
+    {
+      "file": "20260716000001_payment_workflow_hardening.sql",
+      "size": 4204,
+      "modified": "2026-07-26T21:14:33.181Z"
+    },
+    {
+      "file": "20260716010001_bar_items_release1.sql",
+      "size": 8562,
+      "modified": "2026-07-26T21:14:33.181Z"
+    },
+    {
+      "file": "20260716015500_add_get_product_catalog_rpc.sql",
+      "size": 4864,
+      "modified": "2026-07-26T21:14:33.181Z"
+    },
+    {
+      "file": "20260716020000_add_product_page_workflow_rpcs.sql",
+      "size": 11529,
+      "modified": "2026-07-26T21:14:33.181Z"
+    },
+    {
+      "file": "20260717000001_inventory_count_session_persistence.sql",
+      "size": 6012,
+      "modified": "2026-07-19T14:26:56.478Z"
+    },
+    {
+      "file": "20260717000002_count_sheet_workflow_fields.sql",
+      "size": 587,
+      "modified": "2026-07-26T21:14:33.185Z"
+    },
+    {
+      "file": "20260717000003_payment_reminders_and_failure_notify.sql",
+      "size": 7680,
+      "modified": "2026-07-26T21:14:33.186Z"
+    },
+    {
+      "file": "20260718000001_profiles_rls_tenant_super_admin_fix.sql",
+      "size": 1219,
+      "modified": "2026-07-26T21:14:33.186Z"
+    },
+    {
+      "file": "20260718000002_organizations_rls_hierarchy_rebuild.sql",
+      "size": 2106,
+      "modified": "2026-07-26T21:14:33.186Z"
+    },
+    {
+      "file": "20260718000003_brands_locations_rls_tenant_super_admin_fix.sql",
+      "size": 5628,
+      "modified": "2026-07-26T21:14:33.186Z"
+    },
+    {
+      "file": "20260718000004_fix_reminders_role_list.sql",
+      "size": 4389,
+      "modified": "2026-07-26T21:14:33.190Z"
+    },
+    {
+      "file": "20260719000001_fix_business_verification_review_actions.sql",
+      "size": 6686,
+      "modified": "2026-07-26T21:14:33.190Z"
+    },
+    {
+      "file": "20260719000002_banking_onboarding_completed.sql",
+      "size": 10042,
+      "modified": "2026-07-26T21:14:33.190Z"
+    },
+    {
+      "file": "20260719000003_drop_dead_preferred_vendor_id.sql",
+      "size": 572,
+      "modified": "2026-07-26T21:14:33.190Z"
+    },
+    {
+      "file": "20260719000004_register_invoice_document.sql",
+      "size": 3497,
+      "modified": "2026-07-26T21:14:33.194Z"
+    },
+    {
+      "file": "20260719000005_find_duplicate_invoice_documents.sql",
+      "size": 1956,
+      "modified": "2026-07-26T21:14:33.195Z"
+    },
+    {
+      "file": "20260719000006_unlimited_approval_flag.sql",
+      "size": 7058,
+      "modified": "2026-07-26T21:14:33.195Z"
+    },
+    {
+      "file": "20260719000007_invoice_audit_events_ip_user_agent.sql",
+      "size": 1080,
+      "modified": "2026-07-26T21:14:33.195Z"
+    },
+    {
+      "file": "20260719000008_restrict_autopay_invoice_approval.sql",
+      "size": 2410,
+      "modified": "2026-07-26T21:14:33.198Z"
+    },
+    {
+      "file": "20260719000009_org_remove_member_audit_log.sql",
+      "size": 6189,
+      "modified": "2026-07-26T21:14:33.198Z"
+    },
+    {
+      "file": "20260719000010_trusted_profile_write_remaining_functions.sql",
+      "size": 32762,
+      "modified": "2026-07-26T21:14:33.198Z"
+    },
+    {
+      "file": "20260719000011_missing_product_crud_rpcs.sql",
+      "size": 7784,
+      "modified": "2026-07-26T21:14:33.198Z"
+    },
+    {
+      "file": "20260719000012_products_accounting_category_gl_codes.sql",
+      "size": 1601,
+      "modified": "2026-07-26T21:14:33.202Z"
+    },
+    {
+      "file": "20260719000013_product_id_friendly_duplicate_error.sql",
+      "size": 5491,
+      "modified": "2026-07-26T21:14:33.202Z"
+    },
+    {
+      "file": "20260719000014_product_approval_workflow.sql",
+      "size": 17899,
+      "modified": "2026-07-26T21:14:33.202Z"
+    },
+    {
+      "file": "20260719000015_invoice_audit_common_path_and_webhook_dispatch.sql",
+      "size": 4068,
+      "modified": "2026-07-26T21:14:33.202Z"
+    },
+    {
+      "file": "20260719000016_org_document_storage_stats.sql",
+      "size": 990,
+      "modified": "2026-07-26T21:14:33.206Z"
+    },
+    {
+      "file": "20260719000017_organization_profile_details.sql",
+      "size": 2980,
+      "modified": "2026-07-26T21:14:33.206Z"
+    },
+    {
+      "file": "20260719000018_vendor_custom_fields.sql",
+      "size": 653,
+      "modified": "2026-07-26T21:14:33.206Z"
+    },
+    {
+      "file": "20260720000001_product_module_phase1_safe_rpcs.sql",
+      "size": 23681,
+      "modified": "2026-07-26T21:14:33.209Z"
+    },
+    {
+      "file": "20260720000002_margin_edge_product_category_types.sql",
+      "size": 1998,
+      "modified": "2026-07-26T21:14:33.211Z"
+    },
+    {
+      "file": "20260720000003_product_ai_category_suggestions.sql",
+      "size": 18298,
+      "modified": "2026-07-26T21:14:33.211Z"
+    },
+    {
+      "file": "20260720000004_fix_product_verification_queue_ambiguity.sql",
+      "size": 4902,
+      "modified": "2026-07-26T21:14:33.211Z"
+    },
+    {
+      "file": "20260720000005_product_catalog_counts_and_inventory_toggle.sql",
+      "size": 9511,
+      "modified": "2026-07-26T21:14:33.213Z"
+    },
+    {
+      "file": "20260720000006_reload_product_rpc_schema_cache.sql",
+      "size": 133,
+      "modified": "2026-07-26T21:14:33.214Z"
+    },
+    {
+      "file": "20260720000007_fix_inventory_toggle_tenant_roles.sql",
+      "size": 6052,
+      "modified": "2026-07-26T21:14:33.215Z"
+    },
+    {
+      "file": "20260720000008_product_edit_rpc.sql",
+      "size": 4848,
+      "modified": "2026-07-26T21:14:33.216Z"
+    },
+    {
+      "file": "20260720000009_product_create_rpc_and_uppercase_names.sql",
+      "size": 6216,
+      "modified": "2026-07-26T21:14:33.216Z"
+    },
+    {
+      "file": "20260720000010_fix_product_delete_tenant_roles.sql",
+      "size": 1666,
+      "modified": "2026-07-26T21:14:33.216Z"
+    },
+    {
+      "file": "20260720000011_backfill_approved_invoice_purchase_lines.sql",
+      "size": 12189,
+      "modified": "2026-07-26T21:14:33.219Z"
+    },
+    {
+      "file": "20260720000012_fix_purchase_report_scope_and_json_fallback.sql",
+      "size": 6733,
+      "modified": "2026-07-26T21:14:33.219Z"
+    },
+    {
+      "file": "20260720000013_fix_tenant_super_admin_visibility.sql",
+      "size": 2131,
+      "modified": "2026-07-26T21:14:33.219Z"
+    },
+    {
+      "file": "20260720000014_reject_business_verification_terminal_status.sql",
+      "size": 7358,
+      "modified": "2026-07-26T21:14:33.219Z"
+    },
+    {
+      "file": "20260720000015_username_login.sql",
+      "size": 3271,
+      "modified": "2026-07-26T21:14:33.223Z"
+    },
+    {
+      "file": "20260720000016_check_payment_method.sql",
+      "size": 2938,
+      "modified": "2026-07-26T21:14:33.223Z"
+    },
+    {
+      "file": "20260720000017_tax_identifier_vault_reveal.sql",
+      "size": 10557,
+      "modified": "2026-07-26T21:14:33.223Z"
+    },
+    {
+      "file": "20260720000018_business_name_availability_check.sql",
+      "size": 9367,
+      "modified": "2026-07-26T21:14:33.223Z"
+    },
+    {
+      "file": "20260720000019_remove_check_payment_method.sql",
+      "size": 1208,
+      "modified": "2026-07-26T21:14:33.227Z"
+    },
+    {
+      "file": "20260720000020_hierarchy_review_gate.sql",
+      "size": 11244,
+      "modified": "2026-07-26T21:14:33.227Z"
+    },
+    {
+      "file": "20260720000021_onboarding_state_includes_hierarchy_submission.sql",
+      "size": 2213,
+      "modified": "2026-07-26T21:14:33.227Z"
+    },
+    {
+      "file": "20260720000022_bank_account_hierarchy_assignment.sql",
+      "size": 7811,
+      "modified": "2026-07-26T21:14:33.227Z"
+    },
+    {
+      "file": "20260720000023_fix_wastage_soft_delete_and_product_vendor_name.sql",
+      "size": 5719,
+      "modified": "2026-07-26T21:14:33.231Z"
+    },
+    {
+      "file": "20260720000024_repeatable_bank_signature_capture.sql",
+      "size": 4639,
+      "modified": "2026-07-26T21:14:33.231Z"
+    },
+    {
+      "file": "20260720000025_usps_onboarding_address_validation_toggle.sql",
+      "size": 5529,
+      "modified": "2026-07-26T21:14:33.231Z"
+    },
+    {
+      "file": "20260721000001_recipe_categories_phase1.sql",
+      "size": 10119,
+      "modified": "2026-07-26T21:14:33.231Z"
+    },
+    {
+      "file": "20260721000002_recipe_categories_edit_delete.sql",
+      "size": 4662,
+      "modified": "2026-07-26T21:14:33.231Z"
+    },
+    {
+      "file": "20260721000003_recipe_categories_allow_default_edit_delete.sql",
+      "size": 6446,
+      "modified": "2026-07-26T21:14:33.235Z"
+    },
+    {
+      "file": "20260721000004_billing_per_location.sql",
+      "size": 294,
+      "modified": "2026-07-26T21:14:33.237Z"
+    },
+    {
+      "file": "20260721000005_fix_product_category_type_and_accounting_sync.sql",
+      "size": 7116,
+      "modified": "2026-07-26T21:14:33.237Z"
+    },
+    {
+      "file": "20260721000006_manual_category_edit_approves_ai_review.sql",
+      "size": 4091,
+      "modified": "2026-07-26T21:14:33.237Z"
+    },
+    {
+      "file": "20260721000007_fix_product_report_units_from_extracted_pack_size.sql",
+      "size": 30522,
+      "modified": "2026-07-26T21:14:33.240Z"
+    },
+    {
+      "file": "20260721000008_fix_product_unit_quantity_formatter.sql",
+      "size": 2678,
+      "modified": "2026-07-26T21:14:33.240Z"
+    },
+    {
+      "file": "20260721000009_product_unit_conversion_pricing.sql",
+      "size": 4858,
+      "modified": "2026-07-26T21:14:33.240Z"
+    },
+    {
+      "file": "20260721000010_category_performance_report.sql",
+      "size": 29910,
+      "modified": "2026-07-22T17:53:34.998Z"
+    },
+    {
+      "file": "20260721000011_capture_tenant_super_admin_tenant_wide_scope.sql",
+      "size": 5032,
+      "modified": "2026-07-26T21:14:33.244Z"
+    },
+    {
+      "file": "20260721000012_update_onboarding_plan_tiers.sql",
+      "size": 1163,
+      "modified": "2026-07-26T21:14:33.244Z"
+    },
+    {
+      "file": "20260721000013_skip_banking_onboarding.sql",
+      "size": 1791,
+      "modified": "2026-07-26T21:14:33.244Z"
+    },
+    {
+      "file": "20260721000014_harden_skip_banking_onboarding.sql",
+      "size": 1807,
+      "modified": "2026-07-26T21:14:33.244Z"
+    },
+    {
+      "file": "20260721000015_repair_vendor_operational_columns.sql",
+      "size": 8282,
+      "modified": "2026-07-26T21:14:33.247Z"
+    },
+    {
+      "file": "20260721000016_guard_invoice_workflow_scope.sql",
+      "size": 9236,
+      "modified": "2026-07-26T21:14:33.248Z"
+    },
+    {
+      "file": "20260721000017_mandatory_invoice_payment_scope_ids.sql",
+      "size": 6975,
+      "modified": "2026-07-26T21:14:33.248Z"
+    },
+    {
+      "file": "20260721000018_production_onboarding_security_hardening.sql",
+      "size": 13018,
+      "modified": "2026-07-26T21:14:33.248Z"
+    },
+    {
+      "file": "20260721000019_production_reporting_and_backup_hardening.sql",
+      "size": 5003,
+      "modified": "2026-07-26T21:14:33.248Z"
+    },
+    {
+      "file": "20260721000020_invoice_module_production_hardening.sql",
+      "size": 22831,
+      "modified": "2026-07-26T21:14:33.252Z"
+    },
+    {
+      "file": "20260721000021_invoice_anomaly_review_workflow.sql",
+      "size": 7250,
+      "modified": "2026-07-26T21:14:33.252Z"
+    },
+    {
+      "file": "20260721000022_remote_lint_cleanup.sql",
+      "size": 2399,
+      "modified": "2026-07-26T21:14:33.252Z"
+    },
+    {
+      "file": "20260721000023_db_lint_warning_cleanup.sql",
+      "size": 24694,
+      "modified": "2026-07-26T21:14:33.252Z"
+    },
+    {
+      "file": "20260721000040_price_movers_report.sql",
+      "size": 30946,
+      "modified": "2026-07-24T00:36:53.220Z"
+    },
+    {
+      "file": "20260721000050_inventory_usage_report.sql",
+      "size": 36021,
+      "modified": "2026-07-24T00:36:47.229Z"
+    },
+    {
+      "file": "20260721120657_repair_count_sessions_stock_count_columns.sql",
+      "size": 1156,
+      "modified": "2026-07-26T21:14:33.252Z"
+    },
+    {
+      "file": "20260721124500_repair_count_sessions_rls_for_stock_counts.sql",
+      "size": 1877,
+      "modified": "2026-07-26T21:14:33.256Z"
+    },
+    {
+      "file": "20260721135252_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.661Z"
+    },
+    {
+      "file": "20260721140206_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.662Z"
+    },
+    {
+      "file": "20260721161750_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.664Z"
+    },
+    {
+      "file": "20260721164338_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.664Z"
+    },
+    {
+      "file": "20260721171008_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.665Z"
+    },
+    {
+      "file": "20260721180354_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.666Z"
+    },
+    {
+      "file": "20260721180606_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.667Z"
+    },
+    {
+      "file": "20260721182037_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.667Z"
+    },
+    {
+      "file": "20260721185644_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.668Z"
+    },
+    {
+      "file": "20260721185646_remote_history_placeholder.sql",
+      "size": 173,
+      "modified": "2026-07-21T19:00:51.668Z"
+    },
+    {
+      "file": "20260721190000_require_exact_location_match_for_org_wide_roles.sql",
+      "size": 3112,
+      "modified": "2026-07-21T19:22:22.412Z"
+    },
+    {
+      "file": "20260721191500_require_active_location_for_reference_data.sql",
+      "size": 3284,
+      "modified": "2026-07-21T21:20:21.534Z"
+    },
+    {
+      "file": "20260721200000_fix_integration_cron_and_manual_payment_payout.sql",
+      "size": 5401,
+      "modified": "2026-07-21T20:59:57.958Z"
+    },
+    {
+      "file": "20260721201000_decommission_orphaned_stripe_sync_worker.sql",
+      "size": 732,
+      "modified": "2026-07-21T21:27:18.308Z"
+    },
+    {
+      "file": "20260721202000_dashboard_role_and_pos_webhook_hardening.sql",
+      "size": 2289,
+      "modified": "2026-07-21T21:42:08.267Z"
+    },
+    {
+      "file": "20260721203000_disable_simulated_tax_id_verification.sql",
+      "size": 584,
+      "modified": "2026-07-21T21:43:53.331Z"
+    },
+    {
+      "file": "20260721203101_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.335Z"
+    },
+    {
+      "file": "20260721203103_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.336Z"
+    },
+    {
+      "file": "20260721203104_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.338Z"
+    },
+    {
+      "file": "20260721203113_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.338Z"
+    },
+    {
+      "file": "20260721203114_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.340Z"
+    },
+    {
+      "file": "20260721203115_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.341Z"
+    },
+    {
+      "file": "20260721203117_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.343Z"
+    },
+    {
+      "file": "20260721203118_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.344Z"
+    },
+    {
+      "file": "20260721203119_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.345Z"
+    },
+    {
+      "file": "20260721222825_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.346Z"
+    },
+    {
+      "file": "20260721222839_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.348Z"
+    },
+    {
+      "file": "20260721222847_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.349Z"
+    },
+    {
+      "file": "20260721222858_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.351Z"
+    },
+    {
+      "file": "20260721222905_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.353Z"
+    },
+    {
+      "file": "20260722000001_accept_invitation_upserts_profile.sql",
+      "size": 6766,
+      "modified": "2026-07-22T01:31:06.965Z"
+    },
+    {
+      "file": "20260722000002_notification_delivery_preferences.sql",
+      "size": 2984,
+      "modified": "2026-07-22T02:00:25.442Z"
+    },
+    {
+      "file": "20260722000003_fix_organization_plan_default_after_plan_catalog_cleanup.sql",
+      "size": 1778,
+      "modified": "2026-07-22T03:25:17.443Z"
+    },
+    {
+      "file": "20260722000004_restore_dim_date_for_invoice_fact_sync.sql",
+      "size": 4310,
+      "modified": "2026-07-22T03:41:33.257Z"
+    },
+    {
+      "file": "20260722000005_harden_remaining_fact_sync_and_restore_metadata.sql",
+      "size": 11286,
+      "modified": "2026-07-22T03:46:40.539Z"
+    },
+    {
+      "file": "20260722000006_restore_global_module_seed_data.sql",
+      "size": 1392,
+      "modified": "2026-07-22T03:52:14.094Z"
+    },
+    {
+      "file": "20260722000007_preserve_invoice_extraction_state_for_paid_uploads.sql",
+      "size": 926,
+      "modified": "2026-07-22T04:03:52.015Z"
+    },
+    {
+      "file": "20260722000008_requeue_stuck_paid_invoice_uploads.sql",
+      "size": 481,
+      "modified": "2026-07-22T04:04:40.217Z"
+    },
+    {
+      "file": "20260722000009_allow_extraction_updates_for_paid_uploads.sql",
+      "size": 1808,
+      "modified": "2026-07-22T04:06:28.206Z"
+    },
+    {
+      "file": "20260722000010_configurable_payment_approval_controls.sql",
+      "size": 4917,
+      "modified": "2026-07-22T12:23:51.176Z"
+    },
+    {
+      "file": "20260722000011_allow_internal_product_sync_after_invoice_approval.sql",
+      "size": 1749,
+      "modified": "2026-07-22T13:24:14.853Z"
+    },
+    {
+      "file": "20260722000012_sync_approved_invoice_products_to_inventory.sql",
+      "size": 5655,
+      "modified": "2026-07-22T13:38:15.307Z"
+    },
+    {
+      "file": "20260722000013_allow_tenant_super_admin_invoice_org_guard.sql",
+      "size": 1853,
+      "modified": "2026-07-22T15:10:27.247Z"
+    },
+    {
+      "file": "20260722000014_org_level_reference_scope_visible.sql",
+      "size": 8626,
+      "modified": "2026-07-22T17:53:34.999Z"
+    },
+    {
+      "file": "20260722000015_audit_logs_hierarchy_visibility.sql",
+      "size": 12958,
+      "modified": "2026-07-22T16:47:37.153Z"
+    },
+    {
+      "file": "20260722000016_product_count_units.sql",
+      "size": 3195,
+      "modified": "2026-07-22T20:13:38.315Z"
+    },
+    {
+      "file": "20260722000017_product_count_unit_rpcs.sql",
+      "size": 4466,
+      "modified": "2026-07-22T20:33:25.395Z"
+    },
+    {
+      "file": "20260722000018_apply_invite_modules_to_onboarded_orgs.sql",
+      "size": 6074,
+      "modified": "2026-07-23T03:46:47.130Z"
+    },
+    {
+      "file": "20260722000019_location_level_plan_fields.sql",
+      "size": 1653,
+      "modified": "2026-07-23T03:33:21.351Z"
+    },
+    {
+      "file": "20260722011347_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.354Z"
+    },
+    {
+      "file": "20260722013554_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.354Z"
+    },
+    {
+      "file": "20260722020430_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.355Z"
+    },
+    {
+      "file": "20260722032751_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.358Z"
+    },
+    {
+      "file": "20260722034328_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.367Z"
+    },
+    {
+      "file": "20260722035457_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.368Z"
+    },
+    {
+      "file": "20260722035507_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.369Z"
+    },
+    {
+      "file": "20260722041030_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.370Z"
+    },
+    {
+      "file": "20260722041038_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.371Z"
+    },
+    {
+      "file": "20260722041049_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.372Z"
+    },
+    {
+      "file": "20260722132825_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.374Z"
+    },
+    {
+      "file": "20260722132833_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.374Z"
+    },
+    {
+      "file": "20260722134640_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.375Z"
+    },
+    {
+      "file": "20260722134657_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.378Z"
+    },
+    {
+      "file": "20260722152808_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.378Z"
+    },
+    {
+      "file": "20260722183405_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.379Z"
+    },
+    {
+      "file": "20260722183516_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.380Z"
+    },
+    {
+      "file": "20260722201351_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.381Z"
+    },
+    {
+      "file": "20260722202534_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.382Z"
+    },
+    {
+      "file": "20260722202648_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.384Z"
+    },
+    {
+      "file": "20260722203405_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.385Z"
+    },
+    {
+      "file": "20260723000001_provider_neutral_ach_foundation.sql",
+      "size": 32047,
+      "modified": "2026-07-23T14:52:14.331Z"
+    },
+    {
+      "file": "20260723000002_repair_invoice_anomaly_review_contract.sql",
+      "size": 6466,
+      "modified": "2026-07-23T16:07:57.294Z"
+    },
+    {
+      "file": "20260723000003_sync_approved_ap_status_to_invoice_status.sql",
+      "size": 1879,
+      "modified": "2026-07-23T17:08:50.588Z"
+    },
+    {
+      "file": "20260723000004_repair_configurable_self_approval_setting.sql",
+      "size": 5315,
+      "modified": "2026-07-23T17:27:40.572Z"
+    },
+    {
+      "file": "20260723000005_sync_report_unit_source_price.sql",
+      "size": 12120,
+      "modified": "2026-07-20T19:06:52.489Z"
+    },
+    {
+      "file": "20260723000006_allow_locked_invoice_product_sync_metadata.sql",
+      "size": 2257,
+      "modified": "2026-07-23T18:44:49.705Z"
+    },
+    {
+      "file": "20260723000007_restore_ui_driven_invoice_payment_workflow.sql",
+      "size": 19341,
+      "modified": "2026-07-23T19:27:12.426Z"
+    },
+    {
+      "file": "20260723000008_inventory_module_production_hardening.sql",
+      "size": 62785,
+      "modified": "2026-07-23T21:50:00.883Z"
+    },
+    {
+      "file": "20260723000008_notification_preferences_delivery_lookup.sql",
+      "size": 712,
+      "modified": "2026-07-23T21:40:26.320Z"
+    },
+    {
+      "file": "20260723000009_provider_neutral_ach_operations.sql",
+      "size": 4046,
+      "modified": "2026-07-23T21:44:20.721Z"
+    },
+    {
+      "file": "20260723000010_scope_vendor_documents_storage_rls.sql",
+      "size": 3471,
+      "modified": "2026-07-23T21:56:26.399Z"
+    },
+    {
+      "file": "20260723000011_validate_vendor_banking_link_format.sql",
+      "size": 4934,
+      "modified": "2026-07-23T22:56:38.338Z"
+    },
+    {
+      "file": "20260723000012_audit_log_vendor_secret_decrypt.sql",
+      "size": 2603,
+      "modified": "2026-07-23T23:05:45.443Z"
+    },
+    {
+      "file": "20260723000013_drop_dead_vendor_tax_details.sql",
+      "size": 433,
+      "modified": "2026-07-23T23:18:52.305Z"
+    },
+    {
+      "file": "20260723000014_admin_manual_vendor_tax_entry.sql",
+      "size": 4020,
+      "modified": "2026-07-24T15:48:12.189Z"
+    },
+    {
+      "file": "20260723000014_custom_reports_module_builder.sql",
+      "size": 21011,
+      "modified": "2026-07-24T00:19:03.341Z"
+    },
+    {
+      "file": "20260723000015_admin_manual_vendor_banking_entry.sql",
+      "size": 5204,
+      "modified": "2026-07-24T15:48:24.299Z"
+    },
+    {
+      "file": "20260723020730_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.386Z"
+    },
+    {
+      "file": "20260723020747_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.387Z"
+    },
+    {
+      "file": "20260723022610_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.387Z"
+    },
+    {
+      "file": "20260723034711_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.388Z"
+    },
+    {
+      "file": "20260723034722_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.389Z"
+    },
+    {
+      "file": "20260723042030_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.391Z"
+    },
+    {
+      "file": "20260723042031_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.392Z"
+    },
+    {
+      "file": "20260723145601_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.393Z"
+    },
+    {
+      "file": "20260723155416_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.394Z"
+    },
+    {
+      "file": "20260723155504_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.395Z"
+    },
+    {
+      "file": "20260723155518_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.396Z"
+    },
+    {
+      "file": "20260723155841_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.397Z"
+    },
+    {
+      "file": "20260723155855_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.398Z"
+    },
+    {
+      "file": "20260723155913_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.401Z"
+    },
+    {
+      "file": "20260723160013_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.402Z"
+    },
+    {
+      "file": "20260723160739_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.403Z"
+    },
+    {
+      "file": "20260723171544_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.404Z"
+    },
+    {
+      "file": "20260723183024_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.405Z"
+    },
+    {
+      "file": "20260723183116_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.406Z"
+    },
+    {
+      "file": "20260723185257_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.408Z"
+    },
+    {
+      "file": "20260723193709_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.410Z"
+    },
+    {
+      "file": "20260723214457_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.411Z"
+    },
+    {
+      "file": "20260724000000_hard_delete_invoice_workflow.sql",
+      "size": 2128,
+      "modified": "2026-07-24T00:13:51.066Z"
+    },
+    {
+      "file": "20260724000001_grant_check_file_security_authenticated.sql",
+      "size": 744,
+      "modified": "2026-07-24T17:43:20.197Z"
+    },
+    {
+      "file": "20260724000001_menu_item_authoring_edit.sql",
+      "size": 7266,
+      "modified": "2026-07-24T16:09:15.987Z"
+    },
+    {
+      "file": "20260724000001_repair_invite_module_entitlements.sql",
+      "size": 6394,
+      "modified": "2026-07-24T03:18:53.299Z"
+    },
+    {
+      "file": "20260724000002_fix_vendor_metrics_paid_status_reversal.sql",
+      "size": 3289,
+      "modified": "2026-07-24T20:11:08.261Z"
+    },
+    {
+      "file": "20260724000002_sync_auth_metadata_from_profile_after_invite.sql",
+      "size": 7785,
+      "modified": "2026-07-24T13:58:49.412Z"
+    },
+    {
+      "file": "20260724000003_product_module_production_hardening.sql",
+      "size": 46977,
+      "modified": "2026-07-24T17:55:06.280Z"
+    },
+    {
+      "file": "20260724000003_vendor_self_approval_prevention.sql",
+      "size": 1542,
+      "modified": "2026-07-24T22:16:32.875Z"
+    },
+    {
+      "file": "20260724000004_fix_vendor_schema_for_acceptance_tests.sql",
+      "size": 4882,
+      "modified": "2026-07-24T18:09:12.795Z"
+    },
+    {
+      "file": "20260724000004_vendor_archive_mechanism.sql",
+      "size": 4314,
+      "modified": "2026-07-24T22:28:51.112Z"
+    },
+    {
+      "file": "20260724000005_add_audit_columns_to_vendors.sql",
+      "size": 5034,
+      "modified": "2026-07-24T18:25:46.823Z"
+    },
+    {
+      "file": "20260724055240_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.412Z"
+    },
+    {
+      "file": "20260724230614_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.413Z"
+    },
+    {
+      "file": "20260724230625_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.415Z"
+    },
+    {
+      "file": "20260724230626_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.417Z"
+    },
+    {
+      "file": "20260724230918_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.419Z"
+    },
+    {
+      "file": "20260725000001_stripe_connect_payout_refs.sql",
+      "size": 211,
+      "modified": "2026-07-25T21:04:20.681Z"
+    },
+    {
+      "file": "20260725000002_client_feedback_issue_suggestions.sql",
+      "size": 6257,
+      "modified": "2026-07-26T02:16:07.092Z"
+    },
+    {
+      "file": "20260726000001_team_invite_access_permissions.sql",
+      "size": 11951,
+      "modified": "2026-07-26T14:30:19.582Z"
+    },
+    {
+      "file": "20260726000002_notification_delivery_preference_enforcement.sql",
+      "size": 9943,
+      "modified": "2026-07-26T14:41:38.835Z"
+    },
+    {
+      "file": "20260726000003_add_billing_notification_type_and_subscription_trigger.sql",
+      "size": 1976,
+      "modified": "2026-07-26T15:09:50.558Z"
+    },
+    {
+      "file": "20260726000004_schedule_missing_notification_cron_jobs.sql",
+      "size": 3123,
+      "modified": "2026-07-26T15:11:12.699Z"
+    },
+    {
+      "file": "20260726000005_harden_performance_report_scope.sql",
+      "size": 1082,
+      "modified": "2026-07-26T18:23:47.338Z"
+    },
+    {
+      "file": "20260726153725_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.420Z"
+    },
+    {
+      "file": "20260726153758_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.422Z"
+    },
+    {
+      "file": "20260726153807_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.423Z"
+    },
+    {
+      "file": "20260726153818_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.424Z"
+    },
+    {
+      "file": "20260726182718_remote_history_placeholder.sql",
+      "size": 148,
+      "modified": "2026-07-26T19:43:15.426Z"
+    },
+    {
+      "file": "20260726190000_validation_hard_locks.sql",
+      "size": 15973,
+      "modified": "2026-07-26T21:14:33.257Z"
+    },
+    {
+      "file": "20260726193000_invoice_validation_warning_override.sql",
+      "size": 1817,
+      "modified": "2026-07-26T21:14:33.257Z"
+    },
+    {
+      "file": "20260727000000_notification_dispatch_result_tracking.sql",
+      "size": 3852,
+      "modified": "2026-07-27T04:17:41.066Z"
+    },
+    {
+      "file": "20260727000001_strict_location_performance_security.sql",
+      "size": 14794,
+      "modified": "2026-07-27T06:11:45.650Z"
+    },
+    {
+      "file": "20260727000002_align_performance_with_active_hierarchy.sql",
+      "size": 3021,
+      "modified": "2026-07-27T07:16:41.374Z"
+    },
+    {
+      "file": "20260727000003_enrich_location_inventory_usage_evidence.sql",
+      "size": 4634,
+      "modified": "2026-07-27T07:16:41.374Z"
+    },
+    {
+      "file": "20260727010000_close_unguarded_report_rpc_scope.sql",
+      "size": 14137,
+      "modified": "2026-07-27T05:10:55.774Z"
+    },
+    {
+      "file": "20260727020000_close_unguarded_write_rpc_scope.sql",
+      "size": 9730,
+      "modified": "2026-07-27T11:57:16.120Z"
+    },
+    {
+      "file": "20260727020000_restore_performance_report_rpc_execute_grants.sql",
+      "size": 1288,
+      "modified": "2026-07-27T05:31:08.700Z"
+    },
+    {
+      "file": "20260727030000_close_unguarded_event_and_usage_rpc_scope.sql",
+      "size": 3792,
+      "modified": "2026-07-27T12:11:59.684Z"
+    },
+    {
+      "file": "20260727030000_resecure_performance_base_report_rpcs.sql",
+      "size": 2196,
+      "modified": "2026-07-27T07:16:41.374Z"
+    },
+    {
+      "file": "20260727040000_fix_inventory_totals_jwt_and_dead_overload.sql",
+      "size": 2659,
+      "modified": "2026-07-27T12:23:56.121Z"
+    },
+    {
+      "file": "20260727060000_correct_performance_budget_scope.sql",
+      "size": 5580,
+      "modified": "2026-07-27T07:27:56.262Z"
+    },
+    {
+      "file": "20260727070000_expose_price_mover_impact_evidence.sql",
+      "size": 37514,
+      "modified": "2026-07-27T07:44:07.556Z"
+    },
+    {
+      "file": "20260727080000_location_timezone_performance_reports.sql",
+      "size": 14239,
+      "modified": "2026-07-27T11:36:34.941Z"
+    },
+    {
+      "file": "20260727110000_performance_scalability_bounds.sql",
+      "size": 10836,
+      "modified": "2026-07-27T12:02:31.214Z"
+    },
+    {
+      "file": "20260727120000_finish_price_movers_security_invoker.sql",
+      "size": 2384,
+      "modified": "2026-07-27T13:12:17.878Z"
+    },
+    {
+      "file": "20260727130000_custom_plan_only.sql",
+      "size": 2305,
+      "modified": "2026-07-27T14:18:13.943Z"
+    },
+    {
+      "file": "20260727130000_enforce_invoice_approval_limits_by_default.sql",
+      "size": 6433,
+      "modified": "2026-07-27T14:39:30.621Z"
+    },
+    {
+      "file": "20260727150000_fix_performance_drilldown_rpc_coherence.sql",
+      "size": 20589,
+      "modified": "2026-07-27T14:36:40.570Z"
+    },
+    {
+      "file": "20260727160000_fix_count_sessions_status_check_saved_closed.sql",
+      "size": 854,
+      "modified": "2026-07-27T16:28:22.263Z"
+    }
+  ]
+}

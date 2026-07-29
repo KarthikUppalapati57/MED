@@ -643,7 +643,10 @@ export default function BusinessVerification() {
                     <div className="space-y-1.5 rounded-md bg-secondary/20 p-3 text-xs leading-5 text-muted-foreground md:col-span-2">
                       <p className="font-medium text-foreground">Security Consent</p>
                       <p>By clicking <span className="font-medium text-foreground">Send Email OTP</span>, you agree to receive a one-time security code at the email address entered here for onboarding security and business verification.</p>
-                      <p>By clicking <span className="font-medium text-foreground">Send SMS OTP</span>, you agree to receive an automated SMS from RestOps-360, operated by Mindful Tech Solutions, containing a one-time security code. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. <Link to="/privacy" className="font-medium text-primary underline underline-offset-2">Privacy Policy</Link> | <Link to="/sms-terms" className="font-medium text-primary underline underline-offset-2">Terms and Conditions</Link>.</p>
+                      <div className="space-y-2">
+                      <p>By clicking <span className="font-medium text-foreground">Send SMS OTP</span>, you agree to receive an automated SMS from RestOps-360, operated by Mindful Tech Solutions, containing a one-time security code. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help.</p>
+                      <p><Link to="/privacy" className="font-medium text-primary underline underline-offset-2">Privacy Policy</Link> | <Link to="/sms-terms" className="font-medium text-primary underline underline-offset-2">Terms and Conditions</Link></p>
+                      </div>
                     </div>
                   </div>
                 )}

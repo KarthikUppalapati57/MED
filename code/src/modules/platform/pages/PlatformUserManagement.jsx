@@ -21,6 +21,7 @@ import {
 import { Shield, Users, Search, Loader2, X, Copy, Mail, UserPlus, UserCheck, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirmation } from '@/hooks/useConfirmation';
+import { buildSignupUrl } from '@/lib/appUrl';
 
 const createSecureToken = (length = 48) => {
   if (!window.crypto?.getRandomValues) {
@@ -149,7 +150,7 @@ export default function PlatformUserManagement() {
       });
       if (insertError) throw insertError;
 
-      const link = `${window.location.origin}/signup/${token}`;
+      const link = buildSignupUrl(token);
       setGeneratedInviteLink(link);
       setShowPlatformInviteModal(false);
       setIsInviteLinkDialogOpen(true);

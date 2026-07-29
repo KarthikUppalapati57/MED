@@ -5,7 +5,7 @@ import { ArrowLeft, Code2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const effectiveDate = 'July 24, 2026';
-const lastUpdated = 'July 24, 2026';
+const lastUpdated = 'July 27, 2026';
 
 function Section({ title, children }) {
   return (
@@ -40,7 +40,7 @@ export default function OpenSourceNotices() {
           <ScrollArea className="h-[60vh] pr-6">
             <div className="prose prose-slate prose-sm max-w-none space-y-6">
               <p className="text-muted-foreground text-xs italic border-l-2 border-amber-300 pl-3">
-                Generated from an automated scan (<code>license-checker</code>) on July 25, 2026 against production dependencies only. Counts change as dependencies change — regenerate before each production release rather than editing this list by hand.
+                Generated from an automated scan (<code>license-checker</code>) on July 27, 2026 against production dependencies only. Counts change as dependencies change — regenerate before each production release rather than editing this list by hand.
               </p>
 
               <Section title="1. Overview">
@@ -48,7 +48,7 @@ export default function OpenSourceNotices() {
               </Section>
 
               <Section title="2. License Summary">
-                <p>534 production packages (including transitive dependencies) were scanned, covering 11 distinct license identifiers:</p>
+                <p>532 production packages (including transitive dependencies) were scanned, covering 11 distinct license identifiers:</p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border border-border">
                     <thead>
@@ -62,10 +62,9 @@ export default function OpenSourceNotices() {
                       <tr><td className="p-2 border border-border">ISC</td><td className="p-2 border border-border">27</td></tr>
                       <tr><td className="p-2 border border-border">Apache-2.0</td><td className="p-2 border border-border">17</td></tr>
                       <tr><td className="p-2 border border-border">BSD-3-Clause</td><td className="p-2 border border-border">7</td></tr>
-                      <tr><td className="p-2 border border-border">Hippocratic-2.1</td><td className="p-2 border border-border">2</td></tr>
-                      <tr><td className="p-2 border border-border">BSD-2-Clause</td><td className="p-2 border border-border">2</td></tr>
                       <tr><td className="p-2 border border-border">MIT (inferred)</td><td className="p-2 border border-border">2</td></tr>
                       <tr><td className="p-2 border border-border">MPL-2.0 OR Apache-2.0 (dual)</td><td className="p-2 border border-border">1</td></tr>
+                      <tr><td className="p-2 border border-border">BSD-2-Clause</td><td className="p-2 border border-border">1</td></tr>
                       <tr><td className="p-2 border border-border">MIT AND Zlib</td><td className="p-2 border border-border">1</td></tr>
                       <tr><td className="p-2 border border-border">0BSD</td><td className="p-2 border border-border">1</td></tr>
                       <tr><td className="p-2 border border-border">MIT AND ISC</td><td className="p-2 border border-border">1</td></tr>
@@ -75,7 +74,7 @@ export default function OpenSourceNotices() {
               </Section>
 
               <Section title="3. Flagged for Legal Review">
-                <p><strong>react-leaflet</strong> and <strong>@react-leaflet/core</strong> (used for map/location features) are licensed under <strong>Hippocratic-2.1</strong>, an "ethical source" license, not a standard OSI-approved open-source license. It grants use rights subject to conditions tied to human-rights-related conduct standards, which is a materially different risk profile than the MIT/Apache/BSD licenses covering the rest of the dependency tree. [This needs an actual legal review before production publication — has not been assessed here beyond flagging it.] The remaining non-standard entries (a dual-licensed MPL-2.0/Apache-2.0 package, two license-inferred "MIT*" packages, and a couple of compound permissive licenses) are low-risk and typical for a JavaScript dependency tree.</p>
+                <p>None currently. <strong>Update, July 27, 2026:</strong> the previously-flagged <strong>react-leaflet</strong> and <strong>@react-leaflet/core</strong> (licensed under Hippocratic-2.1, an "ethical source" license with human-rights-conduct-tied usage restrictions — a materially different risk profile than the MIT/Apache/BSD licenses covering the rest of the dependency tree) have been removed from the dependency tree. They were confirmed unused anywhere in application code before removal. The remaining non-standard entries (a dual-licensed MPL-2.0/Apache-2.0 package, two license-inferred "MIT*" packages, and a couple of compound permissive licenses) are low-risk and typical for a JavaScript dependency tree.</p>
               </Section>
 
               <Section title="4. Requesting License Texts">

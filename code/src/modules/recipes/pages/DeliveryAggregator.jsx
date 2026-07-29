@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { api } from '@/lib/apiClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -20,10 +20,9 @@ import {
 
 export default function DeliveryAggregator() {
   const { organization, location } = useAuth();
-  const queryClient = useQueryClient();
   const { confirm } = useConfirmation();
 
-  const { data: channels = [], isLoading: loadingChannels } = useQuery({
+  const { data: channels = [] } = useQuery({
     queryKey: ['delivery_channels', location?.id],
     queryFn: async () => {
       const { data, error } = await supabase

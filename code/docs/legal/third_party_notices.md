@@ -1,6 +1,6 @@
 # Third-Party Notices (Generated)
 
-Generated 2026-07-25 via `npx license-checker --production --json` against `code/package.json`. 534 production packages (including transitive dependencies) across 11 license types.
+Generated 2026-07-27 via `npx license-checker --production --json` against `code/package.json`. 532 production packages (including transitive dependencies) across 11 license types.
 
 This file is machine-generated. Regenerate before each production release rather than hand-editing:
 
@@ -544,16 +544,6 @@ npx license-checker --production --json > docs/legal/third_party_notices.json
 - react-transition-group@4.4.5
 - source-map-js@1.2.1
 
-## Hippocratic-2.1 (2)
-
-- @react-leaflet/core@2.1.0
-- react-leaflet@4.2.1
-
-## BSD-2-Clause (2)
-
-- leaflet@1.9.4
-- webidl-conversions@3.0.1
-
 ## MIT* (2)
 
 - rgbcolor@1.0.1
@@ -562,6 +552,10 @@ npx license-checker --production --json > docs/legal/third_party_notices.json
 ## (MPL-2.0 OR Apache-2.0) (1)
 
 - dompurify@3.3.3
+
+## UNLICENSED (1)
+
+- mevs-supabase-app@0.0.0
 
 ## (MIT AND Zlib) (1)
 
@@ -575,3 +569,6 @@ npx license-checker --production --json > docs/legal/third_party_notices.json
 
 - victory-vendor@36.9.2
 
+## BSD-2-Clause (1)
+
+- webidl-conversions@3.0.1
