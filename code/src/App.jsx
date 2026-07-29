@@ -388,10 +388,41 @@ function SignupPage() {
       setError(signUpError.message);
     } else {
       setSuccess(true);
-      // If the user is automatically logged in (session exists), go to root/dashboard
-      // Otherwise (email confirmation required), go to login page
-      const destination = data?.session ? '/' : '/login';
-      setTimeout(() => navigate(destination), 3000);
+      setPendingInviteToken(cleanToken);
+
+      if (data?.session?.access_token && data?.session?.refresh_token) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          const { data: acceptedInvite, error: inviteError } = await withTimeout(
+            supabase.rpc('accept_invitation', { p_token: cleanToken }),
+            10000,
+            'Invitation acceptance timed out. Please sign in to continue onboarding.'
+          );
+          if (inviteError && !String(inviteError.message || '').toLowerCase().includes('already-accepted')) {
+            throw inviteError;
+          }
+          try { localStorage.removeItem(PENDING_INVITE_TOKEN_KEY); } catch {}
+          await supabase.auth.refreshSession();
+          const destination = acceptedInvite?.business_verification_required === false
+            ? '/onboarding'
+            : '/business-verification';
+          setTimeout(() => window.location.assign(destination), 800);
+          return;
+        } catch (inviteErr) {
+          console.warn('Signup succeeded, but invitation acceptance needs retry on login:', inviteErr);
+          setPendingInviteToken(cleanToken);
+          setError(inviteErr.message || 'Account created, but invitation acceptance needs retry. Please sign in to continue onboarding.');
+          try { await supabase.auth.signOut(); } catch (signOutErr) { console.warn('Post-signup retry sign-out failed:', signOutErr); }
+          setTimeout(() => window.location.assign(buildInviteLoginPath(cleanToken, form.email)), 1200);
+          return;
+        }
+      }
+
+      // Email confirmation is required. Keep the invite token pending so login can accept it.
+      setTimeout(() => navigate(buildInviteLoginPath(cleanToken, form.email)), 3000);
     }
   };
 

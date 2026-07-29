@@ -395,8 +395,22 @@ export const AuthProvider = ({ children }) => {
 
         return data;
       } else {
-        // If profile is missing but user is authenticated, create a skeleton profile
+        // Invited signups can become authenticated before the invitation RPC has
+        // created the tenant/profile records. Let the RPC complete that setup
+        // before falling back to a client-side skeleton profile insert.
+        const inviteProcessed = await processPendingInvitation(sessionUser.email, sessionUser.id);
+        if (inviteProcessed) {
+          const invitedProfile = await fetchProfileRef.current(sessionUser.id);
+          if (invitedProfile) {
+            setUserProfile(invitedProfile);
+            setCachedProfile(invitedProfile);
+            return invitedProfile;
+          }
+        }
+
+        // If profile is missing but user is authenticated, create a skeleton profile.
         // This prevents the application from getting stuck in an inconsistent state
+        // for non-invited users.
         const role = sessionUser.app_metadata?.role || 'tenant_super_admin';
         
         // Create a skeleton profile

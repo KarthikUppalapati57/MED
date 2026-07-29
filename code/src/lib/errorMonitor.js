@@ -49,13 +49,24 @@ export async function captureError(error, context = {}) {
     context,
   });
 
-
-  // Attempt to persist to Supabase
+  // Attempt to persist to Supabase only for authenticated sessions. Public
+  // landing/login errors stay in the console because RLS blocks anonymous inserts.
   try {
-    await supabase.from(ERROR_LOG_TABLE).insert([errorPayload]);
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.user?.id) return;
+
+    const { error: dbErr } = await supabase.from(ERROR_LOG_TABLE).insert([{
+      ...errorPayload,
+      user_id: errorPayload.user_id || sessionData.session.user.id,
+    }]);
+    if (dbErr && import.meta.env.DEV) {
+      console.warn('[ErrorMonitor] Could not persist error to database:', dbErr.message);
+    }
   } catch (dbErr) {
-    // If the table doesn't exist or DB is down, just log it
-    console.warn('[ErrorMonitor] Could not persist error to database:', dbErr.message);
+    // If auth or the DB is unavailable, keep the app path alive.
+    if (import.meta.env.DEV) {
+      console.warn('[ErrorMonitor] Could not persist error to database:', dbErr.message);
+    }
   }
 }
 
